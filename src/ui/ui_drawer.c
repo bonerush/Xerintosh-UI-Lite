@@ -19,14 +19,14 @@ uint8_t astra_exit_animation_status = 0;
 void astra_draw_exit_animation()
 {
   static float _temp_h = -8;
-  static float _temp_h_trg = OLED_HEIGHT + 8;
+  static float _temp_h_trg = SCREEN_HEIGHT + 8;
 
   oled_set_draw_color(0);
-  oled_draw_box(0, 0, OLED_WIDTH, _temp_h);
+  oled_draw_box(0, 0, SCREEN_WIDTH, _temp_h);
   oled_set_draw_color(1);
 
-  uint8_t _x_hourglass_offset = OLED_WIDTH / 2 - 8;
-  int8_t _y_hourglass = _temp_h - OLED_HEIGHT / 2 - 18;
+  uint8_t _x_hourglass_offset = SCREEN_WIDTH / 2 - 8;
+  int8_t _y_hourglass = _temp_h - SCREEN_HEIGHT / 2 - 18;
   if (_y_hourglass + 20 >= 0)
   {
     oled_draw_box(_x_hourglass_offset, _y_hourglass + 2, 13, 3);
@@ -71,9 +71,9 @@ void astra_draw_exit_animation()
 
   if (_temp_h + 3 >= 0)
     for (uint8_t i = 0; i <= 3; ++i)
-      oled_draw_H_line(0, _temp_h + i, OLED_WIDTH);
+      oled_draw_H_line(0, _temp_h + i, SCREEN_WIDTH);
 
-  for (int16_t i = 0; i <= OLED_WIDTH; i += 2)
+  for (int16_t i = 0; i <= SCREEN_WIDTH; i += 2)
     for (int16_t j = _temp_h - 5; j <= _temp_h - 1; j++)
     {
       if (j % 2 == 0)
@@ -84,7 +84,7 @@ void astra_draw_exit_animation()
 
   astra_exit_animation(&_temp_h, _temp_h_trg, 94);
 
-  if (astra_exit_animation_status == 0 && _temp_h == _temp_h_trg && _temp_h == OLED_HEIGHT + 8)
+  if (astra_exit_animation_status == 0 && _temp_h == _temp_h_trg && _temp_h == SCREEN_HEIGHT + 8)
   {
     astra_exit_animation_status = 1;
     return;
@@ -102,7 +102,7 @@ void astra_draw_exit_animation()
     astra_exit_animation_finished = true;
     astra_exit_animation_status = 0;
     _temp_h = -8;
-    _temp_h_trg = OLED_HEIGHT + 8;
+    _temp_h_trg = SCREEN_HEIGHT + 8;
     return;
   }
 }
@@ -121,7 +121,7 @@ void astra_draw_info_bar()
       astra_info_bar.is_running = false;
   }
 
-  int16_t _x_info_bar = OLED_WIDTH/2 - astra_info_bar.w_info_bar/2;
+  int16_t _x_info_bar = SCREEN_WIDTH/2 - astra_info_bar.w_info_bar/2;
   int16_t _y_info_bar_1 = astra_info_bar.y_info_bar - 4;
   int16_t _y_info_bar_2 = astra_info_bar.y_info_bar + INFO_BAR_HEIGHT;
 
@@ -131,7 +131,7 @@ void astra_draw_info_bar()
                   (int16_t)astra_info_bar.w_info_bar, INFO_BAR_HEIGHT + 4, 4);
 
   oled_set_draw_color(0);
-  oled_draw_R_box((int16_t)(OLED_WIDTH/2 - (astra_info_bar.w_info_bar + 4)/2), _y_info_bar_1,
+  oled_draw_R_box((int16_t)(SCREEN_WIDTH/2 - (astra_info_bar.w_info_bar + 4)/2), _y_info_bar_1,
                   (int16_t)(astra_info_bar.w_info_bar + 4), INFO_BAR_HEIGHT + 6, 4);
 
   oled_set_draw_color(1);
@@ -162,7 +162,7 @@ void astra_draw_pop_up()
       astra_pop_up.is_running = false;
   }
 
-  int16_t _x_pop_up = OLED_WIDTH/2 - astra_pop_up.w_pop_up/2;
+  int16_t _x_pop_up = SCREEN_WIDTH/2 - astra_pop_up.w_pop_up/2;
   int16_t _y_pop_up = astra_pop_up.y_pop_up + POP_UP_HEIGHT;
 
   astra_set_font(NULL);
@@ -171,7 +171,7 @@ void astra_draw_pop_up()
                   (int16_t)(astra_pop_up.w_pop_up + 4), POP_UP_HEIGHT, 4);
 
   oled_set_draw_color(0);
-  oled_draw_R_box((int16_t)(OLED_WIDTH/2 - (astra_pop_up.w_pop_up + 4)/2 - 2), (int16_t)(astra_pop_up.y_pop_up - 2),
+  oled_draw_R_box((int16_t)(SCREEN_WIDTH/2 - (astra_pop_up.w_pop_up + 4)/2 - 2), (int16_t)(astra_pop_up.y_pop_up - 2),
                   (int16_t)(astra_pop_up.w_pop_up + 8), POP_UP_HEIGHT + 4, 5);
 
   oled_set_draw_color(1);
@@ -181,7 +181,7 @@ void astra_draw_pop_up()
   oled_set_draw_color(0);
   oled_draw_H_line(_x_pop_up, _y_pop_up - 2, (int16_t)astra_pop_up.w_pop_up);
   oled_draw_pixel(_x_pop_up - 1, _y_pop_up - 3);
-  oled_draw_pixel((int16_t)(OLED_WIDTH/2 + astra_pop_up.w_pop_up/2), _y_pop_up - 3);
+  oled_draw_pixel((int16_t)(SCREEN_WIDTH/2 + astra_pop_up.w_pop_up/2), _y_pop_up - 3);
 
   oled_draw_UTF8(_x_pop_up + 3,
                  (int16_t)(astra_pop_up.y_pop_up + oled_get_str_height() + 1),
@@ -213,32 +213,32 @@ void astra_draw_list_appearance()
     for (uint8_t i = draw_cfg[j]._start; i <= draw_cfg[j]._end; i += draw_cfg[j]._step)
       oled_draw_pixel(i, draw_cfg[j]._y);
 
-  oled_draw_V_line(OLED_WIDTH - 5, 0, OLED_HEIGHT);
-  oled_draw_V_line(OLED_WIDTH - 1, 0, OLED_HEIGHT);
+  oled_draw_V_line(SCREEN_WIDTH - 5, 0, SCREEN_HEIGHT);
+  oled_draw_V_line(SCREEN_WIDTH - 1, 0, SCREEN_HEIGHT);
 
   static float _length_each_part = 0;
   _length_each_part = ceilf((SCREEN_HEIGHT - 10.0f) / (float) astra_selector.selected_item->parent->child_num);
-  oled_draw_box(OLED_WIDTH - 4, 5 + astra_selector.selected_index * _length_each_part, 3, _length_each_part);
+  oled_draw_box(SCREEN_WIDTH - 4, 5 + astra_selector.selected_index * _length_each_part, 3, _length_each_part);
 
   oled_set_draw_color(0);
-  oled_draw_H_line(OLED_WIDTH - 4, _length_each_part + (float)astra_selector.selected_index * _length_each_part, 3);
+  oled_draw_H_line(SCREEN_WIDTH - 4, _length_each_part + (float)astra_selector.selected_index * _length_each_part, 3);
 
   if (_length_each_part >= 9)
   {
-    oled_draw_H_line(OLED_WIDTH - 4,
+    oled_draw_H_line(SCREEN_WIDTH - 4,
                      floorf(_length_each_part - 2.0f + (float)astra_selector.selected_index * _length_each_part), 3);
-    oled_draw_H_line(OLED_WIDTH - 4,
+    oled_draw_H_line(SCREEN_WIDTH - 4,
                      floorf(_length_each_part + 2.0f + (float)astra_selector.selected_index * _length_each_part), 3);
   }
 
   oled_set_draw_color(1);
-  oled_draw_box(OLED_WIDTH - 4, 0, 3, 4);
-  oled_draw_box(OLED_WIDTH - 4, OLED_HEIGHT - 4, 3, 4);
+  oled_draw_box(SCREEN_WIDTH - 4, 0, 3, 4);
+  oled_draw_box(SCREEN_WIDTH - 4, SCREEN_HEIGHT - 4, 3, 4);
   oled_set_draw_color(0);
-  oled_draw_H_line(OLED_WIDTH - 4, 2, 3);
-  oled_draw_pixel(OLED_WIDTH - 3, 1);
-  oled_draw_H_line(OLED_WIDTH - 4, OLED_HEIGHT - 3, 3);
-  oled_draw_pixel(OLED_WIDTH - 3, OLED_HEIGHT - 2);
+  oled_draw_H_line(SCREEN_WIDTH - 4, 2, 3);
+  oled_draw_pixel(SCREEN_WIDTH - 3, 1);
+  oled_draw_H_line(SCREEN_WIDTH - 4, SCREEN_HEIGHT - 3, 3);
+  oled_draw_pixel(SCREEN_WIDTH - 3, SCREEN_HEIGHT - 2);
 }
 
 void astra_draw_list_item()
@@ -266,16 +266,16 @@ void astra_draw_list_item()
       if (_y_list_item + 7 > LIST_INFO_BAR_HEIGHT && _y_list_item + 1 < SCREEN_HEIGHT)
       {
         astra_draw_list_icon(astra_selector.selected_item->parent->child_list_item[i]->icon, _x_list_item, _y_list_item);
-        oled_draw_frame(OLED_WIDTH - LIST_ITEM_RIGHT_MARGIN - 7, _y_list_item - 2, 11, 7);
+        oled_draw_frame(SCREEN_WIDTH - LIST_ITEM_RIGHT_MARGIN - 7, _y_list_item - 2, 11, 7);
         if (*_switch_item->value == true)
         {
-          oled_draw_box(OLED_WIDTH - LIST_ITEM_RIGHT_MARGIN - 1, _y_list_item, 3, 3);
-          oled_draw_pixel(OLED_WIDTH - LIST_ITEM_RIGHT_MARGIN - 4, _y_list_item + 1);
+          oled_draw_box(SCREEN_WIDTH - LIST_ITEM_RIGHT_MARGIN - 1, _y_list_item, 3, 3);
+          oled_draw_pixel(SCREEN_WIDTH - LIST_ITEM_RIGHT_MARGIN - 4, _y_list_item + 1);
         }
         else
         {
-          oled_draw_box(OLED_WIDTH - LIST_ITEM_RIGHT_MARGIN - 5, _y_list_item, 3, 3);
-          oled_draw_pixel(OLED_WIDTH - LIST_ITEM_RIGHT_MARGIN, _y_list_item + 1);
+          oled_draw_box(SCREEN_WIDTH - LIST_ITEM_RIGHT_MARGIN - 5, _y_list_item, 3, 3);
+          oled_draw_pixel(SCREEN_WIDTH - LIST_ITEM_RIGHT_MARGIN, _y_list_item + 1);
         }
       }
     }
@@ -298,7 +298,7 @@ void astra_draw_list_item()
         astra_draw_list_icon(astra_selector.selected_item->parent->child_list_item[i]->icon, _x_list_item, _y_list_item);
         char _value_str[10] = {};
         sprintf(_value_str, "%d", *_slider_item->value);
-        int16_t _x_value = OLED_WIDTH - LIST_ITEM_RIGHT_MARGIN - oled_get_str_width(_value_str) + 2;
+        int16_t _x_value = SCREEN_WIDTH - LIST_ITEM_RIGHT_MARGIN - oled_get_str_width(_value_str) + 2;
 
         if (_slider_item->is_confirmed)
         {
