@@ -2,6 +2,7 @@
 #define UI_CORE_H
 
 #include <stdbool.h>
+#include <stdint.h>
 
 #define ALLOW_EXIT_ASTRA_UI_BY_USER 1
 

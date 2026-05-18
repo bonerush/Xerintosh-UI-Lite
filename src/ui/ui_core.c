@@ -88,7 +88,7 @@ void astra_refresh_list_item_position()
 
 void astra_refresh_selector_position()
 {
-  astra_set_font(nullptr);
+  astra_set_font(NULL);
   astra_selector.y_selector_trg = astra_selector.selected_item->y_list_item_trg - oled_get_str_height() + 1;
   if (astra_selector.selected_item->type == switch_item || astra_selector.selected_item->type == slider_item)
     astra_selector.w_selector_trg = SCREEN_WIDTH - 18;
