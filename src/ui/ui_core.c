@@ -76,7 +76,11 @@ void astra_init_list()
 void astra_init_core()
 {
   astra_init_list();
-  astra_bind_item_to_selector(astra_get_root_list());
+  astra_list_item_t *root = astra_get_root_list();
+  if (root->child_num > 0)
+    astra_bind_item_to_selector(root->child_list_item[0]);
+  else
+    astra_bind_item_to_selector(root);
   astra_bind_selector_to_camera(astra_get_selector());
 }
 

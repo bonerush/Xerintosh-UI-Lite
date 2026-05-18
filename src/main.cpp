@@ -40,9 +40,9 @@ static void input_process()
 void setup()
 {
     M5.begin();
-    hal_system_init();
-    hal_display_init();
-    hal_input_init();
+    M5.Display.setBrightness(255);
+    M5.Display.setRotation(1);
+
     astra_ui_driver_init();
 
     astra_list_item_t* root = astra_get_root_list();
@@ -67,9 +67,11 @@ void setup()
 
 void loop()
 {
+    M5.update();
     input_process();
+    hal_display_clear();
     astra_ui_main_core();
     astra_ui_widget_core();
     hal_display_flush();
-    delay(1);
+    delay(16);
 }

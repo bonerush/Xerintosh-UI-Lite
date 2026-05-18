@@ -5,8 +5,13 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+#ifdef NATIVE_TEST
 #define SCREEN_WIDTH  80
 #define SCREEN_HEIGHT 160
+#else
+#define SCREEN_WIDTH  160
+#define SCREEN_HEIGHT 80
+#endif
 #define COLOR_BG      0x0000
 #define COLOR_FG      0xFFFF
 #define COLOR_ACCENT  0x07E0

@@ -257,8 +257,8 @@ void hal_display_init(void) {
     if (!g_canvas) {
         g_canvas = new M5Canvas(&M5.Display);
     }
-    g_canvas->createSprite(SCREEN_WIDTH, SCREEN_HEIGHT);
     g_canvas->setColorDepth(16);
+    g_canvas->createSprite(SCREEN_WIDTH, SCREEN_HEIGHT);
 }
 
 void hal_display_clear(void) {
@@ -310,7 +310,7 @@ void hal_draw_circle(int16_t x, int16_t y, int16_t r, uint16_t color) {
 }
 
 void hal_set_font(const void* font) {
-    if (g_canvas) g_canvas->setTextFont((const lgfx::v1::IFont*)font);
+    if (g_canvas) g_canvas->setFont((const lgfx::v1::IFont*)font);
 }
 
 void hal_draw_string(int16_t x, int16_t y, const char* str, uint16_t color) {

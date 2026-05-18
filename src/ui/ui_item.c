@@ -12,7 +12,7 @@ void astra_set_font(void *_font)
 
 astra_info_bar_t astra_info_bar = {0, 1, 0 - 2 * INFO_BAR_HEIGHT, 0 - 2 * INFO_BAR_HEIGHT, 80, 80, false, 0, 1};
 
-void astra_push_info_bar(char *_content, const uint16_t _span)
+void astra_push_info_bar(const char *_content, const uint16_t _span)
 {
   //设定显示时间的概念，超过了显示时间，就将ytrg设为初始位置，如果在显示时间之内，有新的消息涌入，则y和ytrg都不变，继续显示，且显示时间清零
   //只有显示时间到了的时候，才会复位
@@ -36,7 +36,7 @@ void astra_push_info_bar(char *_content, const uint16_t _span)
 
 astra_pop_up_t astra_pop_up = {0, 1, 0 - 2 * POP_UP_HEIGHT, 0 - 2 * POP_UP_HEIGHT, 80, 80, false, 0, 1};
 
-void astra_push_pop_up(char *_content, const uint16_t _span)
+void astra_push_pop_up(const char *_content, const uint16_t _span)
 {
   astra_pop_up.time = get_ticks();
   astra_pop_up.content = _content;
@@ -103,7 +103,7 @@ astra_list_item_t *astra_get_root_list()
   return _astra_list_root_item;
 }
 
-astra_list_item_t *astra_new_list_item(char *_content, astra_list_item_icon_t icon)
+astra_list_item_t *astra_new_list_item(const char *_content, astra_list_item_icon_t icon)
 {
   astra_list_item_t *_astra_list_item = malloc(sizeof(astra_list_item_t));
   memset(_astra_list_item, 0, sizeof(astra_list_item_t));
@@ -117,7 +117,7 @@ astra_list_item_t *astra_new_list_item(char *_content, astra_list_item_icon_t ic
   return _astra_list_item;
 }
 
-astra_list_item_t *astra_new_switch_item(char *_content, bool *_value, void (*_init_function)(), void (*_exit_function)(), astra_list_item_icon_t icon)
+astra_list_item_t *astra_new_switch_item(const char *_content, bool *_value, void (*_init_function)(), void (*_exit_function)(), astra_list_item_icon_t icon)
 {
   astra_switch_item_t *_astra_switch_item = malloc(sizeof(astra_switch_item_t));
   memset(_astra_switch_item, 0, sizeof(astra_switch_item_t));
@@ -134,7 +134,7 @@ astra_list_item_t *astra_new_switch_item(char *_content, bool *_value, void (*_i
 return (astra_list_item_t*)_astra_switch_item;
 }
 
-astra_list_item_t *astra_new_button_item(char *_content, void (*_exit_function)(), astra_list_item_icon_t icon)
+astra_list_item_t *astra_new_button_item(const char *_content, void (*_exit_function)(), astra_list_item_icon_t icon)
 {
   astra_button_item_t *_astra_button_item = malloc(sizeof(astra_button_item_t));
   memset(_astra_button_item, 0, sizeof(astra_button_item_t));
@@ -150,7 +150,7 @@ astra_list_item_t *astra_new_button_item(char *_content, void (*_exit_function)(
 return (astra_list_item_t*)_astra_button_item;
 }
 
-astra_list_item_t *astra_new_slider_item(char *_content, int16_t *_value, uint8_t _step, int16_t _min, int16_t _max, void (*_init_function)(), void (*_exit_function)(), astra_list_item_icon_t icon)
+astra_list_item_t *astra_new_slider_item(const char *_content, int16_t *_value, uint8_t _step, int16_t _min, int16_t _max, void (*_init_function)(), void (*_exit_function)(), astra_list_item_icon_t icon)
 {
   astra_slider_item_t *_astra_slider_item = malloc(sizeof(astra_slider_item_t));
   memset(_astra_slider_item, 0, sizeof(astra_slider_item_t));
@@ -170,7 +170,7 @@ astra_list_item_t *astra_new_slider_item(char *_content, int16_t *_value, uint8_
 return (astra_list_item_t*)_astra_slider_item;
 }
 
-astra_list_item_t *astra_new_user_item(char *_content, void (*_init_function)(), void (*_loop_function)(), void (*_exit_function)(), astra_list_item_icon_t icon)
+astra_list_item_t *astra_new_user_item(const char *_content, void (*_init_function)(), void (*_loop_function)(), void (*_exit_function)(), astra_list_item_icon_t icon)
 {
   astra_user_item_t *_astra_user_item = malloc(sizeof(astra_user_item_t));
   memset(_astra_user_item, 0, sizeof(astra_user_item_t));
@@ -197,6 +197,7 @@ astra_selector_t *astra_get_selector()
 bool astra_bind_item_to_selector(astra_list_item_t *_item)
 {
   if (_item == NULL) return false;
+  if (_item->parent == NULL) return false; // root item has no parent
 
   //找item在父节点中的序号
   uint8_t _temp_index = 0;
