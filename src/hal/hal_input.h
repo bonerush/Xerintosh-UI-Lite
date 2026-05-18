@@ -1,0 +1,44 @@
+#ifndef HAL_INPUT_H
+#define HAL_INPUT_H
+#include <stdint.h>
+#include <stdbool.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+typedef enum {
+    HAL_BTN_A = 0,
+    HAL_BTN_B = 1,
+    HAL_BTN_COUNT
+} hal_button_t;
+
+typedef enum {
+    HAL_EVENT_NONE = 0,
+    HAL_EVENT_SHORT_PRESS,
+    HAL_EVENT_LONG_PRESS,
+    HAL_EVENT_DOUBLE_CLICK
+} hal_event_t;
+
+typedef struct {
+    bool pressed;
+    bool mode;           // 0 = mode1, 1 = mode2, toggled by double-click
+    uint32_t pressTime;
+    uint32_t lastReleaseTime;
+    uint8_t debounceCount;
+    bool debouncedState;
+    bool lastRawState;
+    bool longPressFired;
+    uint32_t lastRepeatTime;
+} hal_button_state_t;
+
+extern void hal_input_init(void);
+extern void hal_input_update(void);
+extern hal_event_t hal_input_get_event(hal_button_t btn);
+extern bool hal_input_is_pressed(hal_button_t btn);
+extern bool hal_input_get_mode(hal_button_t btn);
+
+#ifdef __cplusplus
+}
+#endif
+#endif
