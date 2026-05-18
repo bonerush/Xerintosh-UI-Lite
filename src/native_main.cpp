@@ -1,3 +1,5 @@
+#ifdef NATIVE_TEST
+
 #include <gtest/gtest.h>
 
 extern "C" {
@@ -41,3 +43,5 @@ int main(int argc, char **argv)
     astra_ui_driver_init();
     return RUN_ALL_TESTS();
 }
+
+#endif
