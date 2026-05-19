@@ -116,7 +116,7 @@ void astra_draw_info_bar()
   int16_t _y_info_bar_1 = astra_info_bar.y_info_bar - 4;
   int16_t _y_info_bar_2 = astra_info_bar.y_info_bar + INFO_BAR_HEIGHT;
 
-  astra_set_font(NULL);
+  astra_set_font(hal_get_cn_font());
   oled_set_draw_color(1);
   oled_draw_R_box(_x_info_bar + 3, _y_info_bar_1 + 3,
                   (int16_t)astra_info_bar.w_info_bar, INFO_BAR_HEIGHT + 4, 4);
@@ -156,7 +156,7 @@ void astra_draw_pop_up()
   int16_t _x_pop_up = SCREEN_WIDTH/2 - astra_pop_up.w_pop_up/2;
   int16_t _y_pop_up = astra_pop_up.y_pop_up + POP_UP_HEIGHT;
 
-  astra_set_font(NULL);
+  astra_set_font(hal_get_cn_font());
   oled_set_draw_color(1);
   oled_draw_R_box(_x_pop_up + 1, (int16_t)astra_pop_up.y_pop_up + 3,
                   (int16_t)(astra_pop_up.w_pop_up + 4), POP_UP_HEIGHT, 4);
@@ -276,30 +276,45 @@ static void draw_list_item_slider(astra_slider_item_t *_slider, int16_t _x, int1
   if (!is_item_visible(_y)) return;
 
   astra_draw_list_icon(_slider->base_item.icon, _x, _y);
-  char _value_str[10] = {};
-  sprintf(_value_str, "%d", *_slider->value);
-  int16_t _x_value = SCREEN_WIDTH - LIST_ITEM_RIGHT_MARGIN - oled_get_str_width(_value_str) + 2;
 
-  if (_slider->is_confirmed)
+  /* Only draw value text for non-confirmed sliders.
+     Confirmed slider values are drawn after selector XOR in astra_draw_slider_overlays()
+     to avoid inversion artifacts. */
+  if (!_slider->is_confirmed)
   {
-    static uint32_t _last_tick = 0;
-    static bool _is_visiable = false;
-    uint32_t _ticks = get_ticks();
-    if (_is_visiable)
-    {
-      oled_set_draw_color(1);
-      oled_draw_R_box(_x_value, _y - 4, oled_get_UTF8_width(_value_str) + 4, oled_get_str_height() - 2, 1);
-    }
-    oled_set_draw_color(0);
+    char _value_str[10] = {};
+    sprintf(_value_str, "%d", *_slider->value);
+    int16_t _value_width = oled_get_UTF8_width(_value_str);
+    int16_t _x_value = SCREEN_WIDTH - LIST_ITEM_RIGHT_MARGIN - _value_width + 2;
+    oled_set_draw_color(1);
     oled_draw_str(_x_value + 2, _y + oled_get_str_height() / 2, _value_str);
-    if (_ticks - _last_tick >= 1000)
-    {
-      _is_visiable = !_is_visiable;
-      _last_tick = _ticks;
-    }
   }
-  else
+}
+
+static void astra_draw_slider_overlays(void)
+{
+  astra_list_item_t *parent = astra_selector.selected_item->parent;
+  if (!parent) return;
+
+  for (uint8_t i = 0; i < parent->child_num; i++)
   {
+    astra_list_item_t *_item = parent->child_list_item[i];
+    if (_item->type != slider_item) continue;
+
+    astra_slider_item_t *_slider = astra_to_slider_item(_item);
+    if (!_slider->is_confirmed) continue;
+
+    int16_t _y = _item->y_list_item + astra_camera.y_camera - oled_get_str_height()/2;
+    if (!is_item_visible(_y)) continue;
+
+    char _value_str[10] = {};
+    sprintf(_value_str, "%d", *_slider->value);
+    int16_t _value_width = oled_get_UTF8_width(_value_str);
+    int16_t _x_value = SCREEN_WIDTH - LIST_ITEM_RIGHT_MARGIN - _value_width + 2;
+
+    oled_set_draw_color(0);
+    oled_draw_R_box(_x_value, _y - 2, _value_width + 4, oled_get_str_height() - 2, 1);
+    oled_set_draw_color(1);
     oled_draw_str(_x_value + 2, _y + oled_get_str_height() / 2, _value_str);
   }
 }
@@ -342,7 +357,7 @@ void astra_draw_list_item()
         break;
     }
 
-    astra_set_font(NULL);
+    astra_set_font(hal_get_cn_font());
     if (_y_list_item + oled_get_str_height() / 2 > LIST_INFO_BAR_HEIGHT &&
         _y_list_item + oled_get_str_height() / 2 < SCREEN_HEIGHT)
       oled_draw_UTF8(10 + _x_list_item, _y_list_item + oled_get_str_height() / 2, _item->content);
@@ -421,9 +436,25 @@ void astra_draw_widget()
   astra_draw_pop_up();
 }
 
+void astra_draw_long_press_hint(uint32_t duration_ms, uint32_t threshold_ms)
+{
+    if (duration_ms == 0 || duration_ms >= threshold_ms) return;
+
+    float progress = (float)duration_ms / (float)threshold_ms;
+    uint16_t bar_width = 40;
+    uint16_t bar_height = 4;
+    uint16_t x = SCREEN_WIDTH - bar_width - 6;
+    uint16_t y = SCREEN_HEIGHT - 6;
+
+    oled_set_draw_color(1);
+    oled_draw_frame(x, y, bar_width, bar_height);
+    oled_draw_box(x + 1, y + 1, (uint16_t)((bar_width - 2) * progress), bar_height - 2);
+}
+
 void astra_draw_list()
 {
   astra_draw_list_appearance();
   astra_draw_list_item();
   astra_draw_selector();
+  astra_draw_slider_overlays();
 }

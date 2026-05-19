@@ -5,17 +5,21 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-/* 动画速度常量 */
-#define ANIM_SPEED_LIST_ITEM    84
-#define ANIM_SPEED_SELECTOR     92
-#define ANIM_SPEED_SELECTOR_H   93
-#define ANIM_SPEED_INFO_BAR     94
-#define ANIM_SPEED_POP_UP_W     96
-#define ANIM_SPEED_CAMERA       96
-#define ANIM_SPEED_EXIT         94
+/* 动画速度常量 — 基于可配置的全局变量 */
+extern uint8_t g_anim_speed;
 
-static void* astra_font;
-extern void astra_set_font(void* _font);
+#define ANIM_SPEED_LIST_ITEM    (g_anim_speed - 8)
+#define ANIM_SPEED_SELECTOR     (g_anim_speed)
+#define ANIM_SPEED_SELECTOR_H   (g_anim_speed + 1)
+#define ANIM_SPEED_INFO_BAR     (g_anim_speed + 2)
+#define ANIM_SPEED_INFO_BAR_W   (g_anim_speed + 3)
+#define ANIM_SPEED_POP_UP_W     (g_anim_speed + 4)
+#define ANIM_SPEED_POP_UP_Y     (g_anim_speed + 2)
+#define ANIM_SPEED_CAMERA       (g_anim_speed + 4)
+#define ANIM_SPEED_EXIT         (g_anim_speed + 2)
+
+static const void* astra_font;
+extern void astra_set_font(const void* _font);
 
 extern bool astra_exit_animation_finished;
 extern bool astra_refresh_list_value;
@@ -99,6 +103,7 @@ typedef struct astra_list_item_t
   uint8_t child_num;
   struct astra_list_item_t *child_list_item[MAX_LIST_CHILD_NUM];
   struct astra_list_item_t *parent;
+  void *user_data;
 } astra_list_item_t;
 
 typedef struct astra_switch_item_t
@@ -163,6 +168,11 @@ extern astra_list_item_t *astra_new_user_item(const char *_content, void (*_init
 //在此过程中，派生类的专有变量不会丢失内容，selector发现是user type后再转换回派生类执行对应内部函数即可
 
 extern bool astra_push_item_to_list(astra_list_item_t *_parent, astra_list_item_t *_child);
+
+// 从父列表中移除子项并释放内存
+extern bool astra_remove_item_from_list(astra_list_item_t *_parent, astra_list_item_t *_child);
+// 清空父列表的所有子项并释放内存
+extern void astra_clear_children_of_list(astra_list_item_t *_parent);
 /*** 列表项 ***/
 
 /*** 选择器 ***/

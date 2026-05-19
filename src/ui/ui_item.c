@@ -5,7 +5,7 @@
 
 #include "ui_core.h"
 
-void astra_set_font(void *_font)
+void astra_set_font(const void *_font)
 {
   if (_font != astra_font) oled_set_font(_font);
 }
@@ -30,7 +30,7 @@ void astra_push_info_bar(const char *_content, const uint16_t _span)
     astra_info_bar.is_running = true;
   }
 
-  astra_set_font(NULL);
+  astra_set_font(hal_get_cn_font());
   astra_info_bar.w_info_bar_trg = oled_get_UTF8_width(astra_info_bar.content) + INFO_BAR_OFFSET;
 }
 
@@ -38,6 +38,12 @@ astra_pop_up_t astra_pop_up = {0, 1, 0 - 2 * POP_UP_HEIGHT, 0 - 2 * POP_UP_HEIGH
 
 void astra_push_pop_up(const char *_content, const uint16_t _span)
 {
+  if (astra_pop_up.is_running && astra_pop_up.content != NULL && strcmp(astra_pop_up.content, _content) == 0) {
+    astra_pop_up.time_start = get_ticks();
+    astra_pop_up.span = _span;
+    return;
+  }
+
   astra_pop_up.time = get_ticks();
   astra_pop_up.content = _content;
   astra_pop_up.span = _span;
@@ -51,7 +57,7 @@ void astra_push_pop_up(const char *_content, const uint16_t _span)
     astra_pop_up.is_running = true;
   }
 
-  astra_set_font(NULL);
+  astra_set_font(hal_get_cn_font());
   astra_pop_up.w_pop_up_trg = oled_get_UTF8_width(astra_pop_up.content) + POP_UP_OFFSET;
 }
 
@@ -90,7 +96,7 @@ static void astra_init_base_item(astra_list_item_t *_item, astra_list_item_type_
 {
   memset(_item, 0, sizeof(astra_list_item_t));
   _item->type = _type;
-  _item->content = _content;
+  _item->content = _content ? strdup(_content) : NULL;
   _item->icon = (_icon == default_icon) ? _default_icon : _icon;
 }
 
@@ -150,6 +156,8 @@ astra_list_item_t *astra_new_slider_item(const char *_content, int16_t *_value, 
   _item->value_step = _step;
   _item->value_min = _min;
   _item->value_max = _max;
+  _item->value_backup = *_value;
+  _item->is_confirmed = false;
   _item->init_function = _init_function;
   _item->exit_function = _exit_function;
   return (astra_list_item_t*)_item;
@@ -356,8 +364,7 @@ void astra_selector_exit_current_item()
 
   if (astra_selector.selected_item->parent->layer == 0 && in_astra)
   {
-    if (ALLOW_EXIT_ASTRA_UI_BY_USER) in_astra = false;
-    return;
+    return;  // 主菜单没有上一级，不允许退出
   }
 
   //给选择的item的父item的父item的所有子item坐标清零 做动画
@@ -378,7 +385,7 @@ bool astra_push_item_to_list(astra_list_item_t *_parent, astra_list_item_t *_chi
   _child->layer = _parent->layer + 1;
   _child->child_num = 0;
 
-  astra_set_font(NULL);
+  astra_set_font(hal_get_cn_font());
   if (_parent->child_num == 0) _child->y_list_item_trg = oled_get_str_height() + LIST_FONT_TOP_MARGIN - 1;
   else _child->y_list_item_trg = _parent->child_list_item[_parent->child_num - 1]->y_list_item_trg + LIST_ITEM_SPACING;
 
@@ -392,6 +399,57 @@ bool astra_push_item_to_list(astra_list_item_t *_parent, astra_list_item_t *_chi
   _child->parent = _parent;
 
   return true;
+}
+
+bool astra_remove_item_from_list(astra_list_item_t *_parent, astra_list_item_t *_child)
+{
+  if (_parent == NULL || _child == NULL) return false;
+
+  uint8_t idx = 0;
+  for (; idx < _parent->child_num; idx++)
+  {
+    if (_parent->child_list_item[idx] == _child)
+      break;
+  }
+  if (idx >= _parent->child_num) return false;
+
+  // Shift remaining children down
+  for (uint8_t i = idx; i < _parent->child_num - 1; i++)
+  {
+    _parent->child_list_item[i] = _parent->child_list_item[i + 1];
+  }
+  _parent->child_num--;
+  _parent->child_list_item[_parent->child_num] = NULL;
+
+  // Recalculate y_list_item_trg for remaining children
+  astra_set_font(hal_get_cn_font());
+  for (uint8_t i = 0; i < _parent->child_num; i++)
+  {
+    if (i == 0)
+      _parent->child_list_item[i]->y_list_item_trg = oled_get_str_height() + LIST_FONT_TOP_MARGIN - 1;
+    else
+      _parent->child_list_item[i]->y_list_item_trg = _parent->child_list_item[i - 1]->y_list_item_trg + LIST_ITEM_SPACING;
+  }
+
+  if (_child->content) {
+    free((void*)_child->content);
+    _child->content = NULL;
+  }
+  if (_child->user_data) {
+    free(_child->user_data);
+    _child->user_data = NULL;
+  }
+  free(_child);
+  return true;
+}
+
+void astra_clear_children_of_list(astra_list_item_t *_parent)
+{
+  if (_parent == NULL) return;
+  while (_parent->child_num > 0)
+  {
+    astra_remove_item_from_list(_parent, _parent->child_list_item[_parent->child_num - 1]);
+  }
 }
 
 astra_camera_t astra_camera = {0, 0, 0, 0}; //在refresh加上camera的坐标

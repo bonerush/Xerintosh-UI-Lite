@@ -36,6 +36,7 @@ extern void hal_draw_utf8(int16_t x, int16_t y, const char* str, uint16_t color)
 extern int16_t hal_get_string_width(const char* str);
 extern int16_t hal_get_utf8_width(const char* str);
 extern int16_t hal_get_font_height(void);
+extern const void* hal_get_cn_font(void);
 
 extern void hal_draw_xor_rect(int16_t x, int16_t y, int16_t w, int16_t h);
 extern void hal_draw_xbitmap(int16_t x, int16_t y, int16_t w, int16_t h, const uint8_t* bitmap);

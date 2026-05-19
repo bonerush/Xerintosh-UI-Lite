@@ -31,6 +31,7 @@ struct btn_state {
     bool pressed;
     uint32_t press_time;
     bool long_fired;
+    uint32_t press_duration_ms;
 };
 
 static struct btn_state g_btn_a = {false, 0, false};
@@ -53,10 +54,12 @@ static hal_event_t check_button_event(struct btn_state *st, bool wasPressed, boo
     st->pressed = true;
     st->press_time = millis();
     st->long_fired = false;
+    st->press_duration_ms = 0;
   }
   if (wasReleased)
   {
     st->pressed = false;
+    st->press_duration_ms = 0;
     if (!st->long_fired)
     {
       return HAL_EVENT_SHORT_PRESS;
@@ -64,7 +67,8 @@ static hal_event_t check_button_event(struct btn_state *st, bool wasPressed, boo
   }
   if (st->pressed && !st->long_fired)
   {
-    if (millis() - st->press_time >= LONG_PRESS_DURATION_MS)
+    st->press_duration_ms = millis() - st->press_time;
+    if (st->press_duration_ms >= LONG_PRESS_DURATION_MS)
     {
       st->long_fired = true;
       return HAL_EVENT_LONG_PRESS;
@@ -91,14 +95,37 @@ hal_event_t hal_input_get_event(hal_button_t btn)
 }
 
 bool hal_input_is_pressed(hal_button_t btn) {
-    if (btn == HAL_BTN_A) return M5.BtnA.isPressed();
-    if (btn == HAL_BTN_B) return M5.BtnB.isPressed();
+    struct btn_state *st = nullptr;
+    if (btn == HAL_BTN_A) {
+        st = &g_btn_a;
+        bool pressed = M5.BtnA.isPressed();
+        if (pressed && st->pressed) {
+            st->press_duration_ms = millis() - st->press_time;
+        }
+        return pressed;
+    }
+    if (btn == HAL_BTN_B) {
+        st = &g_btn_b;
+        bool pressed = M5.BtnB.isPressed();
+        if (pressed && st->pressed) {
+            st->press_duration_ms = millis() - st->press_time;
+        }
+        return pressed;
+    }
     return false;
 }
 
 bool hal_input_get_mode(hal_button_t btn) {
     (void)btn;
     return false;
+}
+
+uint32_t hal_input_get_press_duration(hal_button_t btn) {
+    struct btn_state *st = nullptr;
+    if (btn == HAL_BTN_A) st = &g_btn_a;
+    else if (btn == HAL_BTN_B) st = &g_btn_b;
+    else return 0;
+    return st->press_duration_ms;
 }
 
 #endif

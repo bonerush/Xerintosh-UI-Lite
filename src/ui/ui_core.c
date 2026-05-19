@@ -4,6 +4,7 @@
 #include <math.h>
 
 bool in_astra = false;
+uint16_t astra_draw_color = 0xFFFF;
 
 /**
  * @brief 进入astra ui lite
@@ -25,6 +26,7 @@ void astra_animation(float *_pos, float _pos_trg, float _speed)
 {
   if (*_pos != _pos_trg)
   {
+    if (_speed >= 99.0f) _speed = 99.0f;
     if (fabs(*_pos - _pos_trg) <= 1.0f) *_pos = _pos_trg;
     else *_pos += (_pos_trg - *_pos) / (100.0f - _speed) / 1.0f;
   }
@@ -33,12 +35,12 @@ void astra_animation(float *_pos, float _pos_trg, float _speed)
 void astra_refresh_info_bar()
 {
   astra_animation(&astra_info_bar.y_info_bar, astra_info_bar.y_info_bar_trg, ANIM_SPEED_INFO_BAR);
-  astra_animation(&astra_info_bar.w_info_bar, astra_info_bar.w_info_bar_trg, ANIM_SPEED_INFO_BAR + 1);
+  astra_animation(&astra_info_bar.w_info_bar, astra_info_bar.w_info_bar_trg, ANIM_SPEED_INFO_BAR_W);
 }
 
 void astra_refresh_pop_up()
 {
-  astra_animation(&astra_pop_up.y_pop_up, astra_pop_up.y_pop_up_trg, ANIM_SPEED_INFO_BAR);
+  astra_animation(&astra_pop_up.y_pop_up, astra_pop_up.y_pop_up_trg, ANIM_SPEED_POP_UP_Y);
   astra_animation(&astra_pop_up.w_pop_up, astra_pop_up.w_pop_up_trg, ANIM_SPEED_POP_UP_W);
 }
 
@@ -92,12 +94,12 @@ void astra_refresh_list_item_position()
 
 void astra_refresh_selector_position()
 {
-  astra_set_font(NULL);
+  astra_set_font(hal_get_cn_font());
   astra_selector.y_selector_trg = astra_selector.selected_item->y_list_item_trg - oled_get_str_height() + 1;
   if (astra_selector.selected_item->type == switch_item || astra_selector.selected_item->type == slider_item)
     astra_selector.w_selector_trg = SCREEN_WIDTH - 18;
   else astra_selector.w_selector_trg = oled_get_UTF8_width(astra_selector.selected_item->content) + 12;
-  astra_selector.h_selector_trg = 15;
+  astra_selector.h_selector_trg = oled_get_str_height() + 4;
   astra_animation(&astra_selector.y_selector, astra_selector.y_selector_trg, ANIM_SPEED_SELECTOR);
   astra_animation(&astra_selector.w_selector, astra_selector.w_selector_trg, ANIM_SPEED_SELECTOR);
   astra_animation(&astra_selector.h_selector, astra_selector.h_selector_trg, ANIM_SPEED_SELECTOR_H);

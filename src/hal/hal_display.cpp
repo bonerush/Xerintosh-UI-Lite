@@ -220,6 +220,10 @@ int16_t hal_get_font_height(void) {
     return 8;
 }
 
+const void* hal_get_cn_font(void) {
+    return NULL;
+}
+
 void hal_draw_xor_rect(int16_t x, int16_t y, int16_t w, int16_t h) {
     if (w <= 0 || h <= 0) return;
     for (int16_t row = 0; row < h; row++) {
@@ -310,21 +314,25 @@ void hal_draw_circle(int16_t x, int16_t y, int16_t r, uint16_t color) {
 }
 
 void hal_set_font(const void* font) {
-    if (g_canvas) g_canvas->setFont((const lgfx::v1::IFont*)font);
+    if (!g_canvas) return;
+    if (font)
+        g_canvas->setFont((const lgfx::v1::IFont*)font);
+    else
+        g_canvas->setFont(&fonts::Font0);
 }
 
 void hal_draw_string(int16_t x, int16_t y, const char* str, uint16_t color) {
     if (!g_canvas || !str) return;
     g_canvas->setTextColor(color);
-    g_canvas->setCursor(x, y);
-    g_canvas->print(str);
+    g_canvas->setTextDatum(lgfx::v1::baseline_left);
+    g_canvas->drawString(str, x, y);
 }
 
 void hal_draw_utf8(int16_t x, int16_t y, const char* str, uint16_t color) {
     if (!g_canvas || !str) return;
     g_canvas->setTextColor(color);
-    g_canvas->setCursor(x, y);
-    g_canvas->print(str);
+    g_canvas->setTextDatum(lgfx::v1::baseline_left);
+    g_canvas->drawString(str, x, y);
 }
 
 int16_t hal_get_string_width(const char* str) {
@@ -343,20 +351,34 @@ int16_t hal_get_font_height(void) {
 }
 
 void hal_draw_xor_rect(int16_t x, int16_t y, int16_t w, int16_t h) {
-    if (!g_canvas) return;
+    if (!g_canvas || w <= 0 || h <= 0) return;
+    uint16_t* buf = (uint16_t*)malloc(w * sizeof(uint16_t));
+    if (!buf) return;
     for (int16_t row = 0; row < h; row++) {
-        for (int16_t col = 0; col < w; col++) {
-            int16_t px = x + col;
-            int16_t py = y + row;
-            uint16_t color = g_canvas->readPixel(px, py);
-            g_canvas->drawPixel(px, py, color ^ 0xFFFF);
+        int16_t py = y + row;
+        if (py < 0 || py >= SCREEN_HEIGHT) continue;
+        int16_t px_start = x;
+        int16_t px_end = x + w - 1;
+        if (px_start < 0) px_start = 0;
+        if (px_end >= SCREEN_WIDTH) px_end = SCREEN_WIDTH - 1;
+        int16_t read_w = px_end - px_start + 1;
+        if (read_w <= 0) continue;
+        g_canvas->readRect(px_start, py, read_w, 1, buf);
+        for (int16_t i = 0; i < read_w; i++) {
+            buf[i] ^= 0xFFFF;
         }
+        g_canvas->pushImage(px_start, py, read_w, 1, buf);
     }
+    free(buf);
 }
 
 void hal_draw_xbitmap(int16_t x, int16_t y, int16_t w, int16_t h, const uint8_t* bitmap) {
     if (!g_canvas || !bitmap) return;
     g_canvas->drawXBitmap(x, y, bitmap, w, h, COLOR_FG);
+}
+
+const void* hal_get_cn_font(void) {
+    return &fonts::efontCN_12;
 }
 
 #endif

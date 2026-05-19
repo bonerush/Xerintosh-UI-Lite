@@ -30,6 +30,7 @@ typedef struct {
     bool lastRawState;
     bool longPressFired;
     uint32_t lastRepeatTime;
+    uint32_t press_duration_ms;
 } hal_button_state_t;
 
 extern void hal_input_init(void);
@@ -37,6 +38,7 @@ extern void hal_input_update(void);
 extern hal_event_t hal_input_get_event(hal_button_t btn);
 extern bool hal_input_is_pressed(hal_button_t btn);
 extern bool hal_input_get_mode(hal_button_t btn);
+extern uint32_t hal_input_get_press_duration(hal_button_t btn);
 
 #ifdef __cplusplus
 }
