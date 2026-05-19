@@ -5,15 +5,6 @@
 
 #include "ui_core.h"
 
-void astra_exit_animation(float *_pos, float _posTrg, float _speed)
-{
-  if (*_pos != _posTrg)
-  {
-    if (fabs(*_pos - _posTrg) <= 1.0f) *_pos = _posTrg;
-    else *_pos += (_posTrg - *_pos) / (100.0f - _speed) / 1.0f;
-  }
-}
-
 uint8_t astra_exit_animation_status = 0;
 
 void astra_draw_exit_animation()
@@ -82,7 +73,7 @@ void astra_draw_exit_animation()
         oled_draw_pixel(i, j);
     }
 
-  astra_exit_animation(&_temp_h, _temp_h_trg, 94);
+  astra_animation(&_temp_h, _temp_h_trg, ANIM_SPEED_EXIT);
 
   if (astra_exit_animation_status == 0 && _temp_h == _temp_h_trg && _temp_h == SCREEN_HEIGHT + 8)
   {
@@ -241,99 +232,120 @@ void astra_draw_list_appearance()
   oled_draw_pixel(SCREEN_WIDTH - 3, SCREEN_HEIGHT - 2);
 }
 
+static bool is_item_visible(int16_t _y_item)
+{
+  return (_y_item + 2 > LIST_INFO_BAR_HEIGHT && _y_item - 2 < SCREEN_HEIGHT);
+}
+
+static void draw_list_item_list(astra_list_item_t *_item, int16_t _x, int16_t _y)
+{
+  if (is_item_visible(_y))
+    astra_draw_list_icon(_item->icon, _x, _y);
+}
+
+static void draw_list_item_switch(astra_switch_item_t *_switch, int16_t _x, int16_t _y)
+{
+  if (_switch->init_function && astra_refresh_list_value)
+    _switch->init_function();
+  if (!is_item_visible(_y)) return;
+
+  astra_draw_list_icon(_switch->base_item.icon, _x, _y);
+  oled_draw_frame(SCREEN_WIDTH - LIST_ITEM_RIGHT_MARGIN - 7, _y - 2, 11, 7);
+  if (*_switch->value)
+  {
+    oled_draw_box(SCREEN_WIDTH - LIST_ITEM_RIGHT_MARGIN - 1, _y, 3, 3);
+    oled_draw_pixel(SCREEN_WIDTH - LIST_ITEM_RIGHT_MARGIN - 4, _y + 1);
+  }
+  else
+  {
+    oled_draw_box(SCREEN_WIDTH - LIST_ITEM_RIGHT_MARGIN - 5, _y, 3, 3);
+    oled_draw_pixel(SCREEN_WIDTH - LIST_ITEM_RIGHT_MARGIN, _y + 1);
+  }
+}
+
+static void draw_list_item_button(astra_button_item_t *_button, int16_t _x, int16_t _y)
+{
+  if (is_item_visible(_y))
+    astra_draw_list_icon(_button->base_item.icon, _x, _y);
+}
+
+static void draw_list_item_slider(astra_slider_item_t *_slider, int16_t _x, int16_t _y)
+{
+  if (_slider->init_function && astra_refresh_list_value)
+    _slider->init_function();
+  if (!is_item_visible(_y)) return;
+
+  astra_draw_list_icon(_slider->base_item.icon, _x, _y);
+  char _value_str[10] = {};
+  sprintf(_value_str, "%d", *_slider->value);
+  int16_t _x_value = SCREEN_WIDTH - LIST_ITEM_RIGHT_MARGIN - oled_get_str_width(_value_str) + 2;
+
+  if (_slider->is_confirmed)
+  {
+    static uint32_t _last_tick = 0;
+    static bool _is_visiable = false;
+    uint32_t _ticks = get_ticks();
+    if (_is_visiable)
+    {
+      oled_set_draw_color(1);
+      oled_draw_R_box(_x_value, _y - 4, oled_get_UTF8_width(_value_str) + 4, oled_get_str_height() - 2, 1);
+    }
+    oled_set_draw_color(0);
+    oled_draw_str(_x_value + 2, _y + oled_get_str_height() / 2, _value_str);
+    if (_ticks - _last_tick >= 1000)
+    {
+      _is_visiable = !_is_visiable;
+      _last_tick = _ticks;
+    }
+  }
+  else
+  {
+    oled_draw_str(_x_value + 2, _y + oled_get_str_height() / 2, _value_str);
+  }
+}
+
+static void draw_list_item_user(astra_list_item_t *_item, int16_t _x, int16_t _y)
+{
+  if (is_item_visible(_y))
+    astra_draw_list_icon(_item->icon, _x, _y);
+}
+
 void astra_draw_list_item()
 {
   for (unsigned char i = 0; i < astra_selector.selected_item->parent->child_num; i++)
   {
+    astra_list_item_t *_item = astra_selector.selected_item->parent->child_list_item[i];
     int16_t _x_list_item = astra_camera.x_camera + LIST_ITEM_LEFT_MARGIN;
-    int16_t _y_list_item = astra_selector.selected_item->parent->child_list_item[i]->y_list_item +
-                           astra_camera.y_camera - oled_get_str_height()/2;
+    int16_t _y_list_item = _item->y_list_item + astra_camera.y_camera - oled_get_str_height()/2;
 
     oled_set_draw_color(1);
-    if (astra_selector.selected_item->parent->child_list_item[i]->type == list_item)
+    switch (_item->type)
     {
-      if (_y_list_item + 2 > LIST_INFO_BAR_HEIGHT && _y_list_item - 2 < SCREEN_HEIGHT)
-      {
-        astra_draw_list_icon(astra_selector.selected_item->parent->child_list_item[i]->icon, _x_list_item, _y_list_item);
-      }
-    }
-    else if (astra_selector.selected_item->parent->child_list_item[i]->type == switch_item)
-    {
-      astra_switch_item_t *_switch_item = astra_to_switch_item(astra_selector.selected_item->parent->child_list_item[i]);
-      if (_switch_item->init_function && astra_refresh_list_value)
-        _switch_item->init_function();
-
-      if (_y_list_item + 7 > LIST_INFO_BAR_HEIGHT && _y_list_item + 1 < SCREEN_HEIGHT)
-      {
-        astra_draw_list_icon(astra_selector.selected_item->parent->child_list_item[i]->icon, _x_list_item, _y_list_item);
-        oled_draw_frame(SCREEN_WIDTH - LIST_ITEM_RIGHT_MARGIN - 7, _y_list_item - 2, 11, 7);
-        if (*_switch_item->value == true)
-        {
-          oled_draw_box(SCREEN_WIDTH - LIST_ITEM_RIGHT_MARGIN - 1, _y_list_item, 3, 3);
-          oled_draw_pixel(SCREEN_WIDTH - LIST_ITEM_RIGHT_MARGIN - 4, _y_list_item + 1);
-        }
-        else
-        {
-          oled_draw_box(SCREEN_WIDTH - LIST_ITEM_RIGHT_MARGIN - 5, _y_list_item, 3, 3);
-          oled_draw_pixel(SCREEN_WIDTH - LIST_ITEM_RIGHT_MARGIN, _y_list_item + 1);
-        }
-      }
-    }
-    else if (astra_selector.selected_item->parent->child_list_item[i]->type == button_item)
-    {
-      astra_button_item_t *_button_item = astra_to_button_item(astra_selector.selected_item->parent->child_list_item[i]);
-      if (_y_list_item + 7 > LIST_INFO_BAR_HEIGHT && _y_list_item + 1 < SCREEN_HEIGHT)
-      {
-        astra_draw_list_icon(astra_selector.selected_item->parent->child_list_item[i]->icon, _x_list_item, _y_list_item);
-      }
-    }
-    else if (astra_selector.selected_item->parent->child_list_item[i]->type == slider_item)
-    {
-      astra_slider_item_t *_slider_item = astra_to_slider_item(astra_selector.selected_item->parent->child_list_item[i]);
-      if (_slider_item->init_function && astra_refresh_list_value)
-        _slider_item->init_function();
-
-      if (_y_list_item + 5 > LIST_INFO_BAR_HEIGHT && _y_list_item - 2 < SCREEN_HEIGHT)
-      {
-        astra_draw_list_icon(astra_selector.selected_item->parent->child_list_item[i]->icon, _x_list_item, _y_list_item);
-        char _value_str[10] = {};
-        sprintf(_value_str, "%d", *_slider_item->value);
-        int16_t _x_value = SCREEN_WIDTH - LIST_ITEM_RIGHT_MARGIN - oled_get_str_width(_value_str) + 2;
-
-        if (_slider_item->is_confirmed)
-        {
-          static uint32_t _last_tick = 0;
-          static bool _is_visiable = false;
-          uint32_t _ticks = get_ticks();
-          if (_is_visiable)
-          {
-            oled_set_draw_color(1);
-            oled_draw_R_box(_x_value, _y_list_item - 4, oled_get_UTF8_width(_value_str) + 4, oled_get_str_height() - 2, 1);
-          }
-          oled_set_draw_color(0);
-          oled_draw_str(_x_value + 2, _y_list_item + oled_get_str_height() / 2, _value_str);
-          if (_ticks - _last_tick >= 1000)
-          {
-            _is_visiable = !_is_visiable;
-            _last_tick = _ticks;
-          }
-        }
-        else
-          oled_draw_str(_x_value + 2, _y_list_item + oled_get_str_height() / 2, _value_str);
-      }
-    }
-    else
-    {
-      if (_y_list_item + oled_get_str_height() / 2 > LIST_INFO_BAR_HEIGHT &&
-          _y_list_item + oled_get_str_height() / 2 < SCREEN_HEIGHT)
-        astra_draw_list_icon(astra_selector.selected_item->parent->child_list_item[i]->icon, _x_list_item, _y_list_item);
+      case list_item:
+        draw_list_item_list(_item, _x_list_item, _y_list_item);
+        break;
+      case switch_item:
+        draw_list_item_switch(astra_to_switch_item(_item), _x_list_item, _y_list_item);
+        break;
+      case button_item:
+        draw_list_item_button(astra_to_button_item(_item), _x_list_item, _y_list_item);
+        break;
+      case slider_item:
+        draw_list_item_slider(astra_to_slider_item(_item), _x_list_item, _y_list_item);
+        break;
+      case user_item:
+        draw_list_item_user(_item, _x_list_item, _y_list_item);
+        break;
+      default:
+        if (is_item_visible(_y_list_item))
+          astra_draw_list_icon(_item->icon, _x_list_item, _y_list_item);
+        break;
     }
 
     astra_set_font(NULL);
     if (_y_list_item + oled_get_str_height() / 2 > LIST_INFO_BAR_HEIGHT &&
         _y_list_item + oled_get_str_height() / 2 < SCREEN_HEIGHT)
-      oled_draw_UTF8(10 + _x_list_item, _y_list_item + oled_get_str_height() / 2,
-                   astra_selector.selected_item->parent->child_list_item[i]->content);
+      oled_draw_UTF8(10 + _x_list_item, _y_list_item + oled_get_str_height() / 2, _item->content);
   }
 
   astra_refresh_list_value = false;

@@ -21,25 +21,25 @@ bool astra_is_in_user_item()
   return (astra_selector.selected_item->type == user_item && astra_to_user_item(astra_selector.selected_item)->in_user_item) ? true : false;
 }
 
-void astra_animation(float *_pos, float _posTrg, float _speed)
+void astra_animation(float *_pos, float _pos_trg, float _speed)
 {
-  if (*_pos != _posTrg)
+  if (*_pos != _pos_trg)
   {
-    if (fabs(*_pos - _posTrg) <= 1.0f) *_pos = _posTrg;
-    else *_pos += (_posTrg - *_pos) / (100.0f - _speed) / 1.0f;
+    if (fabs(*_pos - _pos_trg) <= 1.0f) *_pos = _pos_trg;
+    else *_pos += (_pos_trg - *_pos) / (100.0f - _speed) / 1.0f;
   }
 }
 
 void astra_refresh_info_bar()
 {
-  astra_animation(&astra_info_bar.y_info_bar, astra_info_bar.y_info_bar_trg, 94);
-  astra_animation(&astra_info_bar.w_info_bar, astra_info_bar.w_info_bar_trg, 95);
+  astra_animation(&astra_info_bar.y_info_bar, astra_info_bar.y_info_bar_trg, ANIM_SPEED_INFO_BAR);
+  astra_animation(&astra_info_bar.w_info_bar, astra_info_bar.w_info_bar_trg, ANIM_SPEED_INFO_BAR + 1);
 }
 
 void astra_refresh_pop_up()
 {
-  astra_animation(&astra_pop_up.y_pop_up, astra_pop_up.y_pop_up_trg, 94);
-  astra_animation(&astra_pop_up.w_pop_up, astra_pop_up.w_pop_up_trg, 96);
+  astra_animation(&astra_pop_up.y_pop_up, astra_pop_up.y_pop_up_trg, ANIM_SPEED_INFO_BAR);
+  astra_animation(&astra_pop_up.w_pop_up, astra_pop_up.w_pop_up_trg, ANIM_SPEED_POP_UP_W);
 }
 
 void astra_refresh_camera_position()
@@ -51,8 +51,8 @@ void astra_refresh_camera_position()
   if (astra_camera.selector->y_selector_trg + astra_camera.y_camera_trg < 0)  //向上超出屏幕 需要向上移动
     astra_camera.y_camera_trg = 0 - astra_camera.selector->y_selector_trg + LIST_FONT_TOP_MARGIN;
 
-  astra_animation(&astra_camera.x_camera, astra_camera.x_camera_trg, 96);
-  astra_animation(&astra_camera.y_camera, astra_camera.y_camera_trg, 96);
+  astra_animation(&astra_camera.x_camera, astra_camera.x_camera_trg, ANIM_SPEED_CAMERA);
+  astra_animation(&astra_camera.y_camera, astra_camera.y_camera_trg, ANIM_SPEED_CAMERA);
 }
 
 void astra_refresh_widget_core_position()
@@ -87,7 +87,7 @@ void astra_init_core()
 void astra_refresh_list_item_position()
 {
   for (uint8_t i = 0; i < astra_selector.selected_item->parent->child_num; i++)
-    astra_animation(&astra_selector.selected_item->parent->child_list_item[i]->y_list_item, astra_selector.selected_item->parent->child_list_item[i]->y_list_item_trg, 84);
+    astra_animation(&astra_selector.selected_item->parent->child_list_item[i]->y_list_item, astra_selector.selected_item->parent->child_list_item[i]->y_list_item_trg, ANIM_SPEED_LIST_ITEM);
 }
 
 void astra_refresh_selector_position()
@@ -98,9 +98,9 @@ void astra_refresh_selector_position()
     astra_selector.w_selector_trg = SCREEN_WIDTH - 18;
   else astra_selector.w_selector_trg = oled_get_UTF8_width(astra_selector.selected_item->content) + 12;
   astra_selector.h_selector_trg = 15;
-  astra_animation(&astra_selector.y_selector, astra_selector.y_selector_trg, 92);
-  astra_animation(&astra_selector.w_selector, astra_selector.w_selector_trg, 92);
-  astra_animation(&astra_selector.h_selector, astra_selector.h_selector_trg, 93);
+  astra_animation(&astra_selector.y_selector, astra_selector.y_selector_trg, ANIM_SPEED_SELECTOR);
+  astra_animation(&astra_selector.w_selector, astra_selector.w_selector_trg, ANIM_SPEED_SELECTOR);
+  astra_animation(&astra_selector.h_selector, astra_selector.h_selector_trg, ANIM_SPEED_SELECTOR_H);
 }
 
 void astra_refresh_main_core_position()

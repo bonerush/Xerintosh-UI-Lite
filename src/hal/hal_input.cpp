@@ -46,52 +46,48 @@ void hal_input_update(void) {
     // M5Unified handles debounce internally; we just track edge events here
 }
 
-hal_event_t hal_input_get_event(hal_button_t btn) {
-    struct btn_state *st = nullptr;
-    if (btn == HAL_BTN_A) st = &g_btn_a;
-    else if (btn == HAL_BTN_B) st = &g_btn_b;
-    else return HAL_EVENT_NONE;
-
-    // Use M5Unified native edge-triggered APIs
-    if (btn == HAL_BTN_A) {
-        if (M5.BtnA.wasPressed()) {
-            st->pressed = true;
-            st->press_time = millis();
-            st->long_fired = false;
-        }
-        if (M5.BtnA.wasReleased()) {
-            st->pressed = false;
-            if (!st->long_fired) {
-                return HAL_EVENT_SHORT_PRESS;
-            }
-        }
-        if (st->pressed && !st->long_fired) {
-            if (millis() - st->press_time >= LONG_PRESS_DURATION_MS) {
-                st->long_fired = true;
-                return HAL_EVENT_LONG_PRESS;
-            }
-        }
-    } else if (btn == HAL_BTN_B) {
-        if (M5.BtnB.wasPressed()) {
-            st->pressed = true;
-            st->press_time = millis();
-            st->long_fired = false;
-        }
-        if (M5.BtnB.wasReleased()) {
-            st->pressed = false;
-            if (!st->long_fired) {
-                return HAL_EVENT_SHORT_PRESS;
-            }
-        }
-        if (st->pressed && !st->long_fired) {
-            if (millis() - st->press_time >= LONG_PRESS_DURATION_MS) {
-                st->long_fired = true;
-                return HAL_EVENT_LONG_PRESS;
-            }
-        }
+static hal_event_t check_button_event(struct btn_state *st, bool wasPressed, bool wasReleased)
+{
+  if (wasPressed)
+  {
+    st->pressed = true;
+    st->press_time = millis();
+    st->long_fired = false;
+  }
+  if (wasReleased)
+  {
+    st->pressed = false;
+    if (!st->long_fired)
+    {
+      return HAL_EVENT_SHORT_PRESS;
     }
+  }
+  if (st->pressed && !st->long_fired)
+  {
+    if (millis() - st->press_time >= LONG_PRESS_DURATION_MS)
+    {
+      st->long_fired = true;
+      return HAL_EVENT_LONG_PRESS;
+    }
+  }
+  return HAL_EVENT_NONE;
+}
 
-    return HAL_EVENT_NONE;
+hal_event_t hal_input_get_event(hal_button_t btn)
+{
+  struct btn_state *st = nullptr;
+  if (btn == HAL_BTN_A) st = &g_btn_a;
+  else if (btn == HAL_BTN_B) st = &g_btn_b;
+  else return HAL_EVENT_NONE;
+
+  if (btn == HAL_BTN_A)
+  {
+    return check_button_event(st, M5.BtnA.wasPressed(), M5.BtnA.wasReleased());
+  }
+  else
+  {
+    return check_button_event(st, M5.BtnB.wasPressed(), M5.BtnB.wasReleased());
+  }
 }
 
 bool hal_input_is_pressed(hal_button_t btn) {

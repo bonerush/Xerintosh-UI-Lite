@@ -5,6 +5,15 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+/* 动画速度常量 */
+#define ANIM_SPEED_LIST_ITEM    84
+#define ANIM_SPEED_SELECTOR     92
+#define ANIM_SPEED_SELECTOR_H   93
+#define ANIM_SPEED_INFO_BAR     94
+#define ANIM_SPEED_POP_UP_W     96
+#define ANIM_SPEED_CAMERA       96
+#define ANIM_SPEED_EXIT         94
+
 static void* astra_font;
 extern void astra_set_font(void* _font);
 
