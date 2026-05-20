@@ -2,22 +2,24 @@
 #define APP_INIT_H
 
 #include <stdbool.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/* 外部状态标志（由 main.cpp 定义） */
+/* ─── 外部状态标志（由 main.cpp / native_main.cpp 定义） ─── */
+
 extern bool wifi_on;
 extern bool bt_on;
 
-/* 构建 UI 菜单树 */
-void app_init_ui(void);
+/* ─── 生命周期 ─── */
 
-/* 初始化 WiFi / 蓝牙管理器 */
+void app_init_ui(void);
 void app_init_managers(void);
 
-/* 输入处理（每帧调用） */
+/* ─── 每帧输入处理 ─── */
+
 void app_input_process(void);
 
 #ifdef __cplusplus

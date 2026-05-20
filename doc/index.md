@@ -17,6 +17,10 @@ Project Root
 │   ├── [项目系统](ui/item.md)          ← 列表项、开关、滑条、按钮、用户页
 │   ├── [核心引擎](ui/core.md)          ← 动画插值、相机、选择器、主循环
 │   └── [绘制管线](ui/drawer.md)        ← 列表外观、选择器高亮、弹窗、信息栏
+├── App 层
+│   ├── [设置管理](app/settings.md)     ← 亮度/动画/方向配置与存储
+│   ├── [应用初始化](app/app-init.md)   ← 菜单构建、管理器初始化、输入处理
+│   └── [编码风格规范](coding-style.md) ← C OOP 命名、封装、继承规范
 └── 入口
     ├── src/main.cpp                   ← M5Stick-C 实际入口
     └── src/native_main.cpp            ← GoogleTest 桌面测试入口

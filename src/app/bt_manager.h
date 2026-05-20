@@ -2,10 +2,13 @@
 #define BT_MANAGER_H
 
 #include <stdbool.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/* ─── 类型定义 ─── */
 
 typedef enum {
     BT_MGR_IDLE,
@@ -17,7 +20,12 @@ typedef enum {
     BT_MGR_PAIR_FAILED
 } bt_mgr_state_t;
 
+/* ─── 生命周期 ─── */
+
 void bt_mgr_init(void);
+
+/* ─── 操作函数 ─── */
+
 void bt_mgr_enable(void);
 void bt_mgr_disable(void);
 bool bt_mgr_is_enabled(void);
@@ -29,4 +37,5 @@ void bt_mgr_on_switch_toggle(void);
 #ifdef __cplusplus
 }
 #endif
-#endif // BT_MANAGER_H
+
+#endif /* BT_MANAGER_H */

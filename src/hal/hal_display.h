@@ -1,10 +1,15 @@
 #ifndef HAL_DISPLAY_H
 #define HAL_DISPLAY_H
+
 #include <stdint.h>
 #include <stdbool.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/* ─── 常量 ─── */
+
 #ifdef NATIVE_TEST
 #define SCREEN_WIDTH  80
 #define SCREEN_HEIGHT 160
@@ -14,13 +19,18 @@ extern int16_t g_screen_height;
 #define SCREEN_WIDTH  g_screen_width
 #define SCREEN_HEIGHT g_screen_height
 #endif
+
 #define COLOR_BG      0x0000
 #define COLOR_FG      0xFFFF
 #define COLOR_ACCENT  0x07E0
 
+/* ─── 生命周期 ─── */
+
 extern void hal_display_init(void);
 extern void hal_display_clear(void);
 extern void hal_display_flush(void);
+
+/* ─── 绘制原语 ─── */
 
 extern void hal_draw_pixel(int16_t x, int16_t y, uint16_t color);
 extern void hal_draw_line(int16_t x1, int16_t y1, int16_t x2, int16_t y2, uint16_t color);
@@ -32,6 +42,8 @@ extern void hal_draw_round_rect(int16_t x, int16_t y, int16_t w, int16_t h, int1
 extern void hal_draw_fill_round_rect(int16_t x, int16_t y, int16_t w, int16_t h, int16_t r, uint16_t color);
 extern void hal_draw_circle(int16_t x, int16_t y, int16_t r, uint16_t color);
 
+/* ─── 字体与文本 ─── */
+
 extern void hal_set_font(const void* font);
 extern void hal_draw_string(int16_t x, int16_t y, const char* str, uint16_t color);
 extern void hal_draw_utf8(int16_t x, int16_t y, const char* str, uint16_t color);
@@ -39,6 +51,8 @@ extern int16_t hal_get_string_width(const char* str);
 extern int16_t hal_get_utf8_width(const char* str);
 extern int16_t hal_get_font_height(void);
 extern const void* hal_get_cn_font(void);
+
+/* ─── 高级绘制 ─── */
 
 extern void hal_draw_xor_rect(int16_t x, int16_t y, int16_t w, int16_t h);
 extern void hal_draw_xbitmap(int16_t x, int16_t y, int16_t w, int16_t h, const uint8_t* bitmap);
@@ -49,4 +63,5 @@ extern void hal_clear_clip_rect(void);
 #ifdef __cplusplus
 }
 #endif
-#endif
+
+#endif /* HAL_DISPLAY_H */

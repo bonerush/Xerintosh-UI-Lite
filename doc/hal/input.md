@@ -14,7 +14,7 @@
 
 ### 按键状态结构
 
-*📄 Source: [hal_input.h](../../src/hal/hal_input.h#L23-L33)*
+*📄 Source: [hal_input.h](../../src/hal/hal_input.h#L27-L37)*
 
 ```c
 typedef struct {

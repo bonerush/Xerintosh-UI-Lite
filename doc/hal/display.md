@@ -17,7 +17,7 @@
 
 ### 屏幕参数
 
-*📄 Source: [hal_display.h](../../src/hal/hal_display.h#L8-L12)*
+*📄 Source: [hal_display.h](../../src/hal/hal_display.h#L12-L16)*
 
 ```c
 #define SCREEN_WIDTH  80

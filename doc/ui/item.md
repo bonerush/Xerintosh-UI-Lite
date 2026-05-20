@@ -12,7 +12,7 @@
 
 ### 类型层次（继承体系）
 
-*📄 Source: [ui_item.h](../../src/ui/ui_item.h#L62-L93)*
+*📄 Source: [ui_item.h](../../src/ui/ui_item.h#L82-L106)*
 
 ```c
 typedef enum {
@@ -38,7 +38,7 @@ typedef struct astra_list_item_t {
 
 所有派生类都把 `astra_list_item_t` 作为**第一个成员**：
 
-*📄 Source: [ui_item.h](../../src/ui/ui_item.h#L95-L137)*
+*📄 Source: [ui_item.h](../../src/ui/ui_item.h#L117-L151)*
 
 ```c
 typedef struct astra_switch_item_t {
@@ -223,7 +223,7 @@ bool astra_push_item_to_list(astra_list_item_t *_parent, astra_list_item_t *_chi
 
 ### 选择器（Selector）
 
-*📄 Source: [ui_item.h](../../src/ui/ui_item.h#L159-L174)*
+*📄 Source: [ui_item.h](../../src/ui/ui_item.h#L189-L204)*
 
 ```c
 typedef struct astra_selector_t {
@@ -363,7 +363,7 @@ void astra_selector_jump_to_selected_item() {
 
 ### 相机（Camera / Viewport）
 
-*📄 Source: [ui_item.h](../../src/ui/ui_item.h#L176-L186)*
+*📄 Source: [ui_item.h](../../src/ui/ui_item.h#L206-L216)*
 
 ```c
 typedef struct astra_camera_t {

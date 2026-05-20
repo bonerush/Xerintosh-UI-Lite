@@ -2,10 +2,13 @@
 #define SERIAL_INPUT_H
 
 #include <stdbool.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/* ─── 类型定义 ─── */
 
 typedef enum {
     SERIAL_STATE_IDLE,
@@ -15,6 +18,8 @@ typedef enum {
     SERIAL_STATE_PAIR_CODE_RECEIVED,
     SERIAL_STATE_CANCELLED
 } serial_state_t;
+
+/* ─── 操作函数 ─── */
 
 void           serial_request_wifi_password(const char *ssid);
 void           serial_request_bt_pair_code(const char *device_name);
@@ -28,4 +33,5 @@ const char*    serial_get_target_addr(void);
 #ifdef __cplusplus
 }
 #endif
-#endif // SERIAL_INPUT_H
+
+#endif /* SERIAL_INPUT_H */

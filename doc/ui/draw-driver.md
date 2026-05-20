@@ -12,7 +12,7 @@
 
 ### 宏映射表
 
-*📄 Source: [ui_draw_driver.h](../../src/ui/ui_draw_driver.h#L7-L31)*
+*📄 Source: [ui_draw_driver.h](../../src/ui/ui_draw_driver.h#L11-L35)*
 
 ```c
 #define get_ticks() hal_get_ticks()
@@ -60,7 +60,7 @@
 
 ### 已废弃的 OLED 专属 API
 
-*📄 Source: [ui_draw_driver.h](../../src/ui/ui_draw_driver.h#L24-L32)*
+*📄 Source: [ui_draw_driver.h](../../src/ui/ui_draw_driver.h#L38-L46)*
 
 ```c
 #define oled_draw_H_dotted_line(x, y, l) /* placeholder */

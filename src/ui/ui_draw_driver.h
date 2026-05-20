@@ -3,12 +3,18 @@
 
 #include "hal/hal_display.h"
 #include "hal/hal_system.h"
+#include <stdint.h>
+#include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+/* ─── 全局绘制颜色 ─── */
+
 extern uint16_t astra_draw_color;
+
+/* ─── OLED → HAL 宏桥接层 ─── */
 
 #define get_ticks() hal_get_ticks()
 #define delay(ms) hal_delay_ms(ms)
@@ -37,10 +43,12 @@ extern uint16_t astra_draw_color;
 #define oled_send_buffer() hal_display_flush()
 #define oled_send_area_buffer(x, y, w, h) /* not needed */
 
+/* ─── 生命周期 ─── */
+
 extern void astra_ui_driver_init(void);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif // UI_DRAW_DRIVER_H
+#endif /* UI_DRAW_DRIVER_H */

@@ -31,7 +31,7 @@
 #define ANIM_SPEED_EXIT         94
 ```
 
-*📄 Source: [ui_item.h](../../src/ui/ui_item.h#L11-L18)*
+*📄 Source: [ui_item.h](../../src/ui/ui_item.h#L14-L22)*
 
 ### 2. 统一重复动画函数
 

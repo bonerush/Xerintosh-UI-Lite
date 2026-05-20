@@ -1,11 +1,14 @@
 #ifndef HAL_INPUT_H
 #define HAL_INPUT_H
+
 #include <stdint.h>
 #include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/* ─── 类型定义 ─── */
 
 typedef enum {
     HAL_BTN_A = 0,
@@ -22,7 +25,7 @@ typedef enum {
 
 typedef struct {
     bool pressed;
-    bool mode;           // 0 = mode1, 1 = mode2, toggled by double-click
+    bool mode;           /* 0 = mode1, 1 = mode2, toggled by double-click */
     uint32_t pressTime;
     uint32_t lastReleaseTime;
     uint8_t debounceCount;
@@ -33,7 +36,12 @@ typedef struct {
     uint32_t press_duration_ms;
 } hal_button_state_t;
 
+/* ─── 生命周期 ─── */
+
 extern void hal_input_init(void);
+
+/* ─── 操作函数 ─── */
+
 extern void hal_input_update(void);
 extern hal_event_t hal_input_get_event(hal_button_t btn);
 extern bool hal_input_is_pressed(hal_button_t btn);
@@ -43,4 +51,5 @@ extern uint32_t hal_input_get_press_duration(hal_button_t btn);
 #ifdef __cplusplus
 }
 #endif
-#endif
+
+#endif /* HAL_INPUT_H */
