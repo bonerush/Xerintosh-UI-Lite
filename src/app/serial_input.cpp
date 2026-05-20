@@ -1,3 +1,5 @@
+#include <stddef.h>
+
 #ifdef NATIVE_TEST
 
 #include "serial_input.h"
@@ -9,9 +11,9 @@ void serial_request_bt_pair_code_with_addr(const char *device_name, const char *
 }
 void serial_cancel(void) {}
 serial_state_t serial_poll(void) { return SERIAL_STATE_IDLE; }
-const char* serial_get_input(void) { return nullptr; }
-const char* serial_get_target_name(void) { return nullptr; }
-const char* serial_get_target_addr(void) { return nullptr; }
+const char* serial_get_input(void) { return NULL; }
+const char* serial_get_target_name(void) { return NULL; }
+const char* serial_get_target_addr(void) { return NULL; }
 
 #else
 
@@ -23,10 +25,10 @@ const char* serial_get_target_addr(void) { return nullptr; }
 // Constants
 // ---------------------------------------------------------------------------
 
-static const size_t   INPUT_BUFFER_SIZE   = 65;   // 64 chars + null terminator
-static const size_t   PASSWORD_MAX_LEN    = 64;
-static const size_t   PAIR_CODE_MAX_LEN   = 16;
-static const uint32_t TIMEOUT_MS          = 30000; // 30 seconds
+#define INPUT_BUFFER_SIZE   65   /* 64 chars + null terminator */
+#define PASSWORD_MAX_LEN    64
+#define PAIR_CODE_MAX_LEN   16
+#define TIMEOUT_MS          30000 /* 30 seconds */
 
 // ---------------------------------------------------------------------------
 // Module state (file-scoped, immutable from the outside)

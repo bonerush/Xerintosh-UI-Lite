@@ -9,7 +9,7 @@
  * 由于新旧格式在值 1 和 2 上有重叠，优先按旧格式映射以兼容旧数据。
  * 设备首次启动并保存新值后，后续读取将直接获得新格式值。
  */
-extern "C" int16_t resolve_rotation_level(uint8_t saved_rot)
+int16_t resolve_rotation_level(uint8_t saved_rot)
 {
     /* 旧格式 landscape → 新格式 landscape */
     if (saved_rot == 1 || saved_rot == 3)

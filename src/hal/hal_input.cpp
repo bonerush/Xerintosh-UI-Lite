@@ -79,7 +79,7 @@ static hal_event_t check_button_event(struct btn_state *st, bool wasPressed, boo
 
 hal_event_t hal_input_get_event(hal_button_t btn)
 {
-  struct btn_state *st = nullptr;
+  struct btn_state *st = NULL;
   if (btn == HAL_BTN_A) st = &g_btn_a;
   else if (btn == HAL_BTN_B) st = &g_btn_b;
   else return HAL_EVENT_NONE;
@@ -95,7 +95,7 @@ hal_event_t hal_input_get_event(hal_button_t btn)
 }
 
 bool hal_input_is_pressed(hal_button_t btn) {
-    struct btn_state *st = nullptr;
+    struct btn_state *st = NULL;
     if (btn == HAL_BTN_A) {
         st = &g_btn_a;
         bool pressed = M5.BtnA.isPressed();
@@ -121,7 +121,7 @@ bool hal_input_get_mode(hal_button_t btn) {
 }
 
 uint32_t hal_input_get_press_duration(hal_button_t btn) {
-    struct btn_state *st = nullptr;
+    struct btn_state *st = NULL;
     if (btn == HAL_BTN_A) st = &g_btn_a;
     else if (btn == HAL_BTN_B) st = &g_btn_b;
     else return 0;

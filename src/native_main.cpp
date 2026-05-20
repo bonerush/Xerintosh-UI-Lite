@@ -8,6 +8,16 @@ extern "C" {
 #include "ui/ui_draw_driver.h"
 #include "ui/ui_core.h"
 #include "ui/ui_item.h"
+
+/* 桩回调（供 native 测试链接 app_init.c 使用） */
+void on_brightness_change_cb(void) {}
+void on_anim_speed_change_cb(void) {}
+void on_anim_enabled_change_cb(void) {}
+void on_screen_rotation_change_cb(void) {}
+
+/* 外部状态标志桩 */
+bool wifi_on = true;
+bool bt_on = true;
 }
 
 TEST(AnimationTest, EasingConverges)

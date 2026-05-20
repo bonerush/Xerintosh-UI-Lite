@@ -39,17 +39,17 @@ static const char *NVS_NAMESPACE = "astra";
 
 /* ─── Internal helpers ─── */
 
-static bool read_count(Preferences &prefs, const char *key, uint8_t &out) {
-    if (!prefs.isKey(key)) {
-        out = 0;
+static bool read_count(Preferences *prefs, const char *key, uint8_t *out) {
+    if (!prefs->isKey(key)) {
+        *out = 0;
         return true;
     }
-    out = prefs.getUChar(key, 0);
+    *out = prefs->getUChar(key, 0);
     return true;
 }
 
-static bool write_count(Preferences &prefs, const char *key, uint8_t val) {
-    return prefs.putUChar(key, val) == 1;
+static bool write_count(Preferences *prefs, const char *key, uint8_t val) {
+    return prefs->putUChar(key, val) == 1;
 }
 
 /* ─── Init ─── */
@@ -75,7 +75,7 @@ int storage_wifi_get_count(void) {
     Preferences prefs;
     prefs.begin(NVS_NAMESPACE, true);
     uint8_t count = 0;
-    read_count(prefs, "wifi_count", count);
+    read_count(&prefs,"wifi_count", count);
     prefs.end();
     return (int)count;
 }
@@ -89,7 +89,7 @@ bool storage_wifi_get(int index, char *ssid, char *pass) {
     prefs.begin(NVS_NAMESPACE, true);
 
     uint8_t count = 0;
-    read_count(prefs, "wifi_count", count);
+    read_count(&prefs,"wifi_count", count);
     if (index >= (int)count) {
         prefs.end();
         return false;
@@ -116,7 +116,7 @@ int storage_wifi_find(const char *ssid) {
     prefs.begin(NVS_NAMESPACE, true);
 
     uint8_t count = 0;
-    read_count(prefs, "wifi_count", count);
+    read_count(&prefs,"wifi_count", count);
 
     char buf[STORAGE_SSID_MAX_LEN];
     for (int i = 0; i < (int)count; i++) {
@@ -146,7 +146,7 @@ bool storage_wifi_add(const char *ssid, const char *pass) {
 
     /* Check if SSID already exists -> update password in-place */
     uint8_t count = 0;
-    read_count(prefs, "wifi_count", count);
+    read_count(&prefs,"wifi_count", count);
 
     char buf[STORAGE_SSID_MAX_LEN];
     for (int i = 0; i < (int)count; i++) {
@@ -177,7 +177,7 @@ bool storage_wifi_add(const char *ssid, const char *pass) {
     prefs.putString(key_pass, pass);
 
     uint8_t new_count = count + 1;
-    write_count(prefs, "wifi_count", new_count);
+    write_count(&prefs,"wifi_count", new_count);
 
     prefs.end();
     return true;
@@ -192,7 +192,7 @@ bool storage_wifi_remove(int index) {
     prefs.begin(NVS_NAMESPACE, false);
 
     uint8_t count = 0;
-    read_count(prefs, "wifi_count", count);
+    read_count(&prefs,"wifi_count", count);
     if (index >= (int)count) {
         prefs.end();
         return false;
@@ -228,7 +228,7 @@ bool storage_wifi_remove(int index) {
     prefs.remove(key_last_pass);
 
     uint8_t new_count = count - 1;
-    write_count(prefs, "wifi_count", new_count);
+    write_count(&prefs,"wifi_count", new_count);
 
     prefs.end();
     return true;
@@ -240,7 +240,7 @@ int storage_bt_get_count(void) {
     Preferences prefs;
     prefs.begin(NVS_NAMESPACE, true);
     uint8_t count = 0;
-    read_count(prefs, "bt_count", count);
+    read_count(&prefs,"bt_count", count);
     prefs.end();
     return (int)count;
 }
@@ -254,7 +254,7 @@ bool storage_bt_get(int index, char *addr, char *name) {
     prefs.begin(NVS_NAMESPACE, true);
 
     uint8_t count = 0;
-    read_count(prefs, "bt_count", count);
+    read_count(&prefs,"bt_count", count);
     if (index >= (int)count) {
         prefs.end();
         return false;
@@ -281,7 +281,7 @@ int storage_bt_find(const char *addr) {
     prefs.begin(NVS_NAMESPACE, true);
 
     uint8_t count = 0;
-    read_count(prefs, "bt_count", count);
+    read_count(&prefs,"bt_count", count);
 
     char buf[STORAGE_BT_ADDR_MAX_LEN];
     for (int i = 0; i < (int)count; i++) {
@@ -311,7 +311,7 @@ bool storage_bt_add(const char *addr, const char *name) {
 
     /* Check if address already exists -> update name in-place */
     uint8_t count = 0;
-    read_count(prefs, "bt_count", count);
+    read_count(&prefs,"bt_count", count);
 
     char buf[STORAGE_BT_ADDR_MAX_LEN];
     for (int i = 0; i < (int)count; i++) {
@@ -342,7 +342,7 @@ bool storage_bt_add(const char *addr, const char *name) {
     prefs.putString(key_name, name);
 
     uint8_t new_count = count + 1;
-    write_count(prefs, "bt_count", new_count);
+    write_count(&prefs,"bt_count", new_count);
 
     prefs.end();
     return true;
@@ -357,7 +357,7 @@ bool storage_bt_remove(int index) {
     prefs.begin(NVS_NAMESPACE, false);
 
     uint8_t count = 0;
-    read_count(prefs, "bt_count", count);
+    read_count(&prefs,"bt_count", count);
     if (index >= (int)count) {
         prefs.end();
         return false;
@@ -393,7 +393,7 @@ bool storage_bt_remove(int index) {
     prefs.remove(key_last_name);
 
     uint8_t new_count = count - 1;
-    write_count(prefs, "bt_count", new_count);
+    write_count(&prefs,"bt_count", new_count);
 
     prefs.end();
     return true;
