@@ -5,7 +5,7 @@
 int16_t g_brightness_level       = 5;
 int16_t g_anim_speed_level       = 5;
 extern bool g_anim_enabled;
-int16_t g_screen_rotation_level  = 2;
+int16_t g_screen_rotation_level  = ORIENTATION_LANDSCAPE;
 
 /* 屏幕旋转兼容映射（声明在 rotation_helper.c） */
 extern int16_t resolve_rotation_level(uint8_t saved_rot);

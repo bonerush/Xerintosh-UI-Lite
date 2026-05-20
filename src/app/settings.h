@@ -8,6 +8,13 @@
 extern "C" {
 #endif
 
+/* ─── 屏幕方向枚举（直观可读） ─── */
+
+typedef enum {
+    ORIENTATION_PORTRAIT  = 1,  /* 竖屏：rotation = 0°  */
+    ORIENTATION_LANDSCAPE = 2,  /* 横屏：rotation = 90° */
+} screen_orientation_t;
+
 /* ─── 全局状态 ─── */
 
 extern int16_t g_brightness_level;

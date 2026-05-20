@@ -45,8 +45,8 @@ void app_init_ui(void)
         "动画速度", &g_anim_speed_level, 1, 1, 10,
         NULL, on_anim_speed_change_cb, default_icon);
     xerintosh_list_item_t* sl_rot = xerintosh_new_slider_item(
-        "屏幕方向", &g_screen_rotation_level, 1, 1, 2,
-        NULL, on_screen_rotation_change_cb, default_icon);
+        "横屏/竖屏", &g_screen_rotation_level, 1, 1, 2,
+        on_screen_rotation_change_cb, on_screen_rotation_change_cb, default_icon);
 
     xerintosh_push_item_to_list(root, item1);
     xerintosh_push_item_to_list(root, item2);

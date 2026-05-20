@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include "settings.h"
 
 /**
  * @brief 将存储的屏幕旋转值解析为新的 level 格式。
@@ -13,12 +14,12 @@ int16_t resolve_rotation_level(uint8_t saved_rot)
 {
     /* 旧格式 landscape → 新格式 landscape */
     if (saved_rot == 1 || saved_rot == 3)
-        return 2;
+        return ORIENTATION_LANDSCAPE;
 
     /* 旧格式 portrait → 新格式 portrait */
     if (saved_rot == 0 || saved_rot == 2)
-        return 1;
+        return ORIENTATION_PORTRAIT;
 
-    /* 明确的未知值，默认 landscape */
-    return 2;
+    /* 明确的未知值，默认横屏 */
+    return ORIENTATION_LANDSCAPE;
 }
