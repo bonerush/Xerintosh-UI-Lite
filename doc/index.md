@@ -1,8 +1,8 @@
-# Astra UI for M5Stick-C 知识地图
+# Xerintosh UI for M5Stick-C 知识地图
 
 ## 架构总览
 
-本项目是将 `reference/oled-ui-astra-lite`（128×64 OLED 菜单框架）移植到 **M5Stick-C**（80×160 TFT，ESP32-PICO）的固件项目。
+本项目是将 `reference/oled-ui-Xerintosh-lite`（128×64 OLED 菜单框架）移植到 **M5Stick-C**（80×160 TFT，ESP32-PICO）的固件项目。
 
 采用 **分层架构**：
 
@@ -41,7 +41,7 @@ Project Root
 
 - **TFT 双缓冲**：使用 `M5Canvas` 作为后台缓冲区，必须传入父显示对象 `new M5Canvas(&M5.Display)`
 - **XOR 选择器高亮**：TFT 不支持 OLED 的 `draw_color(2)` 反色，改用像素级 `color ^ 0xFFFF`
-- **C 风格面向对象**：基类 `astra_list_item_t` 作为结构体第一个成员，派生类通过强制类型转换实现多态
+- **C 风格面向对象**：基类 `xerintosh_list_item_t` 作为结构体第一个成员，派生类通过强制类型转换实现多态
 - **动画插值公式**：`current += (target - current) / (100.0f - speed)`
 
 ## 文档树

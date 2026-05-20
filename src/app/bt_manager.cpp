@@ -48,8 +48,8 @@ static const unsigned long SCAN_DURATION_MS = 10000;
 #define BT_WARMUP_DELAY_MS 1500
 
 // Menu items
-static astra_list_item_t *g_settings_list = NULL;
-static astra_list_item_t *g_devices_list = NULL;
+static xerintosh_list_item_t *g_settings_list = NULL;
+static xerintosh_list_item_t *g_devices_list = NULL;
 
 // Forward declarations
 static void rebuild_device_list(void);
@@ -84,9 +84,9 @@ class ScanCallbacks : public NimBLEAdvertisedDeviceCallbacks {
 // Menu callbacks
 // ---------------------------------------------------------------------------
 static void on_device_button_pressed(void) {
-    astra_list_item_t *item = astra_selector.selected_item;
+    xerintosh_list_item_t *item = xerintosh_selector.selected_item;
     if (!item || !item->content) return;
-    astra_push_pop_up("请在串口输入配对码", 100);
+    xerintosh_push_pop_up("请在串口输入配对码", 100);
     const char *addr = (const char*)item->user_data;
     if (addr && addr[0]) {
         serial_request_bt_pair_code_with_addr(item->content, addr);
@@ -97,14 +97,14 @@ static void on_device_button_pressed(void) {
 }
 
 static void on_bt_reconnect_pressed(void) {
-    astra_list_item_t *parent = astra_selector.selected_item->parent;
+    xerintosh_list_item_t *parent = xerintosh_selector.selected_item->parent;
     if (!parent || !parent->user_data) return;
 
     char addr[STORAGE_BT_ADDR_MAX_LEN];
     strlcpy(addr, (const char*)parent->user_data, sizeof(addr));
 
-    astra_push_pop_up("搜索中...", 2000);
-    astra_selector_exit_current_item();
+    xerintosh_push_pop_up("搜索中...", 2000);
+    xerintosh_selector_exit_current_item();
 
     g_scan_result_count = 0;
     NimBLEDevice::getScan()->start(SCAN_DURATION_MS / 1000, false);
@@ -113,7 +113,7 @@ static void on_bt_reconnect_pressed(void) {
 }
 
 static void on_bt_delete_pressed(void) {
-    astra_list_item_t *parent = astra_selector.selected_item->parent;
+    xerintosh_list_item_t *parent = xerintosh_selector.selected_item->parent;
     if (!parent || !parent->user_data) return;
 
     char addr[STORAGE_BT_ADDR_MAX_LEN];
@@ -122,8 +122,8 @@ static void on_bt_delete_pressed(void) {
     int idx = storage_bt_find(addr);
     if (idx >= 0) storage_bt_remove(idx);
 
-    astra_push_pop_up("已删除", 1500);
-    astra_selector_exit_current_item();
+    xerintosh_push_pop_up("已删除", 1500);
+    xerintosh_selector_exit_current_item();
     rebuild_device_list();
 }
 
@@ -132,7 +132,7 @@ static void on_bt_scan_pressed(void) {
     NimBLEDevice::getScan()->start(SCAN_DURATION_MS / 1000, false);
     g_scan_start_time = millis();
     g_state = BT_MGR_SCANNING;
-    astra_push_pop_up("扫描中...", SCAN_DURATION_MS);
+    xerintosh_push_pop_up("扫描中...", SCAN_DURATION_MS);
 }
 
 // ---------------------------------------------------------------------------
@@ -141,9 +141,9 @@ static void on_bt_scan_pressed(void) {
 static void rebuild_device_list(void) {
     /* Create the Devices list on first call */
     if (!g_devices_list) {
-        g_devices_list = astra_new_list_item("蓝牙设备", list_icon);
+        g_devices_list = xerintosh_new_list_item("蓝牙设备", list_icon);
         if (g_settings_list && g_devices_list) {
-            astra_push_item_to_list(g_settings_list, g_devices_list);
+            xerintosh_push_item_to_list(g_settings_list, g_devices_list);
         }
     }
 
@@ -151,7 +151,7 @@ static void rebuild_device_list(void) {
 
     /* Safety: if selector is inside Devices subtree, move it to Devices itself
        so clearing children doesn't create a dangling pointer. */
-    astra_list_item_t *check = astra_selector.selected_item;
+    xerintosh_list_item_t *check = xerintosh_selector.selected_item;
     while (check && check != g_devices_list) check = check->parent;
     if (check == g_devices_list) {
         uint8_t idx = 0;
@@ -163,11 +163,11 @@ static void rebuild_device_list(void) {
                 }
             }
         }
-        astra_selector.selected_item = g_devices_list;
-        astra_selector.selected_index = idx;
+        xerintosh_selector.selected_item = g_devices_list;
+        xerintosh_selector.selected_index = idx;
     }
 
-    astra_clear_children_of_list(g_devices_list);
+    xerintosh_clear_children_of_list(g_devices_list);
 
     for (int i = 0; i < g_scan_result_count && i < 9; i++) {
         int8_t saved_idx = storage_bt_find(g_scan_results[i].address);
@@ -181,35 +181,35 @@ static void rebuild_device_list(void) {
                      g_scan_results[i].name);
         }
 
-        astra_list_item_t *item;
+        xerintosh_list_item_t *item;
         if (saved_idx >= 0) {
-            item = astra_new_list_item(display_name, list_icon);
-            astra_list_item_t *reconnect =
-                astra_new_button_item("重新连接", on_bt_reconnect_pressed,
+            item = xerintosh_new_list_item(display_name, list_icon);
+            xerintosh_list_item_t *reconnect =
+                xerintosh_new_button_item("重新连接", on_bt_reconnect_pressed,
                                       default_icon);
-            astra_list_item_t *del =
-                astra_new_button_item("删除", on_bt_delete_pressed,
+            xerintosh_list_item_t *del =
+                xerintosh_new_button_item("删除", on_bt_delete_pressed,
                                       default_icon);
-            astra_push_item_to_list(item, reconnect);
-            astra_push_item_to_list(item, del);
+            xerintosh_push_item_to_list(item, reconnect);
+            xerintosh_push_item_to_list(item, del);
         } else {
-            item = astra_new_button_item(display_name,
+            item = xerintosh_new_button_item(display_name,
                                          on_device_button_pressed, default_icon);
         }
 
         item->user_data = strdup(g_scan_results[i].address);
-        astra_push_item_to_list(g_devices_list, item);
+        xerintosh_push_item_to_list(g_devices_list, item);
     }
 
-    astra_list_item_t *scan_btn =
-        astra_new_button_item("扫描", on_bt_scan_pressed, default_icon);
-    astra_push_item_to_list(g_devices_list, scan_btn);
+    xerintosh_list_item_t *scan_btn =
+        xerintosh_new_button_item("扫描", on_bt_scan_pressed, default_icon);
+    xerintosh_push_item_to_list(g_devices_list, scan_btn);
 
     /* After rebuild, if selector was on Devices, move it to the first child
        so the user sees the device list content immediately. */
-    if (astra_selector.selected_item == g_devices_list && g_devices_list->child_num > 0) {
-        astra_selector.selected_item = g_devices_list->child_list_item[0];
-        astra_selector.selected_index = 0;
+    if (xerintosh_selector.selected_item == g_devices_list && g_devices_list->child_num > 0) {
+        xerintosh_selector.selected_item = g_devices_list->child_list_item[0];
+        xerintosh_selector.selected_index = 0;
     }
 }
 
@@ -222,7 +222,7 @@ void bt_mgr_init(void) {
     g_devices_list = NULL;
     g_scan_result_count = 0;
 
-    astra_list_item_t *root = astra_get_root_list();
+    xerintosh_list_item_t *root = xerintosh_get_root_list();
     if (root && root->child_num > 0) {
         g_settings_list = root->child_list_item[0];  // "Settings"
     }
@@ -246,18 +246,18 @@ void bt_mgr_disable(void) {
     g_bt_enabled = false;
 
     if (g_devices_list) {
-        astra_list_item_t *check = astra_selector.selected_item;
+        xerintosh_list_item_t *check = xerintosh_selector.selected_item;
         while (check && check != g_devices_list) check = check->parent;
         if (check == g_devices_list) {
             if (g_settings_list) {
-                astra_selector.selected_item = g_settings_list->child_list_item[0];
-                astra_selector.selected_index = 0;
+                xerintosh_selector.selected_item = g_settings_list->child_list_item[0];
+                xerintosh_selector.selected_index = 0;
             }
         }
 
-        astra_clear_children_of_list(g_devices_list);
+        xerintosh_clear_children_of_list(g_devices_list);
         if (g_settings_list) {
-            astra_remove_item_from_list(g_settings_list, g_devices_list);
+            xerintosh_remove_item_from_list(g_settings_list, g_devices_list);
         }
         g_devices_list = NULL;
     }
@@ -286,7 +286,7 @@ void bt_mgr_update(void) {
     case BT_MGR_SCANNING: {
         if (millis() - g_scan_start_time >= SCAN_DURATION_MS) {
             NimBLEDevice::getScan()->stop();
-            astra_hide_pop_up();
+            xerintosh_hide_pop_up();
             rebuild_device_list();
             g_state = BT_MGR_SCAN_DONE;
         }
@@ -294,7 +294,7 @@ void bt_mgr_update(void) {
     }
     case BT_MGR_PAIRING: {
         /* Keep pop-up visible while waiting for input */
-        astra_push_pop_up("请在串口输入配对码", 100);
+        xerintosh_push_pop_up("请在串口输入配对码", 100);
         serial_state_t ss = serial_poll();
         if (ss == SERIAL_STATE_PAIR_CODE_RECEIVED) {
             const char *code = serial_get_input();
@@ -303,13 +303,13 @@ void bt_mgr_update(void) {
             if (code && name) {
                 storage_bt_add(addr ? addr : name, name);
                 Serial.println("OK");
-                astra_push_pop_up("已配对", 2000);
+                xerintosh_push_pop_up("已配对", 2000);
                 g_state = BT_MGR_PAIRED;
                 rebuild_device_list();
             }
         } else if (ss == SERIAL_STATE_CANCELLED) {
             g_state = BT_MGR_SCAN_DONE;
-            astra_push_pop_up("已取消", 1500);
+            xerintosh_push_pop_up("已取消", 1500);
         }
         break;
     }

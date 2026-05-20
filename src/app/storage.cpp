@@ -35,7 +35,7 @@ void     storage_set_screen_rotation(uint8_t val) { (void)val; }
 #include <Preferences.h>
 #include <string.h>
 
-static const char *NVS_NAMESPACE = "astra";
+static const char *NVS_NAMESPACE = "Xerintosh";
 
 /* ─── Internal helpers ─── */
 

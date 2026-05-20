@@ -35,9 +35,9 @@ extern bool wifi_on;   // defined in main.cpp
 static wifi_mgr_state_t g_state           = WIFI_MGR_IDLE;
 static bool             g_wifi_enabled    = false;
 
-static astra_list_item_t *g_settings_list  = NULL;  // "Settings" list_item
-static astra_list_item_t *g_networks_list  = NULL;  // "Networks" list_item (child of Settings)
-static astra_list_item_t *g_scan_button    = NULL;
+static xerintosh_list_item_t *g_settings_list  = NULL;  // "Settings" list_item
+static xerintosh_list_item_t *g_networks_list  = NULL;  // "Networks" list_item (child of Settings)
+static xerintosh_list_item_t *g_scan_button    = NULL;
 
 static bool  g_connecting = false;
 static char  g_connecting_ssid[STORAGE_SSID_MAX_LEN] = {0};
@@ -80,7 +80,7 @@ bool wifi_mgr_is_waiting_input(void)
 void wifi_mgr_init(void)
 {
     /* Settings is the first child of root */
-    astra_list_item_t *root = astra_get_root_list();
+    xerintosh_list_item_t *root = xerintosh_get_root_list();
     if (root && root->child_num > 0) {
         g_settings_list = root->child_list_item[0];  // "Settings"
     }
@@ -110,17 +110,17 @@ void wifi_mgr_disable(void)
 
     if (g_networks_list) {
         /* If selector is currently inside Networks subtree, exit back to Settings */
-        astra_list_item_t *check = astra_selector.selected_item;
+        xerintosh_list_item_t *check = xerintosh_selector.selected_item;
         while (check && check != g_networks_list) {
             check = check->parent;
         }
         if (check == g_networks_list) {
-            astra_selector.selected_item  = g_settings_list->child_list_item[0];
-            astra_selector.selected_index = 0;
+            xerintosh_selector.selected_item  = g_settings_list->child_list_item[0];
+            xerintosh_selector.selected_index = 0;
         }
 
-        astra_clear_children_of_list(g_networks_list);
-        astra_remove_item_from_list(g_settings_list, g_networks_list);
+        xerintosh_clear_children_of_list(g_networks_list);
+        xerintosh_remove_item_from_list(g_settings_list, g_networks_list);
         g_networks_list = NULL;
     }
 
@@ -146,9 +146,9 @@ static void rebuild_network_list(int scan_count)
 {
     /* Create the Networks list on first call */
     if (!g_networks_list) {
-        g_networks_list = astra_new_list_item("网络", list_icon);
+        g_networks_list = xerintosh_new_list_item("网络", list_icon);
         if (g_settings_list && g_networks_list) {
-            astra_push_item_to_list(g_settings_list, g_networks_list);
+            xerintosh_push_item_to_list(g_settings_list, g_networks_list);
         }
     }
 
@@ -158,7 +158,7 @@ static void rebuild_network_list(int scan_count)
 
     /* Safety: if selector is inside Networks subtree, move it to Networks itself
        so clearing children doesn't create a dangling pointer. */
-    astra_list_item_t *check = astra_selector.selected_item;
+    xerintosh_list_item_t *check = xerintosh_selector.selected_item;
     while (check && check != g_networks_list) {
         check = check->parent;
     }
@@ -172,11 +172,11 @@ static void rebuild_network_list(int scan_count)
                 }
             }
         }
-        astra_selector.selected_item = g_networks_list;
-        astra_selector.selected_index = idx;
+        xerintosh_selector.selected_item = g_networks_list;
+        xerintosh_selector.selected_index = idx;
     }
 
-    astra_clear_children_of_list(g_networks_list);
+    xerintosh_clear_children_of_list(g_networks_list);
 
     /* Cap to 9 results (MAX_LIST_CHILD_NUM - 1 for Scan button) */
     int show_count = scan_count;
@@ -196,31 +196,31 @@ static void rebuild_network_list(int scan_count)
             snprintf(display_name, sizeof(display_name), "%s", ssid.c_str());
         }
 
-        astra_list_item_t *item;
+        xerintosh_list_item_t *item;
         if (saved_idx >= 0) {
             /* Saved network -> list_item with Reconnect / Delete children */
-            item = astra_new_list_item(display_name, list_icon);
-            astra_list_item_t *reconnect = astra_new_button_item("重新连接", on_reconnect_pressed, default_icon);
-            astra_list_item_t *del        = astra_new_button_item("删除",    on_delete_pressed,    default_icon);
-            astra_push_item_to_list(item, reconnect);
-            astra_push_item_to_list(item, del);
+            item = xerintosh_new_list_item(display_name, list_icon);
+            xerintosh_list_item_t *reconnect = xerintosh_new_button_item("重新连接", on_reconnect_pressed, default_icon);
+            xerintosh_list_item_t *del        = xerintosh_new_button_item("删除",    on_delete_pressed,    default_icon);
+            xerintosh_push_item_to_list(item, reconnect);
+            xerintosh_push_item_to_list(item, del);
         } else {
             /* Unknown network -> button_item triggers serial password input */
-            item = astra_new_button_item(display_name, on_network_button_pressed, default_icon);
+            item = xerintosh_new_button_item(display_name, on_network_button_pressed, default_icon);
         }
 
-        astra_push_item_to_list(g_networks_list, item);
+        xerintosh_push_item_to_list(g_networks_list, item);
     }
 
     /* Append Scan button at the end */
-    g_scan_button = astra_new_button_item("扫描", on_scan_pressed, default_icon);
-    astra_push_item_to_list(g_networks_list, g_scan_button);
+    g_scan_button = xerintosh_new_button_item("扫描", on_scan_pressed, default_icon);
+    xerintosh_push_item_to_list(g_networks_list, g_scan_button);
 
     /* After rebuild, if selector was on Networks, move it to the first child
        so the user sees the network list content immediately. */
-    if (astra_selector.selected_item == g_networks_list && g_networks_list->child_num > 0) {
-        astra_selector.selected_item = g_networks_list->child_list_item[0];
-        astra_selector.selected_index = 0;
+    if (xerintosh_selector.selected_item == g_networks_list && g_networks_list->child_num > 0) {
+        xerintosh_selector.selected_item = g_networks_list->child_list_item[0];
+        xerintosh_selector.selected_index = 0;
     }
 
     /* Free the scan result buffer so the next scan can start cleanly. */
@@ -231,19 +231,19 @@ static void rebuild_network_list(int scan_count)
 
 static void on_network_button_pressed(void)
 {
-    const char *content = astra_selector.selected_item->content;
+    const char *content = xerintosh_selector.selected_item->content;
     if (!content) {
         return;
     }
 
-    astra_push_pop_up("请在串口输入密码", 8000);
+    xerintosh_push_pop_up("请在串口输入密码", 8000);
     serial_request_wifi_password(content);
     g_state = WIFI_MGR_CONNECTING;
 }
 
 static void on_reconnect_pressed(void)
 {
-    const char *parent_content = astra_selector.selected_item->parent->content;
+    const char *parent_content = xerintosh_selector.selected_item->parent->content;
     if (!parent_content) {
         return;
     }
@@ -267,14 +267,14 @@ static void on_reconnect_pressed(void)
     WiFi.begin(ssid, pass);
     strncpy(g_connecting_ssid, ssid, STORAGE_SSID_MAX_LEN);
     g_connecting = true;
-    astra_push_pop_up("连接中...", 3000);
+    xerintosh_push_pop_up("连接中...", 3000);
 
-    astra_selector_exit_current_item();
+    xerintosh_selector_exit_current_item();
 }
 
 static void on_delete_pressed(void)
 {
-    const char *parent_content = astra_selector.selected_item->parent->content;
+    const char *parent_content = xerintosh_selector.selected_item->parent->content;
     if (!parent_content) {
         return;
     }
@@ -292,8 +292,8 @@ static void on_delete_pressed(void)
         storage_wifi_remove(idx);
     }
 
-    astra_push_pop_up("已删除", 1500);
-    astra_selector_exit_current_item();
+    xerintosh_push_pop_up("已删除", 1500);
+    xerintosh_selector_exit_current_item();
     rebuild_network_list(WiFi.scanComplete());
 }
 
@@ -302,18 +302,18 @@ static void on_scan_pressed(void)
     WiFi.scanDelete();          /* free any stale results first */
     int16_t scan_ret = WiFi.scanNetworks(true);    /* async */
     if (scan_ret == -2) {
-        astra_push_pop_up("扫描失败", 2000);
+        xerintosh_push_pop_up("扫描失败", 2000);
         g_state = WIFI_MGR_IDLE;
     } else if (scan_ret >= 0) {
         /* Scan completed synchronously */
-        astra_hide_pop_up();
+        xerintosh_hide_pop_up();
         rebuild_network_list(scan_ret);
         g_state = WIFI_MGR_SCAN_DONE;
         g_scan_retry_count = 0;
     } else {
         g_state = WIFI_MGR_SCANNING;
         g_wifi_scan_start_time = millis();
-        astra_push_pop_up("扫描中...", WIFI_SCAN_TIMEOUT_MS);
+        xerintosh_push_pop_up("扫描中...", WIFI_SCAN_TIMEOUT_MS);
     }
 }
 
@@ -340,7 +340,7 @@ void wifi_mgr_update(void)
         /* 扫描超时检查 */
         if (millis() - g_wifi_scan_start_time >= WIFI_SCAN_TIMEOUT_MS) {
             WiFi.scanDelete();
-            astra_hide_pop_up();
+            xerintosh_hide_pop_up();
             rebuild_network_list(0);
             g_state = WIFI_MGR_SCAN_DONE;
             g_scan_retry_count = 0;
@@ -349,7 +349,7 @@ void wifi_mgr_update(void)
 
         int16_t result = WiFi.scanComplete();
         if (result >= 0) {
-            astra_hide_pop_up();
+            xerintosh_hide_pop_up();
             rebuild_network_list(result);
             g_state = WIFI_MGR_SCAN_DONE;
             g_scan_retry_count = 0;
@@ -361,8 +361,8 @@ void wifi_mgr_update(void)
                 WiFi.scanNetworks(true);
                 g_wifi_scan_start_time = millis();
             } else {
-                astra_hide_pop_up();
-                astra_push_pop_up("扫描失败", 2000);
+                xerintosh_hide_pop_up();
+                xerintosh_push_pop_up("扫描失败", 2000);
                 g_state = WIFI_MGR_IDLE;
                 g_scan_retry_count = 0;
             }
@@ -384,11 +384,11 @@ void wifi_mgr_update(void)
                 strncpy(g_connecting_pass, input,  STORAGE_PASS_MAX_LEN);
                 g_connecting = true;
                 Serial.println("CONNECTING...");
-                astra_push_pop_up("连接中...", 3000);
+                xerintosh_push_pop_up("连接中...", 3000);
             }
         } else if (ss == SERIAL_STATE_CANCELLED) {
             g_state = WIFI_MGR_SCAN_DONE;
-            astra_push_pop_up("已取消", 1500);
+            xerintosh_push_pop_up("已取消", 1500);
         }
 
         /* Check WiFi connection status */
@@ -398,13 +398,13 @@ void wifi_mgr_update(void)
                 g_connecting = false;
                 storage_wifi_add(g_connecting_ssid, g_connecting_pass);
                 Serial.println("OK");
-                astra_push_pop_up("已连接", 2000);
+                xerintosh_push_pop_up("已连接", 2000);
                 g_state = WIFI_MGR_CONNECTED;
             } else if (status == WL_CONNECT_FAILED ||
                        status == WL_NO_SSID_AVAIL) {
                 g_connecting = false;
                 Serial.println("FAIL");
-                astra_push_pop_up("连接失败", 2000);
+                xerintosh_push_pop_up("连接失败", 2000);
                 g_state = WIFI_MGR_CONNECT_FAILED;
             }
             /* WL_IDLE_STATUS / WL_DISCONNECTED => still trying */

@@ -27,35 +27,35 @@ extern void on_screen_rotation_change_cb(void);
 
 void app_init_ui(void)
 {
-    astra_list_item_t* root = astra_get_root_list();
+    xerintosh_list_item_t* root = xerintosh_get_root_list();
 
-    astra_list_item_t* item1 = astra_new_list_item("设置", list_icon);
-    astra_list_item_t* item2 = astra_new_list_item("关于", user_icon);
+    xerintosh_list_item_t* item1 = xerintosh_new_list_item("设置", list_icon);
+    xerintosh_list_item_t* item2 = xerintosh_new_list_item("关于", user_icon);
 
-    astra_list_item_t* sw1 = astra_new_switch_item(
+    xerintosh_list_item_t* sw1 = xerintosh_new_switch_item(
         "WiFi", &wifi_on, NULL, wifi_mgr_on_switch_toggle, default_icon);
-    astra_list_item_t* sw2 = astra_new_switch_item(
+    xerintosh_list_item_t* sw2 = xerintosh_new_switch_item(
         "蓝牙", &bt_on, NULL, bt_mgr_on_switch_toggle, default_icon);
-    astra_list_item_t* sl1 = astra_new_slider_item(
+    xerintosh_list_item_t* sl1 = xerintosh_new_slider_item(
         "亮度", &g_brightness_level, 1, 1, 10,
         NULL, on_brightness_change_cb, default_icon);
-    astra_list_item_t* sw_anim = astra_new_switch_item(
+    xerintosh_list_item_t* sw_anim = xerintosh_new_switch_item(
         "动画效果", &g_anim_enabled, NULL, on_anim_enabled_change_cb, default_icon);
-    astra_list_item_t* sl_anim = astra_new_slider_item(
+    xerintosh_list_item_t* sl_anim = xerintosh_new_slider_item(
         "动画速度", &g_anim_speed_level, 1, 1, 10,
         NULL, on_anim_speed_change_cb, default_icon);
-    astra_list_item_t* sl_rot = astra_new_slider_item(
+    xerintosh_list_item_t* sl_rot = xerintosh_new_slider_item(
         "屏幕方向", &g_screen_rotation_level, 1, 1, 2,
         NULL, on_screen_rotation_change_cb, default_icon);
 
-    astra_push_item_to_list(root, item1);
-    astra_push_item_to_list(root, item2);
-    astra_push_item_to_list(item1, sw1);
-    astra_push_item_to_list(item1, sw2);
-    astra_push_item_to_list(item1, sl1);
-    astra_push_item_to_list(item1, sw_anim);
-    astra_push_item_to_list(item1, sl_anim);
-    astra_push_item_to_list(item1, sl_rot);
+    xerintosh_push_item_to_list(root, item1);
+    xerintosh_push_item_to_list(root, item2);
+    xerintosh_push_item_to_list(item1, sw1);
+    xerintosh_push_item_to_list(item1, sw2);
+    xerintosh_push_item_to_list(item1, sl1);
+    xerintosh_push_item_to_list(item1, sw_anim);
+    xerintosh_push_item_to_list(item1, sl_anim);
+    xerintosh_push_item_to_list(item1, sl_rot);
 }
 
 /* ─── 管理器初始化 ─── */
@@ -80,7 +80,7 @@ void app_input_process(void)
 
     if (event_b == HAL_EVENT_SHORT_PRESS)
     {
-        astra_selector_go_prev_item();
+        xerintosh_selector_go_prev_item();
     }
     else if (event_b == HAL_EVENT_LONG_PRESS)
     {
@@ -89,15 +89,15 @@ void app_input_process(void)
         } else if (bt_mgr_is_waiting_input()) {
             serial_cancel();
         }
-        astra_selector_exit_current_item();
+        xerintosh_selector_exit_current_item();
     }
 
     if (event_a == HAL_EVENT_SHORT_PRESS)
     {
-        astra_selector_go_next_item();
+        xerintosh_selector_go_next_item();
     }
     else if (event_a == HAL_EVENT_LONG_PRESS)
     {
-        astra_selector_jump_to_selected_item();
+        xerintosh_selector_jump_to_selected_item();
     }
 }

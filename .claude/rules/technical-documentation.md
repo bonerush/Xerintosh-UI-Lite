@@ -320,11 +320,11 @@ The directory tree inside `doc/` **should** mirror the project's source code str
 
 | Source Path | Documentation Path |
 |---|---|
-| `Core/Src/astra/ui/item/` | `doc/ui/item-system/` |
-| `Core/Src/astra/config/` | `doc/config/` |
+| `Core/Src/Xerintosh/ui/item/` | `doc/ui/item-system/` |
+| `Core/Src/Xerintosh/config/` | `doc/config/` |
 | `Core/Src/hal/hal_dreamCore/` | `doc/hal/dreamcore.md` |
 
-**Why:** When a developer is reading `Core/Src/astra/ui/item/menu.cpp`, they should intuitively know to look in `doc/ui/item-system/` for the explanation.
+**Why:** When a developer is reading `Core/Src/Xerintosh/ui/item/menu.cpp`, they should intuitively know to look in `doc/ui/item-system/` for the explanation.
 
 ### MANDATORY: Naming Conventions
 

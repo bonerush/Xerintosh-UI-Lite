@@ -1,0 +1,58 @@
+#include "boot_screen.h"
+#include "hal/hal_display.h"
+#include "hal/hal_system.h"
+#include <stdint.h>
+#include <stddef.h>
+
+void boot_screen_show(void)
+{
+    int16_t sw = SCREEN_WIDTH;
+    int16_t sh = SCREEN_HEIGHT;
+
+    /* 麦景塔机身尺寸（按屏幕比例） */
+    int16_t body_w = sw * 6 / 10;
+    int16_t body_h = sh * 3 / 10;
+    int16_t body_x = (sw - body_w) / 2;
+    int16_t body_y = (sh - body_h) / 2 - 10;
+
+    /* 屏幕边框 */
+    int16_t bezel = (sw < 100) ? 3 : 4;
+    int16_t screen_w = body_w - bezel * 2;
+    int16_t screen_h = body_h * 5 / 10;
+    int16_t screen_x = body_x + bezel;
+    int16_t screen_y = body_y + bezel;
+
+    /* 软盘槽 */
+    int16_t slot_w = body_w * 5 / 10;
+    int16_t slot_h = (sw < 100) ? 2 : 3;
+    int16_t slot_x = body_x + (body_w - slot_w) / 2;
+    int16_t slot_y = body_y + body_h - bezel - slot_h - 2;
+
+    /* 清屏 */
+    hal_display_clear();
+
+    /* 绘制机身（白色圆角矩形轮廓） */
+    hal_draw_round_rect(body_x, body_y, body_w, body_h, 3, COLOR_FG);
+
+    /* 绘制屏幕区域（黑色填充） */
+    hal_draw_fill_rect(screen_x, screen_y, screen_w, screen_h, COLOR_BG);
+
+    /* 绘制屏幕边框（白色） */
+    hal_draw_rect(screen_x, screen_y, screen_w, screen_h, COLOR_FG);
+
+    /* 绘制软盘槽（白色填充） */
+    hal_draw_fill_rect(slot_x, slot_y, slot_w, slot_h, COLOR_FG);
+
+    /* 绘制 "Xerintosh" 文字 */
+    const char* label = "Xerintosh";
+    hal_set_font(NULL);
+    int16_t tw = hal_get_string_width(label);
+    int16_t tx = (sw - tw) / 2;
+    int16_t ty = body_y + body_h + 8;
+    hal_draw_string(tx, ty, label, COLOR_FG);
+
+    hal_display_flush();
+
+    /* 延迟 2 秒 */
+    hal_delay_ms(2000);
+}

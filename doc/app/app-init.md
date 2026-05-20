@@ -25,20 +25,20 @@
 ```c
 void app_init_ui(void)
 {
-    astra_list_item_t* root = astra_get_root_list();
+    xerintosh_list_item_t* root = xerintosh_get_root_list();
 
-    astra_list_item_t* item1 = astra_new_list_item("设置", list_icon);
-    astra_list_item_t* item2 = astra_new_list_item("关于", user_icon);
+    xerintosh_list_item_t* item1 = xerintosh_new_list_item("设置", list_icon);
+    xerintosh_list_item_t* item2 = xerintosh_new_list_item("关于", user_icon);
 
-    astra_list_item_t* sw1 = astra_new_switch_item(
+    xerintosh_list_item_t* sw1 = xerintosh_new_switch_item(
         "WiFi", &wifi_on, NULL, wifi_mgr_on_switch_toggle, default_icon);
-    astra_list_item_t* sw2 = astra_new_switch_item(
+    xerintosh_list_item_t* sw2 = xerintosh_new_switch_item(
         "蓝牙", &bt_on, NULL, bt_mgr_on_switch_toggle, default_icon);
     /* ... 更多控件 ... */
 
-    astra_push_item_to_list(root, item1);
-    astra_push_item_to_list(root, item2);
-    astra_push_item_to_list(item1, sw1);
+    xerintosh_push_item_to_list(root, item1);
+    xerintosh_push_item_to_list(root, item2);
+    xerintosh_push_item_to_list(item1, sw1);
     /* ... */
 }
 ```
@@ -100,14 +100,14 @@ void app_input_process(void)
     hal_event_t event_b = hal_input_get_event(HAL_BTN_B);
 
     if (event_b == HAL_EVENT_SHORT_PRESS)
-        astra_selector_go_prev_item();
+        xerintosh_selector_go_prev_item();
     else if (event_b == HAL_EVENT_LONG_PRESS)
         /* 处理长按B：串口取消 + 退出当前项 */
 
     if (event_a == HAL_EVENT_SHORT_PRESS)
-        astra_selector_go_next_item();
+        xerintosh_selector_go_next_item();
     else if (event_a == HAL_EVENT_LONG_PRESS)
-        astra_selector_jump_to_selected_item();
+        xerintosh_selector_jump_to_selected_item();
 }
 ```
 

@@ -28,6 +28,7 @@ bool bt_on = true;
 #include "app/serial_input.h"
 #include "app/wifi_manager.h"
 #include "app/bt_manager.h"
+#include "app/boot_screen.h"
 
 /* ─── 设置变更回调（由 app_init.c 引用） ─── */
 
@@ -80,12 +81,13 @@ void setup()
     int16_t screen_rotation = (g_screen_rotation_level == 1) ? 0 : 1;
     M5.Display.setRotation(screen_rotation);
 
-    astra_ui_driver_init();
+    xerintosh_ui_driver_init();
+    boot_screen_show();
     app_init_ui();
     app_init_managers();
 
-    astra_init_core();
-    in_astra = true;
+    xerintosh_init_core();
+    in_xerintosh = true;
 }
 
 void loop()
@@ -95,15 +97,15 @@ void loop()
     wifi_mgr_update();
     bt_mgr_update();
     hal_display_clear();
-    astra_ui_main_core();
-    astra_ui_widget_core();
+    xerintosh_ui_main_core();
+    xerintosh_ui_widget_core();
 
     uint32_t dur_a = hal_input_get_press_duration(HAL_BTN_A);
     uint32_t dur_b = hal_input_get_press_duration(HAL_BTN_B);
     if (dur_a > 0 && dur_a < 500) {
-        astra_draw_long_press_hint(dur_a, 500);
+        xerintosh_draw_long_press_hint(dur_a, 500);
     } else if (dur_b > 0 && dur_b < 500) {
-        astra_draw_long_press_hint(dur_b, 500);
+        xerintosh_draw_long_press_hint(dur_b, 500);
     }
 
     hal_display_flush();

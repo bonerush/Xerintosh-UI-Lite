@@ -14,7 +14,7 @@
 
 | 模块 | 前缀 | 示例 |
 |------|------|------|
-| UI 核心 | `astra_` | `astra_init_core()` |
+| UI 核心 | `xerintosh_` | `xerintosh_init_core()` |
 | 硬件抽象-显示 | `hal_display_` | `hal_display_clear()` |
 | 硬件抽象-输入 | `hal_input_` | `hal_input_update()` |
 | 设置管理 | `settings_` | `settings_load_from_storage()` |
@@ -26,18 +26,18 @@
 
 ```c
 /* 函数：模块前缀 + snake_case */
-void astra_init_core(void);
+void xerintosh_init_core(void);
 int16_t settings_brightness_hw_value(void);
 
 /* 结构体：模块前缀 + _t */
-typedef struct { ... } astra_list_item_t;
+typedef struct { ... } xerintosh_list_item_t;
 typedef struct { ... } hal_display_t;
 
 /* 枚举：模块前缀 + _type_t */
-typedef enum { ... } astra_list_item_type_t;
+typedef enum { ... } xerintosh_list_item_type_t;
 
 /* 回调类型：模块前缀 + _cb_t */
-typedef void (*astra_item_cb_t)(void *user_data);
+typedef void (*xerintosh_item_cb_t)(void *user_data);
 
 /* 全局变量（模块内部）：g_ 前缀 */
 static int16_t g_brightness_level = 5;
@@ -47,7 +47,7 @@ static int16_t g_brightness_level = 5;
 #define SCREEN_WIDTH 80
 
 /* 参数：前导下划线（本项目沿用 convention） */
-void astra_animation(float *_pos, float _pos_trg, float _speed);
+void xerintosh_animation(float *_pos, float _pos_trg, float _speed);
 ```
 
 ---
@@ -129,14 +129,14 @@ typedef enum {
     slider_item,
     user_item,
     button_item,
-} astra_list_item_type_t;
+} xerintosh_list_item_type_t;
 
-typedef struct astra_list_item_t {
-    astra_list_item_type_t type;   /* 类型标签：必须放第一位 */
-    astra_list_item_icon_t icon;
+typedef struct xerintosh_list_item_t {
+    xerintosh_list_item_type_t type;   /* 类型标签：必须放第一位 */
+    xerintosh_list_item_icon_t icon;
     const char *content;
     /* ... 其他公共字段 */
-} astra_list_item_t;
+} xerintosh_list_item_t;
 ```
 
 ### 3.2 派生结构体
@@ -144,13 +144,13 @@ typedef struct astra_list_item_t {
 派生结构体**必须把基类作为第一个成员**，这是 C 标准保证的内存布局兼容。
 
 ```c
-typedef struct astra_switch_item_t {
-    astra_list_item_t base_item;   /* 必须放第一位！ */
+typedef struct xerintosh_switch_item_t {
+    xerintosh_list_item_t base_item;   /* 必须放第一位！ */
     bool *value;
     void (*init_cb)(void *user_data);
     void (*exit_cb)(void *user_data);
     void *user_data;
-} astra_switch_item_t;
+} xerintosh_switch_item_t;
 ```
 
 ### 3.3 安全类型转换
@@ -158,20 +158,20 @@ typedef struct astra_switch_item_t {
 永远不要直接强制转换，必须通过类型标签检查。
 
 ```c
-static astra_list_item_t *astra_safe_cast(astra_list_item_t *_item,
-                                          astra_list_item_type_t _expected)
+static xerintosh_list_item_t *xerintosh_safe_cast(xerintosh_list_item_t *_item,
+                                          xerintosh_list_item_type_t _expected)
 {
     if (_item != NULL && _item->type == _expected)
         return _item;
-    return astra_get_root_list();  /* 降级到 root，避免空指针崩溃 */
+    return xerintosh_get_root_list();  /* 降级到 root，避免空指针崩溃 */
 }
 
-astra_switch_item_t *astra_to_switch_item(astra_list_item_t *_item) {
-    return (astra_switch_item_t *)astra_safe_cast(_item, switch_item);
+xerintosh_switch_item_t *xerintosh_to_switch_item(xerintosh_list_item_t *_item) {
+    return (xerintosh_switch_item_t *)xerintosh_safe_cast(_item, switch_item);
 }
 ```
 
-**为什么基类必须放第一位**：C 标准保证结构体的第一个成员偏移量为 0。因此 `(astra_list_item_t*)switch_item_ptr` 是安全的，指针值不变，只是解释方式不同。
+**为什么基类必须放第一位**：C 标准保证结构体的第一个成员偏移量为 0。因此 `(xerintosh_list_item_t*)switch_item_ptr` 是安全的，指针值不变，只是解释方式不同。
 
 ---
 
@@ -182,14 +182,14 @@ astra_switch_item_t *astra_to_switch_item(astra_list_item_t *_item) {
 所有回调统一使用 `void (*)(void *user_data)` 签名，并附带 `user_data` 上下文指针。
 
 ```c
-typedef void (*astra_callback_t)(void *user_data);
+typedef void (*xerintosh_callback_t)(void *user_data);
 
 /* 在结构体中 */
-struct astra_user_item_t {
-    astra_list_item_t base_item;
-    astra_callback_t init_cb;
-    astra_callback_t loop_cb;
-    astra_callback_t exit_cb;
+struct xerintosh_user_item_t {
+    xerintosh_list_item_t base_item;
+    xerintosh_callback_t init_cb;
+    xerintosh_callback_t loop_cb;
+    xerintosh_callback_t exit_cb;
     void *user_data;  /* 回调上下文 */
 };
 ```
@@ -198,9 +198,9 @@ struct astra_user_item_t {
 
 ```c
 /* 注册回调时传递上下文 */
-astra_list_item_t *item = astra_new_user_item(
+xerintosh_list_item_t *item = xerintosh_new_user_item(
     "我的页面",
-    my_init,      /* astra_callback_t */
+    my_init,      /* xerintosh_callback_t */
     my_loop,
     my_exit,
     &my_context   /* void *user_data */

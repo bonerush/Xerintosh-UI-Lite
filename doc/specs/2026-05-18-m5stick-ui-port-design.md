@@ -4,7 +4,7 @@
 
 ## 概述
 
-本文档描述将 `reference/oled-ui-astra-lite`（基于 u8g2 的 128×64 OLED UI 框架）移植到 M5Stick-C（80×160 TFT，ST7735S）的设计方案。
+本文档描述将 `reference/oled-ui-Xerintosh-lite`（基于 u8g2 的 128×64 OLED UI 框架）移植到 M5Stick-C（80×160 TFT，ST7735S）的设计方案。
 
 移植策略：**先精确复制，再平台适配**。保留原始框架的所有状态逻辑、动画公式、数据结构，仅替换硬件相关代码和屏幕尺寸常量。
 
@@ -105,10 +105,10 @@ BtnA (GPIO37) / BtnB (GPIO39) 各有两个模式，通过双击切换。
 
 ```
 1. input_process()              → 更新按键状态机
-2. astra_ui_main_core()         → 更新动画 + 业务逻辑
+2. xerintosh_ui_main_core()         → 更新动画 + 业务逻辑
 3. canvas->clear()              → 清空后缓冲
-4. astra_draw_list()            → 背景层：列表外观 + 列表项 + 选择器
-5. astra_draw_widget()          → 前景层：信息栏 + 弹窗
+4. xerintosh_draw_list()            → 背景层：列表外观 + 列表项 + 选择器
+5. xerintosh_draw_widget()          → 前景层：信息栏 + 弹窗
 6. canvas->pushSprite()         → DMA 推送到屏幕
 7. delay(1)                     → 帧率控制
 ```
@@ -116,7 +116,7 @@ BtnA (GPIO37) / BtnB (GPIO39) 各有两个模式，通过双击切换。
 ### 动画引擎（保留原始公式）
 
 ```c
-void astra_animation(float *_pos, float _posTrg, float _speed) {
+void xerintosh_animation(float *_pos, float _posTrg, float _speed) {
     if (fabs(*_pos - _posTrg) <= 1.0f) *_pos = _posTrg;
     else *_pos += (_posTrg - *_pos) / (100.0f - _speed) / 1.0f;
 }
@@ -145,7 +145,7 @@ void astra_animation(float *_pos, float _posTrg, float _speed) {
 ## 数据结构（保留原始设计）
 
 C 风格 OOP：
-- 所有 UI 元素以 `astra_list_item_t` 为基结构体（第一个成员）
+- 所有 UI 元素以 `xerintosh_list_item_t` 为基结构体（第一个成员）
 - 派生类型：`switch_item_t`、`slider_item_t`、`button_item_t`、`user_item_t`
 - 类型安全转换：通过 `type` 枚举检查后再做指针强转
 
@@ -158,15 +158,15 @@ void setup() {
     hal_system_init();        // 初始化 tick 计数器
     hal_input_init();         // 配置 GPIO37/39
 
-    astra_init_core();        // 初始化 UI 核心
+    xerintosh_init_core();        // 初始化 UI 核心
     // 构建菜单树...
-    in_astra = true;          // 直接启动 UI（无长按门槛）
+    in_xerintosh = true;          // 直接启动 UI（无长按门槛）
 }
 
 void loop() {
     input_process();
-    astra_ui_main_core();
-    astra_ui_widget_core();
+    xerintosh_ui_main_core();
+    xerintosh_ui_widget_core();
     hal_display_flush();
     delay(1);
 }
@@ -191,10 +191,10 @@ void loop() {
 
 | 原始文件 | 移植后文件 | 变更说明 |
 |---------|-----------|---------|
-| `astra_ui_core.h/.c` | `ui_core.h/.c` | 重命名，去除作者注释，适配尺寸常量 |
-| `astra_ui_drawer.h/.c` | `ui_drawer.h/.c` | 重命名，去除作者注释，颜色调用适配 |
-| `astra_ui_item.h/.c` | `ui_item.h/.c` | 重命名，去除作者注释 |
-| `astra_ui_draw_driver.h/.c` | `ui_draw_driver.h/.c` | 将宏替换为 HAL 函数调用 |
+| `xerintosh_ui_core.h/.c` | `ui_core.h/.c` | 重命名，去除作者注释，适配尺寸常量 |
+| `xerintosh_ui_drawer.h/.c` | `ui_drawer.h/.c` | 重命名，去除作者注释，颜色调用适配 |
+| `xerintosh_ui_item.h/.c` | `ui_item.h/.c` | 重命名，去除作者注释 |
+| `xerintosh_ui_draw_driver.h/.c` | `ui_draw_driver.h/.c` | 将宏替换为 HAL 函数调用 |
 | （无） | `hal_display.h/.c` | 全新：M5Canvas 双缓冲封装 |
 | （无） | `hal_input.h/.c` | 全新：按键状态机 |
 | （无） | `hal_system.h/.c` | 全新：tick / delay |
