@@ -56,9 +56,9 @@ extern "C" void on_anim_enabled_change_cb(void)
 extern "C" void on_screen_rotation_change_cb(void)
 {
     /* M5StickC panel offset_rotation=2:
-     *   setRotation(1) → actual 270° (portrait)
-     *   setRotation(3) → actual 90°  (landscape) */
-    int16_t gfx_rotation = (g_screen_rotation_level == ORIENTATION_PORTRAIT) ? 1 : 3;
+     *   setRotation(2) → actual 0°   (portrait / 竖屏)
+     *   setRotation(3) → actual 90°  (landscape / 横屏) */
+    int16_t gfx_rotation = (g_screen_rotation_level == ORIENTATION_PORTRAIT) ? 2 : 3;
     M5.Display.setRotation(gfx_rotation);
     storage_set_screen_rotation((uint8_t)g_screen_rotation_level);
     hal_display_init();
@@ -82,9 +82,9 @@ void setup()
     g_anim_speed = settings_anim_speed_value();
 
     /* M5StickC panel offset_rotation=2:
-     *   setRotation(1) → actual 270° (portrait)
-     *   setRotation(3) → actual 90°  (landscape) */
-    int16_t gfx_rotation = (g_screen_rotation_level == ORIENTATION_PORTRAIT) ? 1 : 3;
+     *   setRotation(2) → actual 0°   (portrait / 竖屏)
+     *   setRotation(3) → actual 90°  (landscape / 横屏) */
+    int16_t gfx_rotation = (g_screen_rotation_level == ORIENTATION_PORTRAIT) ? 2 : 3;
     M5.Display.setRotation(gfx_rotation);
 
     xerintosh_ui_driver_init();
@@ -115,7 +115,6 @@ void loop()
     }
 
     hal_display_flush();
-    delay(16);
 }
 
 #endif /* NATIVE_TEST */

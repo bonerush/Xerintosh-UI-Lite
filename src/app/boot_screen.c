@@ -9,22 +9,23 @@ void boot_screen_show(void)
     int16_t sw = SCREEN_WIDTH;
     int16_t sh = SCREEN_HEIGHT;
 
-    /* 麦景塔机身尺寸（按屏幕比例） */
-    int16_t body_w = sw * 6 / 10;
-    int16_t body_h = sh * 3 / 10;
+    /* 以短边为基准，保证横竖屏下机身比例一致 */
+    int16_t base = (sw < sh) ? sw : sh;
+    int16_t body_w = base * 55 / 100;
+    int16_t body_h = base * 75 / 100;
     int16_t body_x = (sw - body_w) / 2;
-    int16_t body_y = (sh - body_h) / 2 - 10;
+    int16_t body_y = (sh - body_h) / 2 - 4;
 
     /* 屏幕边框 */
-    int16_t bezel = (sw < 100) ? 3 : 4;
+    int16_t bezel = 3;
     int16_t screen_w = body_w - bezel * 2;
-    int16_t screen_h = body_h * 5 / 10;
+    int16_t screen_h = body_h * 45 / 100;
     int16_t screen_x = body_x + bezel;
     int16_t screen_y = body_y + bezel;
 
     /* 软盘槽 */
     int16_t slot_w = body_w * 5 / 10;
-    int16_t slot_h = (sw < 100) ? 2 : 3;
+    int16_t slot_h = (base < 100) ? 2 : 3;
     int16_t slot_x = body_x + (body_w - slot_w) / 2;
     int16_t slot_y = body_y + body_h - bezel - slot_h - 2;
 
