@@ -75,7 +75,7 @@ int storage_wifi_get_count(void) {
     Preferences prefs;
     prefs.begin(NVS_NAMESPACE, true);
     uint8_t count = 0;
-    read_count(&prefs,"wifi_count", count);
+    read_count(&prefs,"wifi_count", &count);
     prefs.end();
     return (int)count;
 }
@@ -89,7 +89,7 @@ bool storage_wifi_get(int index, char *ssid, char *pass) {
     prefs.begin(NVS_NAMESPACE, true);
 
     uint8_t count = 0;
-    read_count(&prefs,"wifi_count", count);
+    read_count(&prefs,"wifi_count", &count);
     if (index >= (int)count) {
         prefs.end();
         return false;
@@ -116,7 +116,7 @@ int storage_wifi_find(const char *ssid) {
     prefs.begin(NVS_NAMESPACE, true);
 
     uint8_t count = 0;
-    read_count(&prefs,"wifi_count", count);
+    read_count(&prefs,"wifi_count", &count);
 
     char buf[STORAGE_SSID_MAX_LEN];
     for (int i = 0; i < (int)count; i++) {
@@ -146,7 +146,7 @@ bool storage_wifi_add(const char *ssid, const char *pass) {
 
     /* Check if SSID already exists -> update password in-place */
     uint8_t count = 0;
-    read_count(&prefs,"wifi_count", count);
+    read_count(&prefs,"wifi_count", &count);
 
     char buf[STORAGE_SSID_MAX_LEN];
     for (int i = 0; i < (int)count; i++) {
@@ -192,7 +192,7 @@ bool storage_wifi_remove(int index) {
     prefs.begin(NVS_NAMESPACE, false);
 
     uint8_t count = 0;
-    read_count(&prefs,"wifi_count", count);
+    read_count(&prefs,"wifi_count", &count);
     if (index >= (int)count) {
         prefs.end();
         return false;
@@ -240,7 +240,7 @@ int storage_bt_get_count(void) {
     Preferences prefs;
     prefs.begin(NVS_NAMESPACE, true);
     uint8_t count = 0;
-    read_count(&prefs,"bt_count", count);
+    read_count(&prefs,"bt_count", &count);
     prefs.end();
     return (int)count;
 }
@@ -254,7 +254,7 @@ bool storage_bt_get(int index, char *addr, char *name) {
     prefs.begin(NVS_NAMESPACE, true);
 
     uint8_t count = 0;
-    read_count(&prefs,"bt_count", count);
+    read_count(&prefs,"bt_count", &count);
     if (index >= (int)count) {
         prefs.end();
         return false;
@@ -281,7 +281,7 @@ int storage_bt_find(const char *addr) {
     prefs.begin(NVS_NAMESPACE, true);
 
     uint8_t count = 0;
-    read_count(&prefs,"bt_count", count);
+    read_count(&prefs,"bt_count", &count);
 
     char buf[STORAGE_BT_ADDR_MAX_LEN];
     for (int i = 0; i < (int)count; i++) {
@@ -311,7 +311,7 @@ bool storage_bt_add(const char *addr, const char *name) {
 
     /* Check if address already exists -> update name in-place */
     uint8_t count = 0;
-    read_count(&prefs,"bt_count", count);
+    read_count(&prefs,"bt_count", &count);
 
     char buf[STORAGE_BT_ADDR_MAX_LEN];
     for (int i = 0; i < (int)count; i++) {
@@ -357,7 +357,7 @@ bool storage_bt_remove(int index) {
     prefs.begin(NVS_NAMESPACE, false);
 
     uint8_t count = 0;
-    read_count(&prefs,"bt_count", count);
+    read_count(&prefs,"bt_count", &count);
     if (index >= (int)count) {
         prefs.end();
         return false;

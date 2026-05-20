@@ -10,6 +10,11 @@ int16_t g_anim_speed = 92;
 
 #ifndef NATIVE_TEST
 
+extern "C" {
+bool wifi_on = true;
+bool bt_on = true;
+}
+
 #include <M5Unified.h>
 #include <M5GFX.h>
 
