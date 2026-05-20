@@ -32,13 +32,6 @@ int16_t anim_speed = 40 + g_anim_speed_level * 5;          /* 实际速度 45-95
 *📄 Source: [settings.h](../../src/app/settings.h)*
 
 ```c
-typedef struct {
-    int16_t brightness_level;       /* 1-10 */
-    int16_t anim_speed_level;       /* 1-10 */
-    bool    anim_enabled;
-    int16_t screen_rotation_level;  /* 1=portrait, 2=landscape */
-} settings_t;
-
 extern int16_t g_brightness_level;
 extern int16_t g_anim_speed_level;
 extern bool    g_anim_enabled;
