@@ -1,4 +1,37 @@
 #include "storage.h"
+
+#ifdef NATIVE_TEST
+
+void     storage_init(void) {}
+int      storage_wifi_get_count(void) { return 0; }
+bool     storage_wifi_get(int index, char *ssid, char *pass) {
+    (void)index; (void)ssid; (void)pass; return false;
+}
+int      storage_wifi_find(const char *ssid) { (void)ssid; return -1; }
+bool     storage_wifi_add(const char *ssid, const char *pass) {
+    (void)ssid; (void)pass; return false;
+}
+bool     storage_wifi_remove(int index) { (void)index; return false; }
+int      storage_bt_get_count(void) { return 0; }
+bool     storage_bt_get(int index, char *addr, char *name) {
+    (void)index; (void)addr; (void)name; return false;
+}
+int      storage_bt_find(const char *addr) { (void)addr; return -1; }
+bool     storage_bt_add(const char *addr, const char *name) {
+    (void)addr; (void)name; return false;
+}
+bool     storage_bt_remove(int index) { (void)index; return false; }
+int16_t  storage_get_brightness(void) { return 50; }
+void     storage_set_brightness(int16_t val) { (void)val; }
+uint8_t  storage_get_anim_speed(void) { return 92; }
+void     storage_set_anim_speed(uint8_t val) { (void)val; }
+bool     storage_get_anim_enabled(void) { return true; }
+void     storage_set_anim_enabled(bool val) { (void)val; }
+uint8_t  storage_get_screen_rotation(void) { return 2; }
+void     storage_set_screen_rotation(uint8_t val) { (void)val; }
+
+#else
+
 #include <Preferences.h>
 #include <string.h>
 
@@ -411,3 +444,51 @@ void storage_set_anim_speed(uint8_t val) {
     prefs.putUChar("anim_speed", val);
     prefs.end();
 }
+
+/* ─── Animation Enabled ─── */
+
+bool storage_get_anim_enabled(void) {
+    Preferences prefs;
+    prefs.begin(NVS_NAMESPACE, true);
+
+    if (!prefs.isKey("anim_enabled")) {
+        prefs.end();
+        return true; // default: animation on
+    }
+
+    bool val = prefs.getBool("anim_enabled", true);
+    prefs.end();
+    return val;
+}
+
+void storage_set_anim_enabled(bool val) {
+    Preferences prefs;
+    prefs.begin(NVS_NAMESPACE, false);
+    prefs.putBool("anim_enabled", val);
+    prefs.end();
+}
+
+/* ─── Screen Rotation ─── */
+
+uint8_t storage_get_screen_rotation(void) {
+    Preferences prefs;
+    prefs.begin(NVS_NAMESPACE, true);
+
+    if (!prefs.isKey("screen_rot")) {
+        prefs.end();
+        return 2; // default: landscape (level 2 = 90deg)
+    }
+
+    uint8_t val = prefs.getUChar("screen_rot", 1);
+    prefs.end();
+    return val;
+}
+
+void storage_set_screen_rotation(uint8_t val) {
+    Preferences prefs;
+    prefs.begin(NVS_NAMESPACE, false);
+    prefs.putUChar("screen_rot", val);
+    prefs.end();
+}
+
+#endif /* NATIVE_TEST */

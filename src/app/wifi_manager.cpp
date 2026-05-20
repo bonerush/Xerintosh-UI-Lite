@@ -1,3 +1,18 @@
+#ifdef NATIVE_TEST
+
+#include "app/wifi_manager.h"
+
+void wifi_mgr_init(void) {}
+void wifi_mgr_enable(void) {}
+void wifi_mgr_disable(void) {}
+bool wifi_mgr_is_enabled(void) { return false; }
+wifi_mgr_state_t wifi_mgr_get_state(void) { return WIFI_MGR_IDLE; }
+bool wifi_mgr_is_waiting_input(void) { return false; }
+void wifi_mgr_update(void) {}
+void wifi_mgr_on_switch_toggle(void) {}
+
+#else
+
 #include <WiFi.h>
 #include <Arduino.h>
 #include <string.h>
@@ -27,6 +42,13 @@ static astra_list_item_t *g_scan_button    = NULL;
 static bool  g_connecting = false;
 static char  g_connecting_ssid[STORAGE_SSID_MAX_LEN] = {0};
 static char  g_connecting_pass[STORAGE_PASS_MAX_LEN] = {0};
+
+static unsigned long g_wifi_scan_start_time = 0;
+static unsigned long g_warmup_start_time   = 0;
+static int g_scan_retry_count = 0;
+
+#define WIFI_WARMUP_DELAY_MS 3000
+#define WIFI_SCAN_TIMEOUT_MS 30000
 
 /* ─── Forward declarations (callbacks) ─── */
 
@@ -63,18 +85,10 @@ void wifi_mgr_init(void)
         g_settings_list = root->child_list_item[0];  // "Settings"
     }
 
-    /* Try auto-connect with saved credentials */
-    if (storage_wifi_get_count() > 0) {
-        char ssid[STORAGE_SSID_MAX_LEN];
-        char pass[STORAGE_PASS_MAX_LEN];
-        if (storage_wifi_get(0, ssid, pass)) {
-            WiFi.mode(WIFI_STA);
-            WiFi.begin(ssid, pass);
-            g_connecting = true;
-            strncpy(g_connecting_ssid, ssid, STORAGE_SSID_MAX_LEN);
-            /* Non-blocking - connection result handled in wifi_mgr_update() */
-        }
-    }
+    /* NOTE: Auto-connect removed. WiFi is off by default (wifi_on = false).
+       Starting WiFi.begin() here causes scan failures later because
+       WiFi.disconnect() leaves the driver in an unstable state.
+       Connection is handled when user selects a network instead. */
 }
 
 /* ─── Enable / Disable ─── */
@@ -83,35 +97,9 @@ void wifi_mgr_enable(void)
 {
     g_wifi_enabled = true;
     WiFi.mode(WIFI_STA);
-
-    /* If a background auto-connection is still in progress, stop it
-       so the scan can acquire the WiFi radio. */
-    if (g_connecting || WiFi.status() == WL_IDLE_STATUS) {
-        WiFi.disconnect();
-        g_connecting = false;
-    }
-
-    /* Wait for WiFi driver to become idle before starting scan. */
-    delay(300);
-
-    /* Delete any stale scan results so the new scan can start cleanly. */
-    WiFi.scanDelete();
-
-    /* Create "Networks" list and append to Settings */
-    g_networks_list = astra_new_list_item("网络", list_icon);
-    if (g_settings_list && g_networks_list) {
-        astra_push_item_to_list(g_settings_list, g_networks_list);
-    }
-
-    /* Start async scan */
-    int16_t scan_ret = WiFi.scanNetworks(true);
-    if (scan_ret == -2) {
-        astra_push_pop_up("扫描失败", 2000);
-        g_state = WIFI_MGR_IDLE;
-    } else {
-        g_state = WIFI_MGR_SCANNING;
-        astra_push_pop_up("扫描中...", 100);
-    }
+    g_warmup_start_time = millis();
+    g_state = WIFI_MGR_WARMUP;
+    rebuild_network_list(0);
 }
 
 void wifi_mgr_disable(void)
@@ -156,6 +144,14 @@ void wifi_mgr_on_switch_toggle(void)
 
 static void rebuild_network_list(int scan_count)
 {
+    /* Create the Networks list on first call */
+    if (!g_networks_list) {
+        g_networks_list = astra_new_list_item("网络", list_icon);
+        if (g_settings_list && g_networks_list) {
+            astra_push_item_to_list(g_settings_list, g_networks_list);
+        }
+    }
+
     if (!g_networks_list) {
         return;
     }
@@ -240,7 +236,7 @@ static void on_network_button_pressed(void)
         return;
     }
 
-    astra_push_pop_up("请在串口输入密码", 100);
+    astra_push_pop_up("请在串口输入密码", 8000);
     serial_request_wifi_password(content);
     g_state = WIFI_MGR_CONNECTING;
 }
@@ -308,16 +304,22 @@ static void on_scan_pressed(void)
     if (scan_ret == -2) {
         astra_push_pop_up("扫描失败", 2000);
         g_state = WIFI_MGR_IDLE;
+    } else if (scan_ret >= 0) {
+        /* Scan completed synchronously */
+        astra_hide_pop_up();
+        rebuild_network_list(scan_ret);
+        g_state = WIFI_MGR_SCAN_DONE;
+        g_scan_retry_count = 0;
     } else {
         g_state = WIFI_MGR_SCANNING;
-        astra_push_pop_up("扫描中...", 100);
+        g_wifi_scan_start_time = millis();
+        astra_push_pop_up("扫描中...", WIFI_SCAN_TIMEOUT_MS);
     }
 }
 
 /* ─── Per-frame update (non-blocking state machine) ─── */
 
 #define WIFI_SCAN_MAX_RETRIES 3
-static int g_scan_retry_count = 0;
 
 void wifi_mgr_update(void)
 {
@@ -327,10 +329,27 @@ void wifi_mgr_update(void)
 
     switch (g_state) {
 
+    case WIFI_MGR_WARMUP: {
+        if (millis() - g_warmup_start_time >= WIFI_WARMUP_DELAY_MS) {
+            on_scan_pressed();
+        }
+        break;
+    }
+
     case WIFI_MGR_SCANNING: {
-        astra_push_pop_up("扫描中...", 100);
+        /* 扫描超时检查 */
+        if (millis() - g_wifi_scan_start_time >= WIFI_SCAN_TIMEOUT_MS) {
+            WiFi.scanDelete();
+            astra_hide_pop_up();
+            rebuild_network_list(0);
+            g_state = WIFI_MGR_SCAN_DONE;
+            g_scan_retry_count = 0;
+            break;
+        }
+
         int16_t result = WiFi.scanComplete();
         if (result >= 0) {
+            astra_hide_pop_up();
             rebuild_network_list(result);
             g_state = WIFI_MGR_SCAN_DONE;
             g_scan_retry_count = 0;
@@ -338,8 +357,11 @@ void wifi_mgr_update(void)
             /* 扫描失败 - retry if under limit */
             if (g_scan_retry_count < WIFI_SCAN_MAX_RETRIES) {
                 g_scan_retry_count++;
+                WiFi.scanDelete();
                 WiFi.scanNetworks(true);
+                g_wifi_scan_start_time = millis();
             } else {
+                astra_hide_pop_up();
                 astra_push_pop_up("扫描失败", 2000);
                 g_state = WIFI_MGR_IDLE;
                 g_scan_retry_count = 0;
@@ -350,8 +372,6 @@ void wifi_mgr_update(void)
     }
 
     case WIFI_MGR_CONNECTING: {
-        /* Keep pop-up visible while waiting for input */
-        astra_push_pop_up("请在串口输入密码", 100);
         /* Poll serial for password input */
         serial_state_t ss = serial_poll();
         if (ss == SERIAL_STATE_PASSWORD_RECEIVED) {
@@ -401,3 +421,5 @@ void wifi_mgr_update(void)
         break;
     }
 }
+
+#endif /* NATIVE_TEST */

@@ -1,3 +1,18 @@
+#ifdef NATIVE_TEST
+
+#include "app/bt_manager.h"
+
+void bt_mgr_init(void) {}
+void bt_mgr_enable(void) {}
+void bt_mgr_disable(void) {}
+bool bt_mgr_is_enabled(void) { return false; }
+bt_mgr_state_t bt_mgr_get_state(void) { return BT_MGR_IDLE; }
+bool bt_mgr_is_waiting_input(void) { return false; }
+void bt_mgr_update(void) {}
+void bt_mgr_on_switch_toggle(void) {}
+
+#else
+
 #include <Arduino.h>
 #include <NimBLEDevice.h>
 
@@ -28,7 +43,9 @@ struct BleDeviceResult {
 static BleDeviceResult g_scan_results[20];
 static int g_scan_result_count = 0;
 static unsigned long g_scan_start_time = 0;
-static const unsigned long SCAN_DURATION_MS = 5000;
+static unsigned long g_warmup_start_time = 0;
+static const unsigned long SCAN_DURATION_MS = 10000;
+#define BT_WARMUP_DELAY_MS 1500
 
 // Menu items
 static astra_list_item_t *g_settings_list = NULL;
@@ -115,13 +132,21 @@ static void on_bt_scan_pressed(void) {
     NimBLEDevice::getScan()->start(SCAN_DURATION_MS / 1000, false);
     g_scan_start_time = millis();
     g_state = BT_MGR_SCANNING;
-    astra_push_pop_up("扫描中...", 2000);
+    astra_push_pop_up("扫描中...", SCAN_DURATION_MS);
 }
 
 // ---------------------------------------------------------------------------
 // Device list builder
 // ---------------------------------------------------------------------------
 static void rebuild_device_list(void) {
+    /* Create the Devices list on first call */
+    if (!g_devices_list) {
+        g_devices_list = astra_new_list_item("蓝牙设备", list_icon);
+        if (g_settings_list && g_devices_list) {
+            astra_push_item_to_list(g_settings_list, g_devices_list);
+        }
+    }
+
     if (!g_devices_list) return;
 
     /* Safety: if selector is inside Devices subtree, move it to Devices itself
@@ -210,16 +235,10 @@ void bt_mgr_enable(void) {
     scan->setAdvertisedDeviceCallbacks(new ScanCallbacks());
     scan->setActiveScan(true);
 
-    g_devices_list = astra_new_list_item("蓝牙设备", list_icon);
-    if (g_settings_list && g_devices_list) {
-        astra_push_item_to_list(g_settings_list, g_devices_list);
-    }
-
     g_scan_result_count = 0;
-    scan->start(SCAN_DURATION_MS / 1000, false);
-    g_scan_start_time = millis();
-    g_state = BT_MGR_SCANNING;
-    astra_push_pop_up("扫描中...", 2000);
+    g_warmup_start_time = millis();
+    g_state = BT_MGR_WARMUP;
+    rebuild_device_list();
 }
 
 void bt_mgr_disable(void) {
@@ -258,9 +277,16 @@ void bt_mgr_update(void) {
     if (!g_bt_enabled && g_state == BT_MGR_IDLE) return;
 
     switch (g_state) {
+    case BT_MGR_WARMUP: {
+        if (millis() - g_warmup_start_time >= BT_WARMUP_DELAY_MS) {
+            on_bt_scan_pressed();
+        }
+        break;
+    }
     case BT_MGR_SCANNING: {
         if (millis() - g_scan_start_time >= SCAN_DURATION_MS) {
             NimBLEDevice::getScan()->stop();
+            astra_hide_pop_up();
             rebuild_device_list();
             g_state = BT_MGR_SCAN_DONE;
         }
@@ -299,3 +325,5 @@ void bt_mgr_on_switch_toggle(void) {
         bt_mgr_disable();
     }
 }
+
+#endif /* NATIVE_TEST */

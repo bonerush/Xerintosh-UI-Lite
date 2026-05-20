@@ -1,3 +1,20 @@
+#ifdef NATIVE_TEST
+
+#include "serial_input.h"
+
+void serial_request_wifi_password(const char *ssid) { (void)ssid; }
+void serial_request_bt_pair_code(const char *device_name) { (void)device_name; }
+void serial_request_bt_pair_code_with_addr(const char *device_name, const char *device_addr) {
+    (void)device_name; (void)device_addr;
+}
+void serial_cancel(void) {}
+serial_state_t serial_poll(void) { return SERIAL_STATE_IDLE; }
+const char* serial_get_input(void) { return nullptr; }
+const char* serial_get_target_name(void) { return nullptr; }
+const char* serial_get_target_addr(void) { return nullptr; }
+
+#else
+
 #include "serial_input.h"
 #include <Arduino.h>
 #include <string.h>
@@ -192,3 +209,5 @@ const char *serial_get_target_addr(void)
 {
     return target_addr[0] ? target_addr : NULL;
 }
+
+#endif /* NATIVE_TEST */

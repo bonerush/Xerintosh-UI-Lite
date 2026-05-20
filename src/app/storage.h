@@ -40,6 +40,14 @@ void     storage_set_brightness(int16_t val);
 uint8_t  storage_get_anim_speed(void);
 void     storage_set_anim_speed(uint8_t val);
 
+// Animation enabled (default true)
+bool     storage_get_anim_enabled(void);
+void     storage_set_anim_enabled(bool val);
+
+// Screen rotation level (1=portrait 0deg, 2=landscape 90deg; default 2)
+uint8_t  storage_get_screen_rotation(void);
+void     storage_set_screen_rotation(uint8_t val);
+
 #ifdef __cplusplus
 }
 #endif
