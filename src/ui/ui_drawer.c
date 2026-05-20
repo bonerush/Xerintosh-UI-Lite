@@ -386,9 +386,24 @@ void astra_draw_list_item()
         _item->is_scrolling = false;
       }
 
-      oled_draw_UTF8(10 + _x_list_item - (int16_t)_scroll_x,
+      /* 设置裁剪区域：限制文字只在 icon 右侧到控件左侧之间显示 */
+      int16_t _clip_x = LIST_ITEM_LEFT_MARGIN + 10;
+      int16_t _clip_y = _y_list_item - oled_get_str_height() / 2 - 2;
+      int16_t _clip_h = oled_get_str_height() + 4;
+      hal_set_clip_rect(_clip_x, _clip_y, _avail_width, _clip_h);
+
+      int16_t _cycle_dist = _text_width + _avail_width;
+      int16_t _draw_x = _clip_x - (int16_t)_scroll_x;
+
+      /* 绘制两份相同文字，形成无缝循环跑马灯 */
+      oled_draw_UTF8(_draw_x,
                      _y_list_item + oled_get_str_height() / 2,
                      _item->content);
+      oled_draw_UTF8(_draw_x + _cycle_dist,
+                     _y_list_item + oled_get_str_height() / 2,
+                     _item->content);
+
+      hal_clear_clip_rect();
       /* ----------------------------------- */
     }
   }
@@ -502,24 +517,11 @@ float astra_compute_scroll_offset(int16_t text_width, int16_t avail_width,
   if (!is_selected || text_width <= avail_width)
     return 0.0f;
 
-  const uint32_t SCROLL_DURATION_MS = 2000;
-  const uint32_t PAUSE_DURATION_MS  = 500;
-  const uint32_t CYCLE_MS = SCROLL_DURATION_MS + PAUSE_DURATION_MS;
-
-  int16_t max_offset = text_width - avail_width;
-  if (max_offset <= 0)
+  int16_t cycle_distance = text_width + avail_width;
+  if (cycle_distance <= 0)
     return 0.0f;
 
-  uint32_t phase = elapsed_ms % CYCLE_MS;
-
-  if (phase < SCROLL_DURATION_MS) {
-    float t = (float)phase / (float)SCROLL_DURATION_MS;
-    /* ease-in-out quadratic */
-    t = t < 0.5f ? 2.0f * t * t
-                 : 1.0f - (-2.0f * t + 2.0f) * (-2.0f * t + 2.0f) / 2.0f;
-    return t * max_offset;
-  } else {
-    /* pause phase: hold at max_offset */
-    return (float)max_offset;
-  }
+  const uint32_t SCROLL_CYCLE_MS = 3000;
+  uint32_t phase = elapsed_ms % SCROLL_CYCLE_MS;
+  return ((float)phase / (float)SCROLL_CYCLE_MS) * (float)cycle_distance;
 }

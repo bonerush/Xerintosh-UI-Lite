@@ -43,6 +43,9 @@ extern const void* hal_get_cn_font(void);
 extern void hal_draw_xor_rect(int16_t x, int16_t y, int16_t w, int16_t h);
 extern void hal_draw_xbitmap(int16_t x, int16_t y, int16_t w, int16_t h, const uint8_t* bitmap);
 
+extern void hal_set_clip_rect(int16_t x, int16_t y, int16_t w, int16_t h);
+extern void hal_clear_clip_rect(void);
+
 #ifdef __cplusplus
 }
 #endif

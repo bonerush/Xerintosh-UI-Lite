@@ -250,6 +250,13 @@ void hal_draw_xbitmap(int16_t x, int16_t y, int16_t w, int16_t h, const uint8_t*
     }
 }
 
+void hal_set_clip_rect(int16_t x, int16_t y, int16_t w, int16_t h) {
+    (void)x; (void)y; (void)w; (void)h;
+}
+
+void hal_clear_clip_rect(void) {
+}
+
 #else
 
 #include <M5Unified.h>
@@ -379,6 +386,14 @@ void hal_draw_xor_rect(int16_t x, int16_t y, int16_t w, int16_t h) {
 void hal_draw_xbitmap(int16_t x, int16_t y, int16_t w, int16_t h, const uint8_t* bitmap) {
     if (!g_canvas || !bitmap) return;
     g_canvas->drawXBitmap(x, y, bitmap, w, h, COLOR_FG);
+}
+
+void hal_set_clip_rect(int16_t x, int16_t y, int16_t w, int16_t h) {
+    if (g_canvas) g_canvas->setClipRect(x, y, w, h);
+}
+
+void hal_clear_clip_rect(void) {
+    if (g_canvas) g_canvas->clearClipRect();
 }
 
 const void* hal_get_cn_font(void) {
