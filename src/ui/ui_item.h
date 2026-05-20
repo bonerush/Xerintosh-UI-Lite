@@ -6,7 +6,7 @@
 #include <stdbool.h>
 
 /* 动画速度常量 — 基于可配置的全局变量 */
-extern uint8_t g_anim_speed;
+extern int16_t g_anim_speed;
 
 #define ANIM_SPEED_LIST_ITEM    (g_anim_speed - 8)
 #define ANIM_SPEED_SELECTOR     (g_anim_speed)
@@ -60,6 +60,7 @@ typedef struct astra_pop_up_t
 extern astra_pop_up_t astra_pop_up;
 
 extern void astra_push_pop_up(const char *_content, const uint16_t _span);
+extern void astra_hide_pop_up(void);
 /*** 弹窗 ***/
 
 /*** 列表项 ***/
@@ -104,6 +105,11 @@ typedef struct astra_list_item_t
   struct astra_list_item_t *child_list_item[MAX_LIST_CHILD_NUM];
   struct astra_list_item_t *parent;
   void *user_data;
+
+  /* 文字滚动状态（Phase 1.2） */
+  float content_scroll_offset;      /* 当前滚动偏移 */
+  uint32_t scroll_start_time;       /* 滚动开始时间戳 */
+  bool is_scrolling;                /* 是否正在滚动 */
 } astra_list_item_t;
 
 typedef struct astra_switch_item_t

@@ -10,7 +10,8 @@ uint8_t astra_exit_animation_status = 0;
 void astra_draw_exit_animation()
 {
   static float _temp_h = -8;
-  static float _temp_h_trg = SCREEN_HEIGHT + 8;
+  static float _temp_h_trg = -999;
+  if (_temp_h_trg < 0) _temp_h_trg = SCREEN_HEIGHT + 8;
 
   oled_set_draw_color(0);
   oled_draw_box(0, 0, SCREEN_WIDTH, _temp_h);
@@ -360,7 +361,36 @@ void astra_draw_list_item()
     astra_set_font(hal_get_cn_font());
     if (_y_list_item + oled_get_str_height() / 2 > LIST_INFO_BAR_HEIGHT &&
         _y_list_item + oled_get_str_height() / 2 < SCREEN_HEIGHT)
-      oled_draw_UTF8(10 + _x_list_item, _y_list_item + oled_get_str_height() / 2, _item->content);
+    {
+      /* ---- 文字滚动效果 (Phase 1.2) ---- */
+      int16_t _text_width = oled_get_UTF8_width(_item->content);
+      int16_t _avail_width = SCREEN_WIDTH - LIST_ITEM_LEFT_MARGIN - 10 - LIST_ITEM_RIGHT_MARGIN;
+
+      /* switch/slider 占用右侧空间，减小可用宽度 */
+      if (_item->type == switch_item)
+        _avail_width -= 11;
+      else if (_item->type == slider_item)
+        _avail_width -= 20;
+
+      bool _is_selected = (_item == astra_selector.selected_item);
+      float _scroll_x = 0.0f;
+
+      if (_is_selected && _text_width > _avail_width) {
+        if (!_item->is_scrolling) {
+          _item->is_scrolling = true;
+          _item->scroll_start_time = get_ticks();
+        }
+        uint32_t _elapsed = get_ticks() - _item->scroll_start_time;
+        _scroll_x = astra_compute_scroll_offset(_text_width, _avail_width, true, _elapsed);
+      } else {
+        _item->is_scrolling = false;
+      }
+
+      oled_draw_UTF8(10 + _x_list_item - (int16_t)_scroll_x,
+                     _y_list_item + oled_get_str_height() / 2,
+                     _item->content);
+      /* ----------------------------------- */
+    }
   }
 
   astra_refresh_list_value = false;
@@ -457,4 +487,39 @@ void astra_draw_list()
   astra_draw_list_item();
   astra_draw_selector();
   astra_draw_slider_overlays();
+}
+
+/** @brief 计算文字滚动偏移量（纯函数，便于单元测试）
+ *  @param text_width   文字总宽度
+ *  @param avail_width  可用显示宽度
+ *  @param is_selected  当前项是否被选中
+ *  @param elapsed_ms   从选中开始经过的毫秒数
+ *  @return 水平偏移量（正值表示向左滚动）
+ */
+float astra_compute_scroll_offset(int16_t text_width, int16_t avail_width,
+                                   bool is_selected, uint32_t elapsed_ms)
+{
+  if (!is_selected || text_width <= avail_width)
+    return 0.0f;
+
+  const uint32_t SCROLL_DURATION_MS = 2000;
+  const uint32_t PAUSE_DURATION_MS  = 500;
+  const uint32_t CYCLE_MS = SCROLL_DURATION_MS + PAUSE_DURATION_MS;
+
+  int16_t max_offset = text_width - avail_width;
+  if (max_offset <= 0)
+    return 0.0f;
+
+  uint32_t phase = elapsed_ms % CYCLE_MS;
+
+  if (phase < SCROLL_DURATION_MS) {
+    float t = (float)phase / (float)SCROLL_DURATION_MS;
+    /* ease-in-out quadratic */
+    t = t < 0.5f ? 2.0f * t * t
+                 : 1.0f - (-2.0f * t + 2.0f) * (-2.0f * t + 2.0f) / 2.0f;
+    return t * max_offset;
+  } else {
+    /* pause phase: hold at max_offset */
+    return (float)max_offset;
+  }
 }
