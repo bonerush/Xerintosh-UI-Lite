@@ -55,10 +55,12 @@ extern "C" void on_anim_enabled_change_cb(void)
 
 extern "C" void on_screen_rotation_change_cb(void)
 {
-    /* M5StickC panel offset_rotation=2:
-     *   setRotation(2) → actual 0°   (portrait / 竖屏)
-     *   setRotation(3) → actual 90°  (landscape / 横屏) */
-    int16_t gfx_rotation = (g_screen_rotation_level == ORIENTATION_PORTRAIT) ? 2 : 3;
+    /* M5StickC 实测 rotation 效果：
+     *   setRotation(0) → 正常竖屏 (portrait)
+     *   setRotation(1) → 正常横屏 (landscape)
+     *   setRotation(2) → 反向竖屏
+     *   setRotation(3) → 反向横屏 */
+    int16_t gfx_rotation = (g_screen_rotation_level == ORIENTATION_PORTRAIT) ? 0 : 1;
     M5.Display.setRotation(gfx_rotation);
     storage_set_screen_rotation((uint8_t)g_screen_rotation_level);
     hal_display_init();
@@ -81,10 +83,10 @@ void setup()
     M5.Display.setBrightness((uint8_t)settings_brightness_hw_value());
     g_anim_speed = settings_anim_speed_value();
 
-    /* M5StickC panel offset_rotation=2:
-     *   setRotation(2) → actual 0°   (portrait / 竖屏)
-     *   setRotation(3) → actual 90°  (landscape / 横屏) */
-    int16_t gfx_rotation = (g_screen_rotation_level == ORIENTATION_PORTRAIT) ? 2 : 3;
+    /* M5StickC 实测 rotation 效果：
+     *   setRotation(0) → 正常竖屏 (portrait)
+     *   setRotation(1) → 正常横屏 (landscape) */
+    int16_t gfx_rotation = (g_screen_rotation_level == ORIENTATION_PORTRAIT) ? 0 : 1;
     M5.Display.setRotation(gfx_rotation);
 
     xerintosh_ui_driver_init();

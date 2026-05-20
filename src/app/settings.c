@@ -7,9 +7,6 @@ int16_t g_anim_speed_level       = 5;
 extern bool g_anim_enabled;
 int16_t g_screen_rotation_level  = ORIENTATION_LANDSCAPE;
 
-/* 屏幕旋转兼容映射（声明在 rotation_helper.c） */
-extern int16_t resolve_rotation_level(uint8_t saved_rot);
-
 void settings_load_from_storage(void)
 {
     /* 亮度等级（1-10） */
@@ -37,9 +34,13 @@ void settings_load_from_storage(void)
     /* 动画开关 */
     g_anim_enabled = storage_get_anim_enabled();
 
-    /* 屏幕方向等级 */
+    /* 屏幕方向等级（新 key screen_orient 直接存储新格式值 1/2） */
     uint8_t saved_rot = storage_get_screen_rotation();
-    g_screen_rotation_level = resolve_rotation_level(saved_rot);
+    if (saved_rot == ORIENTATION_PORTRAIT || saved_rot == ORIENTATION_LANDSCAPE) {
+        g_screen_rotation_level = saved_rot;
+    } else {
+        g_screen_rotation_level = ORIENTATION_LANDSCAPE;
+    }
 }
 
 int16_t settings_brightness_hw_value(void)
