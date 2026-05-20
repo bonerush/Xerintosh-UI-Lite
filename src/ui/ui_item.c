@@ -41,6 +41,7 @@ void astra_push_pop_up(const char *_content, const uint16_t _span)
   if (astra_pop_up.is_running && astra_pop_up.content != NULL && strcmp(astra_pop_up.content, _content) == 0) {
     astra_pop_up.time_start = get_ticks();
     astra_pop_up.span = _span;
+    astra_pop_up.y_pop_up_trg = 20;
     return;
   }
 
@@ -59,6 +60,13 @@ void astra_push_pop_up(const char *_content, const uint16_t _span)
 
   astra_set_font(hal_get_cn_font());
   astra_pop_up.w_pop_up_trg = oled_get_UTF8_width(astra_pop_up.content) + POP_UP_OFFSET;
+}
+
+void astra_hide_pop_up(void)
+{
+  astra_pop_up.is_running = false;
+  astra_pop_up.y_pop_up_trg = 0 - 2 * POP_UP_HEIGHT;
+  astra_pop_up.y_pop_up = 0 - 2 * POP_UP_HEIGHT;
 }
 
 // astra_list_item_t astra_list_item_root = {};

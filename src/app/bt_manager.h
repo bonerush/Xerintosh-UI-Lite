@@ -9,6 +9,7 @@ extern "C" {
 
 typedef enum {
     BT_MGR_IDLE,
+    BT_MGR_WARMUP,
     BT_MGR_SCANNING,
     BT_MGR_SCAN_DONE,
     BT_MGR_PAIRING,

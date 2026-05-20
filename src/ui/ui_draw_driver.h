@@ -4,6 +4,10 @@
 #include "hal/hal_display.h"
 #include "hal/hal_system.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 extern uint16_t astra_draw_color;
 
 #define get_ticks() hal_get_ticks()
@@ -34,5 +38,9 @@ extern uint16_t astra_draw_color;
 #define oled_send_area_buffer(x, y, w, h) /* not needed */
 
 extern void astra_ui_driver_init(void);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // UI_DRAW_DRIVER_H

@@ -9,8 +9,10 @@ extern "C" {
 #define SCREEN_WIDTH  80
 #define SCREEN_HEIGHT 160
 #else
-#define SCREEN_WIDTH  160
-#define SCREEN_HEIGHT 80
+extern int16_t g_screen_width;
+extern int16_t g_screen_height;
+#define SCREEN_WIDTH  g_screen_width
+#define SCREEN_HEIGHT g_screen_height
 #endif
 #define COLOR_BG      0x0000
 #define COLOR_FG      0xFFFF

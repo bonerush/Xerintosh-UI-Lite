@@ -4,6 +4,10 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define ALLOW_EXIT_ASTRA_UI_BY_USER 1
 
 extern bool in_astra;
@@ -24,5 +28,11 @@ extern void astra_ui_main_core(void);
 
 extern void astra_animation(float *_pos, float _posTrg, float _speed);
 extern uint8_t astra_exit_animation_status;
+
+extern bool g_anim_enabled;
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

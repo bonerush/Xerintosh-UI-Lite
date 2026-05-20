@@ -5,6 +5,10 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* 动画速度常量 — 基于可配置的全局变量 */
 extern int16_t g_anim_speed;
 
@@ -209,5 +213,9 @@ extern astra_camera_t astra_camera;
 extern astra_camera_t* astra_get_camera();
 extern void astra_bind_selector_to_camera(astra_selector_t *_selector);
 /*** 相机 ***/
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // UI_ITEM_H

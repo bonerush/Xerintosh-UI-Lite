@@ -1,12 +1,11 @@
 #include <stdint.h>
 
-extern "C" {
 #include "app/storage.h"
-int16_t resolve_rotation_level(uint8_t saved_rot);
-}
+extern "C" int16_t resolve_rotation_level(uint8_t saved_rot);
 
+extern "C" {
 int16_t g_anim_speed = 92;
-extern bool g_anim_enabled;
+}
 bool wifi_on = true;
 bool bt_on = true;
 
@@ -15,7 +14,6 @@ bool bt_on = true;
 #include <M5Unified.h>
 #include <M5GFX.h>
 
-extern "C" {
 #include "hal/hal_system.h"
 #include "hal/hal_display.h"
 #include "hal/hal_input.h"
@@ -23,7 +21,6 @@ extern "C" {
 #include "ui/ui_core.h"
 #include "ui/ui_item.h"
 #include "ui/ui_drawer.h"
-}
 #include "app/serial_input.h"
 #include "app/wifi_manager.h"
 #include "app/bt_manager.h"

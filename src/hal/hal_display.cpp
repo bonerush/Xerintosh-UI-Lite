@@ -256,13 +256,17 @@ void hal_draw_xbitmap(int16_t x, int16_t y, int16_t w, int16_t h, const uint8_t*
 #include <M5GFX.h>
 
 static M5Canvas* g_canvas = nullptr;
+int16_t g_screen_width = 160;
+int16_t g_screen_height = 80;
 
 void hal_display_init(void) {
     if (!g_canvas) {
         g_canvas = new M5Canvas(&M5.Display);
     }
     g_canvas->setColorDepth(16);
-    g_canvas->createSprite(SCREEN_WIDTH, SCREEN_HEIGHT);
+    g_screen_width = M5.Display.width();
+    g_screen_height = M5.Display.height();
+    g_canvas->createSprite(g_screen_width, g_screen_height);
 }
 
 void hal_display_clear(void) {

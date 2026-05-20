@@ -9,6 +9,7 @@ extern "C" {
 
 typedef enum {
     WIFI_MGR_IDLE,
+    WIFI_MGR_WARMUP,
     WIFI_MGR_SCANNING,
     WIFI_MGR_SCAN_DONE,
     WIFI_MGR_CONNECTING,
