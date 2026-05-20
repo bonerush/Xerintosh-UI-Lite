@@ -66,6 +66,12 @@ void storage_init(void) {
         prefs.putUChar("bt_count", 0);
     }
 
+    /* Default screen orientation: landscape (横屏, level 2).
+     * Uses a new key so old portrait defaults are ignored on first boot. */
+    if (!prefs.isKey("screen_orient")) {
+        prefs.putUChar("screen_orient", 2); // landscape
+    }
+
     prefs.end();
 }
 
@@ -474,12 +480,12 @@ uint8_t storage_get_screen_rotation(void) {
     Preferences prefs;
     prefs.begin(NVS_NAMESPACE, true);
 
-    if (!prefs.isKey("screen_rot")) {
+    if (!prefs.isKey("screen_orient")) {
         prefs.end();
         return 2; // default: landscape (level 2 = 90deg)
     }
 
-    uint8_t val = prefs.getUChar("screen_rot", 1);
+    uint8_t val = prefs.getUChar("screen_orient", 2);
     prefs.end();
     return val;
 }
@@ -487,7 +493,7 @@ uint8_t storage_get_screen_rotation(void) {
 void storage_set_screen_rotation(uint8_t val) {
     Preferences prefs;
     prefs.begin(NVS_NAMESPACE, false);
-    prefs.putUChar("screen_rot", val);
+    prefs.putUChar("screen_orient", val);
     prefs.end();
 }
 
