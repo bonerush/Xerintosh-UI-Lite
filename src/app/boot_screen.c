@@ -1,9 +1,26 @@
+/**
+ * @file   boot_screen.c
+ * @brief  开机画面实现
+ * @details 绘制 "Xerintosh" 品牌开机画面：白色圆角矩形机身、黑色屏幕、
+ *          软盘槽及品牌文字。自动适配横竖屏，以短边为基准保持机身比例。
+ *
+ * @copyright Copyright (c) 2026
+ */
+
 #include "boot_screen.h"
 #include "hal/hal_display.h"
 #include "hal/hal_system.h"
 #include <stdint.h>
 #include <stddef.h>
 
+/**
+ * @brief 显示开机画面并延时 2 秒
+ * @note  绘制元素：
+ *        1. 白色圆角矩形机身（以短边为基准，保证横竖屏比例一致）
+ *        2. 黑色填充屏幕区域（带白色边框）
+ *        3. 白色软盘槽
+ *        4. "Xerintosh" 品牌文字（居中）
+ */
 void boot_screen_show(void)
 {
     int16_t sw = SCREEN_WIDTH;

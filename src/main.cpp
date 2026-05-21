@@ -1,3 +1,12 @@
+/**
+ * @file   main.cpp
+ * @brief  M5Stick-C 固件主入口
+ * @details 硬件环境主程序：初始化 M5Unified、NVS 存储、设置、显示驱动、
+ *          UI 菜单及管理器，进入主循环处理输入、更新状态机及渲染 UI。
+ *
+ * @copyright Copyright (c) 2026
+ */
+
 #include <stdint.h>
 
 #include "app/storage.h"
@@ -5,14 +14,14 @@
 #include "app/app_init.h"
 
 extern "C" {
-int16_t g_anim_speed = 92;
+int16_t g_anim_speed = 92;  /* 全局动画速度默认值 */
 }
 
 #ifndef NATIVE_TEST
 
 extern "C" {
-bool wifi_on = true;
-bool bt_on = true;
+bool wifi_on = true;  /* WiFi 默认开关状态 */
+bool bt_on = true;    /* 蓝牙默认开关状态 */
 }
 
 #include <M5Unified.h>
@@ -30,10 +39,14 @@ bool bt_on = true;
 #include "app/bt_manager.h"
 #include "app/boot_screen.h"
 
-/* ─── 设置变更回调（由 app_init.c 引用） ─── */
+/* ═══ 设置变更回调（由 app_init.c 引用）═══ */
 
-static int16_t brightness = 50;
+static int16_t brightness = 50;  /* 当前硬件亮度缓存 */
 
+/**
+ * @brief 亮度变更回调
+ * @note  将亮度等级转换为硬件 PWM 值并应用到屏幕
+ */
 extern "C" void on_brightness_change_cb(void)
 {
     brightness = g_brightness_level * 10;
@@ -42,32 +55,45 @@ extern "C" void on_brightness_change_cb(void)
     storage_set_brightness(brightness);
 }
 
+/**
+ * @brief 动画速度变更回调
+ */
 extern "C" void on_anim_speed_change_cb(void)
 {
     g_anim_speed = settings_anim_speed_value();
     storage_set_anim_speed((uint8_t)g_anim_speed);
 }
 
+/**
+ * @brief 动画开关变更回调
+ */
 extern "C" void on_anim_enabled_change_cb(void)
 {
     storage_set_anim_enabled(g_anim_enabled);
 }
 
+/**
+ * @brief 屏幕方向变更回调
+ * @note  M5StickC 实测 rotation 效果：
+ *        setRotation(0) → 正常竖屏 (portrait)
+ *        setRotation(1) → 正常横屏 (landscape)
+ *        setRotation(2) → 反向竖屏
+ *        setRotation(3) → 反向横屏
+ */
 extern "C" void on_screen_rotation_change_cb(void)
 {
-    /* M5StickC 实测 rotation 效果：
-     *   setRotation(0) → 正常竖屏 (portrait)
-     *   setRotation(1) → 正常横屏 (landscape)
-     *   setRotation(2) → 反向竖屏
-     *   setRotation(3) → 反向横屏 */
     int16_t gfx_rotation = (g_screen_rotation_level == ORIENTATION_PORTRAIT) ? 0 : 1;
     M5.Display.setRotation(gfx_rotation);
     storage_set_screen_rotation((uint8_t)g_screen_rotation_level);
     hal_display_init();
 }
 
-/* ─── 入口 ─── */
+/* ═══ 入口 ═══ */
 
+/**
+ * @brief Arduino setup()：系统初始化
+ * @note  初始化顺序：M5 硬件 → 串口 → 存储 → 设置 → 显示 → UI → 管理器
+ */
 void setup()
 {
     M5.begin();
@@ -95,9 +121,13 @@ void setup()
     app_init_managers();
 
     xerintosh_init_core();
-    in_xerintosh = true;
+    g_in_xerintosh = true;
 }
 
+/**
+ * @brief Arduino loop()：主循环
+ * @note  每帧执行：输入处理 → 管理器更新 → 清屏 → UI 渲染 → 长按提示 → 刷新
+ */
 void loop()
 {
     M5.update();

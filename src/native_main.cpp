@@ -1,3 +1,12 @@
+/**
+ * @file   native_main.cpp
+ * @brief  Native 测试环境主入口
+ * @details 使用 GoogleTest 框架对 Xerintosh UI 核心进行单元测试。
+ *          在 native 环境下运行，不依赖任何硬件库。
+ *
+ * @copyright Copyright (c) 2026
+ */
+
 #ifdef NATIVE_TEST
 
 #include <gtest/gtest.h>
@@ -20,6 +29,11 @@ bool wifi_on = true;
 bool bt_on = true;
 }
 
+/* ═══ 动画测试 ═══ */
+
+/**
+ * @brief 测试缓动动画是否收敛到目标值
+ */
 TEST(AnimationTest, EasingConverges)
 {
     float pos = 0.0f;
@@ -30,6 +44,11 @@ TEST(AnimationTest, EasingConverges)
     EXPECT_FLOAT_EQ(pos, target);
 }
 
+/* ═══ 列表项测试 ═══ */
+
+/**
+ * @brief 测试根列表是否正确创建
+ */
 TEST(ItemTest, RootListCreated)
 {
     xerintosh_list_item_t* root = xerintosh_get_root_list();
@@ -37,6 +56,9 @@ TEST(ItemTest, RootListCreated)
     EXPECT_EQ(root->type, list_item);
 }
 
+/**
+ * @brief 测试子项挂载功能
+ */
 TEST(ItemTest, PushItem)
 {
     xerintosh_list_item_t* root = xerintosh_get_root_list();
@@ -45,6 +67,11 @@ TEST(ItemTest, PushItem)
     EXPECT_TRUE(result);
 }
 
+/* ═══ 主入口 ═══ */
+
+/**
+ * @brief Native 测试主函数
+ */
 int main(int argc, char **argv)
 {
     ::testing::InitGoogleTest(&argc, argv);
