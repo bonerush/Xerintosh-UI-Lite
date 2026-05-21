@@ -10,9 +10,12 @@
 #ifndef UI_ITEM_H
 #define UI_ITEM_H
 
-#include "ui_draw_driver.h"
+#include "hal/hal_display.h"
 #include <stdint.h>
 #include <stdbool.h>
+
+/* 全局绘制颜色（定义在 ui_core.c） */
+extern uint16_t g_xerintosh_draw_color;
 
 #ifdef __cplusplus
 extern "C" {
@@ -142,6 +145,7 @@ typedef enum {
     slider_icon,
     flag_icon,
     power_icon,
+    custom_icon,    /* 自定义位图图标，需配合 bitmap_data 使用 */
 } xerintosh_list_item_icon_t;
 
 /* ═══ 列表项基类 ═══ */
@@ -167,6 +171,11 @@ typedef struct xerintosh_list_item_t
   float content_scroll_offset;       /* 当前滚动偏移 */
   uint32_t scroll_start_time;        /* 滚动开始时间戳 */
   bool is_scrolling;                 /* 是否正在滚动 */
+
+  /* 自定义位图图标（仅当 icon == custom_icon 时有效） */
+  const uint8_t *bitmap_data;        /* XBM 位图数据指针 */
+  uint8_t bitmap_w;                  /* 位图宽度（像素） */
+  uint8_t bitmap_h;                  /* 位图高度（像素） */
 } xerintosh_list_item_t;
 
 /* ═══ 派生类型 ═══ */
@@ -222,6 +231,16 @@ typedef struct xerintosh_user_item_t
   bool user_item_inited;             /* init_function 是否已执行 */
   bool user_item_looping;            /* loop_function 是否正在运行 */
 } xerintosh_user_item_t;
+
+/**
+ * @brief  为列表项设置自定义位图图标
+ * @param  _item  列表项指针
+ * @param  bitmap XBM 位图数据指针
+ * @param  w      位图宽度（像素）
+ * @param  h      位图高度（像素）
+ * @note   设置后该项的 icon 会自动变为 custom_icon
+ */
+extern void xerintosh_set_item_bitmap(xerintosh_list_item_t *_item, const uint8_t *bitmap, uint8_t w, uint8_t h);
 
 /* ═══ 列表项操作 ═══ */
 

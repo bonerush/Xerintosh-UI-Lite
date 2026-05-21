@@ -242,43 +242,41 @@ xerintosh_list_item_t* app = xerintosh_new_user_item(
 
 ### 4.1 基本实现模板
 
-```cpp
-#include <M5Unified.h>
-#include "ui/ui_item.h"
+```c
+#include "hal/hal_display.h"
+#include "hal/hal_system.h"
 
 static uint32_t start_time = 0;
 
-void my_app_init()
+void my_app_init(void)
 {
     // 一次性初始化：分配资源、重置状态
-    start_time = millis();
+    start_time = hal_get_ticks();
 }
 
-void my_app_loop()
+void my_app_loop(void)
 {
     // 每帧执行：完全控制屏幕绘制
     // 框架不会绘制菜单列表、选择器等任何 UI 元素
 
-    M5.Display.fillScreen(BLACK);
-    M5.Display.setTextColor(WHITE);
-    M5.Display.setTextSize(2);
+    hal_display_clear();
 
-    uint32_t elapsed = (millis() - start_time) / 1000;
+    uint32_t elapsed = (hal_get_ticks() - start_time) / 1000;
     char buf[32];
     snprintf(buf, sizeof(buf), "%02lu:%02lu", elapsed / 60, elapsed % 60);
 
-    int16_t tw = M5.Display.textWidth(buf);
-    int16_t th = 16;
-    M5.Display.setCursor((SCREEN_WIDTH - tw) / 2, (SCREEN_HEIGHT - th) / 2);
-    M5.Display.print(buf);
+    int16_t tw = hal_get_string_width(buf);
+    int16_t th = hal_get_font_height();
+    int16_t x = (SCREEN_WIDTH - tw) / 2;
+    int16_t y = (SCREEN_HEIGHT - th) / 2;
+
+    hal_draw_string(x, y, buf, COLOR_FG);
 
     // 提示返回方式
-    M5.Display.setTextSize(1);
-    M5.Display.setCursor(10, SCREEN_HEIGHT - 10);
-    M5.Display.print("长按A返回");
+    hal_draw_utf8(4, SCREEN_HEIGHT - 10, "长按 B 返回", COLOR_FG);
 }
 
-void my_app_exit()
+void my_app_exit(void)
 {
     // 清理资源：释放内存、关闭外设、保存状态等
     start_time = 0;
@@ -333,16 +331,16 @@ void my_game_loop()
 
 | 按键 | 短按 | 长按 |
 |------|------|------|
-| **BtnA** | 选择器上移一项 | 返回上一层 / 退出当前项 |
-| **BtnB** | 选择器下移一项 | 确认 / 进入选中项 |
+| **BtnA** | 选择器下移一项 | 确认 / 进入选中项 |
+| **BtnB** | 选择器上移一项 | 返回上一层 / 退出当前项 |
 
 ### 5.1 特殊状态下的按键行为
 
 | 当前状态 | 短按 A | 短按 B | 长按 A | 长按 B |
 |----------|--------|--------|--------|--------|
-| 普通列表 | 上移 | 下移 | 返回上级 | 进入/确认 |
+| 普通列表 | 下移（下一个） | 上移（上一个） | 确认/进入 | 返回上级 |
 | `slider_item` 编辑模式 | 数值 -step | 数值 +step | 取消，恢复原值 | 确认修改 |
-| `user_item` 内部 | 由 App 决定 | 由 App 决定 | 退出 App | 由 App 决定 |
+| `user_item` 内部 | 由 App 决定 | 由 App 决定 | 由 App 决定 | 退出 App |
 
 ### 5.2 修改按键映射
 
@@ -496,11 +494,10 @@ void sensor_app_init()
     // 初始化传感器
 }
 
-void sensor_app_loop()
+void sensor_app_loop(void)
 {
-    M5.Display.fillScreen(BLACK);
-    M5.Display.setCursor(10, 30);
-    M5.Display.print("Sensor Data");
+    hal_display_clear();
+    hal_draw_utf8(10, 30, "Sensor Data", COLOR_FG);
     // ... 读取并显示传感器数据
 }
 

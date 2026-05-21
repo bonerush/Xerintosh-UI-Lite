@@ -17,6 +17,7 @@ int16_t g_brightness_level       = 5;                        /* 默认亮度等�
 int16_t g_anim_speed_level       = 5;                        /* 默认动画速度 5 */
 extern bool g_anim_enabled;                                  /* 动画开关（定义在 ui_core.h） */
 int16_t g_screen_rotation_level  = ORIENTATION_LANDSCAPE;    /* 默认横屏 */
+bool    g_is_landscape           = true;                     /* 默认横屏 */
 
 /* ═══ 从存储加载 ═══ */
 
@@ -63,6 +64,9 @@ void settings_load_from_storage(void)
     } else {
         g_screen_rotation_level = ORIENTATION_LANDSCAPE;
     }
+
+    /* 同步到 bool 开关 */
+    g_is_landscape = (g_screen_rotation_level == ORIENTATION_LANDSCAPE);
 }
 
 /* ═══ 值转换 ═══ */

@@ -44,7 +44,7 @@ extern void on_screen_rotation_change_cb(void);
  *        │   ├── 亮度（滑块 1-10）
  *        │   ├── 动画效果（开关）
  *        │   ├── 动画速度（滑块 1-10）
- *        │   └── 横屏/竖屏（滑块 1-2）
+ *        │   └── 横屏/竖屏（开关）
  *        └── 关于（user_item）
  */
 void app_init_ui(void)
@@ -66,9 +66,8 @@ void app_init_ui(void)
     xerintosh_list_item_t* sl_anim = xerintosh_new_slider_item(
         "动画速度", &g_anim_speed_level, 1, 1, 10,
         NULL, on_anim_speed_change_cb, default_icon);
-    xerintosh_list_item_t* sl_rot = xerintosh_new_slider_item(
-        "横屏/竖屏", &g_screen_rotation_level, 1, 1, 2,
-        on_screen_rotation_change_cb, on_screen_rotation_change_cb, default_icon);
+    xerintosh_list_item_t* sw_rot = xerintosh_new_switch_item(
+        "横屏/竖屏", &g_is_landscape, NULL, on_screen_rotation_change_cb, default_icon);
 
     xerintosh_push_item_to_list(root, item1);
     xerintosh_push_item_to_list(root, item2);
@@ -77,7 +76,7 @@ void app_init_ui(void)
     xerintosh_push_item_to_list(item1, sl1);
     xerintosh_push_item_to_list(item1, sw_anim);
     xerintosh_push_item_to_list(item1, sl_anim);
-    xerintosh_push_item_to_list(item1, sl_rot);
+    xerintosh_push_item_to_list(item1, sw_rot);
 }
 
 /* ═══ 管理器初始化 ═══ */

@@ -66,7 +66,7 @@ static unsigned long g_connect_start_time  = 0;    /* 连接开始时间 */
 static int g_scan_retry_count = 0;                 /* 扫描重试计数 */
 
 /* 超时常量 */
-#define WIFI_WARMUP_DELAY_MS    3000   /* 预热等待时间 */
+#define WIFI_WARMUP_DELAY_MS    100   /* 预热等待时间 */
 #define WIFI_SCAN_TIMEOUT_MS    30000  /* 扫描超时时间 */
 #define WIFI_CONNECT_TIMEOUT_MS 15000  /* 连接超时时间 */
 

@@ -13,6 +13,7 @@
 #include <stdio.h>
 
 #include "ui_core.h"
+#include "hal/hal_system.h"
 
 /* ═══ 全局状态定义 ═══ */
 
@@ -34,9 +35,9 @@ void xerintosh_draw_exit_animation()
   if (_temp_h_trg < 0) _temp_h_trg = SCREEN_HEIGHT + 8;
 
   /* 绘制全屏黑色遮罩，高度由 _temp_h 控制 */
-  oled_set_draw_color(0);
-  oled_draw_box(0, 0, SCREEN_WIDTH, _temp_h);
-  oled_set_draw_color(1);
+  g_xerintosh_draw_color = COLOR_BG;
+  hal_draw_fill_rect(0, 0, SCREEN_WIDTH, _temp_h, g_xerintosh_draw_color);
+  g_xerintosh_draw_color = COLOR_FG;
 
   /* 计算沙漏居中偏移 */
   uint8_t _x_hourglass_offset = SCREEN_WIDTH / 2 - 8;
@@ -44,13 +45,13 @@ void xerintosh_draw_exit_animation()
   if (_y_hourglass + 20 >= 0)
   {
     /* 沙漏上半部分 */
-    oled_draw_box(_x_hourglass_offset, _y_hourglass + 2, 13, 3);
-    oled_set_draw_color(0);
-    oled_draw_H_line(_x_hourglass_offset + 2, _y_hourglass + 3, 9);
-    oled_set_draw_color(1);
+    hal_draw_fill_rect(_x_hourglass_offset, _y_hourglass + 2, 13, 3, g_xerintosh_draw_color);
+    g_xerintosh_draw_color = COLOR_BG;
+    hal_draw_h_line(_x_hourglass_offset + 2, _y_hourglass + 3, 9, g_xerintosh_draw_color);
+    g_xerintosh_draw_color = COLOR_FG;
 
-    oled_draw_V_line(_x_hourglass_offset + 1, _y_hourglass + 4, 5);
-    oled_draw_V_line(_x_hourglass_offset + 11, _y_hourglass + 4, 5);
+    hal_draw_v_line(_x_hourglass_offset + 1, _y_hourglass + 4, 5, g_xerintosh_draw_color);
+    hal_draw_v_line(_x_hourglass_offset + 11, _y_hourglass + 4, 5, g_xerintosh_draw_color);
 
     /* 沙漏中间填充 */
     for (uint8_t i = 0; i < 5; ++i)
@@ -58,25 +59,25 @@ void xerintosh_draw_exit_animation()
       int8_t _current_y = _y_hourglass + 8 + i;
       int8_t _left_x = (i < 3) ? (_x_hourglass_offset + 1 + i) : (_x_hourglass_offset + 4);
       int8_t _right_x = (i < 3) ? (_x_hourglass_offset + 10 - i) : (_x_hourglass_offset + 7);
-      oled_draw_H_line(_left_x, _current_y, 2);
-      oled_draw_H_line(_right_x, _current_y, 2);
+      hal_draw_h_line(_left_x, _current_y, 2, g_xerintosh_draw_color);
+      hal_draw_h_line(_right_x, _current_y, 2, g_xerintosh_draw_color);
     }
 
     for (uint8_t i = 0; i < 3; ++i)
     {
       int8_t _current_y = _y_hourglass + 13 + i;
-      oled_draw_H_line(_x_hourglass_offset + 3 - i, _current_y, 2);
-      oled_draw_H_line(_x_hourglass_offset + 8 + i, _current_y, 2);
+      hal_draw_h_line(_x_hourglass_offset + 3 - i, _current_y, 2, g_xerintosh_draw_color);
+      hal_draw_h_line(_x_hourglass_offset + 8 + i, _current_y, 2, g_xerintosh_draw_color);
     }
 
-    oled_draw_V_line(_x_hourglass_offset + 1, _y_hourglass + 16, 3);
-    oled_draw_V_line(_x_hourglass_offset + 11, _y_hourglass + 16, 3);
+    hal_draw_v_line(_x_hourglass_offset + 1, _y_hourglass + 16, 3, g_xerintosh_draw_color);
+    hal_draw_v_line(_x_hourglass_offset + 11, _y_hourglass + 16, 3, g_xerintosh_draw_color);
 
     /* 沙漏下半部分 */
-    oled_draw_box(_x_hourglass_offset, _y_hourglass + 19, 13, 3);
-    oled_set_draw_color(0);
-    oled_draw_H_line(_x_hourglass_offset + 2, _y_hourglass + 20, 9);
-    oled_set_draw_color(1);
+    hal_draw_fill_rect(_x_hourglass_offset, _y_hourglass + 19, 13, 3, g_xerintosh_draw_color);
+    g_xerintosh_draw_color = COLOR_BG;
+    hal_draw_h_line(_x_hourglass_offset + 2, _y_hourglass + 20, 9, g_xerintosh_draw_color);
+    g_xerintosh_draw_color = COLOR_FG;
 
     /* 沙漏颗粒点 */
     const uint8_t _points[][2] = {
@@ -84,22 +85,22 @@ void xerintosh_draw_exit_animation()
       {5, 17}, {7, 17}, {4, 18}, {6, 18}, {8, 18}
     };
     for (uint8_t i = 0; i < sizeof(_points) / sizeof(_points[0]); ++i)
-      oled_draw_pixel(_x_hourglass_offset + _points[i][0], _y_hourglass + _points[i][1]);
+      hal_draw_pixel(_x_hourglass_offset + _points[i][0], _y_hourglass + _points[i][1], g_xerintosh_draw_color);
   }
 
   /* 底部扫描线 */
   if (_temp_h + 3 >= 0)
     for (uint8_t i = 0; i <= 3; ++i)
-      oled_draw_H_line(0, _temp_h + i, SCREEN_WIDTH);
+      hal_draw_h_line(0, _temp_h + i, SCREEN_WIDTH, g_xerintosh_draw_color);
 
   /* 交错像素扫描效果 */
   for (int16_t i = 0; i <= SCREEN_WIDTH; i += 2)
     for (int16_t j = _temp_h - 5; j <= _temp_h - 1; j++)
     {
       if (j % 2 == 0)
-        oled_draw_pixel(i + 1, j);
+        hal_draw_pixel(i + 1, j, g_xerintosh_draw_color);
       if (j % 2 == 1)
-        oled_draw_pixel(i, j);
+        hal_draw_pixel(i, j, g_xerintosh_draw_color);
     }
 
   xerintosh_animation(&_temp_h, _temp_h_trg, ANIM_SPEED_EXIT);
@@ -140,7 +141,7 @@ void xerintosh_draw_info_bar()
 
   /* 到达目标位置后记录时间戳，用于判断是否超时 */
   if (g_xerintosh_info_bar.y_info_bar == g_xerintosh_info_bar.y_info_bar_trg)
-    g_xerintosh_info_bar.time = get_ticks();
+    g_xerintosh_info_bar.time = hal_get_ticks();
 
   /* 超时后向屏幕上方移出 */
   if (g_xerintosh_info_bar.time - g_xerintosh_info_bar.time_start >= g_xerintosh_info_bar.span)
@@ -157,29 +158,29 @@ void xerintosh_draw_info_bar()
   xerintosh_set_font(hal_get_cn_font());
 
   /* 第一层：阴影底色 */
-  oled_set_draw_color(1);
-  oled_draw_R_box(_x_info_bar + 3, _y_info_bar_1 + 3,
-                  (int16_t)g_xerintosh_info_bar.w_info_bar, INFO_BAR_HEIGHT + 4, 4);
+  g_xerintosh_draw_color = COLOR_FG;
+  hal_draw_fill_round_rect(_x_info_bar + 3, _y_info_bar_1 + 3,
+                  (int16_t)g_xerintosh_info_bar.w_info_bar, INFO_BAR_HEIGHT + 4, 4, g_xerintosh_draw_color);
 
   /* 第二层：外框 */
-  oled_set_draw_color(0);
-  oled_draw_R_box((int16_t)(SCREEN_WIDTH/2 - (g_xerintosh_info_bar.w_info_bar + 4)/2), _y_info_bar_1,
-                  (int16_t)(g_xerintosh_info_bar.w_info_bar + 4), INFO_BAR_HEIGHT + 6, 4);
+  g_xerintosh_draw_color = COLOR_BG;
+  hal_draw_fill_round_rect((int16_t)(SCREEN_WIDTH/2 - (g_xerintosh_info_bar.w_info_bar + 4)/2), _y_info_bar_1,
+                  (int16_t)(g_xerintosh_info_bar.w_info_bar + 4), INFO_BAR_HEIGHT + 6, 4, g_xerintosh_draw_color);
 
   /* 第三层：内框 */
-  oled_set_draw_color(1);
-  oled_draw_R_box(_x_info_bar, _y_info_bar_1,
-                  (int16_t)g_xerintosh_info_bar.w_info_bar, INFO_BAR_HEIGHT + 4, 3);
+  g_xerintosh_draw_color = COLOR_FG;
+  hal_draw_fill_round_rect(_x_info_bar, _y_info_bar_1,
+                  (int16_t)g_xerintosh_info_bar.w_info_bar, INFO_BAR_HEIGHT + 4, 3, g_xerintosh_draw_color);
 
   /* 高光与文字 */
-  oled_set_draw_color(0);
-  oled_draw_H_line(_x_info_bar + 2, _y_info_bar_2 - 2, (int16_t)(g_xerintosh_info_bar.w_info_bar - 4));
-  oled_draw_pixel(_x_info_bar + 1, _y_info_bar_2 - 3);
-  oled_draw_pixel(_x_info_bar - 2, _y_info_bar_2 - 3);
+  g_xerintosh_draw_color = COLOR_BG;
+  hal_draw_h_line(_x_info_bar + 2, _y_info_bar_2 - 2, (int16_t)(g_xerintosh_info_bar.w_info_bar - 4), g_xerintosh_draw_color);
+  hal_draw_pixel(_x_info_bar + 1, _y_info_bar_2 - 3, g_xerintosh_draw_color);
+  hal_draw_pixel(_x_info_bar - 2, _y_info_bar_2 - 3, g_xerintosh_draw_color);
 
-  oled_draw_UTF8(_x_info_bar + 6,
-                 (int16_t)(g_xerintosh_info_bar.y_info_bar + oled_get_str_height() - 2),
-                 g_xerintosh_info_bar.content);
+  hal_draw_utf8(_x_info_bar + 6,
+                 (int16_t)(g_xerintosh_info_bar.y_info_bar + hal_get_font_height() - 2),
+                 g_xerintosh_info_bar.content, g_xerintosh_draw_color);
 }
 
 /* ═══ 弹窗 ═══ */
@@ -194,7 +195,7 @@ void xerintosh_draw_pop_up()
 
   /* 到达目标位置后记录时间戳 */
   if (g_xerintosh_pop_up.y_pop_up == g_xerintosh_pop_up.y_pop_up_trg)
-    g_xerintosh_pop_up.time = get_ticks();
+    g_xerintosh_pop_up.time = hal_get_ticks();
 
   /* 超时后向上移出 */
   if (g_xerintosh_pop_up.time - g_xerintosh_pop_up.time_start >= g_xerintosh_pop_up.span)
@@ -210,29 +211,29 @@ void xerintosh_draw_pop_up()
   xerintosh_set_font(hal_get_cn_font());
 
   /* 阴影底色 */
-  oled_set_draw_color(1);
-  oled_draw_R_box(_x_pop_up + 1, (int16_t)g_xerintosh_pop_up.y_pop_up + 3,
-                  (int16_t)(g_xerintosh_pop_up.w_pop_up + 4), POP_UP_HEIGHT, 4);
+  g_xerintosh_draw_color = COLOR_FG;
+  hal_draw_fill_round_rect(_x_pop_up + 1, (int16_t)g_xerintosh_pop_up.y_pop_up + 3,
+                  (int16_t)(g_xerintosh_pop_up.w_pop_up + 4), POP_UP_HEIGHT, 4, g_xerintosh_draw_color);
 
   /* 外框 */
-  oled_set_draw_color(0);
-  oled_draw_R_box((int16_t)(SCREEN_WIDTH/2 - (g_xerintosh_pop_up.w_pop_up + 4)/2 - 2), (int16_t)(g_xerintosh_pop_up.y_pop_up - 2),
-                  (int16_t)(g_xerintosh_pop_up.w_pop_up + 8), POP_UP_HEIGHT + 4, 5);
+  g_xerintosh_draw_color = COLOR_BG;
+  hal_draw_fill_round_rect((int16_t)(SCREEN_WIDTH/2 - (g_xerintosh_pop_up.w_pop_up + 4)/2 - 2), (int16_t)(g_xerintosh_pop_up.y_pop_up - 2),
+                  (int16_t)(g_xerintosh_pop_up.w_pop_up + 8), POP_UP_HEIGHT + 4, 5, g_xerintosh_draw_color);
 
   /* 内框 */
-  oled_set_draw_color(1);
-  oled_draw_R_box(_x_pop_up - 2, (int16_t)g_xerintosh_pop_up.y_pop_up,
-                  (int16_t)(g_xerintosh_pop_up.w_pop_up + 4), POP_UP_HEIGHT, 3);
+  g_xerintosh_draw_color = COLOR_FG;
+  hal_draw_fill_round_rect(_x_pop_up - 2, (int16_t)g_xerintosh_pop_up.y_pop_up,
+                  (int16_t)(g_xerintosh_pop_up.w_pop_up + 4), POP_UP_HEIGHT, 3, g_xerintosh_draw_color);
 
   /* 高光与文字 */
-  oled_set_draw_color(0);
-  oled_draw_H_line(_x_pop_up, _y_pop_up - 2, (int16_t)g_xerintosh_pop_up.w_pop_up);
-  oled_draw_pixel(_x_pop_up - 1, _y_pop_up - 3);
-  oled_draw_pixel((int16_t)(SCREEN_WIDTH/2 + g_xerintosh_pop_up.w_pop_up/2), _y_pop_up - 3);
+  g_xerintosh_draw_color = COLOR_BG;
+  hal_draw_h_line(_x_pop_up, _y_pop_up - 2, (int16_t)g_xerintosh_pop_up.w_pop_up, g_xerintosh_draw_color);
+  hal_draw_pixel(_x_pop_up - 1, _y_pop_up - 3, g_xerintosh_draw_color);
+  hal_draw_pixel((int16_t)(SCREEN_WIDTH/2 + g_xerintosh_pop_up.w_pop_up/2), _y_pop_up - 3, g_xerintosh_draw_color);
 
-  oled_draw_UTF8(_x_pop_up + 3,
-                 (int16_t)(g_xerintosh_pop_up.y_pop_up + oled_get_str_height() + 1),
-                 g_xerintosh_pop_up.content);
+  hal_draw_utf8(_x_pop_up + 3,
+                 (int16_t)(g_xerintosh_pop_up.y_pop_up + hal_get_font_height() + 1),
+                 g_xerintosh_pop_up.content, g_xerintosh_draw_color);
 }
 
 /* ═══ 列表外观 ═══ */
@@ -243,9 +244,9 @@ void xerintosh_draw_pop_up()
  */
 void xerintosh_draw_list_appearance()
 {
-  oled_set_draw_color(1);
-  oled_draw_H_line(0, 1, 66);
-  oled_draw_H_line(0, 0, 67);
+  g_xerintosh_draw_color = COLOR_FG;
+  hal_draw_h_line(0, 1, 66, g_xerintosh_draw_color);
+  hal_draw_h_line(0, 0, 67, g_xerintosh_draw_color);
 
   /* 顶部右侧装饰像素 */
   const struct
@@ -265,38 +266,38 @@ void xerintosh_draw_list_appearance()
 
   for (uint8_t j = 0; j < sizeof(draw_cfg) / sizeof(draw_cfg[0]); ++j)
     for (uint8_t i = draw_cfg[j]._start; i <= draw_cfg[j]._end; i += draw_cfg[j]._step)
-      oled_draw_pixel(i, draw_cfg[j]._y);
+      hal_draw_pixel(i, draw_cfg[j]._y, g_xerintosh_draw_color);
 
   /* 右侧边框竖线 */
-  oled_draw_V_line(SCREEN_WIDTH - 5, 0, SCREEN_HEIGHT);
-  oled_draw_V_line(SCREEN_WIDTH - 1, 0, SCREEN_HEIGHT);
+  hal_draw_v_line(SCREEN_WIDTH - 5, 0, SCREEN_HEIGHT, g_xerintosh_draw_color);
+  hal_draw_v_line(SCREEN_WIDTH - 1, 0, SCREEN_HEIGHT, g_xerintosh_draw_color);
 
   /* 滚动条 */
   static float _length_each_part = 0;
   _length_each_part = ceilf((SCREEN_HEIGHT - 10.0f) / (float) g_xerintosh_selector.selected_item->parent->child_num);
-  oled_draw_box(SCREEN_WIDTH - 4, 5 + g_xerintosh_selector.selected_index * _length_each_part, 3, _length_each_part);
+  hal_draw_fill_rect(SCREEN_WIDTH - 4, 5 + g_xerintosh_selector.selected_index * _length_each_part, 3, _length_each_part, g_xerintosh_draw_color);
 
   /* 滚动条内部高光线 */
-  oled_set_draw_color(0);
-  oled_draw_H_line(SCREEN_WIDTH - 4, _length_each_part + (float)g_xerintosh_selector.selected_index * _length_each_part, 3);
+  g_xerintosh_draw_color = COLOR_BG;
+  hal_draw_h_line(SCREEN_WIDTH - 4, _length_each_part + (float)g_xerintosh_selector.selected_index * _length_each_part, 3, g_xerintosh_draw_color);
 
   if (_length_each_part >= 9)
   {
-    oled_draw_H_line(SCREEN_WIDTH - 4,
-                     floorf(_length_each_part - 2.0f + (float)g_xerintosh_selector.selected_index * _length_each_part), 3);
-    oled_draw_H_line(SCREEN_WIDTH - 4,
-                     floorf(_length_each_part + 2.0f + (float)g_xerintosh_selector.selected_index * _length_each_part), 3);
+    hal_draw_h_line(SCREEN_WIDTH - 4,
+                     floorf(_length_each_part - 2.0f + (float)g_xerintosh_selector.selected_index * _length_each_part), 3, g_xerintosh_draw_color);
+    hal_draw_h_line(SCREEN_WIDTH - 4,
+                     floorf(_length_each_part + 2.0f + (float)g_xerintosh_selector.selected_index * _length_each_part), 3, g_xerintosh_draw_color);
   }
 
   /* 滚动条上下端点 */
-  oled_set_draw_color(1);
-  oled_draw_box(SCREEN_WIDTH - 4, 0, 3, 4);
-  oled_draw_box(SCREEN_WIDTH - 4, SCREEN_HEIGHT - 4, 3, 4);
-  oled_set_draw_color(0);
-  oled_draw_H_line(SCREEN_WIDTH - 4, 2, 3);
-  oled_draw_pixel(SCREEN_WIDTH - 3, 1);
-  oled_draw_H_line(SCREEN_WIDTH - 4, SCREEN_HEIGHT - 3, 3);
-  oled_draw_pixel(SCREEN_WIDTH - 3, SCREEN_HEIGHT - 2);
+  g_xerintosh_draw_color = COLOR_FG;
+  hal_draw_fill_rect(SCREEN_WIDTH - 4, 0, 3, 4, g_xerintosh_draw_color);
+  hal_draw_fill_rect(SCREEN_WIDTH - 4, SCREEN_HEIGHT - 4, 3, 4, g_xerintosh_draw_color);
+  g_xerintosh_draw_color = COLOR_BG;
+  hal_draw_h_line(SCREEN_WIDTH - 4, 2, 3, g_xerintosh_draw_color);
+  hal_draw_pixel(SCREEN_WIDTH - 3, 1, g_xerintosh_draw_color);
+  hal_draw_h_line(SCREEN_WIDTH - 4, SCREEN_HEIGHT - 3, 3, g_xerintosh_draw_color);
+  hal_draw_pixel(SCREEN_WIDTH - 3, SCREEN_HEIGHT - 2, g_xerintosh_draw_color);
 }
 
 /* ═══ 可见性判断 ═══ */
@@ -335,18 +336,19 @@ static void draw_list_item_switch(xerintosh_switch_item_t *_switch, int16_t _x, 
   xerintosh_draw_list_icon(_switch->base_item.icon, _x, _y);
 
   /* 绘制开关外框 */
-  oled_draw_frame(SCREEN_WIDTH - LIST_ITEM_RIGHT_MARGIN - 7, _y - 2, 11, 7);
+  g_xerintosh_draw_color = COLOR_FG;
+  hal_draw_rect(SCREEN_WIDTH - LIST_ITEM_RIGHT_MARGIN - 7, _y - 2, 11, 7, g_xerintosh_draw_color);
   if (*_switch->value)
   {
     /* 开启态：方块靠右 */
-    oled_draw_box(SCREEN_WIDTH - LIST_ITEM_RIGHT_MARGIN - 1, _y, 3, 3);
-    oled_draw_pixel(SCREEN_WIDTH - LIST_ITEM_RIGHT_MARGIN - 4, _y + 1);
+    hal_draw_fill_rect(SCREEN_WIDTH - LIST_ITEM_RIGHT_MARGIN - 1, _y, 3, 3, g_xerintosh_draw_color);
+    hal_draw_pixel(SCREEN_WIDTH - LIST_ITEM_RIGHT_MARGIN - 4, _y + 1, g_xerintosh_draw_color);
   }
   else
   {
     /* 关闭态：方块靠左 */
-    oled_draw_box(SCREEN_WIDTH - LIST_ITEM_RIGHT_MARGIN - 5, _y, 3, 3);
-    oled_draw_pixel(SCREEN_WIDTH - LIST_ITEM_RIGHT_MARGIN, _y + 1);
+    hal_draw_fill_rect(SCREEN_WIDTH - LIST_ITEM_RIGHT_MARGIN - 5, _y, 3, 3, g_xerintosh_draw_color);
+    hal_draw_pixel(SCREEN_WIDTH - LIST_ITEM_RIGHT_MARGIN, _y + 1, g_xerintosh_draw_color);
   }
 }
 
@@ -375,10 +377,10 @@ static void draw_list_item_slider(xerintosh_slider_item_t *_slider, int16_t _x, 
   {
     char _value_str[10] = {};
     sprintf(_value_str, "%d", *_slider->value);
-    int16_t _value_width = oled_get_UTF8_width(_value_str);
+    int16_t _value_width = hal_get_utf8_width(_value_str);
     int16_t _x_value = SCREEN_WIDTH - LIST_ITEM_RIGHT_MARGIN - _value_width + 2;
-    oled_set_draw_color(1);
-    oled_draw_str(_x_value + 2, _y + oled_get_str_height() / 2, _value_str);
+    g_xerintosh_draw_color = COLOR_FG;
+    hal_draw_string(_x_value + 2, _y + hal_get_font_height() / 2, _value_str, g_xerintosh_draw_color);
   }
 }
 
@@ -399,19 +401,19 @@ static void xerintosh_draw_slider_overlays(void)
     xerintosh_slider_item_t *_slider = xerintosh_to_slider_item(_item);
     if (!_slider->is_confirmed) continue;
 
-    int16_t _y = _item->y_list_item + g_xerintosh_camera.y_camera - oled_get_str_height()/2;
+    int16_t _y = _item->y_list_item + g_xerintosh_camera.y_camera - hal_get_font_height()/2;
     if (!is_item_visible(_y)) continue;
 
     char _value_str[10] = {};
     sprintf(_value_str, "%d", *_slider->value);
-    int16_t _value_width = oled_get_UTF8_width(_value_str);
+    int16_t _value_width = hal_get_utf8_width(_value_str);
     int16_t _x_value = SCREEN_WIDTH - LIST_ITEM_RIGHT_MARGIN - _value_width + 2;
 
     /* 反色背景框 */
-    oled_set_draw_color(0);
-    oled_draw_R_box(_x_value, _y - 2, _value_width + 4, oled_get_str_height() - 2, 1);
-    oled_set_draw_color(1);
-    oled_draw_str(_x_value + 2, _y + oled_get_str_height() / 2, _value_str);
+    g_xerintosh_draw_color = COLOR_BG;
+    hal_draw_fill_round_rect(_x_value, _y - 2, _value_width + 4, hal_get_font_height() - 2, 1, g_xerintosh_draw_color);
+    g_xerintosh_draw_color = COLOR_FG;
+    hal_draw_string(_x_value + 2, _y + hal_get_font_height() / 2, _value_str, g_xerintosh_draw_color);
   }
 }
 
@@ -435,10 +437,10 @@ void xerintosh_draw_list_item()
   {
     xerintosh_list_item_t *_item = g_xerintosh_selector.selected_item->parent->child_list_item[i];
     int16_t _x_list_item = g_xerintosh_camera.x_camera + LIST_ITEM_LEFT_MARGIN;
-    int16_t _y_list_item = _item->y_list_item + g_xerintosh_camera.y_camera - oled_get_str_height()/2;//列表项 y 坐标调整为以文字基线为中心，方便后续滚动效
+    int16_t _y_list_item = _item->y_list_item + g_xerintosh_camera.y_camera - hal_get_font_height()/2;//列表项 y 坐标调整为以文字基线为中心，方便后续滚动效
 
     /* 根据类型分发到对应的绘制函数 */
-    oled_set_draw_color(1);
+    g_xerintosh_draw_color = COLOR_FG;
     switch (_item->type)
     {
       case list_item:
@@ -462,12 +464,17 @@ void xerintosh_draw_list_item()
         break;
     }
 
+    /* 自定义位图图标补充绘制 */
+    if (_item->icon == custom_icon && _item->bitmap_data != NULL) {
+      xerintosh_draw_item_bitmap(_item, _x_list_item, _y_list_item);
+    }
+
     /* ═══ 文字滚动效果 ═══ */
     xerintosh_set_font(hal_get_cn_font());
-    if (_y_list_item + oled_get_str_height() / 2 > LIST_INFO_BAR_HEIGHT &&
-        _y_list_item + oled_get_str_height() / 2 < SCREEN_HEIGHT)
+    if (_y_list_item + hal_get_font_height() / 2 > LIST_INFO_BAR_HEIGHT &&
+        _y_list_item + hal_get_font_height() / 2 < SCREEN_HEIGHT)
     {
-      int16_t _text_width = oled_get_UTF8_width(_item->content);
+      int16_t _text_width = hal_get_utf8_width(_item->content);
       bool _has_right_control = (_item->type == switch_item || _item->type == slider_item);
       int16_t _right_margin = _has_right_control ? LIST_ITEM_RIGHT_MARGIN : 4;
       int16_t _avail_width = SCREEN_WIDTH - LIST_ITEM_LEFT_MARGIN - 10 - _right_margin;
@@ -485,9 +492,9 @@ void xerintosh_draw_list_item()
       if (_is_selected && _text_width > _avail_width) {
         if (!_item->is_scrolling) {
           _item->is_scrolling = true;
-          _item->scroll_start_time = get_ticks();
+          _item->scroll_start_time = hal_get_ticks();
         }
-        uint32_t _elapsed = get_ticks() - _item->scroll_start_time;
+        uint32_t _elapsed = hal_get_ticks() - _item->scroll_start_time;
         _scroll_x = xerintosh_compute_scroll_offset(_text_width, _avail_width, true, _elapsed);
       } else {
         _item->is_scrolling = false;
@@ -495,20 +502,20 @@ void xerintosh_draw_list_item()
 
       /* 设置裁剪区域：限制文字只在 icon 右侧到控件左侧之间显示 */
       int16_t _clip_x = LIST_ITEM_LEFT_MARGIN + 10;//左侧边缘+图标宽度+间距
-      int16_t _clip_y = _y_list_item - oled_get_str_height() / 2 - 2;//列表项 y 坐标 - 文字高度的一半 - 2 像素的垂直余量
-      int16_t _clip_h = oled_get_str_height() + 4;//文字高度 + 4 像素的垂直余量
+      int16_t _clip_y = _y_list_item - hal_get_font_height() / 2 - 2;//列表项 y 坐标 - 文字高度的一半 - 2 像素的垂直余量
+      int16_t _clip_h = hal_get_font_height() + 4;//文字高度 + 4 像素的垂直余量
       hal_set_clip_rect(_clip_x, _clip_y, _avail_width, _clip_h);
 
       int16_t _cycle_dist = _text_width + _avail_width;//循环周期为文字宽度 + 可用宽度
       int16_t _draw_x = _clip_x - (int16_t)_scroll_x;//根据滚动偏移计算当前绘制位置
 
       /* 绘制两份相同文字，形成无缝循环跑马灯 */
-      oled_draw_UTF8(_draw_x,
-                     _y_list_item + oled_get_str_height() / 2,
-                     _item->content);
-      oled_draw_UTF8(_draw_x + _cycle_dist,
-                     _y_list_item + oled_get_str_height() / 2,
-                     _item->content);
+      hal_draw_utf8(_draw_x,
+                     _y_list_item + hal_get_font_height() / 2,
+                     _item->content, g_xerintosh_draw_color);
+      hal_draw_utf8(_draw_x + _cycle_dist,
+                     _y_list_item + hal_get_font_height() / 2,
+                     _item->content, g_xerintosh_draw_color);
 
       hal_clear_clip_rect();
       /* ═══════════════════════ */
@@ -529,43 +536,61 @@ void xerintosh_draw_list_item()
 void xerintosh_draw_list_icon(xerintosh_list_item_icon_t icon, uint16_t x, uint16_t y){
   switch(icon){
     case (list_icon):
-        oled_draw_H_line(2 + x, y - 2, 4);
-        oled_draw_H_line(2 + x, y, 5);
-        oled_draw_H_line(2 + x, y + 2, 3);
+        hal_draw_h_line(2 + x, y - 2, 4, g_xerintosh_draw_color);
+        hal_draw_h_line(2 + x, y, 5, g_xerintosh_draw_color);
+        hal_draw_h_line(2 + x, y + 2, 3, g_xerintosh_draw_color);
       break;
     case (switch_icon):
-        oled_draw_circle(4 + x, y + 1, 3);
-        oled_draw_V_line(4 + x, y, 3);
+        hal_draw_circle(4 + x, y + 1, 3, g_xerintosh_draw_color);
+        hal_draw_v_line(4 + x, y, 3, g_xerintosh_draw_color);
       break;
     case (plus_icon):
-        oled_draw_circle(4 + x, y + 1, 3);
-        oled_draw_V_line(4 + x, y, 3);
-        oled_draw_H_line(3 + x, y + 1, 3);
+        hal_draw_circle(4 + x, y + 1, 3, g_xerintosh_draw_color);
+        hal_draw_v_line(4 + x, y, 3, g_xerintosh_draw_color);
+        hal_draw_h_line(3 + x, y + 1, 3, g_xerintosh_draw_color);
       break;
     case (slider_icon):
-        oled_draw_V_line(3 + x, y - 1, 5);
-        oled_draw_V_line(6 + x, y - 1, 5);
-        oled_draw_box(2 + x, y - 2, 3, 3);
-        oled_draw_box(5 + x, y + 2, 3, 3);
+        hal_draw_v_line(3 + x, y - 1, 5, g_xerintosh_draw_color);
+        hal_draw_v_line(6 + x, y - 1, 5, g_xerintosh_draw_color);
+        hal_draw_fill_rect(2 + x, y - 2, 3, 3, g_xerintosh_draw_color);
+        hal_draw_fill_rect(5 + x, y + 2, 3, 3, g_xerintosh_draw_color);
       break;
     case (user_icon):
-        oled_draw_str(2 + x, y + oled_get_str_height() / 2, "-");
+        hal_draw_string(2 + x, y + hal_get_font_height() / 2, "-", g_xerintosh_draw_color);
       break;
     case (flag_icon):
-        oled_draw_V_line(6 + x, y - 1, 5);
-        oled_draw_box(3 + x, y - 2, 4, 3);
+        hal_draw_v_line(6 + x, y - 1, 5, g_xerintosh_draw_color);
+        hal_draw_fill_rect(3 + x, y - 2, 4, 3, g_xerintosh_draw_color);
       break;
     case (power_icon):
-        oled_draw_circle(4 + x, y + 1, 3);
-        oled_draw_V_line(4 + x, y - 2, 3);
-        oled_set_draw_color(0);
-        oled_draw_pixel(x+3, y-2);
-        oled_draw_pixel(x+5, y-2);
-        oled_set_draw_color(1);
+        hal_draw_circle(4 + x, y + 1, 3, g_xerintosh_draw_color);
+        hal_draw_v_line(4 + x, y - 2, 3, g_xerintosh_draw_color);
+        g_xerintosh_draw_color = COLOR_BG;
+        hal_draw_pixel(x+3, y-2, g_xerintosh_draw_color);
+        hal_draw_pixel(x+5, y-2, g_xerintosh_draw_color);
+        g_xerintosh_draw_color = COLOR_FG;
       break;
     default:
       break;
   }
+}
+
+/**
+ * @brief  绘制列表项的自定义位图图标
+ * @param  _item 列表项指针（需已设置 bitmap_data）
+ * @param  x     图标左上角 x 坐标
+ * @param  y     图标中心 y 坐标
+ * @note   当 icon 为 custom_icon 时由 draw_list_item_xxx 调用
+ */
+void xerintosh_draw_item_bitmap(xerintosh_list_item_t *_item, uint16_t x, uint16_t y)
+{
+  if (_item == NULL || _item->bitmap_data == NULL || _item->bitmap_w == 0 || _item->bitmap_h == 0)
+    return;
+
+  /* 将图标居中于给定的 (x, y) 位置（y 为图标中心） */
+  int16_t draw_x = x;
+  int16_t draw_y = y - _item->bitmap_h / 2;
+  hal_draw_xbitmap(draw_x, draw_y, _item->bitmap_w, _item->bitmap_h, _item->bitmap_data);
 }
 
 /* ═══ 选择器 ═══ */
@@ -582,7 +607,7 @@ void xerintosh_draw_selector()
   hal_draw_xor_rect(_x_selector, _y_selector, g_xerintosh_selector.w_selector, g_xerintosh_selector.h_selector);
 
   /* 右侧虚线装饰 */
-  oled_set_draw_color(1);
+  g_xerintosh_draw_color = COLOR_FG;
   for (int16_t i = g_xerintosh_selector.w_selector + _x_selector;
        i <= g_xerintosh_selector.w_selector + _x_selector + 7; i += 2)
   {
@@ -590,9 +615,9 @@ void xerintosh_draw_selector()
          j <= _y_selector + g_xerintosh_selector.h_selector - 1; j++)
     {
       if (j % 2 == 0)
-        oled_draw_pixel(i + 1, j);
+        hal_draw_pixel(i + 1, j, g_xerintosh_draw_color);
       if (j % 2 == 1)
-        oled_draw_pixel(i, j);
+        hal_draw_pixel(i, j, g_xerintosh_draw_color);
     }
   }
 }
@@ -623,9 +648,9 @@ void xerintosh_draw_long_press_hint(uint32_t duration_ms, uint32_t threshold_ms)
     uint16_t x = SCREEN_WIDTH - bar_width - 6;
     uint16_t y = SCREEN_HEIGHT - 6;
 
-    oled_set_draw_color(1);
-    oled_draw_frame(x, y, bar_width, bar_height);
-    oled_draw_box(x + 1, y + 1, (uint16_t)((bar_width - 2) * progress), bar_height - 2);
+    g_xerintosh_draw_color = COLOR_FG;
+    hal_draw_rect(x, y, bar_width, bar_height, g_xerintosh_draw_color);
+    hal_draw_fill_rect(x + 1, y + 1, (uint16_t)((bar_width - 2) * progress), bar_height - 2, g_xerintosh_draw_color);
 }
 
 /* ═══ 完整列表帧 ═══ */

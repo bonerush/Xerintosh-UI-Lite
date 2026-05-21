@@ -12,7 +12,7 @@
 
 ### 类型层次（继承体系）
 
-*📄 Source: [ui_item.h](../../src/ui/ui_item.h#L82-L106)*
+*📄 Source: [ui_item.h](../../src/ui/ui_item.h#L124-L148)*
 
 ```c
 typedef enum {
@@ -27,18 +27,25 @@ typedef enum {
 typedef struct xerintosh_list_item_t {
     xerintosh_list_item_type_t type;
     xerintosh_list_item_icon_t icon;
-    char *content;
+    const char *content;
     uint8_t layer;
     float y_list_item, y_list_item_trg;   // 当前Y / 目标Y（动画用）
     uint8_t child_num;
     struct xerintosh_list_item_t *child_list_item[MAX_LIST_CHILD_NUM];
     struct xerintosh_list_item_t *parent;
+    void *user_data;
+    float content_scroll_offset;
+    uint32_t scroll_start_time;
+    bool is_scrolling;
+    const uint8_t *bitmap_data;
+    uint8_t bitmap_w;
+    uint8_t bitmap_h;
 } xerintosh_list_item_t;
 ```
 
 所有派生类都把 `xerintosh_list_item_t` 作为**第一个成员**：
 
-*📄 Source: [ui_item.h](../../src/ui/ui_item.h#L117-L151)*
+*📄 Source: [ui_item.h](../../src/ui/ui_item.h#L180-L230)*
 
 ```c
 typedef struct xerintosh_switch_item_t {
@@ -85,6 +92,13 @@ typedef struct xerintosh_user_item_t {
     子项数量
     子项指针数组[最大10个]
     父项指针
+    用户自定义数据指针
+    文字滚动偏移
+    滚动开始时间
+    是否正在滚动
+    自定义位图数据指针
+    位图宽度
+    位图高度
 }
 
 结构体 开关项 {
@@ -110,7 +124,7 @@ typedef struct xerintosh_user_item_t {
 
 ### 类型转换函数
 
-*📄 Source: [ui_item.c](../../src/ui/ui_item.c#L60-L90)*
+*📄 Source: [ui_item.c](../../src/ui/ui_item.c#L125-L130)*
 
 ```c
 xerintosh_switch_item_t *xerintosh_to_switch_item(xerintosh_list_item_t *_item) {
@@ -124,7 +138,7 @@ xerintosh_switch_item_t *xerintosh_to_switch_item(xerintosh_list_item_t *_item) 
 
 ### 构造与挂载
 
-*📄 Source: [ui_item.c](../../src/ui/ui_item.c#L106-L135)*
+*📄 Source: [ui_item.c](../../src/ui/ui_item.c#L209-L230)*
 
 ```c
 xerintosh_list_item_t *xerintosh_new_list_item(char *_content, xerintosh_list_item_icon_t icon) {
@@ -159,7 +173,7 @@ xerintosh_list_item_t *xerintosh_new_list_item(char *_content, xerintosh_list_it
 
 ### 挂载到树（Push）
 
-*📄 Source: [ui_item.c](../../src/ui/ui_item.c#L397-L421)*
+*📄 Source: [ui_item.c](../../src/ui/ui_item.c#L592-L617)*
 
 ```c
 bool xerintosh_push_item_to_list(xerintosh_list_item_t *_parent, xerintosh_list_item_t *_child) {
@@ -223,7 +237,7 @@ bool xerintosh_push_item_to_list(xerintosh_list_item_t *_parent, xerintosh_list_
 
 ### 选择器（Selector）
 
-*📄 Source: [ui_item.h](../../src/ui/ui_item.h#L189-L204)*
+*📄 Source: [ui_item.h](../../src/ui/ui_item.h#L369-L375)*
 
 ```c
 typedef struct xerintosh_selector_t {
@@ -239,7 +253,7 @@ typedef struct xerintosh_selector_t {
 
 ### 导航函数
 
-*📄 Source: [ui_item.c](../../src/ui/ui_item.c#L226-L274)*
+*📄 Source: [ui_item.c](../../src/ui/ui_item.c#L373-L400)*
 
 ```c
 void xerintosh_selector_go_next_item() {
@@ -286,7 +300,7 @@ void xerintosh_selector_go_next_item() {
 
 ### 确认与回退
 
-*📄 Source: [ui_item.c](../../src/ui/ui_item.c#L282-L345)*
+*📄 Source: [ui_item.c](../../src/ui/ui_item.c#L494-L537)*
 
 ```c
 void xerintosh_selector_jump_to_selected_item() {
@@ -363,7 +377,7 @@ void xerintosh_selector_jump_to_selected_item() {
 
 ### 相机（Camera / Viewport）
 
-*📄 Source: [ui_item.h](../../src/ui/ui_item.h#L206-L216)*
+*📄 Source: [ui_item.h](../../src/ui/ui_item.h#L424-L432)*
 
 ```c
 typedef struct xerintosh_camera_t {

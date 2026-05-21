@@ -21,6 +21,8 @@ Project Root
 │   ├── [设置管理](app/settings.md)     ← 亮度/动画/方向配置与存储
 │   ├── [应用初始化](app/app-init.md)   ← 菜单构建、管理器初始化、输入处理
 │   └── [编码风格规范](coding-style.md) ← C OOP 命名、封装、继承规范
+├── 教程
+│   └── [从零开始创建 App](tutorials/your-first-app.md) ← 面向初学者的 App 开发教程
 └── 入口
     ├── src/main.cpp                   ← M5Stick-C 实际入口
     └── src/native_main.cpp            ← GoogleTest 桌面测试入口
@@ -45,6 +47,9 @@ Project Root
 - **动画插值公式**：`current += (target - current) / (100.0f - speed)`
 
 ## 文档树
+
+### 入门教程
+- **[从零开始创建 App](tutorials/your-first-app.md)** — 面向初学者的完整教程，手把手教你创建第一个 `user_item` App
 
 ### HAL 层
 - **[显示驱动](hal/display.md)** — TFT/Native 双实现、绘制原语、XOR 矩形

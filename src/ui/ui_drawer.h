@@ -58,6 +58,15 @@ extern void xerintosh_draw_list_item(void);
 extern void xerintosh_draw_list_icon(xerintosh_list_item_icon_t icon, uint16_t x, uint16_t y);
 
 /**
+ * @brief  绘制列表项的自定义位图图标
+ * @param  _item 列表项指针（需已设置 bitmap_data）
+ * @param  x     图标左上角 x 坐标
+ * @param  y     图标中心 y 坐标
+ * @note   当 icon 为 custom_icon 时由 draw_list_item_xxx 调用
+ */
+extern void xerintosh_draw_item_bitmap(xerintosh_list_item_t *_item, uint16_t x, uint16_t y);
+
+/**
  * @brief 绘制选择器高亮框（XOR 反色矩形 + 右侧虚线装饰）
  */
 extern void xerintosh_draw_selector(void);

@@ -17,15 +17,20 @@
 
 ### 动画插值公式
 
-*📄 Source: [ui_core.c](../../src/ui/ui_core.c#L24-L31)*
+*📄 Source: [ui_core.c](../../src/ui/ui_core.c#L53-L65)*
 
 ```c
-void xerintosh_animation(float *_pos, float _posTrg, float _speed)
+void xerintosh_animation(float *_pos, float _pos_trg, float _speed)
 {
-  if (*_pos != _posTrg)
+  if (*_pos != _pos_trg)
   {
-    if (fabs(*_pos - _posTrg) <= 1.0f) *_pos = _posTrg;
-    else *_pos += (_posTrg - *_pos) / (100.0f - _speed) / 1.0f;
+    if (!g_anim_enabled) {
+      *_pos = _pos_trg;
+      return;
+    }
+    if (_speed >= 99.0f) _speed = 99.0f;
+    if (fabs(*_pos - _pos_trg) <= 1.0f) *_pos = _pos_trg;
+    else *_pos += (_pos_trg - *_pos) / (100.0f - _speed) / 1.0f;
   }
 }
 ```
@@ -58,20 +63,20 @@ void xerintosh_animation(float *_pos, float _posTrg, float _speed)
 
 ### 相机（视口）滚动
 
-*📄 Source: [ui_core.c](../../src/ui/ui_core.c#L45-L56)*
+*📄 Source: [ui_core.c](../../src/ui/ui_core.c#L91-L102)*
 
 ```c
 void xerintosh_refresh_camera_position()
 {
-  // 15为selector的高度
-  if (xerintosh_camera.selector->y_selector_trg + 15 + xerintosh_camera.y_camera_trg > SCREEN_HEIGHT)
-    xerintosh_camera.y_camera_trg = SCREEN_HEIGHT - xerintosh_camera.selector->y_selector_trg - 15;
+  /* 15 为选择器高度 */
+  if (g_xerintosh_camera.selector->y_selector_trg + 15 + g_xerintosh_camera.y_camera_trg > SCREEN_HEIGHT)
+    g_xerintosh_camera.y_camera_trg = SCREEN_HEIGHT - g_xerintosh_camera.selector->y_selector_trg - 15;
 
-  if (xerintosh_camera.selector->y_selector_trg + xerintosh_camera.y_camera_trg < 0)
-    xerintosh_camera.y_camera_trg = 0 - xerintosh_camera.selector->y_selector_trg + LIST_FONT_TOP_MARGIN;
+  if (g_xerintosh_camera.selector->y_selector_trg + g_xerintosh_camera.y_camera_trg < 0)
+    g_xerintosh_camera.y_camera_trg = 0 - g_xerintosh_camera.selector->y_selector_trg + LIST_FONT_TOP_MARGIN;
 
-  xerintosh_animation(&xerintosh_camera.x_camera, xerintosh_camera.x_camera_trg, 96);
-  xerintosh_animation(&xerintosh_camera.y_camera, xerintosh_camera.y_camera_trg, 96);
+  xerintosh_animation(&g_xerintosh_camera.x_camera, g_xerintosh_camera.x_camera_trg, ANIM_SPEED_CAMERA);
+  xerintosh_animation(&g_xerintosh_camera.y_camera, g_xerintosh_camera.y_camera_trg, ANIM_SPEED_CAMERA);
 }
 ```
 
@@ -100,24 +105,20 @@ void xerintosh_refresh_camera_position()
 
 ### 选择器位置刷新
 
-*📄 Source: [ui_core.c](../../src/ui/ui_core.c#L89-L100)*
+*📄 Source: [ui_core.c](../../src/ui/ui_core.c#L157-L168)*
 
 ```c
 void xerintosh_refresh_selector_position()
 {
-  xerintosh_set_font(NULL);
-  xerintosh_selector.y_selector_trg = xerintosh_selector.selected_item->y_list_item_trg - oled_get_str_height() + 1;
-
-  if (xerintosh_selector.selected_item->type == switch_item || xerintosh_selector.selected_item->type == slider_item)
-    xerintosh_selector.w_selector_trg = SCREEN_WIDTH - 18;
-  else
-    xerintosh_selector.w_selector_trg = oled_get_UTF8_width(xerintosh_selector.selected_item->content) + 12;
-
-  xerintosh_selector.h_selector_trg = 15;
-
-  xerintosh_animation(&xerintosh_selector.y_selector, xerintosh_selector.y_selector_trg, 92);
-  xerintosh_animation(&xerintosh_selector.w_selector, xerintosh_selector.w_selector_trg, 92);
-  xerintosh_animation(&xerintosh_selector.h_selector, xerintosh_selector.h_selector_trg, 93);
+  xerintosh_set_font(hal_get_cn_font());
+  g_xerintosh_selector.y_selector_trg = g_xerintosh_selector.selected_item->y_list_item_trg - oled_get_str_height() + 1;
+  if (g_xerintosh_selector.selected_item->type == switch_item || g_xerintosh_selector.selected_item->type == slider_item)
+    g_xerintosh_selector.w_selector_trg = SCREEN_WIDTH - 18;
+  else g_xerintosh_selector.w_selector_trg = oled_get_UTF8_width(g_xerintosh_selector.selected_item->content) + 12;
+  g_xerintosh_selector.h_selector_trg = oled_get_str_height() + 4;
+  xerintosh_animation(&g_xerintosh_selector.y_selector, g_xerintosh_selector.y_selector_trg, ANIM_SPEED_SELECTOR);
+  xerintosh_animation(&g_xerintosh_selector.w_selector, g_xerintosh_selector.w_selector_trg, ANIM_SPEED_SELECTOR);
+  xerintosh_animation(&g_xerintosh_selector.h_selector, g_xerintosh_selector.h_selector_trg, ANIM_SPEED_SELECTOR_H);
 }
 ```
 
@@ -148,20 +149,20 @@ void xerintosh_refresh_selector_position()
 
 ### 主循环调度
 
-*📄 Source: [ui_core.c](../../src/ui/ui_core.c#L113-L158)*
+*📄 Source: [ui_core.c](../../src/ui/ui_core.c#L193-L240)*
 
 ```c
 void xerintosh_ui_main_core()
 {
-  if (!in_xerintosh) return;
+  if (!g_in_xerintosh) return;
 
-  // 处理进入 user_item 的逻辑
-  if (xerintosh_selector.selected_item->type == user_item
-      && !xerintosh_to_user_item(xerintosh_selector.selected_item)->in_user_item)
+  /* 切换 in_user_item 的逻辑 */
+  if (g_xerintosh_selector.selected_item->type == user_item
+      && !xerintosh_to_user_item(g_xerintosh_selector.selected_item)->in_user_item)
   {
-    xerintosh_user_item_t *_selected_user_item = xerintosh_to_user_item(xerintosh_selector.selected_item);
+    xerintosh_user_item_t *_selected_user_item = xerintosh_to_user_item(g_xerintosh_selector.selected_item);
 
-    if (_selected_user_item->entering_user_item && xerintosh_exit_animation_status == 1)
+    if (_selected_user_item->entering_user_item && g_xerintosh_exit_animation_status == 1)
     {
       if (_selected_user_item->init_function != NULL)
         _selected_user_item->init_function();
@@ -169,30 +170,33 @@ void xerintosh_ui_main_core()
     }
   }
 
-  // 渲染分支
-  if (xerintosh_selector.selected_item->type == user_item
-      && xerintosh_to_user_item(xerintosh_selector.selected_item)->in_user_item)
+  /* 渲染逻辑：user_item 内部由 App 自行绘制；列表模式由框架绘制 */
+  if (g_xerintosh_selector.selected_item->type == user_item
+      && xerintosh_to_user_item(g_xerintosh_selector.selected_item)->in_user_item)
   {
-    xerintosh_user_item_t* _selected_user_item = xerintosh_to_user_item(xerintosh_selector.selected_item);
+    xerintosh_user_item_t* _selected_user_item = xerintosh_to_user_item(g_xerintosh_selector.selected_item);
 
     if (_selected_user_item->loop_function != NULL)
+    {
       _selected_user_item->loop_function();
+    }
 
-    if (_selected_user_item->exiting_user_item && xerintosh_exit_animation_status == 1)
+    if (_selected_user_item->exiting_user_item && g_xerintosh_exit_animation_status == 1)
     {
         if (_selected_user_item->exit_function != NULL)
             _selected_user_item->exit_function();
         _selected_user_item->in_user_item = 0;
     }
-  } else {
+  } else
+  {
     xerintosh_refresh_camera_position();
     xerintosh_refresh_main_core_position();
     xerintosh_refresh_selector_position();
     xerintosh_draw_list();
   }
 
-  // 退场动画遮罩
-  if (!xerintosh_exit_animation_finished)
+  /* 退场动画 */
+  if (!g_xerintosh_exit_animation_finished)
     xerintosh_draw_exit_animation();
 }
 ```
@@ -238,7 +242,7 @@ void xerintosh_ui_main_core()
 
 ### 开屏入口（已移除）
 
-*📄 Source: [ui_core.c](../../src/ui/ui_core.c#L14-L17)*
+*📄 Source: [ui_core.c](../../src/ui/ui_core.c#L27-L30)*
 
 ```c
 void ad_xerintosh()

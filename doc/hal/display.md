@@ -17,29 +17,41 @@
 
 ### 屏幕参数
 
-*📄 Source: [hal_display.h](../../src/hal/hal_display.h#L12-L16)*
+*📄 Source: [hal_display.h](../../src/hal/hal_display.h#L22-L34)*
 
 ```c
-#define SCREEN_WIDTH  80
-#define SCREEN_HEIGHT 160
-#define COLOR_BG      0x0000   // 黑色
-#define COLOR_FG      0xFFFF   // 白色
-#define COLOR_ACCENT  0x07E0   // 绿色（保留）
+#ifdef NATIVE_TEST
+#define SCREEN_WIDTH  80   /* native 测试环境屏幕宽度 */
+#define SCREEN_HEIGHT 160  /* native 测试环境屏幕高度 */
+#else
+extern int16_t g_screen_width;   /* 运行时屏幕宽度（硬件环境从 M5.Display 读取） */
+extern int16_t g_screen_height;  /* 运行时屏幕高度 */
+#define SCREEN_WIDTH  g_screen_width
+#define SCREEN_HEIGHT g_screen_height
+#endif
+
+#define COLOR_BG      0x0000  /* 背景色：黑色 */
+#define COLOR_FG      0xFFFF  /* 前景色：白色 */
+#define COLOR_ACCENT  0x07E0  /* 强调色：绿色 */
 ```
 
 ### 双缓冲架构（真机）
 
-*📄 Source: [hal_display.cpp](../../src/hal/hal_display.cpp#L254-L274)*
+*📄 Source: [hal_display.cpp](../../src/hal/hal_display.cpp#L329-L362)*
 
 ```c
-static M5Canvas* g_canvas = nullptr;
+static M5Canvas* g_canvas = nullptr;  /* 离屏画布 */
+int16_t g_screen_width = 160;         /* 默认屏幕宽度，init 时从硬件读取 */
+int16_t g_screen_height = 80;         /* 默认屏幕高度 */
 
 void hal_display_init(void) {
     if (!g_canvas) {
         g_canvas = new M5Canvas(&M5.Display);
     }
-    g_canvas->createSprite(SCREEN_WIDTH, SCREEN_HEIGHT);
     g_canvas->setColorDepth(16);
+    g_screen_width = M5.Display.width();
+    g_screen_height = M5.Display.height();
+    g_canvas->createSprite(g_screen_width, g_screen_height);
 }
 
 void hal_display_clear(void) {
@@ -79,10 +91,10 @@ void hal_display_flush(void) {
 
 ### Native 内存帧缓冲（测试）
 
-*📄 Source: [hal_display.cpp](../../src/hal/hal_display.cpp#L6-L247)*
+*📄 Source: [hal_display.cpp](../../src/hal/hal_display.cpp#L20-L48)*
 
 ```c
-static uint16_t g_framebuffer[SCREEN_WIDTH * SCREEN_HEIGHT];
+static uint16_t g_framebuffer[SCREEN_WIDTH * SCREEN_HEIGHT];  /* RGB565 帧缓冲区 */
 
 void hal_display_init(void) {
     memset(g_framebuffer, 0, sizeof(g_framebuffer));
@@ -113,19 +125,29 @@ Native 环境下所有复杂图形（线、圆、圆角矩形）都通过**软�
 
 TFT 不支持 OLED 的 `draw_color(2)` 反色模式。我们采用**像素级 XOR** 实现选择器高亮。
 
-*📄 Source: [hal_display.cpp](../../src/hal/hal_display.cpp#L345-L355)*
+*📄 Source: [hal_display.cpp](../../src/hal/hal_display.cpp#L485-L505)*
 
 ```c
 void hal_draw_xor_rect(int16_t x, int16_t y, int16_t w, int16_t h) {
-    if (!g_canvas) return;
+    if (!g_canvas || w <= 0 || h <= 0) return;
+    uint16_t* buf = (uint16_t*)malloc(w * sizeof(uint16_t));
+    if (!buf) return;
     for (int16_t row = 0; row < h; row++) {
-        for (int16_t col = 0; col < w; col++) {
-            int16_t px = x + col;
-            int16_t py = y + row;
-            uint16_t color = g_canvas->readPixel(px, py);
-            g_canvas->drawPixel(px, py, color ^ 0xFFFF);
+        int16_t py = y + row;
+        if (py < 0 || py >= SCREEN_HEIGHT) continue;
+        int16_t px_start = x;
+        int16_t px_end = x + w - 1;
+        if (px_start < 0) px_start = 0;
+        if (px_end >= SCREEN_WIDTH) px_end = SCREEN_WIDTH - 1;
+        int16_t read_w = px_end - px_start + 1;
+        if (read_w <= 0) continue;
+        g_canvas->readRect(px_start, py, read_w, 1, buf);
+        for (int16_t i = 0; i < read_w; i++) {
+            buf[i] ^= 0xFFFF;
         }
+        g_canvas->pushImage(px_start, py, read_w, 1, buf);
     }
+    free(buf);
 }
 ```
 
@@ -150,14 +172,14 @@ void hal_draw_xor_rect(int16_t x, int16_t y, int16_t w, int16_t h) {
 
 真机环境下直接委托给 M5GFX 的文本 API：
 
-*📄 Source: [hal_display.cpp](../../src/hal/hal_display.cpp#L312-L343)*
+*📄 Source: [hal_display.cpp](../../src/hal/hal_display.cpp#L451-L480)*
 
 ```c
 void hal_draw_utf8(int16_t x, int16_t y, const char* str, uint16_t color) {
     if (!g_canvas || !str) return;
     g_canvas->setTextColor(color);
-    g_canvas->setCursor(x, y);
-    g_canvas->print(str);
+    g_canvas->setTextDatum(lgfx::v1::baseline_left);
+    g_canvas->drawString(str, x, y);
 }
 
 int16_t hal_get_utf8_width(const char* str) {

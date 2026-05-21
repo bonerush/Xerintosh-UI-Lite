@@ -13,6 +13,7 @@
 #include <string.h>
 
 #include "ui_core.h"
+#include "hal/hal_system.h"
 
 /* ═══ 字体 ═══ */
 
@@ -22,7 +23,7 @@
  */
 void xerintosh_set_font(const void *_font)
 {
-  if (_font != g_xerintosh_font) oled_set_font(_font);
+  if (_font != g_xerintosh_font) hal_set_font(_font);
 }
 
 /* ═══ 信息栏 ═══ */
@@ -41,7 +42,7 @@ void xerintosh_push_info_bar(const char *_content, const uint16_t _span)
      如果在显示时间之内有新的消息涌入，则 y 和 y_trg 都不变，继续显示，且显示时间清零。
      只有显示时间到了的时候，才会复位。 */
 
-  g_xerintosh_info_bar.time = get_ticks();
+  g_xerintosh_info_bar.time = hal_get_ticks();
   g_xerintosh_info_bar.content = _content;
   g_xerintosh_info_bar.span = _span;
   g_xerintosh_info_bar.is_running = false; /* 每次进入该函数都代表有新的消息涌入，所以需要重置 is_running */
@@ -49,13 +50,13 @@ void xerintosh_push_info_bar(const char *_content, const uint16_t _span)
   /* 展开弹窗；收回弹窗和同步时间戳需要在循环中进行，所以移到了 drawer 中 */
   if (!g_xerintosh_info_bar.is_running)
   {
-    g_xerintosh_info_bar.time_start = get_ticks();
+    g_xerintosh_info_bar.time_start = hal_get_ticks();
     g_xerintosh_info_bar.y_info_bar_trg = 0;
     g_xerintosh_info_bar.is_running = true;
   }
 
   xerintosh_set_font(hal_get_cn_font());
-  g_xerintosh_info_bar.w_info_bar_trg = oled_get_UTF8_width(g_xerintosh_info_bar.content) + INFO_BAR_OFFSET;
+  g_xerintosh_info_bar.w_info_bar_trg = hal_get_utf8_width(g_xerintosh_info_bar.content) + INFO_BAR_OFFSET;
 }
 
 /* ═══ 弹窗 ═══ */
@@ -72,13 +73,13 @@ void xerintosh_push_pop_up(const char *_content, const uint16_t _span)
 {
   if (g_xerintosh_pop_up.is_running && g_xerintosh_pop_up.content != NULL
       && strcmp(g_xerintosh_pop_up.content, _content) == 0) {
-    g_xerintosh_pop_up.time_start = get_ticks();
+    g_xerintosh_pop_up.time_start = hal_get_ticks();
     g_xerintosh_pop_up.span = _span;
     g_xerintosh_pop_up.y_pop_up_trg = 20;
     return;
   }
 
-  g_xerintosh_pop_up.time = get_ticks();
+  g_xerintosh_pop_up.time = hal_get_ticks();
   g_xerintosh_pop_up.content = _content;
   g_xerintosh_pop_up.span = _span;
   g_xerintosh_pop_up.is_running = false;
@@ -86,13 +87,13 @@ void xerintosh_push_pop_up(const char *_content, const uint16_t _span)
   /* 弹出 */
   if (!g_xerintosh_pop_up.is_running)
   {
-    g_xerintosh_pop_up.time_start = get_ticks();
+    g_xerintosh_pop_up.time_start = hal_get_ticks();
     g_xerintosh_pop_up.y_pop_up_trg = 20;
     g_xerintosh_pop_up.is_running = true;
   }
 
   xerintosh_set_font(hal_get_cn_font());
-  g_xerintosh_pop_up.w_pop_up_trg = oled_get_UTF8_width(g_xerintosh_pop_up.content) + POP_UP_OFFSET;
+  g_xerintosh_pop_up.w_pop_up_trg = hal_get_utf8_width(g_xerintosh_pop_up.content) + POP_UP_OFFSET;
 }
 
 /**
@@ -163,6 +164,24 @@ static void xerintosh_init_base_item(xerintosh_list_item_t *_item,
   _item->type = _type;
   _item->content = _content ? strdup(_content) : NULL;
   _item->icon = (_icon == default_icon) ? _default_icon : _icon;
+}
+
+/**
+ * @brief  为列表项设置自定义位图图标
+ * @param  _item  列表项指针
+ * @param  bitmap XBM 位图数据指针
+ * @param  w      位图宽度（像素）
+ * @param  h      位图高度（像素）
+ * @note   设置后该项的 icon 会自动变为 custom_icon
+ */
+void xerintosh_set_item_bitmap(xerintosh_list_item_t *_item, const uint8_t *bitmap, uint8_t w, uint8_t h)
+{
+  if (_item == NULL) return;
+  _item->bitmap_data = bitmap;
+  _item->bitmap_w = w;
+  _item->bitmap_h = h;
+  if (bitmap != NULL && w > 0 && h > 0)
+    _item->icon = custom_icon;
 }
 
 /* tips: 不会重复创建 root 节点 */
@@ -582,7 +601,7 @@ bool xerintosh_push_item_to_list(xerintosh_list_item_t *_parent, xerintosh_list_
 
   xerintosh_set_font(hal_get_cn_font());
   if (_parent->child_num == 0)
-    _child->y_list_item_trg = oled_get_str_height() + LIST_FONT_TOP_MARGIN - 1;
+    _child->y_list_item_trg = hal_get_font_height() + LIST_FONT_TOP_MARGIN - 1;
   else
     _child->y_list_item_trg = _parent->child_list_item[_parent->child_num - 1]->y_list_item_trg + LIST_ITEM_SPACING;
 
@@ -631,7 +650,7 @@ bool xerintosh_remove_item_from_list(xerintosh_list_item_t *_parent, xerintosh_l
   for (uint8_t i = 0; i < _parent->child_num; i++)
   {
     if (i == 0)
-      _parent->child_list_item[i]->y_list_item_trg = oled_get_str_height() + LIST_FONT_TOP_MARGIN - 1;
+      _parent->child_list_item[i]->y_list_item_trg = hal_get_font_height() + LIST_FONT_TOP_MARGIN - 1;
     else
       _parent->child_list_item[i]->y_list_item_trg = _parent->child_list_item[i - 1]->y_list_item_trg + LIST_ITEM_SPACING;
   }

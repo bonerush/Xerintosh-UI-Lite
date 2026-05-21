@@ -20,7 +20,7 @@
 
 ## 菜单构建
 
-*📄 Source: [app_init.c](../../src/app/app_init.c#L28-L50)*
+*📄 Source: [app_init.c](../../src/app/app_init.c#L50-L80)*
 
 ```c
 void app_init_ui(void)
@@ -72,7 +72,7 @@ void app_init_ui(void)
 
 ## 管理器初始化
 
-*📄 Source: [app_init.c](../../src/app/app_init.c#L54-L62)*
+*📄 Source: [app_init.c](../../src/app/app_init.c#L82-L94)*
 
 ```c
 void app_init_managers(void)
@@ -89,7 +89,7 @@ void app_init_managers(void)
 
 ## 输入处理
 
-*📄 Source: [app_init.c](../../src/app/app_init.c#L66-L90)*
+*📄 Source: [app_init.c](../../src/app/app_init.c#L96-L136)*
 
 ```c
 void app_input_process(void)

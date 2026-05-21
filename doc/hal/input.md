@@ -4,244 +4,104 @@
 
 ## 概述
 
-输入 HAL 负责读取 M5Stick-C 的两个物理按键（BtnA / BtnB），并输出**高级事件**：短按、长按、双击切换模式。
+输入 HAL 负责读取 M5Stick-C 的两个物理按键（BtnA / BtnB），并输出**短按、长按事件**。
 
-核心挑战是**机械按键抖动**和**多模式切换**。本模块采用“原始读取 → 消抖 → 状态机 → 事件输出”四级流水线。
+与早期版本不同，当前实现已大幅简化：
+
+- **M5Unified 包办底层**：`M5.update()` 在 `main.cpp` 的 `loop()` 中每帧先行调用，负责 GPIO 读取、消抖、边沿检测
+- **HAL 层只做事件判断**：接收 `wasPressed()` / `wasReleased()` 边沿信号，用极简状态机判断短按还是长按
+- **双击检测已移除**：旧版本的双击切模式逻辑已废弃，`hal_input_get_mode()` 为预留空接口
 
 ---
 
 ## 关键概念
 
-### 按键状态结构
+### 双实现架构
 
-*📄 Source: [hal_input.h](../../src/hal/hal_input.h#L27-L37)*
+```
+┌─────────────────┐     ┌─────────────────────┐
+│  NATIVE_TEST    │     │    硬件环境         │
+│  所有函数空桩   │     │  M5Unified + 状态机 │
+│  返回 NONE    │     │  返回 SHORT/LONG    │
+└─────────────────┘     └─────────────────────┘
+```
+
+Native 测试环境下所有输入函数返回空状态，便于在桌面端运行 UI 逻辑单元测试而不依赖真实硬件。
+
+### 内部按键状态
+
+*📄 Source: [hal_input.cpp](../../src/hal/hal_input.cpp#L63-L68)*
 
 ```c
-typedef struct {
-    bool pressed;           // 当前是否按下
-    bool mode;              // 0=模式1, 1=模式2（双击切换）
-    uint32_t pressTime;     // 本次按下时刻
-    uint32_t lastReleaseTime; // 上次松开时刻（用于双击检测）
-    uint8_t debounceCount;  // 消抖计数器
-    bool debouncedState;    // 消抖后的稳定状态
-    bool lastRawState;      // 上一次的原始电平
-    bool longPressFired;    // 本次长按是否已经触发过
-    uint32_t lastRepeatTime; // 长按连发时刻
-} hal_button_state_t;
+struct btn_state {
+    bool pressed;              /* 是否处于按下态 */
+    uint32_t press_time;       /* 按下起始时间 */
+    bool long_fired;           /* 长按事件是否已触发 */
+    uint32_t press_duration_ms; /* 当前按下持续时间 */
+};
 ```
 
-每个按键维护一个这样的状态机实例，所有时间单位均为毫秒（`hal_get_ticks()`）。
+每个按键（A / B）维护一个 `btn_state` 实例。对比旧版本的 `hal_button_state_t`，字段从 9 个精简到 4 个，消抖计数器、双击窗口、连发时刻等均已移除。
 
-### 消抖逻辑
+### 核心事件检测
 
-*📄 Source: [hal_input.cpp](../../src/hal/hal_input.cpp#L40-L56)*
+*📄 Source: [hal_input.cpp](../../src/hal/hal_input.cpp#L95-L123)*
 
 ```c
-static void hal_input_update_button(hal_button_t btn) {
-    hal_button_state_t* state = &g_buttons[btn];
-    bool raw = hal_input_read_raw(btn);
-
-    // Debounce: require 3 consecutive same readings
-    if (raw == state->lastRawState) {
-        if (state->debounceCount < DEBOUNCE_FRAMES) {
-            state->debounceCount++;
-        }
-    } else {
-        state->debounceCount = 0;
-        state->lastRawState = raw;
+static hal_event_t check_button_event(struct btn_state *st,
+                                      bool wasPressed, bool wasReleased)
+{
+  if (wasPressed)
+  {
+    st->pressed = true;
+    st->press_time = millis();
+    st->long_fired = false;
+    st->press_duration_ms = 0;
+  }
+  if (wasReleased)
+  {
+    st->pressed = false;
+    st->press_duration_ms = 0;
+    if (!st->long_fired)
+    {
+      return HAL_EVENT_SHORT_PRESS;
     }
-
-    bool newState = (state->debounceCount >= DEBOUNCE_FRAMES)
-                        ? state->lastRawState
-                        : state->debouncedState;
-    bool changed = (newState != state->debouncedState);
-    state->debouncedState = newState;
-```
-
-#### 中文伪代码拆解
-
-```
-函数 更新按键(按键编号) {
-    原始电平 = 读取GPIO(按键编号)
-
-    // 第一步：消抖计数
-    if (原始电平 == 上一次原始电平) {
-        消抖计数++
-    } else {
-        消抖计数 = 0
-        上一次原始电平 = 原始电平
+  }
+  if (st->pressed && !st->long_fired)
+  {
+    st->press_duration_ms = millis() - st->press_time;
+    if (st->press_duration_ms >= LONG_PRESS_DURATION_MS)
+    {
+      st->long_fired = true;
+      return HAL_EVENT_LONG_PRESS;
     }
-
-    // 第二步：生成稳定状态
-    if (消抖计数 >= 3帧) {
-        稳定状态 = 原始电平
-    } else {
-        稳定状态 = 保持原状态   // 变化被忽略
-    }
-}
-```
-
-**为什么需要 3 帧**：机械按键按下/松开时电平会在几毫秒内反复跳动。连续 3 帧读到相同值才认为是真实状态，可有效消除抖动。
-
-### 事件检测
-
-*📄 Source: [hal_input.cpp](../../src/hal/hal_input.cpp#L58-L101)*
-
-```c
-uint32_t now = hal_get_ticks();
-
-if (changed) {
-    if (newState) {
-        // 刚按下
-        state->pressTime = now;
-        state->longPressFired = false;
-        state->lastRepeatTime = now;
-        state->pressed = true;
-    } else {
-        // 刚松开
-        state->pressed = false;
-        uint32_t duration = now - state->pressTime;
-        if (duration < SHORT_PRESS_MS) {
-            // 检测双击
-            if ((now - state->lastReleaseTime) < DOUBLE_CLICK_MS) {
-                state->mode = !state->mode;
-                state->lastReleaseTime = 0;
-            } else {
-                state->lastReleaseTime = now;
-            }
-        }
-    }
-} else {
-    if (newState) {
-        uint32_t duration = now - state->pressTime;
-        if (duration >= LONG_PRESS_MS) {
-            if (!state->longPressFired) {
-                state->longPressFired = true;
-                state->lastRepeatTime = now;
-            } else if ((now - state->lastRepeatTime) >= LONG_PRESS_REPEAT_MS) {
-                state->lastRepeatTime = now;
-            }
-        }
-    } else {
-        // 松开状态：衰减双击窗口
-        if (state->lastReleaseTime != 0 &&
-            (now - state->lastReleaseTime) >= DOUBLE_CLICK_MS) {
-            state->lastReleaseTime = 0;
-        }
-    }
+  }
+  return HAL_EVENT_NONE;
 }
 ```
 
 #### 中文伪代码拆解
 
 ```
-函数 状态机(稳定状态是否变化) {
-    当前时间 = 获取毫秒Tick()
-
-    if (状态发生变化) {
-        if (变为按下) {
-            记录按下时刻
-            重置长按标记
-        } else {
-            // 变为松开
-            按住时长 = 当前时间 - 按下时刻
-
-            if (按住时长 < 200ms) {
-                // 可能是短按，也可能是双击的一部分
-                if (距离上次松开 < 300ms) {
-                    模式 = !模式      // 双击成功，切换模式
-                    上次松开时刻 = 0   // 防止三连击
-                } else {
-                    上次松开时刻 = 当前时间
-                }
-            }
-        }
-    } else {
-        if (当前处于按住状态) {
-            按住时长 = 当前时间 - 按下时刻
-            if (按住时长 >= 500ms) {
-                if (还没触发过长按) {
-                    标记长按已触发
-                } else if (距离上次连发 >= 100ms) {
-                    记录本次连发时刻    // 支持长按连续触发
-                }
-            }
-        } else {
-            // 持续松开：如果双击窗口超时，清零窗口
-            if (上次松开时刻 != 0 且 距离上次松开 >= 300ms) {
-                上次松开时刻 = 0
-                // 此时上层会收到 HAL_EVENT_SHORT_PRESS
-            }
-        }
-    }
-}
-```
-
-### 事件输出 API
-
-*📄 Source: [hal_input.cpp](../../src/hal/hal_input.cpp#L108-L141)*
-
-```c
-hal_event_t hal_input_get_event(hal_button_t btn) {
-    hal_button_state_t* state = &g_buttons[btn];
-
-    if (!state->debouncedState) {
-        // 松开状态：检查是否有待派发的短按
-        if (state->lastReleaseTime != 0) {
-            uint32_t now = hal_get_ticks();
-            if ((now - state->lastReleaseTime) >= DOUBLE_CLICK_MS) {
-                state->lastReleaseTime = 0;
-                return HAL_EVENT_SHORT_PRESS;
-            }
-        }
-        return HAL_EVENT_NONE;
+函数 检测按键事件(状态指针, 是否刚按下, 是否刚松开) {
+    if (刚按下) {
+        标记为按下态
+        记录按下时刻
+        重置长按标记
     }
 
-    // 按住状态
-    uint32_t now = hal_get_ticks();
-    uint32_t duration = now - state->pressTime;
-
-    if (duration >= LONG_PRESS_MS) {
-        if (state->longPressFired && (now - state->lastRepeatTime) >= LONG_PRESS_REPEAT_MS) {
-            state->lastRepeatTime = now;
-            return HAL_EVENT_LONG_PRESS;
-        }
-        if (!state->longPressFired) {
-            state->longPressFired = true;
-            state->lastRepeatTime = now;
-            return HAL_EVENT_LONG_PRESS;
+    if (刚松开) {
+        标记为松开态
+        if (长按从未触发) {
+            return 短按事件      // 短按在松开时确认
         }
     }
 
-    return HAL_EVENT_NONE;
-}
-```
-
-#### 中文伪代码拆解
-
-```
-函数 获取按键事件(按键编号) {
-    if (按键处于松开状态) {
-        if (存在待确认的短按) {
-            if (双击窗口已超时) {
-                清空待确认标记
-                return 短按事件
-            }
-        }
-        return 无事件
-    }
-
-    // 按键正被按住
-    按住时长 = 当前时间 - 按下时刻
-
-    if (按住时长 >= 500ms) {
-        if (已触发过长按 且 到达连发间隔) {
-            更新连发时刻
-            return 长按事件      // 连续触发
-        }
-        if (从未触发过长按) {
-            标记已触发
-            return 长按事件      // 首次触发
+    if (正按住 且 长按未触发) {
+        按住时长 = 当前时间 - 按下时刻
+        if (按住时长 >= 500ms) {
+            标记长按已触发
+            return 长按事件      // 长按在按住过程中确认
         }
     }
 
@@ -249,25 +109,100 @@ hal_event_t hal_input_get_event(hal_button_t btn) {
 }
 ```
 
+**关键理解**：
+- **短按**在松开时确认：只要按住期间没有触发过长按，松开后就是短按
+- **长按**在按住过程中确认：一旦达到阈值立即返回，无需等待松开
+- **长按触发后松开不再产生短按**：防止同一个按键动作产生两个事件
+
+### 事件输出 API
+
+*📄 Source: [hal_input.cpp](../../src/hal/hal_input.cpp#L128-L143)*
+
+```c
+hal_event_t hal_input_get_event(hal_button_t btn)
+{
+  struct btn_state *st = NULL;
+  if (btn == HAL_BTN_A) st = &g_btn_a;
+  else if (btn == HAL_BTN_B) st = &g_btn_b;
+  else return HAL_EVENT_NONE;
+
+  if (btn == HAL_BTN_A)
+  {
+    return check_button_event(st, M5.BtnA.wasPressed(), M5.BtnA.wasReleased());
+  }
+  else
+  {
+    return check_button_event(st, M5.BtnB.wasPressed(), M5.BtnB.wasReleased());
+  }
+}
+```
+
+#### 中文伪代码拆解
+
+```
+函数 获取按键事件(按键编号) {
+    找到对应按键的状态结构
+
+    if (按键A) {
+        return 检测事件(状态A, M5.BtnA.刚按下, M5.BtnA.刚松开)
+    } else {
+        return 检测事件(状态B, M5.BtnB.刚按下, M5.BtnB.刚松开)
+    }
+}
+```
+
+**为什么 `M5.update()` 在 main 中先行调用**：M5Unified 的 `wasPressed()` / `wasReleased()` 是边沿敏感 API，它们只在 `M5.update()` 执行后的那一帧返回 true。因此 `main.cpp` 每帧先 `M5.update()`，再 `hal_input_get_event()`，才能捕获到正确的边沿。
+
+### 长按进度查询
+
+*📄 Source: [hal_input.cpp](../../src/hal/hal_input.cpp#L148-L167)*
+
+```c
+bool hal_input_is_pressed(hal_button_t btn) {
+    struct btn_state *st = NULL;
+    if (btn == HAL_BTN_A) {
+        st = &g_btn_a;
+        bool pressed = M5.BtnA.isPressed();
+        if (pressed && st->pressed) {
+            st->press_duration_ms = millis() - st->press_time;
+        }
+        return pressed;
+    }
+    /* ... BtnB 同理 ... */
+}
+```
+
+*📄 Source: [hal_input.cpp](../../src/hal/hal_input.cpp#L180-L186)*
+
+```c
+uint32_t hal_input_get_press_duration(hal_button_t btn) {
+    struct btn_state *st = NULL;
+    if (btn == HAL_BTN_A) st = &g_btn_a;
+    else if (btn == HAL_BTN_B) st = &g_btn_b;
+    else return 0;
+    return st->press_duration_ms;
+}
+```
+
+`hal_input_is_pressed()` 在返回按键当前物理状态的同时，**更新 `press_duration_ms`**。UI 层（如长按提示条）可以每帧调用此函数获取实时进度，再通过 `hal_input_get_press_duration()` 读取具体毫秒数。
+
 ### 阈值常量
 
-*📄 Source: [hal_input.cpp](../../src/hal/hal_input.cpp#L18-L22)*
+*📄 Source: [hal_input.cpp](../../src/hal/hal_input.cpp#L58)*
 
 | 常量 | 值 | 含义 |
 |------|-----|------|
-| `DEBOUNCE_FRAMES` | 3 | 消抖需要连续 3 帧相同读数 |
-| `SHORT_PRESS_MS` | 200 | 短按上限（超过则不是短按） |
-| `LONG_PRESS_MS` | 500 | 长按触发阈值 |
-| `LONG_PRESS_REPEAT_MS` | 100 | 长按连发间隔 |
-| `DOUBLE_CLICK_MS` | 300 | 双击判定窗口 |
+| `LONG_PRESS_DURATION_MS` | 500 | 长按触发阈值（毫秒） |
+
+旧版本中的 `DEBOUNCE_FRAMES`、`SHORT_PRESS_MS`、`LONG_PRESS_REPEAT_MS`、`DOUBLE_CLICK_MS` 等常量已全部移除，因为消抖和边沿检测已交由 M5Unified 处理。
 
 ---
 
 ## 与其他组件的关系
 
-- **main.cpp**：每帧调用 `hal_input_update()` → 读取 `hal_input_get_event()`
-- **hal_system**：依赖 `hal_get_ticks()` 获取时间基准
-- **ui_item**：`xerintosh_selector_go_next_item()` 等函数消费按键事件
+- **main.cpp**：每帧调用 `M5.update()` → `hal_input_get_event()` → 将事件传递给 UI 层
+- **hal_system**：依赖 `millis()` 获取时间基准
+- **ui_item**：`xerintosh_selector_go_next_item()` 等函数消费 `HAL_EVENT_SHORT_PRESS` / `HAL_EVENT_LONG_PRESS`
 
 ---
 
