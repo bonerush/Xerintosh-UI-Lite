@@ -1,0 +1,140 @@
+{
+  "title": "M5Stick-C UI 架构导览",
+  "description": "从知识地图到 HAL/APP/UI 三层架构的核心代码路径，覆盖菜单树构建、C OOP 类型系统、动画插值、主循环调度与渲染管线。",
+  "ref": "refactor/c-oop-style",
+  "steps": [
+    {
+      "file": "doc/index.md",
+      "line": 1,
+      "title": "知识地图",
+      "description": "Situation: 这是整个项目的中央索引文档。\\nMechanism: 项目采用三层架构——HAL 层（硬件抽象）、UI 核心层（纯 C）、App 层（业务逻辑）。渲染管线每帧执行清除→背景→选择器→弹窗→刷新。\\nImplication: 先在这里建立全局认知，再深入各层代码。\\nGotcha: doc/ 目录与 src/ 目录保持镜像关系，找文档时直接对应源码路径即可。"
+    },
+    {
+      "file": "src/main.cpp",
+      "line": 97,
+      "title": "硬件入口 setup()",
+      "description": "Situation: Arduino 标准的 setup() 函数，系统启动的唯一入口。\\nMechanism: 初始化顺序——M5 硬件 → 串口 → NVS 存储 → 设置恢复 → 显示驱动 → 开机动画 → UI 菜单 → 管理器。\\nImplication: 任何新增的子系统都应该按这个顺序挂载，存储依赖必须在 UI 之前初始化。\\nGotcha: 屏幕方向和亮度在 setup 中就应用了，后续通过回调函数动态变更。"
+    },
+    {
+      "file": "src/main.cpp",
+      "line": 131,
+      "title": "主循环 loop()",
+      "description": "Situation: 每帧执行的 Arduino loop()。\\nMechanism: 每帧流程——M5.update() → 输入处理 → WiFi/蓝牙管理器更新 → 清屏 → UI 主核心 → UI 控件 → 长按提示 → pushSprite 刷新。\\nGotcha: hal_display_clear() 和 hal_display_flush() 分别位于 UI 渲染前后，形成完整的双缓冲帧。"
+    },
+    {
+      "file": "src/app/app_init.c",
+      "line": 50,
+      "title": "菜单树构建",
+      "description": "Situation: app_init_ui() 在 setup() 中被调用，负责用代码拼装整个菜单树。\\nMechanism: 先创建根节点，再创建 list_item（设置/关于），然后在设置下挂载 switch_item、slider_item 等派生项，最后用 xerintosh_push_item_to_list() 挂载。\\nImplication: 要新增菜单项，只需在这里 new 一个并 push 到对应父节点下。\\nGotcha: 回调函数（如 on_brightness_change_cb）定义在 main.cpp 中，通过 extern 声明在此处使用，避免循环依赖。"
+    },
+    {
+      "file": "src/ui/ui_item.h",
+      "selection": {
+        "start": { "line": 152, "character": 0 },
+        "end": { "line": 170, "character": 0 }
+      },
+      "title": "列表项基类",
+      "description": "Situation: xerintosh_list_item_t 是 C OOP 体系的基类结构体。\\nMechanism: 第一个字段是 type 类型标签，后面跟随所有派生类共享的字段（坐标、层级、子项数组、父指针等）。\\nImplication: 所有派生结构体必须把基类作为第一个成员，C 标准保证此时偏移量为 0，指针转换安全。\\nGotcha: child_list_item 是固定大小数组（MAX_LIST_CHILD_NUM=10），不是动态链表，节省堆内存但限制了每级菜单最多 10 项。"
+    },
+    {
+      "file": "src/ui/ui_item.h",
+      "selection": {
+        "start": { "line": 176, "character": 0 },
+        "end": { "line": 224, "character": 0 }
+      },
+      "title": "派生类型族",
+      "description": "Situation: 四种派生类型——switch_item（开关）、slider_item（滑块）、button_item（按钮）、user_item（全屏 App）。\\nMechanism: 每个派生结构体的第一个成员都是 base_item（xerintosh_list_item_t），后面附加类型特有字段。\\nImplication: 框架通过 type 字段判断实际类型，再用 xerintosh_to_* 函数安全转换。\\nGotcha: user_item 是唯一的全屏入口，它的 loop_function 会每帧调用，接管整个渲染权；其他类型由框架统一绘制。"
+    },
+    {
+      "file": "src/ui/ui_item.c",
+      "selection": {
+        "start": { "line": 207, "character": 0 },
+        "end": { "line": 219, "character": 0 }
+      },
+      "title": "构造函数模式",
+      "description": "Situation: 以 xerintosh_new_switch_item() 为例，展示 C OOP 的'构造函数'写法。\\nMechanism: malloc 派生结构体 → xerintosh_init_base_item() 初始化基类字段 → 填充派生特有字段 → 返回基类指针。\\nImplication: 调用者只拿到 xerintosh_list_item_t*，具体类型被隐藏，实现多态。\\nGotcha: 所有 new 函数在内存分配失败时返回 NULL，但调用代码很少检查这个返回值——在资源极少的嵌入式环境中这可能导致硬故障。"
+    },
+    {
+      "file": "src/ui/ui_item.c",
+      "selection": {
+        "start": { "line": 573, "character": 0 },
+        "end": { "line": 599, "character": 0 }
+      },
+      "title": "挂载与坐标计算",
+      "description": "Situation: xerintosh_push_item_to_list() 将子项挂到父项下，并自动计算其在列表中的纵向目标坐标。\\nMechanism: 设置子项层级 = 父项层级 + 1；第一个子项的 y_trg 从字体高度算起，后续子项按 LIST_ITEM_SPACING（18px）累加；首次挂载到根节点时自动绑定选择器和相机。\\nImplication: 菜单项的纵向排列完全由这里决定，修改间距只需改宏。\\nGotcha: 层级上限 MAX_LIST_LAYER=10，子项上限 MAX_LIST_CHILD_NUM=10，超过会静默返回 false。"
+    },
+    {
+      "file": "src/ui/ui_item.c",
+      "selection": {
+        "start": { "line": 354, "character": 0 },
+        "end": { "line": 381, "character": 0 }
+      },
+      "title": "选择器导航",
+      "description": "Situation: xerintosh_selector_go_next_item() 处理用户按'下'键时的选择器移动。\\nMechanism: 如果当前是 slider_item 且已确认编辑，则增加数值；如果是 user_item 运行态则忽略；否则在兄弟节点间循环移动。\\nImplication: 选择器的核心状态只有 selected_item 和 selected_index 两个字段，逻辑非常集中。\\nGotcha: slider_item 在'确认编辑'状态下，上下键变成调节数值，而不是移动选择器——这是同一种输入事件的双态语义。"
+    },
+    {
+      "file": "src/ui/ui_core.c",
+      "selection": {
+        "start": { "line": 52, "character": 0 },
+        "end": { "line": 65, "character": 0 }
+      },
+      "title": "动画插值公式",
+      "description": "Situation: xerintosh_animation() 是整个 UI 唯一的缓动动画函数。\\nMechanism: 公式 current += (target - current) / (100 - speed)，每次调用向目标逼近一步；当 g_anim_enabled 为 false 时直接跳到目标。\\nImplication: 所有动画（列表项、选择器、相机、弹窗）共用这一个函数，speed 参数控制快慢。\\nGotcha: 这不是基于时间的动画，而是基于帧数的——帧率不稳定时动画时长会变化，但在固定 60fps 的嵌入式场景中可接受。"
+    },
+    {
+      "file": "src/ui/ui_core.c",
+      "selection": {
+        "start": { "line": 192, "character": 0 },
+        "end": { "line": 240, "character": 0 }
+      },
+      "title": "主循环调度器",
+      "description": "Situation: xerintosh_ui_main_core() 是 UI 层的总调度中枢，每帧被 loop() 调用。\\nMechanism: 分两条分支——如果当前是 user_item 且已处于运行态，则调用其 loop_function（App 自绘）；否则刷新相机位置 → 刷新列表项位置 → 刷新选择器位置 → 绘制完整列表。最后叠加退场动画遮罩。\\nImplication: user_item 是唯一的'逃逸出口'，允许 App 完全接管屏幕；其他情况框架负责全部绘制。\\nGotcha: user_item 的 init/loop/exit 生命周期通过 entering/exiting 标志 + 退场动画状态机协同控制，状态转换不是瞬时的。"
+    },
+    {
+      "file": "src/ui/ui_drawer.h",
+      "selection": {
+        "start": { "line": 26, "character": 0 },
+        "end": { "line": 81, "character": 0 }
+      },
+      "title": "渲染管线接口",
+      "description": "Situation: ui_drawer.h 定义了全部绘制函数的接口，是渲染管线的'菜单'。\\nMechanism: 从底层到顶层依次为——列表外观（边框/滚动条）→ 列表项（图标+文字+滚动效果）→ 选择器（XOR 反色高亮框）→ 信息栏/弹窗 → 长按提示。\\nImplication: xerintosh_draw_list() 一次性调用以上全部子步骤，形成完整帧。\\nGotcha: XOR 反色在 OLED 上只需 draw_color(2)，但 TFT 不支持，所以 hal_draw_xor_rect() 是逐像素异或实现的，是性能热点之一。"
+    },
+    {
+      "file": "src/hal/hal_display.h",
+      "selection": {
+        "start": { "line": 35, "character": 0 },
+        "end": { "line": 52, "character": 0 }
+      },
+      "title": "HAL 显示层",
+      "description": "Situation: hal_display.h 是 UI 层与硬件之间的唯一绘制契约。\\nMechanism: 提供生命周期（init/clear/flush）+ 绘制原语（像素/线段/矩形/圆/圆角矩形）+ 字体文本 + 高级特效（XOR 矩形/XBM 位图/裁剪）。\\nImplication: UI 核心层只调用这些 hal_* 函数，完全不感知 M5GFX 或内存帧缓冲的存在。\\nGotcha: 屏幕尺寸在 native 环境是编译时常量（80×160），硬件环境是运行变量（从 M5.Display 读取），UI 代码通过 SCREEN_WIDTH/SCREEN_HEIGHT 宏统一访问。"
+    },
+    {
+      "file": "src/hal/hal_display.cpp",
+      "selection": {
+        "start": { "line": 322, "character": 0 },
+        "end": { "line": 345, "character": 0 }
+      },
+      "title": "双实现架构",
+      "description": "Situation: hal_display.cpp 是项目中唯一的双实现文件，通过 #ifdef NATIVE_TEST 切分。\\nMechanism: Native 测试环境使用 g_framebuffer 数组 + 纯软件算法（Bresenham 画线、中点圆算法）；硬件环境使用 M5Canvas（M5GFX 的离屏画布）进行硬件加速绘制，最后 pushSprite 到物理屏幕。\\nImplication: 同一套 UI 代码可以在桌面跑 GoogleTest（无硬件），也可以在 M5Stick-C 上跑真机。\\nGotcha: XOR 反色在硬件实现中需要逐行 readRect→异或→pushImage，比 native 的逐像素访问慢，但因为区域小可接受。"
+    },
+    {
+      "file": "src/hal/hal_input.h",
+      "selection": {
+        "start": { "line": 24, "character": 0 },
+        "end": { "line": 56, "character": 0 }
+      },
+      "title": "HAL 输入层",
+      "description": "Situation: hal_input.h 定义了双按键（A/B）的输入事件抽象。\\nMechanism: 每个按键维护一组状态（pressed、pressTime、debounceCount、longPressFired 等），hal_input_update() 每帧消抖并生成 SHORT_PRESS / LONG_PRESS / DOUBLE_CLICK 事件。\\nImplication: App 层只需调用 hal_input_get_event() 获取已处理好的离散事件，无需关心原始 GPIO 时序。\\nGotcha: 硬件环境依赖 M5.update() 先读取 GPIO，hal_input_update() 在此基础上做软件消抖；native 环境 update() 是空操作，事件只能通过测试桩注入。"
+    },
+    {
+      "file": "doc/coding-style.md",
+      "line": 1,
+      "title": "C OOP 编码规范",
+      "description": "Situation: 这是项目所有 C 代码必须遵循的风格契约。\\nMechanism: 规范覆盖模块前缀命名、结构体继承模式（基类必须第一位）、安全类型转换、统一回调签名（void (*)(void*)）、C/C++ 边界（头文件必须 C 兼容）。\\nImplication: 新增模块或派生类型时，先来这里查规范，避免风格不统一。\\nGotcha: 当前分支 refactor/c-oop-style 正在将旧代码统一为此规范，如果看到不符合的代码（如缺少模块前缀、直接使用强制转换），那就是待重构项。"
+    },
+    {
+      "title": "导览结束",
+      "description": "Situation: 你已经走完了 M5Stick-C UI 项目从入口到渲染的核心路径。\\nMechanism: 数据流可以总结为——硬件输入 → HAL 抽象 → UI 核心调度 → 动画插值 → Drawer 渲染 → HAL 刷新。\\nImplication: 接下来你可以根据兴趣深入任意子系统：要改菜单结构看 app_init.c；要改动画看 ui_core.c；要改绘制效果看 ui_drawer.c；要移植到新硬件改 hal_*.cpp。\\nGotcha: 项目同时支持 native 测试和硬件运行，改 HAL 时记得两边都验证。"
+    }
+  ]
+}

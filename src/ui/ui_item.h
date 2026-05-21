@@ -22,15 +22,15 @@ extern "C" {
 
 extern int16_t g_anim_speed;  /* 全局动画速度基准值 */
 
-#define ANIM_SPEED_LIST_ITEM    (g_anim_speed - 8)
-#define ANIM_SPEED_SELECTOR     (g_anim_speed)
-#define ANIM_SPEED_SELECTOR_H   (g_anim_speed + 1)
-#define ANIM_SPEED_INFO_BAR     (g_anim_speed + 2)
-#define ANIM_SPEED_INFO_BAR_W   (g_anim_speed + 3)
-#define ANIM_SPEED_POP_UP_W     (g_anim_speed + 4)
-#define ANIM_SPEED_POP_UP_Y     (g_anim_speed + 2)
-#define ANIM_SPEED_CAMERA       (g_anim_speed + 4)
-#define ANIM_SPEED_EXIT         (g_anim_speed + 2)
+#define ANIM_SPEED_LIST_ITEM    (g_anim_speed - 8)//列表项动画速度，适当慢于选择器，确保在快速切换时能及时调整位置以适应文本长度
+#define ANIM_SPEED_SELECTOR     (g_anim_speed)    //选择器动画速度，适当慢于列表项，确保在快速切换时能及时调整位置以适应文本长度
+#define ANIM_SPEED_SELECTOR_H   (g_anim_speed + 1)//选择器高度动画稍快，确保在快速切换时能及时调整尺寸以适应文本长度
+#define ANIM_SPEED_INFO_BAR     (g_anim_speed + 2)//信息栏动画速度，适当快于选择器，确保在快速切换时能及时调整尺寸以适应文本长度
+#define ANIM_SPEED_INFO_BAR_W   (g_anim_speed + 3)//信息栏宽度动画稍快，确保在快速切换时能及时调整尺寸以适应文本长度
+#define ANIM_SPEED_POP_UP_W     (g_anim_speed + 4)//弹窗宽度动画稍快，确保在快速切换时能及时调整尺寸以适应文本长度
+#define ANIM_SPEED_POP_UP_Y     (g_anim_speed + 2)//弹窗动画在 y 轴上稍慢，确保信息栏、弹窗等核心元素的动画速度一致
+#define ANIM_SPEED_CAMERA       (g_anim_speed + 4)//相机动画速度，适当快于选择器，确保在快速切换时能及时调整视图位置
+#define ANIM_SPEED_EXIT         (g_anim_speed + 2)//退出动画速度，主要用于 user_item 退场动画，确保与信息栏、弹窗等核心元素的动画速度一致
 
 /* ═══ 字体 ═══ */
 

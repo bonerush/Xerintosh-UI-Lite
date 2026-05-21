@@ -435,7 +435,7 @@ void xerintosh_draw_list_item()
   {
     xerintosh_list_item_t *_item = g_xerintosh_selector.selected_item->parent->child_list_item[i];
     int16_t _x_list_item = g_xerintosh_camera.x_camera + LIST_ITEM_LEFT_MARGIN;
-    int16_t _y_list_item = _item->y_list_item + g_xerintosh_camera.y_camera - oled_get_str_height()/2;
+    int16_t _y_list_item = _item->y_list_item + g_xerintosh_camera.y_camera - oled_get_str_height()/2;//列表项 y 坐标调整为以文字基线为中心，方便后续滚动效
 
     /* 根据类型分发到对应的绘制函数 */
     oled_set_draw_color(1);
@@ -468,13 +468,15 @@ void xerintosh_draw_list_item()
         _y_list_item + oled_get_str_height() / 2 < SCREEN_HEIGHT)
     {
       int16_t _text_width = oled_get_UTF8_width(_item->content);
-      int16_t _avail_width = SCREEN_WIDTH - LIST_ITEM_LEFT_MARGIN - 10 - LIST_ITEM_RIGHT_MARGIN;
+      bool _has_right_control = (_item->type == switch_item || _item->type == slider_item);
+      int16_t _right_margin = _has_right_control ? LIST_ITEM_RIGHT_MARGIN : 4;
+      int16_t _avail_width = SCREEN_WIDTH - LIST_ITEM_LEFT_MARGIN - 10 - _right_margin;
 
-      /* switch/slider 占用右侧空间，减小可用宽度 */
+      /* switch/slider 额外占用右侧控件空间 */
       if (_item->type == switch_item)
         _avail_width -= 11;
       else if (_item->type == slider_item)
-        _avail_width -= 20;
+        _avail_width -= 11;
 
       bool _is_selected = (_item == g_xerintosh_selector.selected_item);
       float _scroll_x = 0.0f;
@@ -492,13 +494,13 @@ void xerintosh_draw_list_item()
       }
 
       /* 设置裁剪区域：限制文字只在 icon 右侧到控件左侧之间显示 */
-      int16_t _clip_x = LIST_ITEM_LEFT_MARGIN + 10;
-      int16_t _clip_y = _y_list_item - oled_get_str_height() / 2 - 2;
-      int16_t _clip_h = oled_get_str_height() + 4;
+      int16_t _clip_x = LIST_ITEM_LEFT_MARGIN + 10;//左侧边缘+图标宽度+间距
+      int16_t _clip_y = _y_list_item - oled_get_str_height() / 2 - 2;//列表项 y 坐标 - 文字高度的一半 - 2 像素的垂直余量
+      int16_t _clip_h = oled_get_str_height() + 4;//文字高度 + 4 像素的垂直余量
       hal_set_clip_rect(_clip_x, _clip_y, _avail_width, _clip_h);
 
-      int16_t _cycle_dist = _text_width + _avail_width;
-      int16_t _draw_x = _clip_x - (int16_t)_scroll_x;
+      int16_t _cycle_dist = _text_width + _avail_width;//循环周期为文字宽度 + 可用宽度
+      int16_t _draw_x = _clip_x - (int16_t)_scroll_x;//根据滚动偏移计算当前绘制位置
 
       /* 绘制两份相同文字，形成无缝循环跑马灯 */
       oled_draw_UTF8(_draw_x,
