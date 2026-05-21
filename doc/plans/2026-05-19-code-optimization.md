@@ -26,18 +26,18 @@
 ## 已识别的优化点汇总
 
 ### 严重：代码重复
-1. `astra_push_info_bar()` 与 `astra_push_pop_up()` 逻辑几乎完全相同
-2. `astra_to_switch_item()` / `astra_to_button_item()` / `astra_to_slider_item()` / `astra_to_user_item()` 模式完全一致
-3. `astra_new_list_item()` / `astra_new_switch_item()` / `astra_new_button_item()` / `astra_new_slider_item()` / `astra_new_user_item()` 初始化模式重复
+1. `xerintosh_push_info_bar()` 与 `xerintosh_push_pop_up()` 逻辑几乎完全相同
+2. `xerintosh_to_switch_item()` / `xerintosh_to_button_item()` / `xerintosh_to_slider_item()` / `xerintosh_to_user_item()` 模式完全一致
+3. `xerintosh_new_list_item()` / `xerintosh_new_switch_item()` / `xerintosh_new_button_item()` / `xerintosh_new_slider_item()` / `xerintosh_new_user_item()` 初始化模式重复
 4. `hal_input.cpp` 中 BtnA 和 BtnB 的事件处理代码完全重复
-5. `astra_animation()` 与 `astra_exit_animation()` 实现几乎相同
+5. `xerintosh_animation()` 与 `xerintosh_exit_animation()` 实现几乎相同
 
 ### 高：大函数与深层嵌套
-6. `astra_draw_list_item()` ~95行，5层if-else链
-7. `astra_selector_jump_to_selected_item()` ~60行
-8. `astra_selector_exit_current_item()` ~50行
-9. `astra_draw_exit_animation()` ~90行，大量硬编码坐标
-10. `astra_ui_main_core()` 多层嵌套条件
+6. `xerintosh_draw_list_item()` ~95行，5层if-else链
+7. `xerintosh_selector_jump_to_selected_item()` ~60行
+8. `xerintosh_selector_exit_current_item()` ~50行
+9. `xerintosh_draw_exit_animation()` ~90行，大量硬编码坐标
+10. `xerintosh_ui_main_core()` 多层嵌套条件
 
 ### 中：魔法数字与硬编码值
 11. 动画速度值散落各处：`94`, `95`, `96`, `84`, `92`, `93`
@@ -75,26 +75,26 @@
 #define ANIM_SPEED_SELECTOR_H   93
 ```
 
-- [ ] **Step 2: 统一 `astra_animation` 和 `astra_exit_animation`**
+- [ ] **Step 2: 统一 `xerintosh_animation` 和 `xerintosh_exit_animation`**
 
-删除 `ui_drawer.c` 中的 `astra_exit_animation()` 函数（第8-15行），所有调用方改用 `ui_core.c` 中的 `astra_animation()`。
+删除 `ui_drawer.c` 中的 `xerintosh_exit_animation()` 函数（第8-15行），所有调用方改用 `ui_core.c` 中的 `xerintosh_animation()`。
 
 修改 `ui_drawer.c` 第85行：
 ```c
 // 修改前
-astra_exit_animation(&_temp_h, _temp_h_trg, 94);
+xerintosh_exit_animation(&_temp_h, _temp_h_trg, 94);
 // 修改后
-astra_animation(&_temp_h, _temp_h_trg, ANIM_SPEED_EXIT);
+xerintosh_animation(&_temp_h, _temp_h_trg, ANIM_SPEED_EXIT);
 ```
 
 - [ ] **Step 3: 在 `ui_core.c` 中用常量替换魔法速度值**
 
 修改以下调用：
-- `astra_refresh_info_bar()` 中 `94` → `ANIM_SPEED_INFO_BAR`, `95` → `ANIM_SPEED_INFO_BAR + 1`
-- `astra_refresh_pop_up()` 中 `94` → `ANIM_SPEED_INFO_BAR`, `96` → `ANIM_SPEED_POP_UP`
-- `astra_refresh_camera_position()` 中 `96` → `ANIM_SPEED_CAMERA`
-- `astra_refresh_list_item_position()` 中 `84` → `ANIM_SPEED_LIST_ITEM`
-- `astra_refresh_selector_position()` 中 `92` → `ANIM_SPEED_SELECTOR`, `93` → `ANIM_SPEED_SELECTOR_H`
+- `xerintosh_refresh_info_bar()` 中 `94` → `ANIM_SPEED_INFO_BAR`, `95` → `ANIM_SPEED_INFO_BAR + 1`
+- `xerintosh_refresh_pop_up()` 中 `94` → `ANIM_SPEED_INFO_BAR`, `96` → `ANIM_SPEED_POP_UP`
+- `xerintosh_refresh_camera_position()` 中 `96` → `ANIM_SPEED_CAMERA`
+- `xerintosh_refresh_list_item_position()` 中 `84` → `ANIM_SPEED_LIST_ITEM`
+- `xerintosh_refresh_selector_position()` 中 `92` → `ANIM_SPEED_SELECTOR`, `93` → `ANIM_SPEED_SELECTOR_H`
 
 - [ ] **Step 4: 运行测试确保动画行为未变**
 
@@ -121,35 +121,35 @@ git commit -m "refactor: unify animation functions and extract speed constants"
 在 `ui_item.c` 中，在现有转换函数之前添加：
 
 ```c
-static astra_list_item_t *astra_safe_cast(astra_list_item_t *_item, astra_list_item_type_t _expected_type)
+static xerintosh_list_item_t *xerintosh_safe_cast(xerintosh_list_item_t *_item, xerintosh_list_item_type_t _expected_type)
 {
   if (_item != NULL && _item->type == _expected_type)
     return _item;
-  return astra_get_root_list();
+  return xerintosh_get_root_list();
 }
 ```
 
 - [ ] **Step 2: 简化四个类型转换函数**
 
 ```c
-astra_switch_item_t *astra_to_switch_item(astra_list_item_t *_astra_list_item)
+xerintosh_switch_item_t *xerintosh_to_switch_item(xerintosh_list_item_t *_xerintosh_list_item)
 {
-  return (astra_switch_item_t*)astra_safe_cast(_astra_list_item, switch_item);
+  return (xerintosh_switch_item_t*)xerintosh_safe_cast(_xerintosh_list_item, switch_item);
 }
 
-astra_button_item_t *astra_to_button_item(astra_list_item_t *_astra_list_item)
+xerintosh_button_item_t *xerintosh_to_button_item(xerintosh_list_item_t *_xerintosh_list_item)
 {
-  return (astra_button_item_t*)astra_safe_cast(_astra_list_item, button_item);
+  return (xerintosh_button_item_t*)xerintosh_safe_cast(_xerintosh_list_item, button_item);
 }
 
-astra_slider_item_t *astra_to_slider_item(astra_list_item_t *_astra_list_item)
+xerintosh_slider_item_t *xerintosh_to_slider_item(xerintosh_list_item_t *_xerintosh_list_item)
 {
-  return (astra_slider_item_t*)astra_safe_cast(_astra_list_item, slider_item);
+  return (xerintosh_slider_item_t*)xerintosh_safe_cast(_xerintosh_list_item, slider_item);
 }
 
-astra_user_item_t *astra_to_user_item(astra_list_item_t *_astra_list_item)
+xerintosh_user_item_t *xerintosh_to_user_item(xerintosh_list_item_t *_xerintosh_list_item)
 {
-  return (astra_user_item_t*)astra_safe_cast(_astra_list_item, user_item);
+  return (xerintosh_user_item_t*)xerintosh_safe_cast(_xerintosh_list_item, user_item);
 }
 ```
 
@@ -177,11 +177,11 @@ git commit -m "refactor: deduplicate type-cast functions with safe_cast helper"
 在 `ui_item.c` 中添加：
 
 ```c
-static void astra_init_base_item(astra_list_item_t *_item, astra_list_item_type_t _type,
-                                  const char *_content, astra_list_item_icon_t _icon,
-                                  astra_list_item_icon_t _default_icon)
+static void xerintosh_init_base_item(xerintosh_list_item_t *_item, xerintosh_list_item_type_t _type,
+                                  const char *_content, xerintosh_list_item_icon_t _icon,
+                                  xerintosh_list_item_icon_t _default_icon)
 {
-  memset(_item, 0, sizeof(astra_list_item_t));
+  memset(_item, 0, sizeof(xerintosh_list_item_t));
   _item->type = _type;
   _item->content = _content;
   _item->icon = (_icon == default_icon) ? _default_icon : _icon;
@@ -190,34 +190,34 @@ static void astra_init_base_item(astra_list_item_t *_item, astra_list_item_type_
 
 - [ ] **Step 2: 简化所有创建函数**
 
-修改 `astra_new_list_item()`：
+修改 `xerintosh_new_list_item()`：
 ```c
-astra_list_item_t *astra_new_list_item(const char *_content, astra_list_item_icon_t icon)
+xerintosh_list_item_t *xerintosh_new_list_item(const char *_content, xerintosh_list_item_icon_t icon)
 {
-  astra_list_item_t *_item = malloc(sizeof(astra_list_item_t));
+  xerintosh_list_item_t *_item = malloc(sizeof(xerintosh_list_item_t));
   if (_item == NULL) return NULL;
-  astra_init_base_item(_item, list_item, _content, icon, list_icon);
+  xerintosh_init_base_item(_item, list_item, _content, icon, list_icon);
   return _item;
 }
 ```
 
-修改 `astra_new_switch_item()`：
+修改 `xerintosh_new_switch_item()`：
 ```c
-astra_list_item_t *astra_new_switch_item(const char *_content, bool *_value,
+xerintosh_list_item_t *xerintosh_new_switch_item(const char *_content, bool *_value,
                                           void (*_init_function)(), void (*_exit_function)(),
-                                          astra_list_item_icon_t icon)
+                                          xerintosh_list_item_icon_t icon)
 {
-  astra_switch_item_t *_item = malloc(sizeof(astra_switch_item_t));
+  xerintosh_switch_item_t *_item = malloc(sizeof(xerintosh_switch_item_t));
   if (_item == NULL) return NULL;
-  astra_init_base_item(&_item->base_item, switch_item, _content, icon, switch_icon);
+  xerintosh_init_base_item(&_item->base_item, switch_item, _content, icon, switch_icon);
   _item->value = _value;
   _item->init_function = _init_function;
   _item->exit_function = _exit_function;
-  return (astra_list_item_t*)_item;
+  return (xerintosh_list_item_t*)_item;
 }
 ```
 
-类似地简化 `astra_new_button_item()`、`astra_new_slider_item()`、`astra_new_user_item()`。
+类似地简化 `xerintosh_new_button_item()`、`xerintosh_new_slider_item()`、`xerintosh_new_user_item()`。
 
 - [ ] **Step 3: 编译验证**
 
@@ -247,7 +247,7 @@ git commit -m "refactor: extract base item init helper to deduplicate new_*_item
 ```c
 #define DEFINE_PUSH_NOTIFICATION(NAME, STRUCT, Y_FIELD, Y_TRG_FIELD, W_FIELD, W_TRG_FIELD, \
                                   HEIGHT, OFFSET, DEFAULT_Y_TRG, SPEED)                     \
-void astra_push_##NAME(const char *_content, const uint16_t _span)                          \
+void xerintosh_push_##NAME(const char *_content, const uint16_t _span)                          \
 {                                                                                           \
   STRUCT.time = get_ticks();                                                                \
   STRUCT.content = _content;                                                                \
@@ -259,18 +259,18 @@ void astra_push_##NAME(const char *_content, const uint16_t _span)              
     STRUCT.Y_TRG_FIELD = DEFAULT_Y_TRG;                                                     \
     STRUCT.is_running = true;                                                               \
   }                                                                                         \
-  astra_set_font(NULL);                                                                     \
+  xerintosh_set_font(NULL);                                                                     \
   STRUCT.W_TRG_FIELD = oled_get_UTF8_width(STRUCT.content) + OFFSET;                        \
 }
 ```
 
 **注意：** 上述宏方案因字段名不同导致复杂度过高。更优方案是统一数据结构。
 
-**替代方案（推荐）：** 统一 `astra_info_bar_t` 和 `astra_pop_up_t` 为通用结构体：
+**替代方案（推荐）：** 统一 `xerintosh_info_bar_t` 和 `xerintosh_pop_up_t` 为通用结构体：
 
 在 `ui_item.h` 中：
 ```c
-typedef struct astra_notification_t
+typedef struct xerintosh_notification_t
 {
   const char *content;
   uint16_t span;
@@ -278,15 +278,15 @@ typedef struct astra_notification_t
   bool is_running;
   uint32_t time_start;
   uint32_t time;
-} astra_notification_t;
+} xerintosh_notification_t;
 ```
 
-将 `astra_info_bar_t` 和 `astra_pop_up_t` 改为 `astra_notification_t` 的typedef。
+将 `xerintosh_info_bar_t` 和 `xerintosh_pop_up_t` 改为 `xerintosh_notification_t` 的typedef。
 
 - [ ] **Step 2: 提取通用推送函数**
 
 ```c
-static void astra_push_notification(astra_notification_t *_notif, const char *_content,
+static void xerintosh_push_notification(xerintosh_notification_t *_notif, const char *_content,
                                      uint16_t _span, float _default_y_trg, uint8_t _offset)
 {
   _notif->time = get_ticks();
@@ -299,23 +299,23 @@ static void astra_push_notification(astra_notification_t *_notif, const char *_c
     _notif->y_trg = _default_y_trg;
     _notif->is_running = true;
   }
-  astra_set_font(NULL);
+  xerintosh_set_font(NULL);
   _notif->w_trg = oled_get_UTF8_width(_notif->content) + _offset;
 }
 ```
 
-- [ ] **Step 3: 简化 `astra_push_info_bar` 和 `astra_push_pop_up`**
+- [ ] **Step 3: 简化 `xerintosh_push_info_bar` 和 `xerintosh_push_pop_up`**
 
 ```c
-void astra_push_info_bar(const char *_content, const uint16_t _span)
+void xerintosh_push_info_bar(const char *_content, const uint16_t _span)
 {
-  astra_push_notification(&astra_info_bar, _content, _span,
+  xerintosh_push_notification(&xerintosh_info_bar, _content, _span,
                           0 - 2 * INFO_BAR_HEIGHT, INFO_BAR_OFFSET);
 }
 
-void astra_push_pop_up(const char *_content, const uint16_t _span)
+void xerintosh_push_pop_up(const char *_content, const uint16_t _span)
 {
-  astra_push_notification(&astra_pop_up, _content, _span, 20, POP_UP_OFFSET);
+  xerintosh_push_notification(&xerintosh_pop_up, _content, _span, 20, POP_UP_OFFSET);
 }
 ```
 
@@ -339,7 +339,7 @@ git commit -m "refactor: unify info_bar and pop_up into generic notification str
 
 ---
 
-## Task 5: 拆分 `astra_draw_list_item()` 大函数
+## Task 5: 拆分 `xerintosh_draw_list_item()` 大函数
 
 **Files:**
 - Modify: `src/ui/ui_drawer.c`
@@ -357,19 +357,19 @@ static bool is_item_visible(int16_t _y_item)
 - [ ] **Step 2: 提取每种类型的绘制函数**
 
 ```c
-static void draw_list_item_list(astra_list_item_t *_item, int16_t _x, int16_t _y)
+static void draw_list_item_list(xerintosh_list_item_t *_item, int16_t _x, int16_t _y)
 {
   if (is_item_visible(_y))
-    astra_draw_list_icon(_item->icon, _x, _y);
+    xerintosh_draw_list_icon(_item->icon, _x, _y);
 }
 
-static void draw_list_item_switch(astra_switch_item_t *_switch, int16_t _x, int16_t _y)
+static void draw_list_item_switch(xerintosh_switch_item_t *_switch, int16_t _x, int16_t _y)
 {
-  if (_switch->init_function && astra_refresh_list_value)
+  if (_switch->init_function && xerintosh_refresh_list_value)
     _switch->init_function();
   if (!is_item_visible(_y)) return;
 
-  astra_draw_list_icon(_switch->base_item.icon, _x, _y);
+  xerintosh_draw_list_icon(_switch->base_item.icon, _x, _y);
   oled_draw_frame(SCREEN_WIDTH - LIST_ITEM_RIGHT_MARGIN - 7, _y - 2, 11, 7);
   if (*_switch->value)
   {
@@ -383,19 +383,19 @@ static void draw_list_item_switch(astra_switch_item_t *_switch, int16_t _x, int1
   }
 }
 
-static void draw_list_item_button(astra_button_item_t *_button, int16_t _x, int16_t _y)
+static void draw_list_item_button(xerintosh_button_item_t *_button, int16_t _x, int16_t _y)
 {
   if (is_item_visible(_y))
-    astra_draw_list_icon(_button->base_item.icon, _x, _y);
+    xerintosh_draw_list_icon(_button->base_item.icon, _x, _y);
 }
 
-static void draw_list_item_slider(astra_slider_item_t *_slider, int16_t _x, int16_t _y)
+static void draw_list_item_slider(xerintosh_slider_item_t *_slider, int16_t _x, int16_t _y)
 {
-  if (_slider->init_function && astra_refresh_list_value)
+  if (_slider->init_function && xerintosh_refresh_list_value)
     _slider->init_function();
   if (!is_item_visible(_y)) return;
 
-  astra_draw_list_icon(_slider->base_item.icon, _x, _y);
+  xerintosh_draw_list_icon(_slider->base_item.icon, _x, _y);
   char _value_str[10] = {};
   sprintf(_value_str, "%d", *_slider->value);
   int16_t _x_value = SCREEN_WIDTH - LIST_ITEM_RIGHT_MARGIN - oled_get_str_width(_value_str) + 2;
@@ -424,39 +424,39 @@ static void draw_list_item_slider(astra_slider_item_t *_slider, int16_t _x, int1
   }
 }
 
-static void draw_list_item_user(astra_list_item_t *_item, int16_t _x, int16_t _y)
+static void draw_list_item_user(xerintosh_list_item_t *_item, int16_t _x, int16_t _y)
 {
   if (is_item_visible(_y))
-    astra_draw_list_icon(_item->icon, _x, _y);
+    xerintosh_draw_list_icon(_item->icon, _x, _y);
 }
 ```
 
-- [ ] **Step 3: 重写 `astra_draw_list_item()` 使用分派表/简化分支**
+- [ ] **Step 3: 重写 `xerintosh_draw_list_item()` 使用分派表/简化分支**
 
 ```c
-void astra_draw_list_item()
+void xerintosh_draw_list_item()
 {
-  for (unsigned char i = 0; i < astra_selector.selected_item->parent->child_num; i++)
+  for (unsigned char i = 0; i < xerintosh_selector.selected_item->parent->child_num; i++)
   {
-    astra_list_item_t *_item = astra_selector.selected_item->parent->child_list_item[i];
-    int16_t _x = astra_camera.x_camera + LIST_ITEM_LEFT_MARGIN;
-    int16_t _y = _item->y_list_item + astra_camera.y_camera - oled_get_str_height() / 2;
+    xerintosh_list_item_t *_item = xerintosh_selector.selected_item->parent->child_list_item[i];
+    int16_t _x = xerintosh_camera.x_camera + LIST_ITEM_LEFT_MARGIN;
+    int16_t _y = _item->y_list_item + xerintosh_camera.y_camera - oled_get_str_height() / 2;
 
     oled_set_draw_color(1);
     switch (_item->type)
     {
       case list_item:   draw_list_item_list(_item, _x, _y); break;
-      case switch_item: draw_list_item_switch(astra_to_switch_item(_item), _x, _y); break;
-      case button_item: draw_list_item_button(astra_to_button_item(_item), _x, _y); break;
-      case slider_item: draw_list_item_slider(astra_to_slider_item(_item), _x, _y); break;
+      case switch_item: draw_list_item_switch(xerintosh_to_switch_item(_item), _x, _y); break;
+      case button_item: draw_list_item_button(xerintosh_to_button_item(_item), _x, _y); break;
+      case slider_item: draw_list_item_slider(xerintosh_to_slider_item(_item), _x, _y); break;
       case user_item:   draw_list_item_user(_item, _x, _y); break;
     }
 
-    astra_set_font(NULL);
+    xerintosh_set_font(NULL);
     if (is_item_visible(_y))
       oled_draw_UTF8(10 + _x, _y + oled_get_str_height() / 2, _item->content);
   }
-  astra_refresh_list_value = false;
+  xerintosh_refresh_list_value = false;
 }
 ```
 
@@ -469,12 +469,12 @@ Expected: 编译成功
 
 ```bash
 git add src/ui/ui_drawer.c src/ui/ui_drawer.h
-git commit -m "refactor: split astra_draw_list_item into per-type draw helpers"
+git commit -m "refactor: split xerintosh_draw_list_item into per-type draw helpers"
 ```
 
 ---
 
-## Task 6: 拆分 `astra_selector_jump_to_selected_item()` 和 `astra_selector_exit_current_item()`
+## Task 6: 拆分 `xerintosh_selector_jump_to_selected_item()` 和 `xerintosh_selector_exit_current_item()`
 
 **Files:**
 - Modify: `src/ui/ui_item.c`
@@ -482,18 +482,18 @@ git commit -m "refactor: split astra_draw_list_item into per-type draw helpers"
 - [ ] **Step 1: 提取 `handle_user_item_enter` 和 `handle_user_item_exit` 辅助函数**
 
 ```c
-static void handle_user_item_enter(astra_user_item_t *_user_item)
+static void handle_user_item_enter(xerintosh_user_item_t *_user_item)
 {
-  astra_exit_animation_finished = false;
+  xerintosh_exit_animation_finished = false;
   _user_item->entering_user_item = true;
   _user_item->exiting_user_item = false;
   _user_item->user_item_inited = false;
   _user_item->user_item_looping = false;
 }
 
-static void handle_user_item_exit(astra_user_item_t *_user_item)
+static void handle_user_item_exit(xerintosh_user_item_t *_user_item)
 {
-  astra_exit_animation_finished = false;
+  xerintosh_exit_animation_finished = false;
   _user_item->entering_user_item = false;
   _user_item->exiting_user_item = true;
   _user_item->user_item_inited = false;
@@ -504,7 +504,7 @@ static void handle_user_item_exit(astra_user_item_t *_user_item)
 - [ ] **Step 2: 提取 `handle_slider_confirm_toggle` 辅助函数**
 
 ```c
-static void handle_slider_confirm_toggle(astra_slider_item_t *_slider)
+static void handle_slider_confirm_toggle(xerintosh_slider_item_t *_slider)
 {
   if (!_slider->is_confirmed)
   {
@@ -520,24 +520,24 @@ static void handle_slider_confirm_toggle(astra_slider_item_t *_slider)
 }
 ```
 
-- [ ] **Step 3: 重写 `astra_selector_jump_to_selected_item()`**
+- [ ] **Step 3: 重写 `xerintosh_selector_jump_to_selected_item()`**
 
 ```c
-void astra_selector_jump_to_selected_item()
+void xerintosh_selector_jump_to_selected_item()
 {
-  if (!in_astra) return;
+  if (!in_xerintosh) return;
 
-  astra_list_item_t *_sel = astra_selector.selected_item;
+  xerintosh_list_item_t *_sel = xerintosh_selector.selected_item;
 
   if (_sel->type == user_item)
   {
-    handle_user_item_enter(astra_to_user_item(_sel));
+    handle_user_item_enter(xerintosh_to_user_item(_sel));
     return;
   }
 
   if (_sel->type == switch_item)
   {
-    astra_switch_item_t *_sw = astra_to_switch_item(_sel);
+    xerintosh_switch_item_t *_sw = xerintosh_to_switch_item(_sel);
     *_sw->value = !*_sw->value;
     if (_sw->exit_function) _sw->exit_function();
     return;
@@ -545,59 +545,59 @@ void astra_selector_jump_to_selected_item()
 
   if (_sel->type == button_item)
   {
-    astra_button_item_t *_btn = astra_to_button_item(_sel);
+    xerintosh_button_item_t *_btn = xerintosh_to_button_item(_sel);
     if (_btn->exit_function) _btn->exit_function();
     return;
   }
 
   if (_sel->type == slider_item)
   {
-    handle_slider_confirm_toggle(astra_to_slider_item(_sel));
+    handle_slider_confirm_toggle(xerintosh_to_slider_item(_sel));
     return;
   }
 
   if (_sel->child_num == 0) return;
 
-  astra_refresh_list_value = true;
+  xerintosh_refresh_list_value = true;
   for (uint8_t i = 0; i < _sel->child_num; i++)
     _sel->child_list_item[i]->y_list_item = 0;
 
-  astra_selector.selected_index = 0;
-  astra_selector.selected_item = _sel->child_list_item[0];
+  xerintosh_selector.selected_index = 0;
+  xerintosh_selector.selected_item = _sel->child_list_item[0];
 }
 ```
 
-- [ ] **Step 4: 重写 `astra_selector_exit_current_item()`**
+- [ ] **Step 4: 重写 `xerintosh_selector_exit_current_item()`**
 
 ```c
-void astra_selector_exit_current_item()
+void xerintosh_selector_exit_current_item()
 {
-  astra_list_item_t *_sel = astra_selector.selected_item;
+  xerintosh_list_item_t *_sel = xerintosh_selector.selected_item;
 
-  if (_sel->type == slider_item && astra_to_slider_item(_sel)->is_confirmed)
+  if (_sel->type == slider_item && xerintosh_to_slider_item(_sel)->is_confirmed)
   {
-    astra_slider_item_t *_slider = astra_to_slider_item(_sel);
+    xerintosh_slider_item_t *_slider = xerintosh_to_slider_item(_sel);
     _slider->is_confirmed = false;
     *_slider->value = _slider->value_backup;
     return;
   }
 
-  if (_sel->type == user_item && astra_to_user_item(_sel)->in_user_item)
+  if (_sel->type == user_item && xerintosh_to_user_item(_sel)->in_user_item)
   {
-    handle_user_item_exit(astra_to_user_item(_sel));
+    handle_user_item_exit(xerintosh_to_user_item(_sel));
     return;
   }
 
-  astra_refresh_list_value = true;
+  xerintosh_refresh_list_value = true;
 
-  if (_sel->parent->layer == 0 && in_astra)
+  if (_sel->parent->layer == 0 && in_xerintosh)
   {
-    if (ALLOW_EXIT_ASTRA_UI_BY_USER) in_astra = false;
+    if (ALLOW_EXIT_ASTRA_UI_BY_USER) in_xerintosh = false;
     return;
   }
 
-  astra_list_item_t *_parent = _sel->parent;
-  astra_list_item_t *_grandparent = _parent->parent;
+  xerintosh_list_item_t *_parent = _sel->parent;
+  xerintosh_list_item_t *_grandparent = _parent->parent;
 
   for (uint8_t i = 0; i < _grandparent->child_num; i++)
     _grandparent->child_list_item[i]->y_list_item = 0;
@@ -611,8 +611,8 @@ void astra_selector_exit_current_item()
       break;
     }
   }
-  astra_selector.selected_index = _temp_index;
-  astra_selector.selected_item = _parent;
+  xerintosh_selector.selected_index = _temp_index;
+  xerintosh_selector.selected_item = _parent;
 }
 ```
 
@@ -717,7 +717,7 @@ git commit -m "refactor: deduplicate button event handling in hal_input"
 #define HOURGLASS_Y_OFFSET      18  /* SCREEN_HEIGHT/2 相关的偏移 */
 ```
 
-- [ ] **Step 2: 替换 `astra_draw_exit_animation()` 中的硬编码值**
+- [ ] **Step 2: 替换 `xerintosh_draw_exit_animation()` 中的硬编码值**
 
 将沙漏绘制中所有硬编码的坐标和尺寸替换为上述常量。由于沙漏绘制涉及大量像素级坐标，保留相对坐标注释即可。
 
@@ -739,10 +739,10 @@ git commit -m "refactor: extract hourglass drawing constants in exit animation"
 - Modify: `src/ui/ui_item.h`
 - Modify: `src/ui/ui_core.h`
 
-- [ ] **Step 1: 重命名 `astra_animation` 参数**
+- [ ] **Step 1: 重命名 `xerintosh_animation` 参数**
 
 ```c
-void astra_animation(float *_pos, float _pos_trg, float _speed)
+void xerintosh_animation(float *_pos, float _pos_trg, float _speed)
 {
   if (*_pos != _pos_trg)
   {
@@ -778,14 +778,14 @@ git commit -m "style: unify naming convention to snake_case for local variables"
 - Modify: `src/ui/ui_item.c`
 - Modify: `src/ui/ui_core.c`
 
-- [ ] **Step 1: 为 `astra_push_item_to_list` 加强边界检查**
+- [ ] **Step 1: 为 `xerintosh_push_item_to_list` 加强边界检查**
 
 已存在基本检查，确认足够。
 
-- [ ] **Step 2: 为 `astra_bind_item_to_selector` 添加索引查找辅助函数**
+- [ ] **Step 2: 为 `xerintosh_bind_item_to_selector` 添加索引查找辅助函数**
 
 ```c
-static uint8_t find_item_index(astra_list_item_t *_parent, astra_list_item_t *_target)
+static uint8_t find_item_index(xerintosh_list_item_t *_parent, xerintosh_list_item_t *_target)
 {
   for (uint8_t i = 0; i < _parent->child_num; i++)
   {
@@ -796,20 +796,20 @@ static uint8_t find_item_index(astra_list_item_t *_parent, astra_list_item_t *_t
 }
 ```
 
-修改 `astra_bind_item_to_selector()`：
+修改 `xerintosh_bind_item_to_selector()`：
 ```c
-bool astra_bind_item_to_selector(astra_list_item_t *_item)
+bool xerintosh_bind_item_to_selector(xerintosh_list_item_t *_item)
 {
   if (_item == NULL) return false;
   if (_item->parent == NULL) return false;
 
-  if (astra_selector.selected_item == NULL)
+  if (xerintosh_selector.selected_item == NULL)
   {
-    astra_selector.y_selector = 2 * SCREEN_HEIGHT;
-    astra_selector.h_selector = 160;
+    xerintosh_selector.y_selector = 2 * SCREEN_HEIGHT;
+    xerintosh_selector.h_selector = 160;
   }
-  astra_selector.selected_index = find_item_index(_item->parent, _item);
-  astra_selector.selected_item = _item;
+  xerintosh_selector.selected_index = find_item_index(_item->parent, _item);
+  xerintosh_selector.selected_item = _item;
   return true;
 }
 ```
@@ -838,10 +838,10 @@ git commit -m "refactor: extract find_item_index helper and improve defensive ch
 ```c
 TEST(ItemTest, TypeCastSafety)
 {
-  astra_list_item_t *root = astra_get_root_list();
-  astra_list_item_t *sw = astra_new_switch_item("Test", NULL, NULL, NULL, default_icon);
-  EXPECT_EQ(astra_to_switch_item(sw)->base_item.type, switch_item);
-  EXPECT_EQ(astra_to_switch_item(root)->base_item.type, list_item); /* fallback to root */
+  xerintosh_list_item_t *root = xerintosh_get_root_list();
+  xerintosh_list_item_t *sw = xerintosh_new_switch_item("Test", NULL, NULL, NULL, default_icon);
+  EXPECT_EQ(xerintosh_to_switch_item(sw)->base_item.type, switch_item);
+  EXPECT_EQ(xerintosh_to_switch_item(root)->base_item.type, list_item); /* fallback to root */
 }
 ```
 
@@ -850,23 +850,23 @@ TEST(ItemTest, TypeCastSafety)
 ```c
 TEST(SelectorTest, NextPrevNavigation)
 {
-  astra_list_item_t *root = astra_get_root_list();
-  astra_list_item_t *item1 = astra_new_list_item("A", default_icon);
-  astra_list_item_t *item2 = astra_new_list_item("B", default_icon);
-  astra_push_item_to_list(root, item1);
-  astra_push_item_to_list(root, item2);
+  xerintosh_list_item_t *root = xerintosh_get_root_list();
+  xerintosh_list_item_t *item1 = xerintosh_new_list_item("A", default_icon);
+  xerintosh_list_item_t *item2 = xerintosh_new_list_item("B", default_icon);
+  xerintosh_push_item_to_list(root, item1);
+  xerintosh_push_item_to_list(root, item2);
 
-  astra_bind_item_to_selector(item1);
-  EXPECT_EQ(astra_selector.selected_index, 0);
+  xerintosh_bind_item_to_selector(item1);
+  EXPECT_EQ(xerintosh_selector.selected_index, 0);
 
-  astra_selector_go_next_item();
-  EXPECT_EQ(astra_selector.selected_index, 1);
+  xerintosh_selector_go_next_item();
+  EXPECT_EQ(xerintosh_selector.selected_index, 1);
 
-  astra_selector_go_next_item();
-  EXPECT_EQ(astra_selector.selected_index, 0); /* wrap around */
+  xerintosh_selector_go_next_item();
+  EXPECT_EQ(xerintosh_selector.selected_index, 0); /* wrap around */
 
-  astra_selector_go_prev_item();
-  EXPECT_EQ(astra_selector.selected_index, 1); /* wrap around backward */
+  xerintosh_selector_go_prev_item();
+  EXPECT_EQ(xerintosh_selector.selected_index, 1); /* wrap around backward */
 }
 ```
 
@@ -875,10 +875,10 @@ TEST(SelectorTest, NextPrevNavigation)
 ```c
 TEST(ItemTest, PushItemBounds)
 {
-  astra_list_item_t *root = astra_get_root_list();
-  bool result = astra_push_item_to_list(NULL, root);
+  xerintosh_list_item_t *root = xerintosh_get_root_list();
+  bool result = xerintosh_push_item_to_list(NULL, root);
   EXPECT_FALSE(result);
-  result = astra_push_item_to_list(root, NULL);
+  result = xerintosh_push_item_to_list(root, NULL);
   EXPECT_FALSE(result);
 }
 ```

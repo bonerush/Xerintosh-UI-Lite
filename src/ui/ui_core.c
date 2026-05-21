@@ -1,29 +1,56 @@
+/**
+ * @file   ui_core.c
+ * @brief  Xerintosh UI 核心引擎实现
+ * @details 实现动画插值、主循环调度、位置刷新及 user_item 生命周期管理。
+ *          所有 UI 帧的更新与渲染均由 xerintosh_ui_main_core 统筹调度。
+ *
+ * @copyright Copyright (c) 2026
+ */
+
 #include "ui_core.h"
 #include <stdio.h>
 #include "ui_drawer.h"
 #include <math.h>
 
-bool in_astra = false;
-uint16_t astra_draw_color = 0xFFFF;
-bool g_anim_enabled = true;
+/* ═══ 全局状态定义 ═══ */
+
+bool g_in_xerintosh = false;                 /* UI 是否处于激活状态 */
+uint16_t g_xerintosh_draw_color = 0xFFFF;    /* 当前前景色（默认白色） */
+bool g_anim_enabled = true;                  /* 动画是否启用 */
+
+/* ═══ 生命周期 ═══ */
 
 /**
- * @brief 进入astra ui lite
- *
- * @note 需要运行在循环中
- * @note 可以通过按键等传感器进行触发 当in_astra为true时进入astra ui lite
+ * @brief 进入 Xerintosh UI（保留接口，当前实现为空）
+ * @note  旧版本的长按进入逻辑已在 TFT 移植中移除
  */
-void ad_astra()
+void ad_xerintosh()
 {
   /* Splash screen / long-press entry removed for TFT build */
 }
 
-bool astra_is_in_user_item()
+/**
+ * @brief 查询当前是否处于 user_item 内部
+ * @return true  当前选中项为 user_item 且已处于运行态
+ */
+bool xerintosh_is_in_user_item()
 {
-  return (astra_selector.selected_item->type == user_item && astra_to_user_item(astra_selector.selected_item)->in_user_item) ? true : false;
+  return (g_xerintosh_selector.selected_item->type == user_item
+          && xerintosh_to_user_item(g_xerintosh_selector.selected_item)->in_user_item)
+         ? true : false;
 }
 
-void astra_animation(float *_pos, float _pos_trg, float _speed)
+/* ═══ 动画工具 ═══ */
+
+/**
+ * @brief  通用缓动动画函数
+ * @param  _pos     当前位置指针（会被直接更新）
+ * @param  _pos_trg 目标位置
+ * @param  _speed   动画速度（0~99，越大越快）
+ * @note   公式：current += (target - current) / (100 - speed)
+ * @note   当 g_anim_enabled 为 false 时直接跳转到目标位置
+ */
+void xerintosh_animation(float *_pos, float _pos_trg, float _speed)
 {
   if (*_pos != _pos_trg)
   {
@@ -37,100 +64,143 @@ void astra_animation(float *_pos, float _pos_trg, float _speed)
   }
 }
 
-void astra_refresh_info_bar()
+/* ═══ 控件位置刷新 ═══ */
+
+/**
+ * @brief 刷新信息栏位置与宽度
+ */
+void xerintosh_refresh_info_bar()
 {
-  astra_animation(&astra_info_bar.y_info_bar, astra_info_bar.y_info_bar_trg, ANIM_SPEED_INFO_BAR);
-  astra_animation(&astra_info_bar.w_info_bar, astra_info_bar.w_info_bar_trg, ANIM_SPEED_INFO_BAR_W);
+  xerintosh_animation(&g_xerintosh_info_bar.y_info_bar, g_xerintosh_info_bar.y_info_bar_trg, ANIM_SPEED_INFO_BAR);
+  xerintosh_animation(&g_xerintosh_info_bar.w_info_bar, g_xerintosh_info_bar.w_info_bar_trg, ANIM_SPEED_INFO_BAR_W);
 }
 
-void astra_refresh_pop_up()
+/**
+ * @brief 刷新弹窗位置与宽度
+ */
+void xerintosh_refresh_pop_up()
 {
-  astra_animation(&astra_pop_up.y_pop_up, astra_pop_up.y_pop_up_trg, ANIM_SPEED_POP_UP_Y);
-  astra_animation(&astra_pop_up.w_pop_up, astra_pop_up.w_pop_up_trg, ANIM_SPEED_POP_UP_W);
+  xerintosh_animation(&g_xerintosh_pop_up.y_pop_up, g_xerintosh_pop_up.y_pop_up_trg, ANIM_SPEED_POP_UP_Y);
+  xerintosh_animation(&g_xerintosh_pop_up.w_pop_up, g_xerintosh_pop_up.w_pop_up_trg, ANIM_SPEED_POP_UP_W);
 }
 
-void astra_refresh_camera_position()
+/**
+ * @brief 刷新相机位置，确保选择器始终处于可视区域
+ * @note  15 为选择器高度；向下或向上越界时自动调整相机偏移
+ */
+void xerintosh_refresh_camera_position()
 {
-  //15为selector的高度
-  if (astra_camera.selector->y_selector_trg + 15 + astra_camera.y_camera_trg > SCREEN_HEIGHT)  //向下超出屏幕 需要向下移动
-    astra_camera.y_camera_trg = SCREEN_HEIGHT - astra_camera.selector->y_selector_trg - 15;
+  /* 15 为选择器高度 */
+  if (g_xerintosh_camera.selector->y_selector_trg + 15 + g_xerintosh_camera.y_camera_trg > SCREEN_HEIGHT)  /* 向下超出屏幕，需要向下移动 */
+    g_xerintosh_camera.y_camera_trg = SCREEN_HEIGHT - g_xerintosh_camera.selector->y_selector_trg - 15;
 
-  if (astra_camera.selector->y_selector_trg + astra_camera.y_camera_trg < 0)  //向上超出屏幕 需要向上移动
-    astra_camera.y_camera_trg = 0 - astra_camera.selector->y_selector_trg + LIST_FONT_TOP_MARGIN;
+  if (g_xerintosh_camera.selector->y_selector_trg + g_xerintosh_camera.y_camera_trg < 0)  /* 向上超出屏幕，需要向上移动 */
+    g_xerintosh_camera.y_camera_trg = 0 - g_xerintosh_camera.selector->y_selector_trg + LIST_FONT_TOP_MARGIN;
 
-  astra_animation(&astra_camera.x_camera, astra_camera.x_camera_trg, ANIM_SPEED_CAMERA);
-  astra_animation(&astra_camera.y_camera, astra_camera.y_camera_trg, ANIM_SPEED_CAMERA);
+  xerintosh_animation(&g_xerintosh_camera.x_camera, g_xerintosh_camera.x_camera_trg, ANIM_SPEED_CAMERA);
+  xerintosh_animation(&g_xerintosh_camera.y_camera, g_xerintosh_camera.y_camera_trg, ANIM_SPEED_CAMERA);
 }
 
-void astra_refresh_widget_core_position()
+/**
+ * @brief 刷新控件核心位置（信息栏 + 弹窗）
+ */
+void xerintosh_refresh_widget_core_position()
 {
-  //需要调用所有的widget refresh函数
-  astra_refresh_info_bar();
-  astra_refresh_pop_up();
+  /* 需要调用所有的 widget refresh 函数 */
+  xerintosh_refresh_info_bar();
+  xerintosh_refresh_pop_up();
 }
 
-void astra_init_list()
+/**
+ * @brief 初始化列表动画起始位置
+ * @note  将所有根节点子项的 y 坐标归零，用于入场动画
+ */
+void xerintosh_init_list()
 {
-  //做动画
-  for (uint8_t i = 0; i < astra_get_root_list()->child_num; i++)
-    astra_get_root_list()->child_list_item[i]->y_list_item = 0;
-  astra_selector.selected_index = 0;
-  astra_selector.selected_item = astra_get_root_list()->child_list_item[0];
-  astra_selector.y_selector = SCREEN_HEIGHT;
-  astra_selector.h_selector = SCREEN_HEIGHT;
+  /* 做动画：子项从屏幕外滑入 */
+  for (uint8_t i = 0; i < xerintosh_get_root_list()->child_num; i++)
+    xerintosh_get_root_list()->child_list_item[i]->y_list_item = 0;
+  g_xerintosh_selector.selected_index = 0;
+  g_xerintosh_selector.selected_item = xerintosh_get_root_list()->child_list_item[0];
+  g_xerintosh_selector.y_selector = SCREEN_HEIGHT;
+  g_xerintosh_selector.h_selector = SCREEN_HEIGHT;
 }
 
-void astra_init_core()
+/**
+ * @brief 初始化 UI 核心状态（列表、选择器、相机绑定）
+ */
+void xerintosh_init_core()
 {
-  astra_init_list();
-  astra_list_item_t *root = astra_get_root_list();
+  xerintosh_init_list();
+  xerintosh_list_item_t *root = xerintosh_get_root_list();
   if (root->child_num > 0)
-    astra_bind_item_to_selector(root->child_list_item[0]);
+    xerintosh_bind_item_to_selector(root->child_list_item[0]);
   else
-    astra_bind_item_to_selector(root);
-  astra_bind_selector_to_camera(astra_get_selector());
+    xerintosh_bind_item_to_selector(root);
+  xerintosh_bind_selector_to_camera(xerintosh_get_selector());
 }
 
-void astra_refresh_list_item_position()
+/**
+ * @brief 刷新当前列表所有子项的目标位置（动画插值）
+ */
+void xerintosh_refresh_list_item_position()
 {
-  for (uint8_t i = 0; i < astra_selector.selected_item->parent->child_num; i++)
-    astra_animation(&astra_selector.selected_item->parent->child_list_item[i]->y_list_item, astra_selector.selected_item->parent->child_list_item[i]->y_list_item_trg, ANIM_SPEED_LIST_ITEM);
+  for (uint8_t i = 0; i < g_xerintosh_selector.selected_item->parent->child_num; i++)
+    xerintosh_animation(&g_xerintosh_selector.selected_item->parent->child_list_item[i]->y_list_item,
+                     g_xerintosh_selector.selected_item->parent->child_list_item[i]->y_list_item_trg,
+                     ANIM_SPEED_LIST_ITEM);
 }
 
-void astra_refresh_selector_position()
+/**
+ * @brief 刷新选择器的位置与尺寸（基于当前选中项）
+ */
+void xerintosh_refresh_selector_position()
 {
-  astra_set_font(hal_get_cn_font());
-  astra_selector.y_selector_trg = astra_selector.selected_item->y_list_item_trg - oled_get_str_height() + 1;
-  if (astra_selector.selected_item->type == switch_item || astra_selector.selected_item->type == slider_item)
-    astra_selector.w_selector_trg = SCREEN_WIDTH - 18;
-  else astra_selector.w_selector_trg = oled_get_UTF8_width(astra_selector.selected_item->content) + 12;
-  astra_selector.h_selector_trg = oled_get_str_height() + 4;
-  astra_animation(&astra_selector.y_selector, astra_selector.y_selector_trg, ANIM_SPEED_SELECTOR);
-  astra_animation(&astra_selector.w_selector, astra_selector.w_selector_trg, ANIM_SPEED_SELECTOR);
-  astra_animation(&astra_selector.h_selector, astra_selector.h_selector_trg, ANIM_SPEED_SELECTOR_H);
+  xerintosh_set_font(hal_get_cn_font());
+  g_xerintosh_selector.y_selector_trg = g_xerintosh_selector.selected_item->y_list_item_trg - oled_get_str_height() + 1;
+  if (g_xerintosh_selector.selected_item->type == switch_item || g_xerintosh_selector.selected_item->type == slider_item)
+    g_xerintosh_selector.w_selector_trg = SCREEN_WIDTH - 18;
+  else g_xerintosh_selector.w_selector_trg = oled_get_UTF8_width(g_xerintosh_selector.selected_item->content) + 12;
+  g_xerintosh_selector.h_selector_trg = oled_get_str_height() + 4;
+  xerintosh_animation(&g_xerintosh_selector.y_selector, g_xerintosh_selector.y_selector_trg, ANIM_SPEED_SELECTOR);
+  xerintosh_animation(&g_xerintosh_selector.w_selector, g_xerintosh_selector.w_selector_trg, ANIM_SPEED_SELECTOR);
+  xerintosh_animation(&g_xerintosh_selector.h_selector, g_xerintosh_selector.h_selector_trg, ANIM_SPEED_SELECTOR_H);
 }
 
-void astra_refresh_main_core_position()
+/**
+ * @brief 刷新主核心位置（调用列表刷新）
+ */
+void xerintosh_refresh_main_core_position()
 {
-  astra_refresh_list_item_position();
+  xerintosh_refresh_list_item_position();
 }
 
-void astra_ui_widget_core()
+/* ═══ 主循环 ═══ */
+
+/**
+ * @brief UI 控件刷新调度（信息栏、弹窗）
+ */
+void xerintosh_ui_widget_core()
 {
-  astra_refresh_widget_core_position();
-  astra_draw_widget();
+  xerintosh_refresh_widget_core_position();
+  xerintosh_draw_widget();
 }
 
-void astra_ui_main_core()
+/**
+ * @brief UI 主循环核心调度
+ * @note  处理 user_item 生命周期、列表刷新、退场动画等
+ */
+void xerintosh_ui_main_core()
 {
-  if (!in_astra) return;
+  if (!g_in_xerintosh) return;
 
-  //切换in user item的逻辑
-  if (astra_selector.selected_item->type == user_item && !astra_to_user_item(astra_selector.selected_item)->in_user_item)
+  /* 切换 in_user_item 的逻辑 */
+  if (g_xerintosh_selector.selected_item->type == user_item
+      && !xerintosh_to_user_item(g_xerintosh_selector.selected_item)->in_user_item)
   {
-    astra_user_item_t *_selected_user_item = astra_to_user_item(astra_selector.selected_item);
+    xerintosh_user_item_t *_selected_user_item = xerintosh_to_user_item(g_xerintosh_selector.selected_item);
 
-    if (_selected_user_item->entering_user_item && astra_exit_animation_status == 1)
+    if (_selected_user_item->entering_user_item && g_xerintosh_exit_animation_status == 1)
     {
       if (_selected_user_item->init_function != NULL)
         _selected_user_item->init_function();
@@ -138,17 +208,18 @@ void astra_ui_main_core()
     }
   }
 
-  //渲染的逻辑
-  if (astra_selector.selected_item->type == user_item && astra_to_user_item(astra_selector.selected_item)->in_user_item)
+  /* 渲染逻辑：user_item 内部由 App 自行绘制；列表模式由框架绘制 */
+  if (g_xerintosh_selector.selected_item->type == user_item
+      && xerintosh_to_user_item(g_xerintosh_selector.selected_item)->in_user_item)
   {
-    astra_user_item_t* _selected_user_item = astra_to_user_item(astra_selector.selected_item);
+    xerintosh_user_item_t* _selected_user_item = xerintosh_to_user_item(g_xerintosh_selector.selected_item);
 
     if (_selected_user_item->loop_function != NULL)
     {
       _selected_user_item->loop_function();
     }
 
-    if (_selected_user_item->exiting_user_item && astra_exit_animation_status == 1)
+    if (_selected_user_item->exiting_user_item && g_xerintosh_exit_animation_status == 1)
     {
         if (_selected_user_item->exit_function != NULL)
             _selected_user_item->exit_function();
@@ -156,14 +227,14 @@ void astra_ui_main_core()
     }
   } else
   {
-    astra_refresh_camera_position();
-    astra_refresh_main_core_position();
-    astra_refresh_selector_position();
-    astra_draw_list();
+    xerintosh_refresh_camera_position();
+    xerintosh_refresh_main_core_position();
+    xerintosh_refresh_selector_position();
+    xerintosh_draw_list();
   }
 
-  //退场动画
-  //上面都是正常应当绘制的内容 退场动画需要绘制时 只需要在上面的基础上绘制遮罩即可
-  if (!astra_exit_animation_finished)
-    astra_draw_exit_animation();
+  /* 退场动画 */
+  /* 上面都是正常应当绘制的内容；退场动画需要绘制时，只需在上面的基础上绘制遮罩即可 */
+  if (!g_xerintosh_exit_animation_finished)
+    xerintosh_draw_exit_animation();
 }

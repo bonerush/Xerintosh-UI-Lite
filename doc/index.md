@@ -1,8 +1,8 @@
-# Astra UI for M5Stick-C 知识地图
+# Xerintosh UI for M5Stick-C 知识地图
 
 ## 架构总览
 
-本项目是将 `reference/oled-ui-astra-lite`（128×64 OLED 菜单框架）移植到 **M5Stick-C**（80×160 TFT，ESP32-PICO）的固件项目。
+本项目是将 `reference/oled-ui-Xerintosh-lite`（128×64 OLED 菜单框架）移植到 **M5Stick-C**（80×160 TFT，ESP32-PICO）的固件项目。
 
 采用 **分层架构**：
 
@@ -17,6 +17,10 @@ Project Root
 │   ├── [项目系统](ui/item.md)          ← 列表项、开关、滑条、按钮、用户页
 │   ├── [核心引擎](ui/core.md)          ← 动画插值、相机、选择器、主循环
 │   └── [绘制管线](ui/drawer.md)        ← 列表外观、选择器高亮、弹窗、信息栏
+├── App 层
+│   ├── [设置管理](app/settings.md)     ← 亮度/动画/方向配置与存储
+│   ├── [应用初始化](app/app-init.md)   ← 菜单构建、管理器初始化、输入处理
+│   └── [编码风格规范](coding-style.md) ← C OOP 命名、封装、继承规范
 └── 入口
     ├── src/main.cpp                   ← M5Stick-C 实际入口
     └── src/native_main.cpp            ← GoogleTest 桌面测试入口
@@ -37,7 +41,7 @@ Project Root
 
 - **TFT 双缓冲**：使用 `M5Canvas` 作为后台缓冲区，必须传入父显示对象 `new M5Canvas(&M5.Display)`
 - **XOR 选择器高亮**：TFT 不支持 OLED 的 `draw_color(2)` 反色，改用像素级 `color ^ 0xFFFF`
-- **C 风格面向对象**：基类 `astra_list_item_t` 作为结构体第一个成员，派生类通过强制类型转换实现多态
+- **C 风格面向对象**：基类 `xerintosh_list_item_t` 作为结构体第一个成员，派生类通过强制类型转换实现多态
 - **动画插值公式**：`current += (target - current) / (100.0f - speed)`
 
 ## 文档树

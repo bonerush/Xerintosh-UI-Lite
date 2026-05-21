@@ -14,7 +14,7 @@
 
 ### 按键状态结构
 
-*📄 Source: [hal_input.h](../../src/hal/hal_input.h#L23-L33)*
+*📄 Source: [hal_input.h](../../src/hal/hal_input.h#L27-L37)*
 
 ```c
 typedef struct {
@@ -267,7 +267,7 @@ hal_event_t hal_input_get_event(hal_button_t btn) {
 
 - **main.cpp**：每帧调用 `hal_input_update()` → 读取 `hal_input_get_event()`
 - **hal_system**：依赖 `hal_get_ticks()` 获取时间基准
-- **ui_item**：`astra_selector_go_next_item()` 等函数消费按键事件
+- **ui_item**：`xerintosh_selector_go_next_item()` 等函数消费按键事件
 
 ---
 

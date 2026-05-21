@@ -1,6 +1,6 @@
-# Astra UI Lite 开发者指南
+# Xerintosh UI Lite 开发者指南
 
-> 本文档介绍如何基于 Astra UI Lite 框架设计菜单结构、创建自定义 App，以及推荐的项目组织方式。
+> 本文档介绍如何基于 Xerintosh UI Lite 框架设计菜单结构、创建自定义 App，以及推荐的项目组织方式。
 >
 > 关于各模块内部实现，请参考同目录下的 `core.md`、`item.md`、`drawer.md`、`draw-driver.md` 及 `hal/` 下的文档。
 
@@ -21,10 +21,14 @@
 
 ## 1. 框架概述
 
-Astra UI Lite 是一个面向嵌入式设备的层级菜单框架，采用**树形数据模型** + **动画渲染引擎** + **硬件抽象层（HAL）** 的三层架构。
+Xerintosh UI Lite 是一个面向嵌入式设备的层级菜单框架，采用**树形数据模型** + **动画渲染引擎** + **硬件抽象层（HAL）** 的三层架构。
 
 ```
 App 代码
+    │
+    ▼
+app_init.h/c         ← 菜单树构建、管理器初始化、输入处理
+settings.h/c         ← 亮度/动画/方向配置与存储
     │
     ▼
 ui_item.h/c          ← 数据模型：菜单树、选择器、相机
@@ -60,7 +64,7 @@ hal_system.h/cpp     ← 系统时钟与延时
 
 ### 2.2 构建菜单树
 
-所有菜单项通过 `astra_push_item_to_list(parent, child)` 挂载到树上。该函数会自动：
+所有菜单项通过 `xerintosh_push_item_to_list(parent, child)` 挂载到树上。该函数会自动：
 
 1. 设置子节点的 `layer = parent->layer + 1`
 2. 计算子节点的纵向目标坐标 `y_list_item_trg`
@@ -69,13 +73,13 @@ hal_system.h/cpp     ← 系统时钟与延时
 ```c
 #include "ui/ui_item.h"
 
-astra_list_item_t* root = astra_get_root_list();  // 获取（或自动创建）根节点
+xerintosh_list_item_t* root = xerintosh_get_root_list();  // 获取（或自动创建）根节点
 
-astra_list_item_t* settings = astra_new_list_item("设置", list_icon);
-astra_list_item_t* about    = astra_new_list_item("关于", user_icon);
+xerintosh_list_item_t* settings = xerintosh_new_list_item("设置", list_icon);
+xerintosh_list_item_t* about    = xerintosh_new_list_item("关于", user_icon);
 
-astra_push_item_to_list(root, settings);
-astra_push_item_to_list(root, about);
+xerintosh_push_item_to_list(root, settings);
+xerintosh_push_item_to_list(root, about);
 ```
 
 ### 2.3 层级示例
@@ -93,21 +97,21 @@ root（隐式，不显示）
 对应代码：
 
 ```c
-astra_list_item_t* root     = astra_get_root_list();
-astra_list_item_t* settings = astra_new_list_item("设置", list_icon);
-astra_list_item_t* tools    = astra_new_list_item("工具", list_icon);
-astra_list_item_t* about    = astra_new_list_item("关于", flag_icon);
+xerintosh_list_item_t* root     = xerintosh_get_root_list();
+xerintosh_list_item_t* settings = xerintosh_new_list_item("设置", list_icon);
+xerintosh_list_item_t* tools    = xerintosh_new_list_item("工具", list_icon);
+xerintosh_list_item_t* about    = xerintosh_new_list_item("关于", flag_icon);
 
 static bool wifi_on = false;
 static int16_t brightness = 50;
 
-astra_push_item_to_list(settings, astra_new_switch_item("WiFi", &wifi_on, NULL, NULL, switch_icon));
-astra_push_item_to_list(settings, astra_new_slider_item("亮度", &brightness, 5, 0, 100, NULL, NULL, slider_icon));
-astra_push_item_to_list(tools, astra_new_user_item("时钟", clock_init, clock_loop, clock_exit, user_icon));
+xerintosh_push_item_to_list(settings, xerintosh_new_switch_item("WiFi", &wifi_on, NULL, NULL, switch_icon));
+xerintosh_push_item_to_list(settings, xerintosh_new_slider_item("亮度", &brightness, 5, 0, 100, NULL, NULL, slider_icon));
+xerintosh_push_item_to_list(tools, xerintosh_new_user_item("时钟", clock_init, clock_loop, clock_exit, user_icon));
 
-astra_push_item_to_list(root, settings);
-astra_push_item_to_list(root, tools);
-astra_push_item_to_list(root, about);
+xerintosh_push_item_to_list(root, settings);
+xerintosh_push_item_to_list(root, tools);
+xerintosh_push_item_to_list(root, about);
 ```
 
 ---
@@ -116,18 +120,18 @@ astra_push_item_to_list(root, about);
 
 | 类型 | 结构体 | 用途 | 确认键行为 |
 |------|--------|------|-----------|
-| `list_item` | `astra_list_item_t` | 普通菜单/子菜单 | 进入子菜单 |
-| `switch_item` | `astra_switch_item_t` | 布尔开关 | 翻转布尔值 |
-| `slider_item` | `astra_slider_item_t` | 数值调节 | 进入/确认数值编辑模式 |
-| `button_item` | `astra_button_item_t` | 单次触发按钮 | 执行回调函数 |
-| `user_item` | `astra_user_item_t` | **自定义 App/全屏界面** | 进入自定义界面 |
+| `list_item` | `xerintosh_list_item_t` | 普通菜单/子菜单 | 进入子菜单 |
+| `switch_item` | `xerintosh_switch_item_t` | 布尔开关 | 翻转布尔值 |
+| `slider_item` | `xerintosh_slider_item_t` | 数值调节 | 进入/确认数值编辑模式 |
+| `button_item` | `xerintosh_button_item_t` | 单次触发按钮 | 执行回调函数 |
+| `user_item` | `xerintosh_user_item_t` | **自定义 App/全屏界面** | 进入自定义界面 |
 
 ### 3.1 list_item
 
 用于组织子菜单，本身不携带额外数据。
 
 ```c
-astra_list_item_t* item = astra_new_list_item("菜单名", list_icon);
+xerintosh_list_item_t* item = xerintosh_new_list_item("菜单名", list_icon);
 ```
 
 ### 3.2 switch_item
@@ -137,7 +141,7 @@ astra_list_item_t* item = astra_new_list_item("菜单名", list_icon);
 ```c
 static bool wifi_on = false;
 
-astra_list_item_t* sw = astra_new_switch_item(
+xerintosh_list_item_t* sw = xerintosh_new_switch_item(
     "WiFi",           // 显示文本
     &wifi_on,         // 绑定的布尔变量（必须持久有效）
     NULL,             // init_function：进入该项时调用（可选）
@@ -155,7 +159,7 @@ astra_list_item_t* sw = astra_new_switch_item(
 ```c
 static int16_t brightness = 50;
 
-astra_list_item_t* sl = astra_new_slider_item(
+xerintosh_list_item_t* sl = xerintosh_new_slider_item(
     "亮度",
     &brightness,      // 绑定的数值变量
     5,                // 步进值（每按一次增减 5）
@@ -180,12 +184,12 @@ astra_list_item_t* sl = astra_new_slider_item(
 ```c
 void on_reboot()
 {
-    astra_push_pop_up("正在重启...", 2000);
+    xerintosh_push_pop_up("正在重启...", 2000);
     delay(1000);
     ESP.restart();
 }
 
-astra_list_item_t* btn = astra_new_button_item("重启", on_reboot, power_icon);
+xerintosh_list_item_t* btn = xerintosh_new_button_item("重启", on_reboot, power_icon);
 ```
 
 ### 3.5 user_item（自定义 App）
@@ -193,7 +197,7 @@ astra_list_item_t* btn = astra_new_button_item("重启", on_reboot, power_icon);
 这是开发自定义界面的核心类型。它有三个生命周期回调：
 
 ```c
-astra_list_item_t* app = astra_new_user_item(
+xerintosh_list_item_t* app = xerintosh_new_user_item(
     "时钟",           // 菜单显示名称
     clock_init,       // init_function：进入时调用一次
     clock_loop,       // loop_function：进入后每帧调用
@@ -287,10 +291,10 @@ void my_app_exit()
 
 ```c
 // 顶部信息栏（自动收回）
-astra_push_info_bar("连接成功", 1500);
+xerintosh_push_info_bar("连接成功", 1500);
 
 // 中部弹窗（自动收回）
-astra_push_pop_up("已保存", 1000);
+xerintosh_push_pop_up("已保存", 1000);
 ```
 
 ### 4.3 在 user_item 中读取输入（高级）
@@ -318,14 +322,14 @@ void my_game_loop()
 ```
 
 **注意**：
-- `main.cpp` 的 `input_process()` 仍然在每帧运行，长按 A 仍会触发退出逻辑
-- 如果你需要完全接管按键（例如 A 键在游戏中也有用），建议在 `init_function` 中设置一个全局标志，在 `main.cpp` 的 `input_process()` 中判断该标志以跳过框架导航
+- `app_init.c` 的 `app_input_process()` 仍然在每帧运行，长按 A 仍会触发退出逻辑
+- 如果你需要完全接管按键（例如 A 键在游戏中也有用），建议在 `init_function` 中设置一个全局标志，在 `app_init.c` 的 `app_input_process()` 中判断该标志以跳过框架导航
 
 ---
 
 ## 5. 输入交互映射
 
-框架默认的按键映射（定义在 `main.cpp` 的 `input_process()`）：
+框架默认的按键映射（定义在 `app_init.c` 的 `app_input_process()`）：
 
 | 按键 | 短按 | 长按 |
 |------|------|------|
@@ -342,26 +346,26 @@ void my_game_loop()
 
 ### 5.2 修改按键映射
 
-如果你希望自定义按键行为（例如交换 A/B 功能），直接修改 `main.cpp` 中的 `input_process()`：
+如果你希望自定义按键行为（例如交换 A/B 功能），修改 `app_init.c` 中的 `app_input_process()`：
 
-```cpp
-static void input_process()
+```c
+void app_input_process(void)
 {
     hal_input_update();
 
     hal_event_t event_a = hal_input_get_event(HAL_BTN_A);
     hal_event_t event_b = hal_input_get_event(HAL_BTN_B);
 
-    // 示例：交换 A/B 的短按功能
+    /* 示例：交换 A/B 的短按功能 */
     if (event_a == HAL_EVENT_SHORT_PRESS)
-        astra_selector_go_next_item();   // A 短按改为下移
+        xerintosh_selector_go_next_item();   /* A 短按改为下移 */
     else if (event_a == HAL_EVENT_LONG_PRESS)
-        astra_selector_exit_current_item();
+        xerintosh_selector_exit_current_item();
 
     if (event_b == HAL_EVENT_SHORT_PRESS)
-        astra_selector_go_prev_item();   // B 短按改为上移
+        xerintosh_selector_go_prev_item();   /* B 短按改为上移 */
     else if (event_b == HAL_EVENT_LONG_PRESS)
-        astra_selector_jump_to_selected_item();
+        xerintosh_selector_jump_to_selected_item();
 }
 ```
 
@@ -369,157 +373,96 @@ static void input_process()
 
 ## 6. 代码组织建议
 
-不要把所有菜单定义和 App 逻辑都写在 `main.cpp` 中。推荐按功能拆分：
+本项目采用分层架构，各层职责已在 [知识地图](../index.md) 中说明。新增功能时，遵循以下原则：
+
+### 6.1 不要修改框架层
+
+- `ui/` 目录下的文件是 UI 框架核心，不要直接修改
+- `hal/` 目录下的文件是硬件抽象层，如需支持新硬件，新增 HAL 实现文件而非修改现有文件
+
+### 6.2 在 App 层扩展功能
+
+当前项目已提供标准的 App 层模块：
 
 ```
 src/
-├── main.cpp              # 入口：setup / loop，仅保留 input_process
-├── menus/
-│   ├── menu_main.cpp     # 主菜单组装
-│   └── menu_main.h
-├── apps/
-│   ├── app_clock.cpp     # 时钟 App
-│   ├── app_clock.h
-│   ├── app_sensor.cpp    # 传感器数据展示
-│   ├── app_sensor.h
-│   └── ...
+├── main.cpp              # Arduino 入口，保持精简
+├── app/
+│   ├── app_init.c        # 菜单树构建、管理器初始化
+│   ├── app_init.h
+│   ├── settings.c        # 亮度/动画/方向配置
+│   ├── settings.h
+│   ├── storage.cpp       # NVS 存储封装
+│   ├── storage.h
+│   ├── wifi_manager.cpp  # WiFi 管理器
+│   ├── wifi_manager.h
+│   ├── bt_manager.cpp    # 蓝牙管理器
+│   ├── bt_manager.h
+│   └── serial_input.cpp  # 串口输入处理
 ├── hal/                  # 硬件抽象层（不修改）
 └── ui/                   # UI 框架核心（不修改）
 ```
 
-### 6.1 menus/menu_main.cpp
+**新增自定义 App（user_item）时**，建议创建独立的 `app_xxx.c` 文件：
 
-```cpp
-#include "menu_main.h"
-#include "apps/app_clock.h"
+```c
+/* app_clock.c */
+#include "ui/ui_item.h"
+#include "hal/hal_system.h"
+#include "hal/hal_display.h"
 
-void build_main_menu()
+static uint32_t g_start_time = 0;
+
+void app_clock_init(void)
 {
-    astra_list_item_t* root = astra_get_root_list();
-
-    astra_list_item_t* settings = astra_new_list_item("设置", list_icon);
-    static bool wifi_on = false;
-    static int16_t brightness = 50;
-
-    astra_push_item_to_list(settings, astra_new_switch_item("WiFi", &wifi_on, NULL, NULL, switch_icon));
-    astra_push_item_to_list(settings, astra_new_slider_item("亮度", &brightness, 5, 0, 100, NULL, NULL, slider_icon));
-
-    astra_list_item_t* tools = astra_new_list_item("工具", list_icon);
-    astra_push_item_to_list(tools, astra_new_user_item("时钟", clock_app_init, clock_app_loop, clock_app_exit, user_icon));
-
-    astra_push_item_to_list(root, settings);
-    astra_push_item_to_list(root, tools);
-    astra_push_item_to_list(root, astra_new_list_item("关于", flag_icon));
-}
-```
-
-### 6.2 apps/app_clock.cpp
-
-```cpp
-#include "app_clock.h"
-#include <M5Unified.h>
-
-static uint32_t start_time = 0;
-
-void clock_app_init()
-{
-    start_time = millis();
+    g_start_time = hal_get_ticks();
 }
 
-void clock_app_loop()
+void app_clock_loop(void)
 {
-    uint32_t elapsed = (millis() - start_time) / 1000;
+    uint32_t elapsed = (hal_get_ticks() - g_start_time) / 1000;
     char buf[32];
     snprintf(buf, sizeof(buf), "%02lu:%02lu", elapsed / 60, elapsed % 60);
 
-    M5.Display.fillScreen(BLACK);
-    M5.Display.setTextColor(WHITE);
-    M5.Display.setTextSize(2);
-
-    int16_t tw = M5.Display.textWidth(buf);
-    M5.Display.setCursor((SCREEN_WIDTH - tw) / 2, SCREEN_HEIGHT / 2 - 8);
-    M5.Display.print(buf);
-}
-
-void clock_app_exit()
-{
-    start_time = 0;
-}
-```
-
-### 6.3 apps/app_clock.h
-
-```cpp
-#ifndef APP_CLOCK_H
-#define APP_CLOCK_H
-
-extern void clock_app_init();
-extern void clock_app_loop();
-extern void clock_app_exit();
-
-#endif
-```
-
-### 6.4 修改后的 main.cpp
-
-```cpp
-#include <M5Unified.h>
-#include <M5GFX.h>
-
-extern "C" {
-#include "hal/hal_system.h"
-#include "hal/hal_display.h"
-#include "hal/hal_input.h"
-#include "ui/ui_draw_driver.h"
-#include "ui/ui_core.h"
-#include "ui/ui_item.h"
-#include "ui/ui_drawer.h"
-}
-
-extern void build_main_menu();
-
-static void input_process()
-{
-    hal_input_update();
-
-    hal_event_t event_a = hal_input_get_event(HAL_BTN_A);
-    hal_event_t event_b = hal_input_get_event(HAL_BTN_B);
-
-    if (event_a == HAL_EVENT_SHORT_PRESS)
-        astra_selector_go_prev_item();
-    else if (event_a == HAL_EVENT_LONG_PRESS)
-        astra_selector_exit_current_item();
-
-    if (event_b == HAL_EVENT_SHORT_PRESS)
-        astra_selector_go_next_item();
-    else if (event_b == HAL_EVENT_LONG_PRESS)
-        astra_selector_jump_to_selected_item();
-}
-
-void setup()
-{
-    M5.begin();
-    M5.Display.setBrightness(255);
-    M5.Display.setRotation(1);
-
-    astra_ui_driver_init();
-    build_main_menu();
-
-    astra_init_core();
-    in_astra = true;
-}
-
-void loop()
-{
-    M5.update();
-    input_process();
     hal_display_clear();
-    astra_ui_main_core();
-    astra_ui_widget_core();
-    hal_display_flush();
-    delay(16);
+    hal_draw_utf8(10, 30, buf, COLOR_FG);
+}
+
+void app_clock_exit(void)
+{
+    g_start_time = 0;
 }
 ```
+
+然后在 `app_init.c` 中挂载：
+
+```c
+#include "app_clock.h"
+
+void app_init_ui(void)
+{
+    xerintosh_list_item_t* root = xerintosh_get_root_list();
+    xerintosh_list_item_t* tools = xerintosh_new_list_item("工具", list_icon);
+
+    xerintosh_push_item_to_list(tools, xerintosh_new_user_item(
+        "时钟", app_clock_init, app_clock_loop, app_clock_exit, user_icon));
+
+    xerintosh_push_item_to_list(root, tools);
+}
+```
+
+### 6.3 main.cpp 保持精简
+
+重构后的 `main.cpp` 只负责：
+
+1. 调用 `M5.begin()` 初始化硬件
+2. 调用 `settings_load_from_storage()` 恢复设置
+3. 调用 `app_init_ui()` 构建菜单
+4. 调用 `app_init_managers()` 初始化 WiFi/BT
+5. 每帧调用 `app_input_process()` 处理输入
+6. 调用渲染管线完成一帧绘制
+
+**不要在 `main.cpp` 中直接编写菜单构建逻辑或业务逻辑**，这些应提取到 `app_init.c` 或独立的 App 模块中。
 
 ---
 
@@ -539,7 +482,7 @@ static int16_t contrast = 50;
 // ========== 按钮回调 ==========
 void on_factory_reset()
 {
-    astra_push_pop_up("已恢复出厂设置", 2000);
+    xerintosh_push_pop_up("已恢复出厂设置", 2000);
 }
 
 void on_about_exit()
@@ -569,27 +512,27 @@ void sensor_app_exit()
 // ========== 构建菜单 ==========
 void build_main_menu()
 {
-    astra_list_item_t* root = astra_get_root_list();
+    xerintosh_list_item_t* root = xerintosh_get_root_list();
 
     // -- 设置 --
-    astra_list_item_t* settings = astra_new_list_item("设置", list_icon);
-    astra_push_item_to_list(settings, astra_new_switch_item("WiFi", &wifi_on, NULL, NULL, switch_icon));
-    astra_push_item_to_list(settings, astra_new_switch_item("蓝牙", &ble_on, NULL, NULL, switch_icon));
-    astra_push_item_to_list(settings, astra_new_slider_item("音量", &volume, 5, 0, 100, NULL, NULL, slider_icon));
-    astra_push_item_to_list(settings, astra_new_slider_item("对比度", &contrast, 10, 0, 255, NULL, NULL, slider_icon));
+    xerintosh_list_item_t* settings = xerintosh_new_list_item("设置", list_icon);
+    xerintosh_push_item_to_list(settings, xerintosh_new_switch_item("WiFi", &wifi_on, NULL, NULL, switch_icon));
+    xerintosh_push_item_to_list(settings, xerintosh_new_switch_item("蓝牙", &ble_on, NULL, NULL, switch_icon));
+    xerintosh_push_item_to_list(settings, xerintosh_new_slider_item("音量", &volume, 5, 0, 100, NULL, NULL, slider_icon));
+    xerintosh_push_item_to_list(settings, xerintosh_new_slider_item("对比度", &contrast, 10, 0, 255, NULL, NULL, slider_icon));
 
     // -- 工具 --
-    astra_list_item_t* tools = astra_new_list_item("工具", list_icon);
-    astra_push_item_to_list(tools, astra_new_user_item("传感器", sensor_app_init, sensor_app_loop, sensor_app_exit, user_icon));
-    astra_push_item_to_list(tools, astra_new_button_item("恢复出厂", on_factory_reset, power_icon));
+    xerintosh_list_item_t* tools = xerintosh_new_list_item("工具", list_icon);
+    xerintosh_push_item_to_list(tools, xerintosh_new_user_item("传感器", sensor_app_init, sensor_app_loop, sensor_app_exit, user_icon));
+    xerintosh_push_item_to_list(tools, xerintosh_new_button_item("恢复出厂", on_factory_reset, power_icon));
 
     // -- 关于 --
-    astra_list_item_t* about = astra_new_list_item("关于", flag_icon);
+    xerintosh_list_item_t* about = xerintosh_new_list_item("关于", flag_icon);
 
     // -- 挂载到根 --
-    astra_push_item_to_list(root, settings);
-    astra_push_item_to_list(root, tools);
-    astra_push_item_to_list(root, about);
+    xerintosh_push_item_to_list(root, settings);
+    xerintosh_push_item_to_list(root, tools);
+    xerintosh_push_item_to_list(root, about);
 }
 ```
 
@@ -604,12 +547,12 @@ void build_main_menu()
 ```cpp
 // ✅ 正确：静态/全局变量
 static bool wifi_on = false;
-astra_new_switch_item("WiFi", &wifi_on, ...);
+xerintosh_new_switch_item("WiFi", &wifi_on, ...);
 
 // ❌ 错误：局部变量，函数返回后指针悬空
 void bad_example() {
     bool wifi = false;
-    astra_new_switch_item("WiFi", &wifi, ...);  // 危险！
+    xerintosh_new_switch_item("WiFi", &wifi, ...);  // 危险！
 }
 ```
 
@@ -624,12 +567,12 @@ void bad_example() {
 | `MAX_LIST_CHILD_NUM` | 10 | 每个父节点最多 10 个子项 |
 | `MAX_LIST_LAYER` | 10 | 菜单树最大深度 10 层 |
 
-超过限制时 `astra_push_item_to_list()` 返回 `false`。
+超过限制时 `xerintosh_push_item_to_list()` 返回 `false`。
 
 ### 8.4 user_item 中的导航
 
 在 `user_item` 的 `loop_function` 中：
-- 不要调用 `astra_selector_go_next_item()`、`astra_selector_go_prev_item()` 等导航函数，这会破坏菜单状态
+- 不要调用 `xerintosh_selector_go_next_item()`、`xerintosh_selector_go_prev_item()` 等导航函数，这会破坏菜单状态
 - 如果需要自定义按键行为，参考第 4.3 节，通过全局标志让 `input_process()` 跳过框架导航
 
 ### 8.5 屏幕方向与分辨率
@@ -661,33 +604,33 @@ power_icon      // 电源/系统
 
 | 函数 | 说明 |
 |------|------|
-| `astra_get_root_list()` | 获取根节点（单例） |
-| `astra_new_list_item(content, icon)` | 创建普通菜单项 |
-| `astra_new_switch_item(content, value, init, exit, icon)` | 创建开关 |
-| `astra_new_slider_item(content, value, step, min, max, init, exit, icon)` | 创建滑块 |
-| `astra_new_button_item(content, exit, icon)` | 创建按钮 |
-| `astra_new_user_item(content, init, loop, exit, icon)` | 创建自定义 App |
-| `astra_push_item_to_list(parent, child)` | 挂载子项到父项 |
+| `xerintosh_get_root_list()` | 获取根节点（单例） |
+| `xerintosh_new_list_item(content, icon)` | 创建普通菜单项 |
+| `xerintosh_new_switch_item(content, value, init, exit, icon)` | 创建开关 |
+| `xerintosh_new_slider_item(content, value, step, min, max, init, exit, icon)` | 创建滑块 |
+| `xerintosh_new_button_item(content, exit, icon)` | 创建按钮 |
+| `xerintosh_new_user_item(content, init, loop, exit, icon)` | 创建自定义 App |
+| `xerintosh_push_item_to_list(parent, child)` | 挂载子项到父项 |
 
 ### 导航控制
 
 | 函数 | 说明 |
 |------|------|
-| `astra_selector_go_next_item()` | 选择器下移 |
-| `astra_selector_go_prev_item()` | 选择器上移 |
-| `astra_selector_jump_to_selected_item()` | 确认/进入当前项 |
-| `astra_selector_exit_current_item()` | 返回/退出当前项 |
+| `xerintosh_selector_go_next_item()` | 选择器下移 |
+| `xerintosh_selector_go_prev_item()` | 选择器上移 |
+| `xerintosh_selector_jump_to_selected_item()` | 确认/进入当前项 |
+| `xerintosh_selector_exit_current_item()` | 返回/退出当前项 |
 
 ### 通知
 
 | 函数 | 说明 |
 |------|------|
-| `astra_push_info_bar(content, span_ms)` | 顶部信息栏 |
-| `astra_push_pop_up(content, span_ms)` | 中部弹窗 |
+| `xerintosh_push_info_bar(content, span_ms)` | 顶部信息栏 |
+| `xerintosh_push_pop_up(content, span_ms)` | 中部弹窗 |
 
 ### 状态查询
 
 | 函数 | 说明 |
 |------|------|
-| `astra_is_in_user_item()` | 当前是否在某个 user_item 内部 |
-| `in_astra` | 全局布尔：UI 是否激活 |
+| `xerintosh_is_in_user_item()` | 当前是否在某个 user_item 内部 |
+| `in_xerintosh` | 全局布尔：UI 是否激活 |

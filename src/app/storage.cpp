@@ -1,6 +1,18 @@
+/**
+ * @file   storage.cpp
+ * @brief  NVS 存储管理实现
+ * @details 双实现架构：
+ *          - NATIVE_TEST 时：返回固定默认值（桩实现）
+ *          - 硬件环境时：使用 ESP32 Preferences 库进行 NVS 持久化存储
+ *
+ * @copyright Copyright (c) 2026
+ */
+
 #include "storage.h"
 
 #ifdef NATIVE_TEST
+
+/* ═══ Native 测试环境：存储桩 ═══ */
 
 void     storage_init(void) {}
 int      storage_wifi_get_count(void) { return 0; }
@@ -32,33 +44,45 @@ void     storage_set_screen_rotation(uint8_t val) { (void)val; }
 
 #else
 
+/* ═══ 硬件环境：ESP32 Preferences 实现 ═══ */
+
 #include <Preferences.h>
 #include <string.h>
 
-static const char *NVS_NAMESPACE = "astra";
+static const char *NVS_NAMESPACE = "Xerintosh";  /* NVS 命名空间 */
 
-/* ─── Internal helpers ─── */
+/* ─── 内部辅助函数 ─── */
 
-static bool read_count(Preferences &prefs, const char *key, uint8_t &out) {
-    if (!prefs.isKey(key)) {
-        out = 0;
+/**
+ * @brief 从 Preferences 读取计数 key
+ */
+static bool read_count(Preferences *prefs, const char *key, uint8_t *out) {
+    if (!prefs->isKey(key)) {
+        *out = 0;
         return true;
     }
-    out = prefs.getUChar(key, 0);
+    *out = prefs->getUChar(key, 0);
     return true;
 }
 
-static bool write_count(Preferences &prefs, const char *key, uint8_t val) {
-    return prefs.putUChar(key, val) == 1;
+/**
+ * @brief 向 Preferences 写入计数 key
+ */
+static bool write_count(Preferences *prefs, const char *key, uint8_t val) {
+    return prefs->putUChar(key, val) == 1;
 }
 
-/* ─── Init ─── */
+/* ═══ 初始化 ═══ */
 
+/**
+ * @brief 初始化存储命名空间，确保计数 key 存在
+ * @note  屏幕方向使用新 key "screen_orient"，使旧版竖屏默认值在首次启动时被忽略
+ */
 void storage_init(void) {
     Preferences prefs;
     prefs.begin(NVS_NAMESPACE, false);
 
-    /* Ensure count keys exist with default 0 */
+    /* 确保计数 key 存在，默认值为 0 */
     if (!prefs.isKey("wifi_count")) {
         prefs.putUChar("wifi_count", 0);
     }
@@ -66,16 +90,21 @@ void storage_init(void) {
         prefs.putUChar("bt_count", 0);
     }
 
+    /* 默认屏幕方向：横屏（level 2） */
+    if (!prefs.isKey("screen_orient")) {
+        prefs.putUChar("screen_orient", 2); /* 横屏 */
+    }
+
     prefs.end();
 }
 
-/* ─── WiFi ─── */
+/* ═══ WiFi 凭据 ═══ */
 
 int storage_wifi_get_count(void) {
     Preferences prefs;
     prefs.begin(NVS_NAMESPACE, true);
     uint8_t count = 0;
-    read_count(prefs, "wifi_count", count);
+    read_count(&prefs, "wifi_count", &count);
     prefs.end();
     return (int)count;
 }
@@ -89,7 +118,7 @@ bool storage_wifi_get(int index, char *ssid, char *pass) {
     prefs.begin(NVS_NAMESPACE, true);
 
     uint8_t count = 0;
-    read_count(prefs, "wifi_count", count);
+    read_count(&prefs, "wifi_count", &count);
     if (index >= (int)count) {
         prefs.end();
         return false;
@@ -116,7 +145,7 @@ int storage_wifi_find(const char *ssid) {
     prefs.begin(NVS_NAMESPACE, true);
 
     uint8_t count = 0;
-    read_count(prefs, "wifi_count", count);
+    read_count(&prefs, "wifi_count", &count);
 
     char buf[STORAGE_SSID_MAX_LEN];
     for (int i = 0; i < (int)count; i++) {
@@ -144,9 +173,9 @@ bool storage_wifi_add(const char *ssid, const char *pass) {
     Preferences prefs;
     prefs.begin(NVS_NAMESPACE, false);
 
-    /* Check if SSID already exists -> update password in-place */
+    /* 若 SSID 已存在则原地更新密码 */
     uint8_t count = 0;
-    read_count(prefs, "wifi_count", count);
+    read_count(&prefs, "wifi_count", &count);
 
     char buf[STORAGE_SSID_MAX_LEN];
     for (int i = 0; i < (int)count; i++) {
@@ -162,7 +191,7 @@ bool storage_wifi_add(const char *ssid, const char *pass) {
         }
     }
 
-    /* Append to next available slot */
+    /* 追加到下一个空槽位 */
     if (count >= STORAGE_MAX_WIFI_NETWORKS) {
         prefs.end();
         return false;
@@ -177,7 +206,7 @@ bool storage_wifi_add(const char *ssid, const char *pass) {
     prefs.putString(key_pass, pass);
 
     uint8_t new_count = count + 1;
-    write_count(prefs, "wifi_count", new_count);
+    write_count(&prefs, "wifi_count", new_count);
 
     prefs.end();
     return true;
@@ -192,13 +221,13 @@ bool storage_wifi_remove(int index) {
     prefs.begin(NVS_NAMESPACE, false);
 
     uint8_t count = 0;
-    read_count(prefs, "wifi_count", count);
+    read_count(&prefs, "wifi_count", &count);
     if (index >= (int)count) {
         prefs.end();
         return false;
     }
 
-    /* Shift remaining entries down to fill the gap */
+    /* 将后续条目前移填补空缺 */
     for (int i = index; i < (int)count - 1; i++) {
         char key_src_ssid[20];
         char key_dst_ssid[20];
@@ -219,7 +248,7 @@ bool storage_wifi_remove(int index) {
         prefs.putString(key_dst_pass, buf);
     }
 
-    /* Clear the last slot */
+    /* 清空最后一个槽位 */
     char key_last_ssid[20];
     char key_last_pass[20];
     snprintf(key_last_ssid, sizeof(key_last_ssid), "wifi_ssid_%d", (int)count - 1);
@@ -228,19 +257,19 @@ bool storage_wifi_remove(int index) {
     prefs.remove(key_last_pass);
 
     uint8_t new_count = count - 1;
-    write_count(prefs, "wifi_count", new_count);
+    write_count(&prefs, "wifi_count", new_count);
 
     prefs.end();
     return true;
 }
 
-/* ─── Bluetooth ─── */
+/* ═══ 蓝牙凭据 ═══ */
 
 int storage_bt_get_count(void) {
     Preferences prefs;
     prefs.begin(NVS_NAMESPACE, true);
     uint8_t count = 0;
-    read_count(prefs, "bt_count", count);
+    read_count(&prefs, "bt_count", &count);
     prefs.end();
     return (int)count;
 }
@@ -254,7 +283,7 @@ bool storage_bt_get(int index, char *addr, char *name) {
     prefs.begin(NVS_NAMESPACE, true);
 
     uint8_t count = 0;
-    read_count(prefs, "bt_count", count);
+    read_count(&prefs, "bt_count", &count);
     if (index >= (int)count) {
         prefs.end();
         return false;
@@ -281,7 +310,7 @@ int storage_bt_find(const char *addr) {
     prefs.begin(NVS_NAMESPACE, true);
 
     uint8_t count = 0;
-    read_count(prefs, "bt_count", count);
+    read_count(&prefs, "bt_count", &count);
 
     char buf[STORAGE_BT_ADDR_MAX_LEN];
     for (int i = 0; i < (int)count; i++) {
@@ -309,9 +338,9 @@ bool storage_bt_add(const char *addr, const char *name) {
     Preferences prefs;
     prefs.begin(NVS_NAMESPACE, false);
 
-    /* Check if address already exists -> update name in-place */
+    /* 若地址已存在则原地更新名称 */
     uint8_t count = 0;
-    read_count(prefs, "bt_count", count);
+    read_count(&prefs, "bt_count", &count);
 
     char buf[STORAGE_BT_ADDR_MAX_LEN];
     for (int i = 0; i < (int)count; i++) {
@@ -327,7 +356,7 @@ bool storage_bt_add(const char *addr, const char *name) {
         }
     }
 
-    /* Append to next available slot */
+    /* 追加到下一个空槽位 */
     if (count >= STORAGE_MAX_BT_DEVICES) {
         prefs.end();
         return false;
@@ -342,7 +371,7 @@ bool storage_bt_add(const char *addr, const char *name) {
     prefs.putString(key_name, name);
 
     uint8_t new_count = count + 1;
-    write_count(prefs, "bt_count", new_count);
+    write_count(&prefs, "bt_count", new_count);
 
     prefs.end();
     return true;
@@ -357,13 +386,13 @@ bool storage_bt_remove(int index) {
     prefs.begin(NVS_NAMESPACE, false);
 
     uint8_t count = 0;
-    read_count(prefs, "bt_count", count);
+    read_count(&prefs, "bt_count", &count);
     if (index >= (int)count) {
         prefs.end();
         return false;
     }
 
-    /* Shift remaining entries down to fill the gap */
+    /* 将后续条目前移填补空缺 */
     for (int i = index; i < (int)count - 1; i++) {
         char key_src_addr[20];
         char key_dst_addr[20];
@@ -384,7 +413,7 @@ bool storage_bt_remove(int index) {
         prefs.putString(key_dst_name, buf);
     }
 
-    /* Clear the last slot */
+    /* 清空最后一个槽位 */
     char key_last_addr[20];
     char key_last_name[20];
     snprintf(key_last_addr, sizeof(key_last_addr), "bt_addr_%d", (int)count - 1);
@@ -393,13 +422,13 @@ bool storage_bt_remove(int index) {
     prefs.remove(key_last_name);
 
     uint8_t new_count = count - 1;
-    write_count(prefs, "bt_count", new_count);
+    write_count(&prefs, "bt_count", new_count);
 
     prefs.end();
     return true;
 }
 
-/* ─── Brightness ─── */
+/* ═══ 亮度 ═══ */
 
 int16_t storage_get_brightness(void) {
     Preferences prefs;
@@ -422,7 +451,7 @@ void storage_set_brightness(int16_t val) {
     prefs.end();
 }
 
-/* ─── Animation Speed ─── */
+/* ═══ 动画速度 ═══ */
 
 uint8_t storage_get_anim_speed(void) {
     Preferences prefs;
@@ -430,7 +459,7 @@ uint8_t storage_get_anim_speed(void) {
 
     if (!prefs.isKey("anim_speed")) {
         prefs.end();
-        return 92; // default
+        return 92; /* 默认动画速度 */
     }
 
     uint8_t val = prefs.getUChar("anim_speed", 92);
@@ -445,7 +474,7 @@ void storage_set_anim_speed(uint8_t val) {
     prefs.end();
 }
 
-/* ─── Animation Enabled ─── */
+/* ═══ 动画开关 ═══ */
 
 bool storage_get_anim_enabled(void) {
     Preferences prefs;
@@ -453,7 +482,7 @@ bool storage_get_anim_enabled(void) {
 
     if (!prefs.isKey("anim_enabled")) {
         prefs.end();
-        return true; // default: animation on
+        return true; /* 默认开启动画 */
     }
 
     bool val = prefs.getBool("anim_enabled", true);
@@ -468,18 +497,18 @@ void storage_set_anim_enabled(bool val) {
     prefs.end();
 }
 
-/* ─── Screen Rotation ─── */
+/* ═══ 屏幕旋转 ═══ */
 
 uint8_t storage_get_screen_rotation(void) {
     Preferences prefs;
     prefs.begin(NVS_NAMESPACE, true);
 
-    if (!prefs.isKey("screen_rot")) {
+    if (!prefs.isKey("screen_orient")) {
         prefs.end();
-        return 2; // default: landscape (level 2 = 90deg)
+        return 2; /* 默认横屏（level 2 = 90deg） */
     }
 
-    uint8_t val = prefs.getUChar("screen_rot", 1);
+    uint8_t val = prefs.getUChar("screen_orient", 2);
     prefs.end();
     return val;
 }
@@ -487,7 +516,7 @@ uint8_t storage_get_screen_rotation(void) {
 void storage_set_screen_rotation(uint8_t val) {
     Preferences prefs;
     prefs.begin(NVS_NAMESPACE, false);
-    prefs.putUChar("screen_rot", val);
+    prefs.putUChar("screen_orient", val);
     prefs.end();
 }
 

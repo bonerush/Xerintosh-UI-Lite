@@ -12,7 +12,7 @@
 
 ### 宏映射表
 
-*📄 Source: [ui_draw_driver.h](../../src/ui/ui_draw_driver.h#L7-L31)*
+*📄 Source: [ui_draw_driver.h](../../src/ui/ui_draw_driver.h#L11-L35)*
 
 ```c
 #define get_ticks() hal_get_ticks()
@@ -60,7 +60,7 @@
 
 ### 已废弃的 OLED 专属 API
 
-*📄 Source: [ui_draw_driver.h](../../src/ui/ui_draw_driver.h#L24-L32)*
+*📄 Source: [ui_draw_driver.h](../../src/ui/ui_draw_driver.h#L38-L46)*
 
 ```c
 #define oled_draw_H_dotted_line(x, y, l) /* placeholder */
@@ -83,14 +83,14 @@
 *📄 Source: [ui_draw_driver.c](../../src/ui/ui_draw_driver.c)*
 
 ```c
-void astra_ui_driver_init(void) {
+void xerintosh_ui_driver_init(void) {
     hal_display_init();
     hal_system_init();
     hal_input_init();
 }
 ```
 
-`astra_ui_driver_init()` 是 UI 层对外暴露的统一初始化入口，内部按顺序初始化显示、系统时钟和输入三个 HAL 子系统。
+`xerintosh_ui_driver_init()` 是 UI 层对外暴露的统一初始化入口，内部按顺序初始化显示、系统时钟和输入三个 HAL 子系统。
 
 ---
 
@@ -98,7 +98,7 @@ void astra_ui_driver_init(void) {
 
 - **所有 UI `.c` 文件**：通过 `#include "ui_draw_driver.h"` 隐式使用宏映射
 - **hal_display**：宏的目标端，所有 `oled_draw_*` 最终落入 `hal_draw_*`
-- **main.cpp**：`setup()` 中调用 `astra_ui_driver_init()`
+- **main.cpp**：`setup()` 中调用 `xerintosh_ui_driver_init()`
 
 ---
 

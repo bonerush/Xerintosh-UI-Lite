@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 将 reference/oled-ui-astra-lite（128×64 OLED UI 框架）移植到 M5Stick-C（80×160 TFT），实现完整动画菜单系统。
+**Goal:** 将 reference/oled-ui-Xerintosh-lite（128×64 OLED UI 框架）移植到 M5Stick-C（80×160 TFT），实现完整动画菜单系统。
 
 **Architecture:** 保留原始框架所有状态逻辑和动画公式，仅替换硬件抽象层。C 核心 + C++ HAL 桥接。M5Canvas 双缓冲防闪烁。
 
@@ -721,7 +721,7 @@ git commit -m "feat: add hal_input button state machine"
 #define oled_send_buffer()            hal_display_flush()
 #define oled_send_area_buffer(x,y,w,h) /* 全帧刷新，不需要区域刷新 */
 
-extern void astra_ui_driver_init(void);
+extern void xerintosh_ui_driver_init(void);
 
 #endif
 ```
@@ -731,7 +731,7 @@ extern void astra_ui_driver_init(void);
 ```c
 #include "ui_draw_driver.h"
 
-void astra_ui_driver_init(void) {
+void xerintosh_ui_driver_init(void) {
     hal_display_init();
     hal_system_init();
     hal_input_init();
@@ -777,17 +777,17 @@ git commit -m "feat: add ui_draw_driver adapter layer"
 #include <stdint.h>
 #include <stdbool.h>
 
-static void* astra_font;
-extern void astra_set_font(void* _font);
+static void* xerintosh_font;
+extern void xerintosh_set_font(void* _font);
 
-extern bool astra_exit_animation_finished;
-extern bool astra_refresh_list_value;
+extern bool xerintosh_exit_animation_finished;
+extern bool xerintosh_refresh_list_value;
 
 /*** 信息栏 ***/
 #define INFO_BAR_HEIGHT 15
 #define INFO_BAR_OFFSET 10
 
-typedef struct astra_info_bar_t
+typedef struct xerintosh_info_bar_t
 {
   char *content;
   uint16_t span;
@@ -795,16 +795,16 @@ typedef struct astra_info_bar_t
   bool is_running;
   uint32_t time_start;
   uint32_t time;
-} astra_info_bar_t;
+} xerintosh_info_bar_t;
 
-extern astra_info_bar_t astra_info_bar;
-extern void astra_push_info_bar(char *_content, const uint16_t _span);
+extern xerintosh_info_bar_t xerintosh_info_bar;
+extern void xerintosh_push_info_bar(char *_content, const uint16_t _span);
 
 /*** 弹窗 ***/
 #define POP_UP_HEIGHT 20
 #define POP_UP_OFFSET 8
 
-typedef struct astra_pop_up_t
+typedef struct xerintosh_pop_up_t
 {
   char *content;
   uint16_t span;
@@ -812,10 +812,10 @@ typedef struct astra_pop_up_t
   bool is_running;
   uint32_t time_start;
   uint32_t time;
-} astra_pop_up_t;
+} xerintosh_pop_up_t;
 
-extern astra_pop_up_t astra_pop_up;
-extern void astra_push_pop_up(char *_content, const uint16_t _span);
+extern xerintosh_pop_up_t xerintosh_pop_up;
+extern void xerintosh_push_pop_up(char *_content, const uint16_t _span);
 
 /*** 列表项 ***/
 #define MAX_LIST_CHILD_NUM 10
@@ -834,7 +834,7 @@ typedef enum
   slider_item,
   user_item,
   button_item,
-} astra_list_item_type_t;
+} xerintosh_list_item_type_t;
 
 typedef enum {
     default_icon,
@@ -845,38 +845,38 @@ typedef enum {
     slider_icon,
     flag_icon,
     power_icon,
-} astra_list_item_icon_t;
+} xerintosh_list_item_icon_t;
 
-typedef struct astra_list_item_t
+typedef struct xerintosh_list_item_t
 {
-  astra_list_item_type_t type;
-  astra_list_item_icon_t icon;
+  xerintosh_list_item_type_t type;
+  xerintosh_list_item_icon_t icon;
   char *content;
 
   uint8_t layer;
   float y_list_item, y_list_item_trg;
   uint8_t child_num;
-  struct astra_list_item_t *child_list_item[MAX_LIST_CHILD_NUM];
-  struct astra_list_item_t *parent;
-} astra_list_item_t;
+  struct xerintosh_list_item_t *child_list_item[MAX_LIST_CHILD_NUM];
+  struct xerintosh_list_item_t *parent;
+} xerintosh_list_item_t;
 
-typedef struct astra_switch_item_t
+typedef struct xerintosh_switch_item_t
 {
-  astra_list_item_t base_item;
+  xerintosh_list_item_t base_item;
   bool *value;
   void (*init_function)();
   void (*exit_function)();
-} astra_switch_item_t;
+} xerintosh_switch_item_t;
 
-typedef struct astra_button_item_t
+typedef struct xerintosh_button_item_t
 {
-  astra_list_item_t base_item;
+  xerintosh_list_item_t base_item;
   void (*exit_function)();
-} astra_button_item_t;
+} xerintosh_button_item_t;
 
-typedef struct astra_slider_item_t
+typedef struct xerintosh_slider_item_t
 {
-  astra_list_item_t base_item;
+  xerintosh_list_item_t base_item;
   int16_t *value;
   int16_t value_backup;
   bool is_confirmed;
@@ -885,11 +885,11 @@ typedef struct astra_slider_item_t
   int16_t value_min;
   void (*init_function)();
   void (*exit_function)();
-} astra_slider_item_t;
+} xerintosh_slider_item_t;
 
-typedef struct astra_user_item_t
+typedef struct xerintosh_user_item_t
 {
-  astra_list_item_t base_item;
+  xerintosh_list_item_t base_item;
   bool in_user_item;
   bool entering_user_item;
   bool exiting_user_item;
@@ -898,46 +898,46 @@ typedef struct astra_user_item_t
   void (*exit_function)();
   bool user_item_inited;
   bool user_item_looping;
-} astra_user_item_t;
+} xerintosh_user_item_t;
 
-extern astra_list_item_t *astra_get_root_list();
-extern astra_switch_item_t *astra_to_switch_item(astra_list_item_t *_item);
-extern astra_button_item_t *astra_to_button_item(astra_list_item_t *_item);
-extern astra_slider_item_t *astra_to_slider_item(astra_list_item_t *_item);
-extern astra_user_item_t *astra_to_user_item(astra_list_item_t *_item);
-extern astra_list_item_t *astra_new_list_item(char *_content, astra_list_item_icon_t icon);
-extern astra_list_item_t *astra_new_switch_item(char *_content, bool *_value, void (*_init)(), void (*_exit)(), astra_list_item_icon_t icon);
-extern astra_list_item_t *astra_new_button_item(char *_content, void (*_exit)(), astra_list_item_icon_t icon);
-extern astra_list_item_t *astra_new_slider_item(char *_content, int16_t *_value, uint8_t _step, int16_t _min, int16_t _max, void (*_init)(), void (*_exit)(), astra_list_item_icon_t icon);
-extern astra_list_item_t *astra_new_user_item(char *_content, void (*_init)(), void (*_loop)(), void (*_exit)(), astra_list_item_icon_t icon);
-extern bool astra_push_item_to_list(astra_list_item_t *_parent, astra_list_item_t *_child);
+extern xerintosh_list_item_t *xerintosh_get_root_list();
+extern xerintosh_switch_item_t *xerintosh_to_switch_item(xerintosh_list_item_t *_item);
+extern xerintosh_button_item_t *xerintosh_to_button_item(xerintosh_list_item_t *_item);
+extern xerintosh_slider_item_t *xerintosh_to_slider_item(xerintosh_list_item_t *_item);
+extern xerintosh_user_item_t *xerintosh_to_user_item(xerintosh_list_item_t *_item);
+extern xerintosh_list_item_t *xerintosh_new_list_item(char *_content, xerintosh_list_item_icon_t icon);
+extern xerintosh_list_item_t *xerintosh_new_switch_item(char *_content, bool *_value, void (*_init)(), void (*_exit)(), xerintosh_list_item_icon_t icon);
+extern xerintosh_list_item_t *xerintosh_new_button_item(char *_content, void (*_exit)(), xerintosh_list_item_icon_t icon);
+extern xerintosh_list_item_t *xerintosh_new_slider_item(char *_content, int16_t *_value, uint8_t _step, int16_t _min, int16_t _max, void (*_init)(), void (*_exit)(), xerintosh_list_item_icon_t icon);
+extern xerintosh_list_item_t *xerintosh_new_user_item(char *_content, void (*_init)(), void (*_loop)(), void (*_exit)(), xerintosh_list_item_icon_t icon);
+extern bool xerintosh_push_item_to_list(xerintosh_list_item_t *_parent, xerintosh_list_item_t *_child);
 
 /*** 选择器 ***/
-typedef struct astra_selector_t
+typedef struct xerintosh_selector_t
 {
   float y_selector, y_selector_trg, w_selector, w_selector_trg, h_selector, h_selector_trg;
   uint8_t selected_index;
-  astra_list_item_t *selected_item;
-} astra_selector_t;
+  xerintosh_list_item_t *selected_item;
+} xerintosh_selector_t;
 
-extern astra_selector_t astra_selector;
-extern astra_selector_t* astra_get_selector();
-extern bool astra_bind_item_to_selector(astra_list_item_t *_item);
-extern void astra_selector_go_next_item();
-extern void astra_selector_go_prev_item();
-extern void astra_selector_jump_to_selected_item();
-extern void astra_selector_exit_current_item();
+extern xerintosh_selector_t xerintosh_selector;
+extern xerintosh_selector_t* xerintosh_get_selector();
+extern bool xerintosh_bind_item_to_selector(xerintosh_list_item_t *_item);
+extern void xerintosh_selector_go_next_item();
+extern void xerintosh_selector_go_prev_item();
+extern void xerintosh_selector_jump_to_selected_item();
+extern void xerintosh_selector_exit_current_item();
 
 /*** 相机 ***/
-typedef struct astra_camera_t
+typedef struct xerintosh_camera_t
 {
   float x_camera, x_camera_trg, y_camera, y_camera_trg;
-  astra_selector_t *selector;
-} astra_camera_t;
+  xerintosh_selector_t *selector;
+} xerintosh_camera_t;
 
-extern astra_camera_t astra_camera;
-extern astra_camera_t* astra_get_camera();
-extern void astra_bind_selector_to_camera(astra_selector_t *_selector);
+extern xerintosh_camera_t xerintosh_camera;
+extern xerintosh_camera_t* xerintosh_get_camera();
+extern void xerintosh_bind_selector_to_camera(xerintosh_selector_t *_selector);
 
 #endif
 ```
@@ -957,130 +957,130 @@ extern void astra_bind_selector_to_camera(astra_selector_t *_selector);
 #include <sys/types.h>
 #include "ui_core.h"
 
-void astra_set_font(void *_font)
+void xerintosh_set_font(void *_font)
 {
-  if (_font != astra_font) oled_set_font(_font);
+  if (_font != xerintosh_font) oled_set_font(_font);
 }
 
-astra_info_bar_t astra_info_bar = {0, 1, 0 - 2 * INFO_BAR_HEIGHT, 0 - 2 * INFO_BAR_HEIGHT, 80, 80, false, 0, 1};
+xerintosh_info_bar_t xerintosh_info_bar = {0, 1, 0 - 2 * INFO_BAR_HEIGHT, 0 - 2 * INFO_BAR_HEIGHT, 80, 80, false, 0, 1};
 
-void astra_push_info_bar(char *_content, const uint16_t _span)
+void xerintosh_push_info_bar(char *_content, const uint16_t _span)
 {
-  astra_info_bar.time = get_ticks();
-  astra_info_bar.content = _content;
-  astra_info_bar.span = _span;
-  astra_info_bar.is_running = false;
+  xerintosh_info_bar.time = get_ticks();
+  xerintosh_info_bar.content = _content;
+  xerintosh_info_bar.span = _span;
+  xerintosh_info_bar.is_running = false;
 
-  if (!astra_info_bar.is_running)
+  if (!xerintosh_info_bar.is_running)
   {
-    astra_info_bar.time_start = get_ticks();
-    astra_info_bar.y_info_bar_trg = 0;
-    astra_info_bar.is_running = true;
+    xerintosh_info_bar.time_start = get_ticks();
+    xerintosh_info_bar.y_info_bar_trg = 0;
+    xerintosh_info_bar.is_running = true;
   }
 
-  astra_set_font(nullptr); // 使用默认字体
-  astra_info_bar.w_info_bar_trg = oled_get_UTF8_width(astra_info_bar.content) + INFO_BAR_OFFSET;
+  xerintosh_set_font(nullptr); // 使用默认字体
+  xerintosh_info_bar.w_info_bar_trg = oled_get_UTF8_width(xerintosh_info_bar.content) + INFO_BAR_OFFSET;
 }
 
-astra_pop_up_t astra_pop_up = {0, 1, 0 - 2 * POP_UP_HEIGHT, 0 - 2 * POP_UP_HEIGHT, 80, 80, false, 0, 1};
+xerintosh_pop_up_t xerintosh_pop_up = {0, 1, 0 - 2 * POP_UP_HEIGHT, 0 - 2 * POP_UP_HEIGHT, 80, 80, false, 0, 1};
 
-void astra_push_pop_up(char *_content, const uint16_t _span)
+void xerintosh_push_pop_up(char *_content, const uint16_t _span)
 {
-  astra_pop_up.time = get_ticks();
-  astra_pop_up.content = _content;
-  astra_pop_up.span = _span;
-  astra_pop_up.is_running = false;
+  xerintosh_pop_up.time = get_ticks();
+  xerintosh_pop_up.content = _content;
+  xerintosh_pop_up.span = _span;
+  xerintosh_pop_up.is_running = false;
 
-  if (!astra_pop_up.is_running)
+  if (!xerintosh_pop_up.is_running)
   {
-    astra_pop_up.time_start = get_ticks();
-    astra_pop_up.y_pop_up_trg = 20;
-    astra_pop_up.is_running = true;
+    xerintosh_pop_up.time_start = get_ticks();
+    xerintosh_pop_up.y_pop_up_trg = 20;
+    xerintosh_pop_up.is_running = true;
   }
 
-  astra_set_font(nullptr);
-  astra_pop_up.w_pop_up_trg = oled_get_UTF8_width(astra_pop_up.content) + POP_UP_OFFSET;
+  xerintosh_set_font(nullptr);
+  xerintosh_pop_up.w_pop_up_trg = oled_get_UTF8_width(xerintosh_pop_up.content) + POP_UP_OFFSET;
 }
 
-astra_switch_item_t *astra_to_switch_item(astra_list_item_t *_item)
+xerintosh_switch_item_t *xerintosh_to_switch_item(xerintosh_list_item_t *_item)
 {
   if (_item != NULL && _item->type == switch_item)
-    return (astra_switch_item_t*)_item;
-  return (astra_switch_item_t*)astra_get_root_list();
+    return (xerintosh_switch_item_t*)_item;
+  return (xerintosh_switch_item_t*)xerintosh_get_root_list();
 }
 
-astra_button_item_t *astra_to_button_item(astra_list_item_t *_item)
+xerintosh_button_item_t *xerintosh_to_button_item(xerintosh_list_item_t *_item)
 {
   if (_item != NULL && _item->type == button_item)
-    return (astra_button_item_t*)_item;
-  return (astra_button_item_t*)astra_get_root_list();
+    return (xerintosh_button_item_t*)_item;
+  return (xerintosh_button_item_t*)xerintosh_get_root_list();
 }
 
-astra_slider_item_t *astra_to_slider_item(astra_list_item_t *_item)
+xerintosh_slider_item_t *xerintosh_to_slider_item(xerintosh_list_item_t *_item)
 {
   if (_item != NULL && _item->type == slider_item)
-    return (astra_slider_item_t*)_item;
-  return (astra_slider_item_t*)astra_get_root_list();
+    return (xerintosh_slider_item_t*)_item;
+  return (xerintosh_slider_item_t*)xerintosh_get_root_list();
 }
 
-astra_user_item_t *astra_to_user_item(astra_list_item_t *_item)
+xerintosh_user_item_t *xerintosh_to_user_item(xerintosh_list_item_t *_item)
 {
   if (_item != NULL && _item->type == user_item)
-    return (astra_user_item_t*)_item;
-  return (astra_user_item_t*)astra_get_root_list();
+    return (xerintosh_user_item_t*)_item;
+  return (xerintosh_user_item_t*)xerintosh_get_root_list();
 }
 
-astra_list_item_t *astra_get_root_list()
+xerintosh_list_item_t *xerintosh_get_root_list()
 {
-  static astra_list_item_t* _root = NULL;
+  static xerintosh_list_item_t* _root = NULL;
   if (_root == NULL)
   {
-    _root = (astra_list_item_t*)malloc(sizeof(astra_list_item_t));
-    memset(_root, 0, sizeof(astra_list_item_t));
+    _root = (xerintosh_list_item_t*)malloc(sizeof(xerintosh_list_item_t));
+    memset(_root, 0, sizeof(xerintosh_list_item_t));
     _root->type = list_item;
     _root->content = "root";
   }
   return _root;
 }
 
-astra_list_item_t *astra_new_list_item(char *_content, astra_list_item_icon_t icon)
+xerintosh_list_item_t *xerintosh_new_list_item(char *_content, xerintosh_list_item_icon_t icon)
 {
-  astra_list_item_t *_item = (astra_list_item_t*)malloc(sizeof(astra_list_item_t));
-  memset(_item, 0, sizeof(astra_list_item_t));
+  xerintosh_list_item_t *_item = (xerintosh_list_item_t*)malloc(sizeof(xerintosh_list_item_t));
+  memset(_item, 0, sizeof(xerintosh_list_item_t));
   _item->type = list_item;
   _item->content = _content;
   _item->icon = (icon == default_icon) ? list_icon : icon;
   return _item;
 }
 
-astra_list_item_t *astra_new_switch_item(char *_content, bool *_value, void (*_init)(), void (*_exit)(), astra_list_item_icon_t icon)
+xerintosh_list_item_t *xerintosh_new_switch_item(char *_content, bool *_value, void (*_init)(), void (*_exit)(), xerintosh_list_item_icon_t icon)
 {
-  astra_switch_item_t *_switch = (astra_switch_item_t*)malloc(sizeof(astra_switch_item_t));
-  memset(_switch, 0, sizeof(astra_switch_item_t));
+  xerintosh_switch_item_t *_switch = (xerintosh_switch_item_t*)malloc(sizeof(xerintosh_switch_item_t));
+  memset(_switch, 0, sizeof(xerintosh_switch_item_t));
   _switch->base_item.type = switch_item;
   _switch->base_item.content = _content;
   _switch->value = _value;
   _switch->init_function = _init;
   _switch->exit_function = _exit;
   _switch->base_item.icon = (icon == default_icon) ? switch_icon : icon;
-  return (astra_list_item_t*)_switch;
+  return (xerintosh_list_item_t*)_switch;
 }
 
-astra_list_item_t *astra_new_button_item(char *_content, void (*_exit)(), astra_list_item_icon_t icon)
+xerintosh_list_item_t *xerintosh_new_button_item(char *_content, void (*_exit)(), xerintosh_list_item_icon_t icon)
 {
-  astra_button_item_t *_btn = (astra_button_item_t*)malloc(sizeof(astra_button_item_t));
-  memset(_btn, 0, sizeof(astra_button_item_t));
+  xerintosh_button_item_t *_btn = (xerintosh_button_item_t*)malloc(sizeof(xerintosh_button_item_t));
+  memset(_btn, 0, sizeof(xerintosh_button_item_t));
   _btn->base_item.type = button_item;
   _btn->base_item.content = _content;
   _btn->exit_function = _exit;
   _btn->base_item.icon = (icon == default_icon) ? plus_icon : icon;
-  return (astra_list_item_t*)_btn;
+  return (xerintosh_list_item_t*)_btn;
 }
 
-astra_list_item_t *astra_new_slider_item(char *_content, int16_t *_value, uint8_t _step, int16_t _min, int16_t _max, void (*_init)(), void (*_exit)(), astra_list_item_icon_t icon)
+xerintosh_list_item_t *xerintosh_new_slider_item(char *_content, int16_t *_value, uint8_t _step, int16_t _min, int16_t _max, void (*_init)(), void (*_exit)(), xerintosh_list_item_icon_t icon)
 {
-  astra_slider_item_t *_slider = (astra_slider_item_t*)malloc(sizeof(astra_slider_item_t));
-  memset(_slider, 0, sizeof(astra_slider_item_t));
+  xerintosh_slider_item_t *_slider = (xerintosh_slider_item_t*)malloc(sizeof(xerintosh_slider_item_t));
+  memset(_slider, 0, sizeof(xerintosh_slider_item_t));
   _slider->base_item.type = slider_item;
   _slider->base_item.content = _content;
   _slider->value = _value;
@@ -1090,30 +1090,30 @@ astra_list_item_t *astra_new_slider_item(char *_content, int16_t *_value, uint8_
   _slider->init_function = _init;
   _slider->exit_function = _exit;
   _slider->base_item.icon = (icon == default_icon) ? slider_icon : icon;
-  return (astra_list_item_t*)_slider;
+  return (xerintosh_list_item_t*)_slider;
 }
 
-astra_list_item_t *astra_new_user_item(char *_content, void (*_init)(), void (*_loop)(), void (*_exit)(), astra_list_item_icon_t icon)
+xerintosh_list_item_t *xerintosh_new_user_item(char *_content, void (*_init)(), void (*_loop)(), void (*_exit)(), xerintosh_list_item_icon_t icon)
 {
-  astra_user_item_t *_user = (astra_user_item_t*)malloc(sizeof(astra_user_item_t));
-  memset(_user, 0, sizeof(astra_user_item_t));
+  xerintosh_user_item_t *_user = (xerintosh_user_item_t*)malloc(sizeof(xerintosh_user_item_t));
+  memset(_user, 0, sizeof(xerintosh_user_item_t));
   _user->base_item.type = user_item;
   _user->base_item.content = _content;
   _user->init_function = _init;
   _user->loop_function = _loop;
   _user->exit_function = _exit;
   _user->base_item.icon = (icon == default_icon) ? user_icon : icon;
-  return (astra_list_item_t*)_user;
+  return (xerintosh_list_item_t*)_user;
 }
 
-astra_selector_t astra_selector = {};
+xerintosh_selector_t xerintosh_selector = {};
 
-astra_selector_t *astra_get_selector()
+xerintosh_selector_t *xerintosh_get_selector()
 {
-  return &astra_selector;
+  return &xerintosh_selector;
 }
 
-bool astra_bind_item_to_selector(astra_list_item_t *_item)
+bool xerintosh_bind_item_to_selector(xerintosh_list_item_t *_item)
 {
   if (_item == NULL) return false;
   uint8_t _temp_index = 0;
@@ -1125,74 +1125,74 @@ bool astra_bind_item_to_selector(astra_list_item_t *_item)
       break;
     }
   }
-  if (astra_selector.selected_item == NULL)
+  if (xerintosh_selector.selected_item == NULL)
   {
-    astra_selector.y_selector = 2 * SCREEN_HEIGHT;
-    astra_selector.h_selector = 160;
+    xerintosh_selector.y_selector = 2 * SCREEN_HEIGHT;
+    xerintosh_selector.h_selector = 160;
   }
-  astra_selector.selected_index = _temp_index;
-  astra_selector.selected_item = _item;
+  xerintosh_selector.selected_index = _temp_index;
+  xerintosh_selector.selected_item = _item;
   return true;
 }
 
-bool astra_refresh_list_value = true;
+bool xerintosh_refresh_list_value = true;
 
-void astra_selector_go_next_item()
+void xerintosh_selector_go_next_item()
 {
-  if (astra_selector.selected_item->type == slider_item &&
-      astra_to_slider_item(astra_selector.selected_item)->is_confirmed)
+  if (xerintosh_selector.selected_item->type == slider_item &&
+      xerintosh_to_slider_item(xerintosh_selector.selected_item)->is_confirmed)
   {
-    astra_slider_item_t* _slider = astra_to_slider_item(astra_selector.selected_item);
+    xerintosh_slider_item_t* _slider = xerintosh_to_slider_item(xerintosh_selector.selected_item);
     *_slider->value += _slider->value_step;
     if (*_slider->value >= _slider->value_max) *_slider->value = _slider->value_max;
     return;
   }
-  if (astra_selector.selected_item->type == user_item &&
-      astra_to_user_item(astra_selector.selected_item)->in_user_item) return;
+  if (xerintosh_selector.selected_item->type == user_item &&
+      xerintosh_to_user_item(xerintosh_selector.selected_item)->in_user_item) return;
 
-  astra_refresh_list_value = true;
-  if (astra_selector.selected_index == astra_selector.selected_item->parent->child_num - 1)
+  xerintosh_refresh_list_value = true;
+  if (xerintosh_selector.selected_index == xerintosh_selector.selected_item->parent->child_num - 1)
   {
-    astra_selector.selected_item = astra_selector.selected_item->parent->child_list_item[0];
-    astra_selector.selected_index = 0;
+    xerintosh_selector.selected_item = xerintosh_selector.selected_item->parent->child_list_item[0];
+    xerintosh_selector.selected_index = 0;
     return;
   }
-  astra_selector.selected_item = astra_selector.selected_item->parent->child_list_item[++astra_selector.selected_index];
+  xerintosh_selector.selected_item = xerintosh_selector.selected_item->parent->child_list_item[++xerintosh_selector.selected_index];
 }
 
-void astra_selector_go_prev_item()
+void xerintosh_selector_go_prev_item()
 {
-  if (astra_selector.selected_item->type == slider_item &&
-      astra_to_slider_item(astra_selector.selected_item)->is_confirmed)
+  if (xerintosh_selector.selected_item->type == slider_item &&
+      xerintosh_to_slider_item(xerintosh_selector.selected_item)->is_confirmed)
   {
-    astra_slider_item_t* _slider = astra_to_slider_item(astra_selector.selected_item);
+    xerintosh_slider_item_t* _slider = xerintosh_to_slider_item(xerintosh_selector.selected_item);
     *_slider->value -= _slider->value_step;
     if (*_slider->value <= _slider->value_min) *_slider->value = _slider->value_min;
     return;
   }
-  if (astra_selector.selected_item->type == user_item &&
-      astra_to_user_item(astra_selector.selected_item)->in_user_item) return;
+  if (xerintosh_selector.selected_item->type == user_item &&
+      xerintosh_to_user_item(xerintosh_selector.selected_item)->in_user_item) return;
 
-  astra_refresh_list_value = true;
-  if (astra_selector.selected_index == 0)
+  xerintosh_refresh_list_value = true;
+  if (xerintosh_selector.selected_index == 0)
   {
-    astra_selector.selected_item = astra_selector.selected_item->parent->child_list_item[astra_selector.selected_item->parent->child_num - 1];
-    astra_selector.selected_index = astra_selector.selected_item->parent->child_num - 1;
+    xerintosh_selector.selected_item = xerintosh_selector.selected_item->parent->child_list_item[xerintosh_selector.selected_item->parent->child_num - 1];
+    xerintosh_selector.selected_index = xerintosh_selector.selected_item->parent->child_num - 1;
     return;
   }
-  astra_selector.selected_item = astra_selector.selected_item->parent->child_list_item[--astra_selector.selected_index];
+  xerintosh_selector.selected_item = xerintosh_selector.selected_item->parent->child_list_item[--xerintosh_selector.selected_index];
 }
 
-bool astra_exit_animation_finished = true;
+bool xerintosh_exit_animation_finished = true;
 
-void astra_selector_jump_to_selected_item()
+void xerintosh_selector_jump_to_selected_item()
 {
-  if (!in_astra) return;
+  if (!in_xerintosh) return;
 
-  if (astra_selector.selected_item->type == user_item)
+  if (xerintosh_selector.selected_item->type == user_item)
   {
-    astra_exit_animation_finished = false;
-    astra_user_item_t* _user = astra_to_user_item(astra_selector.selected_item);
+    xerintosh_exit_animation_finished = false;
+    xerintosh_user_item_t* _user = xerintosh_to_user_item(xerintosh_selector.selected_item);
     _user->entering_user_item = true;
     _user->exiting_user_item = false;
     _user->user_item_inited = false;
@@ -1200,24 +1200,24 @@ void astra_selector_jump_to_selected_item()
     return;
   }
 
-  if (astra_selector.selected_item->type == switch_item)
+  if (xerintosh_selector.selected_item->type == switch_item)
   {
-    astra_switch_item_t* _switch = astra_to_switch_item(astra_selector.selected_item);
+    xerintosh_switch_item_t* _switch = xerintosh_to_switch_item(xerintosh_selector.selected_item);
     *_switch->value = !*_switch->value;
     if (_switch->exit_function) _switch->exit_function();
     return;
   }
 
-  if (astra_selector.selected_item->type == button_item)
+  if (xerintosh_selector.selected_item->type == button_item)
   {
-    astra_button_item_t* _btn = astra_to_button_item(astra_selector.selected_item);
+    xerintosh_button_item_t* _btn = xerintosh_to_button_item(xerintosh_selector.selected_item);
     if (_btn->exit_function) _btn->exit_function();
     return;
   }
 
-  if (astra_selector.selected_item->type == slider_item)
+  if (xerintosh_selector.selected_item->type == slider_item)
   {
-    astra_slider_item_t* _slider = astra_to_slider_item(astra_selector.selected_item);
+    xerintosh_slider_item_t* _slider = xerintosh_to_slider_item(xerintosh_selector.selected_item);
     if (!_slider->is_confirmed)
     {
       _slider->is_confirmed = true;
@@ -1232,32 +1232,32 @@ void astra_selector_jump_to_selected_item()
     }
   }
 
-  if (astra_selector.selected_item->child_num == 0) return;
+  if (xerintosh_selector.selected_item->child_num == 0) return;
 
-  astra_refresh_list_value = true;
-  for (uint8_t i = 0; i < astra_selector.selected_item->child_num; i++)
-    astra_selector.selected_item->child_list_item[i]->y_list_item = 0;
+  xerintosh_refresh_list_value = true;
+  for (uint8_t i = 0; i < xerintosh_selector.selected_item->child_num; i++)
+    xerintosh_selector.selected_item->child_list_item[i]->y_list_item = 0;
 
-  astra_selector.selected_index = 0;
-  astra_selector.selected_item = astra_selector.selected_item->child_list_item[0];
+  xerintosh_selector.selected_index = 0;
+  xerintosh_selector.selected_item = xerintosh_selector.selected_item->child_list_item[0];
 }
 
-void astra_selector_exit_current_item()
+void xerintosh_selector_exit_current_item()
 {
-  if (astra_selector.selected_item->type == slider_item &&
-      astra_to_slider_item(astra_selector.selected_item)->is_confirmed)
+  if (xerintosh_selector.selected_item->type == slider_item &&
+      xerintosh_to_slider_item(xerintosh_selector.selected_item)->is_confirmed)
   {
-    astra_slider_item_t* _slider = astra_to_slider_item(astra_selector.selected_item);
+    xerintosh_slider_item_t* _slider = xerintosh_to_slider_item(xerintosh_selector.selected_item);
     _slider->is_confirmed = false;
     *_slider->value = _slider->value_backup;
     return;
   }
 
-  if (astra_selector.selected_item->type == user_item &&
-      astra_to_user_item(astra_selector.selected_item)->in_user_item)
+  if (xerintosh_selector.selected_item->type == user_item &&
+      xerintosh_to_user_item(xerintosh_selector.selected_item)->in_user_item)
   {
-    astra_exit_animation_finished = false;
-    astra_user_item_t* _user = astra_to_user_item(astra_selector.selected_item);
+    xerintosh_exit_animation_finished = false;
+    xerintosh_user_item_t* _user = xerintosh_to_user_item(xerintosh_selector.selected_item);
     _user->entering_user_item = false;
     _user->exiting_user_item = true;
     _user->user_item_inited = false;
@@ -1265,31 +1265,31 @@ void astra_selector_exit_current_item()
     return;
   }
 
-  astra_refresh_list_value = true;
+  xerintosh_refresh_list_value = true;
 
-  if (astra_selector.selected_item->parent->layer == 0 && in_astra)
+  if (xerintosh_selector.selected_item->parent->layer == 0 && in_xerintosh)
   {
-    if (ALLOW_EXIT_ASTRA_UI_BY_USER) in_astra = false;
+    if (ALLOW_EXIT_ASTRA_UI_BY_USER) in_xerintosh = false;
     return;
   }
 
-  for (uint8_t i = 0; i < astra_selector.selected_item->parent->parent->child_num; i++)
-    astra_selector.selected_item->parent->parent->child_list_item[i]->y_list_item = 0;
+  for (uint8_t i = 0; i < xerintosh_selector.selected_item->parent->parent->child_num; i++)
+    xerintosh_selector.selected_item->parent->parent->child_list_item[i]->y_list_item = 0;
 
   uint8_t _temp_index = 0;
-  for (uint8_t i = 0; i < astra_selector.selected_item->parent->parent->child_num; i++)
+  for (uint8_t i = 0; i < xerintosh_selector.selected_item->parent->parent->child_num; i++)
   {
-    if (astra_selector.selected_item->parent->parent->child_list_item[i] == astra_selector.selected_item->parent)
+    if (xerintosh_selector.selected_item->parent->parent->child_list_item[i] == xerintosh_selector.selected_item->parent)
     {
       _temp_index = i;
       break;
     }
   }
-  astra_selector.selected_index = _temp_index;
-  astra_selector.selected_item = astra_selector.selected_item->parent;
+  xerintosh_selector.selected_index = _temp_index;
+  xerintosh_selector.selected_item = xerintosh_selector.selected_item->parent;
 }
 
-bool astra_push_item_to_list(astra_list_item_t *_parent, astra_list_item_t *_child)
+bool xerintosh_push_item_to_list(xerintosh_list_item_t *_parent, xerintosh_list_item_t *_child)
 {
   if (_parent == NULL) return false;
   if (_child == NULL) return false;
@@ -1299,7 +1299,7 @@ bool astra_push_item_to_list(astra_list_item_t *_parent, astra_list_item_t *_chi
   _child->layer = _parent->layer + 1;
   _child->child_num = 0;
 
-  astra_set_font(nullptr);
+  xerintosh_set_font(nullptr);
   if (_parent->child_num == 0)
     _child->y_list_item_trg = oled_get_str_height() + LIST_FONT_TOP_MARGIN - 1;
   else
@@ -1307,8 +1307,8 @@ bool astra_push_item_to_list(astra_list_item_t *_parent, astra_list_item_t *_chi
 
   if (_parent->layer == 0 && _parent->child_num == 0)
   {
-    astra_bind_item_to_selector(_child);
-    astra_bind_selector_to_camera(&astra_selector);
+    xerintosh_bind_item_to_selector(_child);
+    xerintosh_bind_selector_to_camera(&xerintosh_selector);
   }
 
   _parent->child_list_item[_parent->child_num++] = _child;
@@ -1317,12 +1317,12 @@ bool astra_push_item_to_list(astra_list_item_t *_parent, astra_list_item_t *_chi
   return true;
 }
 
-astra_camera_t astra_camera = {0, 0, 0, 0};
+xerintosh_camera_t xerintosh_camera = {0, 0, 0, 0};
 
-void astra_bind_selector_to_camera(astra_selector_t *_selector)
+void xerintosh_bind_selector_to_camera(xerintosh_selector_t *_selector)
 {
   if (_selector == NULL) return;
-  astra_camera.selector = _selector;
+  xerintosh_camera.selector = _selector;
 }
 ```
 
@@ -1332,7 +1332,7 @@ Run:
 ```bash
 pio run -e native
 ```
-Expected: 编译通过（此时 ui_core.h 中的 `in_astra` 和 `ALLOW_EXIT_ASTRA_UI_BY_USER` 需要被定义，我们在下一步中解决）
+Expected: 编译通过（此时 ui_core.h 中的 `in_xerintosh` 和 `ALLOW_EXIT_ASTRA_UI_BY_USER` 需要被定义，我们在下一步中解决）
 
 - [ ] **Step 4: Commit**
 
@@ -1359,27 +1359,27 @@ git commit -m "feat: port ui_item data structures and selector/camera logic"
 
 #define ALLOW_EXIT_ASTRA_UI_BY_USER 1
 
-extern bool in_astra;
+extern bool in_xerintosh;
 
-extern void ad_astra(void);
-extern bool astra_is_in_user_item(void);
-extern void astra_refresh_info_bar(void);
-extern void astra_refresh_pop_up(void);
-extern void astra_refresh_camera_position(void);
-extern void astra_refresh_widget_core_position(void);
-extern void astra_init_list(void);
-extern void astra_init_core(void);
-extern void astra_refresh_list_item_position(void);
-extern void astra_refresh_selector_position(void);
-extern void astra_refresh_main_core_position(void);
-extern void astra_ui_widget_core(void);
-extern void astra_ui_main_core(void);
+extern void ad_xerintosh(void);
+extern bool xerintosh_is_in_user_item(void);
+extern void xerintosh_refresh_info_bar(void);
+extern void xerintosh_refresh_pop_up(void);
+extern void xerintosh_refresh_camera_position(void);
+extern void xerintosh_refresh_widget_core_position(void);
+extern void xerintosh_init_list(void);
+extern void xerintosh_init_core(void);
+extern void xerintosh_refresh_list_item_position(void);
+extern void xerintosh_refresh_selector_position(void);
+extern void xerintosh_refresh_main_core_position(void);
+extern void xerintosh_ui_widget_core(void);
+extern void xerintosh_ui_main_core(void);
 
 // 动画函数
-extern void astra_animation(float *_pos, float _posTrg, float _speed);
+extern void xerintosh_animation(float *_pos, float _posTrg, float _speed);
 
 // 退场动画状态
-extern uint8_t astra_exit_animation_status;
+extern uint8_t xerintosh_exit_animation_status;
 
 #endif
 ```
@@ -1392,21 +1392,21 @@ extern uint8_t astra_exit_animation_status;
 #include "ui_drawer.h"
 #include <tgmath.h>
 
-bool in_astra = false;
+bool in_xerintosh = false;
 
-void ad_astra()
+void ad_xerintosh()
 {
   // 开屏动画已移除，UI 直接启动
-  // 如需外部触发，由 main.cpp 设置 in_astra = true
+  // 如需外部触发，由 main.cpp 设置 in_xerintosh = true
 }
 
-bool astra_is_in_user_item()
+bool xerintosh_is_in_user_item()
 {
-  return (astra_selector.selected_item->type == user_item &&
-          astra_to_user_item(astra_selector.selected_item)->in_user_item) ? true : false;
+  return (xerintosh_selector.selected_item->type == user_item &&
+          xerintosh_to_user_item(xerintosh_selector.selected_item)->in_user_item) ? true : false;
 }
 
-void astra_animation(float *_pos, float _posTrg, float _speed)
+void xerintosh_animation(float *_pos, float _posTrg, float _speed)
 {
   if (*_pos != _posTrg)
   {
@@ -1415,95 +1415,95 @@ void astra_animation(float *_pos, float _posTrg, float _speed)
   }
 }
 
-void astra_refresh_info_bar()
+void xerintosh_refresh_info_bar()
 {
-  astra_animation(&astra_info_bar.y_info_bar, astra_info_bar.y_info_bar_trg, 94);
-  astra_animation(&astra_info_bar.w_info_bar, astra_info_bar.w_info_bar_trg, 95);
+  xerintosh_animation(&xerintosh_info_bar.y_info_bar, xerintosh_info_bar.y_info_bar_trg, 94);
+  xerintosh_animation(&xerintosh_info_bar.w_info_bar, xerintosh_info_bar.w_info_bar_trg, 95);
 }
 
-void astra_refresh_pop_up()
+void xerintosh_refresh_pop_up()
 {
-  astra_animation(&astra_pop_up.y_pop_up, astra_pop_up.y_pop_up_trg, 94);
-  astra_animation(&astra_pop_up.w_pop_up, astra_pop_up.w_pop_up_trg, 96);
+  xerintosh_animation(&xerintosh_pop_up.y_pop_up, xerintosh_pop_up.y_pop_up_trg, 94);
+  xerintosh_animation(&xerintosh_pop_up.w_pop_up, xerintosh_pop_up.w_pop_up_trg, 96);
 }
 
-void astra_refresh_camera_position()
+void xerintosh_refresh_camera_position()
 {
   // 15 为 selector 高度
-  if (astra_camera.selector->y_selector_trg + 15 + astra_camera.y_camera_trg > SCREEN_HEIGHT)
-    astra_camera.y_camera_trg = SCREEN_HEIGHT - astra_camera.selector->y_selector_trg - 15;
+  if (xerintosh_camera.selector->y_selector_trg + 15 + xerintosh_camera.y_camera_trg > SCREEN_HEIGHT)
+    xerintosh_camera.y_camera_trg = SCREEN_HEIGHT - xerintosh_camera.selector->y_selector_trg - 15;
 
-  if (astra_camera.selector->y_selector_trg + astra_camera.y_camera_trg < 0)
-    astra_camera.y_camera_trg = 0 - astra_camera.selector->y_selector_trg + LIST_FONT_TOP_MARGIN;
+  if (xerintosh_camera.selector->y_selector_trg + xerintosh_camera.y_camera_trg < 0)
+    xerintosh_camera.y_camera_trg = 0 - xerintosh_camera.selector->y_selector_trg + LIST_FONT_TOP_MARGIN;
 
-  astra_animation(&astra_camera.x_camera, astra_camera.x_camera_trg, 96);
-  astra_animation(&astra_camera.y_camera, astra_camera.y_camera_trg, 96);
+  xerintosh_animation(&xerintosh_camera.x_camera, xerintosh_camera.x_camera_trg, 96);
+  xerintosh_animation(&xerintosh_camera.y_camera, xerintosh_camera.y_camera_trg, 96);
 }
 
-void astra_refresh_widget_core_position()
+void xerintosh_refresh_widget_core_position()
 {
-  astra_refresh_info_bar();
-  astra_refresh_pop_up();
+  xerintosh_refresh_info_bar();
+  xerintosh_refresh_pop_up();
 }
 
-void astra_init_list()
+void xerintosh_init_list()
 {
-  for (uint8_t i = 0; i < astra_get_root_list()->child_num; i++)
-    astra_get_root_list()->child_list_item[i]->y_list_item = 0;
-  astra_selector.selected_index = 0;
-  astra_selector.selected_item = astra_get_root_list()->child_list_item[0];
-  astra_selector.y_selector = OLED_HEIGHT;
-  astra_selector.h_selector = OLED_HEIGHT;
+  for (uint8_t i = 0; i < xerintosh_get_root_list()->child_num; i++)
+    xerintosh_get_root_list()->child_list_item[i]->y_list_item = 0;
+  xerintosh_selector.selected_index = 0;
+  xerintosh_selector.selected_item = xerintosh_get_root_list()->child_list_item[0];
+  xerintosh_selector.y_selector = OLED_HEIGHT;
+  xerintosh_selector.h_selector = OLED_HEIGHT;
 }
 
-void astra_init_core()
+void xerintosh_init_core()
 {
-  astra_init_list();
-  astra_bind_item_to_selector(astra_get_root_list());
-  astra_bind_selector_to_camera(astra_get_selector());
+  xerintosh_init_list();
+  xerintosh_bind_item_to_selector(xerintosh_get_root_list());
+  xerintosh_bind_selector_to_camera(xerintosh_get_selector());
 }
 
-void astra_refresh_list_item_position()
+void xerintosh_refresh_list_item_position()
 {
-  for (uint8_t i = 0; i < astra_selector.selected_item->parent->child_num; i++)
-    astra_animation(&astra_selector.selected_item->parent->child_list_item[i]->y_list_item,
-                    astra_selector.selected_item->parent->child_list_item[i]->y_list_item_trg, 84);
+  for (uint8_t i = 0; i < xerintosh_selector.selected_item->parent->child_num; i++)
+    xerintosh_animation(&xerintosh_selector.selected_item->parent->child_list_item[i]->y_list_item,
+                    xerintosh_selector.selected_item->parent->child_list_item[i]->y_list_item_trg, 84);
 }
 
-void astra_refresh_selector_position()
+void xerintosh_refresh_selector_position()
 {
-  astra_set_font(nullptr);
-  astra_selector.y_selector_trg = astra_selector.selected_item->y_list_item_trg - oled_get_str_height() + 1;
-  if (astra_selector.selected_item->type == switch_item || astra_selector.selected_item->type == slider_item)
-    astra_selector.w_selector_trg = OLED_WIDTH - 18;
+  xerintosh_set_font(nullptr);
+  xerintosh_selector.y_selector_trg = xerintosh_selector.selected_item->y_list_item_trg - oled_get_str_height() + 1;
+  if (xerintosh_selector.selected_item->type == switch_item || xerintosh_selector.selected_item->type == slider_item)
+    xerintosh_selector.w_selector_trg = OLED_WIDTH - 18;
   else
-    astra_selector.w_selector_trg = oled_get_UTF8_width(astra_selector.selected_item->content) + 12;
-  astra_selector.h_selector_trg = 15;
-  astra_animation(&astra_selector.y_selector, astra_selector.y_selector_trg, 92);
-  astra_animation(&astra_selector.w_selector, astra_selector.w_selector_trg, 92);
-  astra_animation(&astra_selector.h_selector, astra_selector.h_selector_trg, 93);
+    xerintosh_selector.w_selector_trg = oled_get_UTF8_width(xerintosh_selector.selected_item->content) + 12;
+  xerintosh_selector.h_selector_trg = 15;
+  xerintosh_animation(&xerintosh_selector.y_selector, xerintosh_selector.y_selector_trg, 92);
+  xerintosh_animation(&xerintosh_selector.w_selector, xerintosh_selector.w_selector_trg, 92);
+  xerintosh_animation(&xerintosh_selector.h_selector, xerintosh_selector.h_selector_trg, 93);
 }
 
-void astra_refresh_main_core_position()
+void xerintosh_refresh_main_core_position()
 {
-  astra_refresh_list_item_position();
+  xerintosh_refresh_list_item_position();
 }
 
-void astra_ui_widget_core()
+void xerintosh_ui_widget_core()
 {
-  astra_refresh_widget_core_position();
-  astra_draw_widget();
+  xerintosh_refresh_widget_core_position();
+  xerintosh_draw_widget();
 }
 
-void astra_ui_main_core()
+void xerintosh_ui_main_core()
 {
-  if (!in_astra) return;
+  if (!in_xerintosh) return;
 
-  if (astra_selector.selected_item->type == user_item &&
-      !astra_to_user_item(astra_selector.selected_item)->in_user_item)
+  if (xerintosh_selector.selected_item->type == user_item &&
+      !xerintosh_to_user_item(xerintosh_selector.selected_item)->in_user_item)
   {
-    astra_user_item_t *_user = astra_to_user_item(astra_selector.selected_item);
-    if (_user->entering_user_item && astra_exit_animation_status == 1)
+    xerintosh_user_item_t *_user = xerintosh_to_user_item(xerintosh_selector.selected_item);
+    if (_user->entering_user_item && xerintosh_exit_animation_status == 1)
     {
       if (_user->init_function != NULL)
         _user->init_function();
@@ -1511,13 +1511,13 @@ void astra_ui_main_core()
     }
   }
 
-  if (astra_selector.selected_item->type == user_item &&
-      astra_to_user_item(astra_selector.selected_item)->in_user_item)
+  if (xerintosh_selector.selected_item->type == user_item &&
+      xerintosh_to_user_item(xerintosh_selector.selected_item)->in_user_item)
   {
-    astra_user_item_t* _user = astra_to_user_item(astra_selector.selected_item);
+    xerintosh_user_item_t* _user = xerintosh_to_user_item(xerintosh_selector.selected_item);
     if (_user->loop_function != NULL)
       _user->loop_function();
-    if (_user->exiting_user_item && astra_exit_animation_status == 1)
+    if (_user->exiting_user_item && xerintosh_exit_animation_status == 1)
     {
       if (_user->exit_function != NULL)
         _user->exit_function();
@@ -1526,14 +1526,14 @@ void astra_ui_main_core()
   }
   else
   {
-    astra_refresh_camera_position();
-    astra_refresh_main_core_position();
-    astra_refresh_selector_position();
-    astra_draw_list();
+    xerintosh_refresh_camera_position();
+    xerintosh_refresh_main_core_position();
+    xerintosh_refresh_selector_position();
+    xerintosh_draw_list();
   }
 
-  if (!astra_exit_animation_finished)
-    astra_draw_exit_animation();
+  if (!xerintosh_exit_animation_finished)
+    xerintosh_draw_exit_animation();
 }
 ```
 
@@ -1568,17 +1568,17 @@ git commit -m "feat: port ui_core animation engine and main loop"
 
 #include "ui_item.h"
 
-extern uint8_t astra_exit_animation_status;
+extern uint8_t xerintosh_exit_animation_status;
 
-extern void astra_draw_exit_animation(void);
-extern void astra_draw_info_bar(void);
-extern void astra_draw_pop_up(void);
-extern void astra_draw_list_appearance(void);
-extern void astra_draw_list_item(void);
-extern void astra_draw_list_icon(astra_list_item_icon_t icon, uint16_t x, uint16_t y);
-extern void astra_draw_selector(void);
-extern void astra_draw_widget(void);
-extern void astra_draw_list(void);
+extern void xerintosh_draw_exit_animation(void);
+extern void xerintosh_draw_info_bar(void);
+extern void xerintosh_draw_pop_up(void);
+extern void xerintosh_draw_list_appearance(void);
+extern void xerintosh_draw_list_item(void);
+extern void xerintosh_draw_list_icon(xerintosh_list_item_icon_t icon, uint16_t x, uint16_t y);
+extern void xerintosh_draw_selector(void);
+extern void xerintosh_draw_widget(void);
+extern void xerintosh_draw_list(void);
 
 #endif
 ```
@@ -1596,7 +1596,7 @@ extern void astra_draw_list(void);
 #include <stdio.h>
 #include "ui_core.h"
 
-void astra_exit_animation(float *_pos, float _posTrg, float _speed)
+void xerintosh_exit_animation(float *_pos, float _posTrg, float _speed)
 {
   if (*_pos != _posTrg)
   {
@@ -1605,9 +1605,9 @@ void astra_exit_animation(float *_pos, float _posTrg, float _speed)
   }
 }
 
-uint8_t astra_exit_animation_status = 0;
+uint8_t xerintosh_exit_animation_status = 0;
 
-void astra_draw_exit_animation()
+void xerintosh_draw_exit_animation()
 {
   static float _temp_h = -8;
   static float _temp_h_trg = OLED_HEIGHT + 8;
@@ -1675,113 +1675,113 @@ void astra_draw_exit_animation()
         oled_draw_pixel(i, j);
     }
 
-  astra_exit_animation(&_temp_h, _temp_h_trg, 94);
+  xerintosh_exit_animation(&_temp_h, _temp_h_trg, 94);
 
-  if (astra_exit_animation_status == 0 && _temp_h == _temp_h_trg && _temp_h == OLED_HEIGHT + 8)
+  if (xerintosh_exit_animation_status == 0 && _temp_h == _temp_h_trg && _temp_h == OLED_HEIGHT + 8)
   {
-    astra_exit_animation_status = 1;
+    xerintosh_exit_animation_status = 1;
     return;
   }
 
-  if (astra_exit_animation_status == 1)
+  if (xerintosh_exit_animation_status == 1)
   {
     _temp_h_trg = -8;
-    astra_exit_animation_status = 2;
+    xerintosh_exit_animation_status = 2;
     return;
   }
 
-  if (astra_exit_animation_status == 2 && _temp_h == _temp_h_trg && _temp_h == -8)
+  if (xerintosh_exit_animation_status == 2 && _temp_h == _temp_h_trg && _temp_h == -8)
   {
-    astra_exit_animation_finished = true;
-    astra_exit_animation_status = 0;
+    xerintosh_exit_animation_finished = true;
+    xerintosh_exit_animation_status = 0;
     _temp_h = -8;
     _temp_h_trg = OLED_HEIGHT + 8;
     return;
   }
 }
 
-void astra_draw_info_bar()
+void xerintosh_draw_info_bar()
 {
-  if (!astra_info_bar.is_running) return;
+  if (!xerintosh_info_bar.is_running) return;
 
-  if (astra_info_bar.y_info_bar == astra_info_bar.y_info_bar_trg)
-    astra_info_bar.time = get_ticks();
+  if (xerintosh_info_bar.y_info_bar == xerintosh_info_bar.y_info_bar_trg)
+    xerintosh_info_bar.time = get_ticks();
 
-  if (astra_info_bar.time - astra_info_bar.time_start >= astra_info_bar.span)
+  if (xerintosh_info_bar.time - xerintosh_info_bar.time_start >= xerintosh_info_bar.span)
   {
-    astra_info_bar.y_info_bar_trg = 0 - 2 * INFO_BAR_HEIGHT;
-    if (astra_info_bar.y_info_bar == astra_info_bar.y_info_bar_trg)
-      astra_info_bar.is_running = false;
+    xerintosh_info_bar.y_info_bar_trg = 0 - 2 * INFO_BAR_HEIGHT;
+    if (xerintosh_info_bar.y_info_bar == xerintosh_info_bar.y_info_bar_trg)
+      xerintosh_info_bar.is_running = false;
   }
 
-  int16_t _x_info_bar = OLED_WIDTH/2 - astra_info_bar.w_info_bar/2;
-  int16_t _y_info_bar_1 = astra_info_bar.y_info_bar - 4;
-  int16_t _y_info_bar_2 = astra_info_bar.y_info_bar + INFO_BAR_HEIGHT;
+  int16_t _x_info_bar = OLED_WIDTH/2 - xerintosh_info_bar.w_info_bar/2;
+  int16_t _y_info_bar_1 = xerintosh_info_bar.y_info_bar - 4;
+  int16_t _y_info_bar_2 = xerintosh_info_bar.y_info_bar + INFO_BAR_HEIGHT;
 
-  astra_set_font(nullptr);
+  xerintosh_set_font(nullptr);
   oled_set_draw_color(1);
   oled_draw_R_box(_x_info_bar + 3, _y_info_bar_1 + 3,
-                  (int16_t)astra_info_bar.w_info_bar, INFO_BAR_HEIGHT + 4, 4);
+                  (int16_t)xerintosh_info_bar.w_info_bar, INFO_BAR_HEIGHT + 4, 4);
 
   oled_set_draw_color(0);
-  oled_draw_R_box((int16_t)(OLED_WIDTH/2 - (astra_info_bar.w_info_bar + 4)/2), _y_info_bar_1,
-                  (int16_t)(astra_info_bar.w_info_bar + 4), INFO_BAR_HEIGHT + 6, 4);
+  oled_draw_R_box((int16_t)(OLED_WIDTH/2 - (xerintosh_info_bar.w_info_bar + 4)/2), _y_info_bar_1,
+                  (int16_t)(xerintosh_info_bar.w_info_bar + 4), INFO_BAR_HEIGHT + 6, 4);
 
   oled_set_draw_color(1);
   oled_draw_R_box(_x_info_bar, _y_info_bar_1,
-                  (int16_t)astra_info_bar.w_info_bar, INFO_BAR_HEIGHT + 4, 3);
+                  (int16_t)xerintosh_info_bar.w_info_bar, INFO_BAR_HEIGHT + 4, 3);
 
   oled_set_draw_color(0);
-  oled_draw_H_line(_x_info_bar + 2, _y_info_bar_2 - 2, (int16_t)(astra_info_bar.w_info_bar - 4));
+  oled_draw_H_line(_x_info_bar + 2, _y_info_bar_2 - 2, (int16_t)(xerintosh_info_bar.w_info_bar - 4));
   oled_draw_pixel(_x_info_bar + 1, _y_info_bar_2 - 3);
   oled_draw_pixel(_x_info_bar - 2, _y_info_bar_2 - 3);
 
   oled_draw_UTF8(_x_info_bar + 6,
-                 (int16_t)(astra_info_bar.y_info_bar + oled_get_str_height() - 2),
-                 astra_info_bar.content);
+                 (int16_t)(xerintosh_info_bar.y_info_bar + oled_get_str_height() - 2),
+                 xerintosh_info_bar.content);
 }
 
-void astra_draw_pop_up()
+void xerintosh_draw_pop_up()
 {
-  if (!astra_pop_up.is_running) return;
+  if (!xerintosh_pop_up.is_running) return;
 
-  if (astra_pop_up.y_pop_up == astra_pop_up.y_pop_up_trg)
-    astra_pop_up.time = get_ticks();
+  if (xerintosh_pop_up.y_pop_up == xerintosh_pop_up.y_pop_up_trg)
+    xerintosh_pop_up.time = get_ticks();
 
-  if (astra_pop_up.time - astra_pop_up.time_start >= astra_pop_up.span)
+  if (xerintosh_pop_up.time - xerintosh_pop_up.time_start >= xerintosh_pop_up.span)
   {
-    astra_pop_up.y_pop_up_trg = 0 - 2 * INFO_BAR_HEIGHT;
-    if (astra_pop_up.y_pop_up == astra_pop_up.y_pop_up_trg)
-      astra_pop_up.is_running = false;
+    xerintosh_pop_up.y_pop_up_trg = 0 - 2 * INFO_BAR_HEIGHT;
+    if (xerintosh_pop_up.y_pop_up == xerintosh_pop_up.y_pop_up_trg)
+      xerintosh_pop_up.is_running = false;
   }
 
-  int16_t _x_pop_up = OLED_WIDTH/2 - astra_pop_up.w_pop_up/2;
-  int16_t _y_pop_up = astra_pop_up.y_pop_up + POP_UP_HEIGHT;
+  int16_t _x_pop_up = OLED_WIDTH/2 - xerintosh_pop_up.w_pop_up/2;
+  int16_t _y_pop_up = xerintosh_pop_up.y_pop_up + POP_UP_HEIGHT;
 
-  astra_set_font(nullptr);
+  xerintosh_set_font(nullptr);
   oled_set_draw_color(1);
-  oled_draw_R_box(_x_pop_up + 1, (int16_t)astra_pop_up.y_pop_up + 3,
-                  (int16_t)(astra_pop_up.w_pop_up + 4), POP_UP_HEIGHT, 4);
+  oled_draw_R_box(_x_pop_up + 1, (int16_t)xerintosh_pop_up.y_pop_up + 3,
+                  (int16_t)(xerintosh_pop_up.w_pop_up + 4), POP_UP_HEIGHT, 4);
 
   oled_set_draw_color(0);
-  oled_draw_R_box((int16_t)(OLED_WIDTH/2 - (astra_pop_up.w_pop_up + 4)/2 - 2), (int16_t)(astra_pop_up.y_pop_up - 2),
-                  (int16_t)(astra_pop_up.w_pop_up + 8), POP_UP_HEIGHT + 4, 5);
+  oled_draw_R_box((int16_t)(OLED_WIDTH/2 - (xerintosh_pop_up.w_pop_up + 4)/2 - 2), (int16_t)(xerintosh_pop_up.y_pop_up - 2),
+                  (int16_t)(xerintosh_pop_up.w_pop_up + 8), POP_UP_HEIGHT + 4, 5);
 
   oled_set_draw_color(1);
-  oled_draw_R_box(_x_pop_up - 2, (int16_t)astra_pop_up.y_pop_up,
-                  (int16_t)(astra_pop_up.w_pop_up + 4), POP_UP_HEIGHT, 3);
+  oled_draw_R_box(_x_pop_up - 2, (int16_t)xerintosh_pop_up.y_pop_up,
+                  (int16_t)(xerintosh_pop_up.w_pop_up + 4), POP_UP_HEIGHT, 3);
 
   oled_set_draw_color(0);
-  oled_draw_H_line(_x_pop_up, _y_pop_up - 2, (int16_t)astra_pop_up.w_pop_up);
+  oled_draw_H_line(_x_pop_up, _y_pop_up - 2, (int16_t)xerintosh_pop_up.w_pop_up);
   oled_draw_pixel(_x_pop_up - 1, _y_pop_up - 3);
-  oled_draw_pixel((int16_t)(OLED_WIDTH/2 + astra_pop_up.w_pop_up/2), _y_pop_up - 3);
+  oled_draw_pixel((int16_t)(OLED_WIDTH/2 + xerintosh_pop_up.w_pop_up/2), _y_pop_up - 3);
 
   oled_draw_UTF8(_x_pop_up + 3,
-                 (int16_t)(astra_pop_up.y_pop_up + oled_get_str_height() + 1),
-                 astra_pop_up.content);
+                 (int16_t)(xerintosh_pop_up.y_pop_up + oled_get_str_height() + 1),
+                 xerintosh_pop_up.content);
 }
 
-void astra_draw_list_appearance()
+void xerintosh_draw_list_appearance()
 {
   oled_set_draw_color(1);
   oled_draw_H_line(0, 1, 66);
@@ -1810,18 +1810,18 @@ void astra_draw_list_appearance()
   oled_draw_V_line(OLED_WIDTH - 1, 0, OLED_HEIGHT);
 
   static float _length_each_part = 0;
-  _length_each_part = ceilf((SCREEN_HEIGHT - 10.0f) / (float) astra_selector.selected_item->parent->child_num);
-  oled_draw_box(OLED_WIDTH - 4, 5 + astra_selector.selected_index * _length_each_part, 3, _length_each_part);
+  _length_each_part = ceilf((SCREEN_HEIGHT - 10.0f) / (float) xerintosh_selector.selected_item->parent->child_num);
+  oled_draw_box(OLED_WIDTH - 4, 5 + xerintosh_selector.selected_index * _length_each_part, 3, _length_each_part);
 
   oled_set_draw_color(0);
-  oled_draw_H_line(OLED_WIDTH - 4, _length_each_part + (float)astra_selector.selected_index * _length_each_part, 3);
+  oled_draw_H_line(OLED_WIDTH - 4, _length_each_part + (float)xerintosh_selector.selected_index * _length_each_part, 3);
 
   if (_length_each_part >= 9)
   {
     oled_draw_H_line(OLED_WIDTH - 4,
-                     floorf(_length_each_part - 2.0f + (float)astra_selector.selected_index * _length_each_part), 3);
+                     floorf(_length_each_part - 2.0f + (float)xerintosh_selector.selected_index * _length_each_part), 3);
     oled_draw_H_line(OLED_WIDTH - 4,
-                     floorf(_length_each_part + 2.0f + (float)astra_selector.selected_index * _length_each_part), 3);
+                     floorf(_length_each_part + 2.0f + (float)xerintosh_selector.selected_index * _length_each_part), 3);
   }
 
   oled_set_draw_color(1);
@@ -1834,31 +1834,31 @@ void astra_draw_list_appearance()
   oled_draw_pixel(OLED_WIDTH - 3, OLED_HEIGHT - 2);
 }
 
-void astra_draw_list_item()
+void xerintosh_draw_list_item()
 {
-  for (unsigned char i = 0; i < astra_selector.selected_item->parent->child_num; i++)
+  for (unsigned char i = 0; i < xerintosh_selector.selected_item->parent->child_num; i++)
   {
-    int16_t _x_list_item = astra_camera.x_camera + LIST_ITEM_LEFT_MARGIN;
-    int16_t _y_list_item = astra_selector.selected_item->parent->child_list_item[i]->y_list_item +
-                           astra_camera.y_camera - oled_get_str_height()/2;
+    int16_t _x_list_item = xerintosh_camera.x_camera + LIST_ITEM_LEFT_MARGIN;
+    int16_t _y_list_item = xerintosh_selector.selected_item->parent->child_list_item[i]->y_list_item +
+                           xerintosh_camera.y_camera - oled_get_str_height()/2;
 
     oled_set_draw_color(1);
-    if (astra_selector.selected_item->parent->child_list_item[i]->type == list_item)
+    if (xerintosh_selector.selected_item->parent->child_list_item[i]->type == list_item)
     {
       if (_y_list_item + 2 > LIST_INFO_BAR_HEIGHT && _y_list_item - 2 < SCREEN_HEIGHT)
       {
-        astra_draw_list_icon(astra_selector.selected_item->parent->child_list_item[i]->icon, _x_list_item, _y_list_item);
+        xerintosh_draw_list_icon(xerintosh_selector.selected_item->parent->child_list_item[i]->icon, _x_list_item, _y_list_item);
       }
     }
-    else if (astra_selector.selected_item->parent->child_list_item[i]->type == switch_item)
+    else if (xerintosh_selector.selected_item->parent->child_list_item[i]->type == switch_item)
     {
-      astra_switch_item_t *_switch_item = astra_to_switch_item(astra_selector.selected_item->parent->child_list_item[i]);
-      if (_switch_item->init_function && astra_refresh_list_value)
+      xerintosh_switch_item_t *_switch_item = xerintosh_to_switch_item(xerintosh_selector.selected_item->parent->child_list_item[i]);
+      if (_switch_item->init_function && xerintosh_refresh_list_value)
         _switch_item->init_function();
 
       if (_y_list_item + 7 > LIST_INFO_BAR_HEIGHT && _y_list_item + 1 < SCREEN_HEIGHT)
       {
-        astra_draw_list_icon(astra_selector.selected_item->parent->child_list_item[i]->icon, _x_list_item, _y_list_item);
+        xerintosh_draw_list_icon(xerintosh_selector.selected_item->parent->child_list_item[i]->icon, _x_list_item, _y_list_item);
         oled_draw_frame(OLED_WIDTH - LIST_ITEM_RIGHT_MARGIN - 7, _y_list_item - 2, 11, 7);
         if (*_switch_item->value == true)
         {
@@ -1872,23 +1872,23 @@ void astra_draw_list_item()
         }
       }
     }
-    else if (astra_selector.selected_item->parent->child_list_item[i]->type == button_item)
+    else if (xerintosh_selector.selected_item->parent->child_list_item[i]->type == button_item)
     {
-      astra_button_item_t *_btn = astra_to_button_item(astra_selector.selected_item->parent->child_list_item[i]);
+      xerintosh_button_item_t *_btn = xerintosh_to_button_item(xerintosh_selector.selected_item->parent->child_list_item[i]);
       if (_y_list_item + 7 > LIST_INFO_BAR_HEIGHT && _y_list_item + 1 < SCREEN_HEIGHT)
       {
-        astra_draw_list_icon(astra_selector.selected_item->parent->child_list_item[i]->icon, _x_list_item, _y_list_item);
+        xerintosh_draw_list_icon(xerintosh_selector.selected_item->parent->child_list_item[i]->icon, _x_list_item, _y_list_item);
       }
     }
-    else if (astra_selector.selected_item->parent->child_list_item[i]->type == slider_item)
+    else if (xerintosh_selector.selected_item->parent->child_list_item[i]->type == slider_item)
     {
-      astra_slider_item_t *_slider = astra_to_slider_item(astra_selector.selected_item->parent->child_list_item[i]);
-      if (_slider->init_function && astra_refresh_list_value)
+      xerintosh_slider_item_t *_slider = xerintosh_to_slider_item(xerintosh_selector.selected_item->parent->child_list_item[i]);
+      if (_slider->init_function && xerintosh_refresh_list_value)
         _slider->init_function();
 
       if (_y_list_item + 5 > LIST_INFO_BAR_HEIGHT && _y_list_item - 2 < SCREEN_HEIGHT)
       {
-        astra_draw_list_icon(astra_selector.selected_item->parent->child_list_item[i]->icon, _x_list_item, _y_list_item);
+        xerintosh_draw_list_icon(xerintosh_selector.selected_item->parent->child_list_item[i]->icon, _x_list_item, _y_list_item);
         char _value_str[10] = {};
         sprintf(_value_str, "%d", *_slider->value);
         int16_t _x_value = OLED_WIDTH - LIST_ITEM_RIGHT_MARGIN - oled_get_str_width(_value_str) + 2;
@@ -1919,20 +1919,20 @@ void astra_draw_list_item()
     {
       if (_y_list_item + oled_get_str_height() / 2 > LIST_INFO_BAR_HEIGHT &&
           _y_list_item + oled_get_str_height() / 2 < SCREEN_HEIGHT)
-        astra_draw_list_icon(astra_selector.selected_item->parent->child_list_item[i]->icon, _x_list_item, _y_list_item);
+        xerintosh_draw_list_icon(xerintosh_selector.selected_item->parent->child_list_item[i]->icon, _x_list_item, _y_list_item);
     }
 
-    astra_set_font(nullptr);
+    xerintosh_set_font(nullptr);
     if (_y_list_item + oled_get_str_height() / 2 > LIST_INFO_BAR_HEIGHT &&
         _y_list_item + oled_get_str_height() / 2 < SCREEN_HEIGHT)
       oled_draw_UTF8(10 + _x_list_item, _y_list_item + oled_get_str_height() / 2,
-                   astra_selector.selected_item->parent->child_list_item[i]->content);
+                   xerintosh_selector.selected_item->parent->child_list_item[i]->content);
   }
 
-  astra_refresh_list_value = false;
+  xerintosh_refresh_list_value = false;
 }
 
-void astra_draw_list_icon(astra_list_item_icon_t icon, uint16_t x, uint16_t y){
+void xerintosh_draw_list_icon(xerintosh_list_item_icon_t icon, uint16_t x, uint16_t y){
   switch(icon){
     case (list_icon):
         oled_draw_H_line(2 + x, y - 2, 4);
@@ -1974,21 +1974,21 @@ void astra_draw_list_icon(astra_list_item_icon_t icon, uint16_t x, uint16_t y){
   }
 }
 
-void astra_draw_selector()
+void xerintosh_draw_selector()
 {
-  int16_t _x_selector = astra_camera.x_camera + LIST_ITEM_LEFT_MARGIN;
-  int16_t _y_selector = astra_selector.y_selector + astra_camera.y_camera;
+  int16_t _x_selector = xerintosh_camera.x_camera + LIST_ITEM_LEFT_MARGIN;
+  int16_t _y_selector = xerintosh_selector.y_selector + xerintosh_camera.y_camera;
 
   // TFT 环境下使用 XOR 反色
-  hal_draw_xor_rect(_x_selector, _y_selector, astra_selector.w_selector, astra_selector.h_selector);
+  hal_draw_xor_rect(_x_selector, _y_selector, xerintosh_selector.w_selector, xerintosh_selector.h_selector);
 
   // 棋盘格过渡
   oled_set_draw_color(1);
-  for (int16_t i = astra_selector.w_selector + _x_selector;
-       i <= astra_selector.w_selector + _x_selector + 7; i += 2)
+  for (int16_t i = xerintosh_selector.w_selector + _x_selector;
+       i <= xerintosh_selector.w_selector + _x_selector + 7; i += 2)
   {
     for (int16_t j = _y_selector;
-         j <= _y_selector + astra_selector.h_selector - 1; j++)
+         j <= _y_selector + xerintosh_selector.h_selector - 1; j++)
     {
       if (j % 2 == 0)
         oled_draw_pixel(i + 1, j);
@@ -1998,17 +1998,17 @@ void astra_draw_selector()
   }
 }
 
-void astra_draw_widget()
+void xerintosh_draw_widget()
 {
-  astra_draw_info_bar();
-  astra_draw_pop_up();
+  xerintosh_draw_info_bar();
+  xerintosh_draw_pop_up();
 }
 
-void astra_draw_list()
+void xerintosh_draw_list()
 {
-  astra_draw_list_appearance();
-  astra_draw_list_item();
-  astra_draw_selector();
+  xerintosh_draw_list_appearance();
+  xerintosh_draw_list_item();
+  xerintosh_draw_selector();
 }
 ```
 
@@ -2064,26 +2064,26 @@ static void input_process()
     if (event_a == INPUT_EVENT_SHORT_PRESS)
     {
         if (mode_a == INPUT_MODE_1)
-            astra_selector_go_prev_item();
+            xerintosh_selector_go_prev_item();
         else
-            astra_selector_go_prev_item();
+            xerintosh_selector_go_prev_item();
     }
     else if (event_a == INPUT_EVENT_LONG_PRESS)
     {
         if (mode_a == INPUT_MODE_1)
-            astra_selector_exit_current_item();
+            xerintosh_selector_exit_current_item();
         else
         {
             // 快速减（仅当 slider 确认时有效）
-            if (astra_selector.selected_item->type == slider_item &&
-                astra_to_slider_item(astra_selector.selected_item)->is_confirmed)
+            if (xerintosh_selector.selected_item->type == slider_item &&
+                xerintosh_to_slider_item(xerintosh_selector.selected_item)->is_confirmed)
             {
-                astra_slider_item_t* s = astra_to_slider_item(astra_selector.selected_item);
+                xerintosh_slider_item_t* s = xerintosh_to_slider_item(xerintosh_selector.selected_item);
                 *s->value -= s->value_step * 5;
                 if (*s->value < s->value_min) *s->value = s->value_min;
             }
             else
-                astra_selector_exit_current_item();
+                xerintosh_selector_exit_current_item();
         }
     }
 
@@ -2091,25 +2091,25 @@ static void input_process()
     if (event_b == INPUT_EVENT_SHORT_PRESS)
     {
         if (mode_b == INPUT_MODE_1)
-            astra_selector_go_next_item();
+            xerintosh_selector_go_next_item();
         else
-            astra_selector_go_next_item();
+            xerintosh_selector_go_next_item();
     }
     else if (event_b == INPUT_EVENT_LONG_PRESS)
     {
         if (mode_b == INPUT_MODE_1)
-            astra_selector_jump_to_selected_item();
+            xerintosh_selector_jump_to_selected_item();
         else
         {
-            if (astra_selector.selected_item->type == slider_item &&
-                astra_to_slider_item(astra_selector.selected_item)->is_confirmed)
+            if (xerintosh_selector.selected_item->type == slider_item &&
+                xerintosh_to_slider_item(xerintosh_selector.selected_item)->is_confirmed)
             {
-                astra_slider_item_t* s = astra_to_slider_item(astra_selector.selected_item);
+                xerintosh_slider_item_t* s = xerintosh_to_slider_item(xerintosh_selector.selected_item);
                 *s->value += s->value_step * 5;
                 if (*s->value > s->value_max) *s->value = s->value_max;
             }
             else
-                astra_selector_jump_to_selected_item();
+                xerintosh_selector_jump_to_selected_item();
         }
     }
 }
@@ -2120,34 +2120,34 @@ void setup()
     hal_system_init();
     hal_display_init();
     hal_input_init();
-    astra_ui_driver_init();
+    xerintosh_ui_driver_init();
 
     // 构建示例菜单
-    astra_list_item_t* root = astra_get_root_list();
+    xerintosh_list_item_t* root = xerintosh_get_root_list();
 
-    astra_list_item_t* item1 = astra_new_list_item("Settings", list_icon);
-    astra_list_item_t* item2 = astra_new_list_item("About", user_icon);
+    xerintosh_list_item_t* item1 = xerintosh_new_list_item("Settings", list_icon);
+    xerintosh_list_item_t* item2 = xerintosh_new_list_item("About", user_icon);
 
     static bool wifi_on = false;
-    astra_list_item_t* sw1 = astra_new_switch_item("WiFi", &wifi_on, nullptr, nullptr, default_icon);
+    xerintosh_list_item_t* sw1 = xerintosh_new_switch_item("WiFi", &wifi_on, nullptr, nullptr, default_icon);
 
     static int16_t brightness = 50;
-    astra_list_item_t* sl1 = astra_new_slider_item("Brightness", &brightness, 5, 0, 100, nullptr, nullptr, default_icon);
+    xerintosh_list_item_t* sl1 = xerintosh_new_slider_item("Brightness", &brightness, 5, 0, 100, nullptr, nullptr, default_icon);
 
-    astra_push_item_to_list(root, item1);
-    astra_push_item_to_list(root, item2);
-    astra_push_item_to_list(item1, sw1);
-    astra_push_item_to_list(item1, sl1);
+    xerintosh_push_item_to_list(root, item1);
+    xerintosh_push_item_to_list(root, item2);
+    xerintosh_push_item_to_list(item1, sw1);
+    xerintosh_push_item_to_list(item1, sl1);
 
-    astra_init_core();
-    in_astra = true;  // 直接启动 UI（无开屏动画）
+    xerintosh_init_core();
+    in_xerintosh = true;  // 直接启动 UI（无开屏动画）
 }
 
 void loop()
 {
     input_process();
-    astra_ui_main_core();
-    astra_ui_widget_core();
+    xerintosh_ui_main_core();
+    xerintosh_ui_widget_core();
     hal_display_flush();
     delay(1);
 }
@@ -2171,23 +2171,23 @@ TEST(AnimationTest, EasingConverges)
     float pos = 0.0f;
     float target = 100.0f;
     for (int i = 0; i < 200; i++) {
-        astra_animation(&pos, target, 92.0f);
+        xerintosh_animation(&pos, target, 92.0f);
     }
     EXPECT_FLOAT_EQ(pos, target);
 }
 
 TEST(ItemTest, RootListCreated)
 {
-    astra_list_item_t* root = astra_get_root_list();
+    xerintosh_list_item_t* root = xerintosh_get_root_list();
     ASSERT_NE(root, nullptr);
     EXPECT_EQ(root->type, list_item);
 }
 
 TEST(ItemTest, PushItem)
 {
-    astra_list_item_t* root = astra_get_root_list();
-    astra_list_item_t* item = astra_new_list_item("Test", default_icon);
-    bool result = astra_push_item_to_list(root, item);
+    xerintosh_list_item_t* root = xerintosh_get_root_list();
+    xerintosh_list_item_t* item = xerintosh_new_list_item("Test", default_icon);
+    bool result = xerintosh_push_item_to_list(root, item);
     EXPECT_TRUE(result);
 }
 
@@ -2196,7 +2196,7 @@ int main(int argc, char **argv)
     ::testing::InitGoogleTest(&argc, argv);
     hal_system_init();
     hal_display_init();
-    astra_ui_driver_init();
+    xerintosh_ui_driver_init();
     return RUN_ALL_TESTS();
 }
 ```
@@ -2278,25 +2278,25 @@ Project Root
 - 单向关注一个主题
 
 内容需覆盖：
-1. 基类 `astra_list_item_t` 结构
+1. 基类 `xerintosh_list_item_t` 结构
 2. 派生类型（switch/slider/button/user）
-3. 选择器 `astra_selector_t`
-4. 相机 `astra_camera_t`
+3. 选择器 `xerintosh_selector_t`
+4. 相机 `xerintosh_camera_t`
 5. C 风格继承/多态的实现方式
 
 - [ ] **Step 3: 编写 `doc/ui/core.md`**
 
 内容需覆盖：
 1. 动画缓动公式
-2. `astra_ui_main_core()` 主循环
+2. `xerintosh_ui_main_core()` 主循环
 3. 退场动画状态机
-4. `ad_astra()` 入口点（已移除开屏逻辑）
+4. `ad_xerintosh()` 入口点（已移除开屏逻辑）
 
 - [ ] **Step 4: 编写 `doc/ui/drawer.md`**
 
 内容需覆盖：
 1. 渲染顺序（Painter's Algorithm）
-2. `astra_draw_list()` 的调用链
+2. `xerintosh_draw_list()` 的调用链
 3. 选择器 XOR 高亮的 TFT 适配
 4. 弹窗和信息栏的动画
 
@@ -2332,10 +2332,10 @@ git commit -m "docs: add technical documentation for ui and hal layers"
 | Spec 要求 | 对应 Task |
 |-----------|----------|
 | 去除原作者信息 | Task 5, 6, 7（已去除所有注释头） |
-| 去除开屏动画 | Task 6（`ad_astra()` 清空，`main.cpp` 直接设置 `in_astra = true`） |
+| 去除开屏动画 | Task 6（`ad_xerintosh()` 清空，`main.cpp` 直接设置 `in_xerintosh = true`） |
 | 80×160 屏幕适配 | Task 2（`SCREEN_WIDTH/HEIGHT`），Task 5（`LIST_ITEM_SPACING` 等常量） |
 | M5Canvas 双缓冲 | Task 2（`hal_display.cpp`） |
-| XOR 反色模拟 | Task 2（`hal_draw_xor_rect()`），Task 7（`astra_draw_selector()` 修改） |
+| XOR 反色模拟 | Task 2（`hal_draw_xor_rect()`），Task 7（`xerintosh_draw_selector()` 修改） |
 | 输入状态机 | Task 3（`hal_input.c`），Task 8（`input_process()`） |
 | 每移植一块写文档 | Task 9（所有文档） |
 | 中文技术文档 | Task 9（所有文档用中文） |
@@ -2351,10 +2351,10 @@ git commit -m "docs: add technical documentation for ui and hal layers"
 
 | 名称 | 定义位置 | 使用位置 | 状态 |
 |------|---------|---------|------|
-| `astra_list_item_t` | `ui_item.h` | 所有 UI 文件 | 一致 |
-| `astra_selector_t` | `ui_item.h` | `ui_core.c`, `ui_drawer.c` | 一致 |
-| `astra_camera_t` | `ui_item.h` | `ui_core.c`, `ui_drawer.c` | 一致 |
-| `in_astra` | `ui_core.h` | `main.cpp`, `ui_core.c`, `ui_item.c` | 一致 |
+| `xerintosh_list_item_t` | `ui_item.h` | 所有 UI 文件 | 一致 |
+| `xerintosh_selector_t` | `ui_item.h` | `ui_core.c`, `ui_drawer.c` | 一致 |
+| `xerintosh_camera_t` | `ui_item.h` | `ui_core.c`, `ui_drawer.c` | 一致 |
+| `in_xerintosh` | `ui_core.h` | `main.cpp`, `ui_core.c`, `ui_item.c` | 一致 |
 | `SCREEN_WIDTH` | `hal_display.h` | 所有绘制文件 | 一致 |
 | `SCREEN_HEIGHT` | `hal_display.h` | 所有绘制文件 | 一致 |
 | `hal_draw_xor_rect` | `hal_display.h` | `ui_drawer.c` | 一致 |

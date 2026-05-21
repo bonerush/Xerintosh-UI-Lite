@@ -1,0 +1,87 @@
+/**
+ * @file   settings.c
+ * @brief  系统设置模块实现
+ * @details 管理亮度、动画速度、动画开关、屏幕方向四项设置。
+ *          负责从 NVS 存储加载设置，并处理新旧存储格式的兼容性转换。
+ *
+ * @copyright Copyright (c) 2026
+ */
+
+#include "settings.h"
+
+#include "storage.h"
+
+/* ═══ 全局状态定义 ═══ */
+
+int16_t g_brightness_level       = 5;                        /* 默认亮度等级 5 */
+int16_t g_anim_speed_level       = 5;                        /* 默认动画速度 5 */
+extern bool g_anim_enabled;                                  /* 动画开关（定义在 ui_core.h） */
+int16_t g_screen_rotation_level  = ORIENTATION_LANDSCAPE;    /* 默认横屏 */
+
+/* ═══ 从存储加载 ═══ */
+
+/**
+ * @brief 从 NVS 存储加载所有设置项到全局变量
+ * @note  处理新旧存储格式的兼容性转换：
+ *        - 亮度：旧格式直接存储 1-10；异常值做范围裁剪
+ *        - 动画速度：旧格式存储 40-95（步进 5），新格式存储 1-10
+ *        - 屏幕方向：新 key 直接存储 1/2，无效值默认横屏
+ */
+void settings_load_from_storage(void)
+{
+    /* 亮度等级（1-10） */
+    int16_t saved_bright = storage_get_brightness();
+    if (saved_bright >= 0) {
+        if (saved_bright >= 1 && saved_bright <= 10) {
+            g_brightness_level = saved_bright;
+        } else {
+            /* 异常旧值：向上取整到最近的等级并裁剪 */
+            g_brightness_level = (saved_bright + 9) / 10;
+            if (g_brightness_level < 1) g_brightness_level = 1;
+            if (g_brightness_level > 10) g_brightness_level = 10;
+        }
+    }
+
+    /* 动画速度等级（1-10） */
+    uint8_t saved_anim = storage_get_anim_speed();
+    if (saved_anim >= 1 && saved_anim <= 10) {
+        g_anim_speed_level = saved_anim;
+    } else if (saved_anim >= 40 && saved_anim <= 95) {
+        /* 旧格式转换：40-95 步进 5 映射到 1-10 */
+        g_anim_speed_level = (saved_anim - 40) / 5;
+        if (g_anim_speed_level < 1) g_anim_speed_level = 1;
+        if (g_anim_speed_level > 10) g_anim_speed_level = 10;
+    }
+
+    /* 动画开关 */
+    g_anim_enabled = storage_get_anim_enabled();
+
+    /* 屏幕方向等级（新 key screen_orient 直接存储新格式值 1/2） */
+    uint8_t saved_rot = storage_get_screen_rotation();
+    if (saved_rot == ORIENTATION_PORTRAIT || saved_rot == ORIENTATION_LANDSCAPE) {
+        g_screen_rotation_level = saved_rot;
+    } else {
+        g_screen_rotation_level = ORIENTATION_LANDSCAPE;
+    }
+}
+
+/* ═══ 值转换 ═══ */
+
+/**
+ * @brief 将亮度等级转换为硬件 PWM 值（0-255）
+ * @return 硬件亮度值
+ */
+int16_t settings_brightness_hw_value(void)
+{
+    int16_t brightness = g_brightness_level * 10;
+    return (int16_t)((brightness * 255) / 100);
+}
+
+/**
+ * @brief 将动画速度等级转换为内部动画速度值
+ * @return 内部动画速度值（40 + level * 5）
+ */
+int16_t settings_anim_speed_value(void)
+{
+    return 40 + g_anim_speed_level * 5;
+}

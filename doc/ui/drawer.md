@@ -15,7 +15,7 @@
 *📄 Source: [ui_drawer.c](../../src/ui/ui_drawer.c#L191-L242)*
 
 ```c
-void astra_draw_list_appearance()
+void xerintosh_draw_list_appearance()
 {
   oled_set_draw_color(1);
   oled_draw_H_line(0, 1, 66);
@@ -42,8 +42,8 @@ void astra_draw_list_appearance()
 
   // 滚动条滑块
   static float _length_each_part = 0;
-  _length_each_part = ceilf((SCREEN_HEIGHT - 10.0f) / (float) astra_selector.selected_item->parent->child_num);
-  oled_draw_box(SCREEN_WIDTH - 4, 5 + astra_selector.selected_index * _length_each_part, 3, _length_each_part);
+  _length_each_part = ceilf((SCREEN_HEIGHT - 10.0f) / (float) xerintosh_selector.selected_item->parent->child_num);
+  oled_draw_box(SCREEN_WIDTH - 4, 5 + xerintosh_selector.selected_index * _length_each_part, 3, _length_each_part);
   // ... 滑块上的装饰分割线
 }
 ```
@@ -86,19 +86,19 @@ void astra_draw_list_appearance()
 *📄 Source: [ui_drawer.c](../../src/ui/ui_drawer.c#L244-L340)*
 
 ```c
-void astra_draw_list_item()
+void xerintosh_draw_list_item()
 {
-  for (unsigned char i = 0; i < astra_selector.selected_item->parent->child_num; i++)
+  for (unsigned char i = 0; i < xerintosh_selector.selected_item->parent->child_num; i++)
   {
-    int16_t _x_list_item = astra_camera.x_camera + LIST_ITEM_LEFT_MARGIN;
-    int16_t _y_list_item = astra_selector.selected_item->parent->child_list_item[i]->y_list_item
-                           + astra_camera.y_camera - oled_get_str_height()/2;
+    int16_t _x_list_item = xerintosh_camera.x_camera + LIST_ITEM_LEFT_MARGIN;
+    int16_t _y_list_item = xerintosh_selector.selected_item->parent->child_list_item[i]->y_list_item
+                           + xerintosh_camera.y_camera - oled_get_str_height()/2;
 
     oled_set_draw_color(1);
 
-    if (astra_selector.selected_item->parent->child_list_item[i]->type == list_item) {
+    if (xerintosh_selector.selected_item->parent->child_list_item[i]->type == list_item) {
       if (_y_list_item + 2 > LIST_INFO_BAR_HEIGHT && _y_list_item - 2 < SCREEN_HEIGHT) {
-        astra_draw_list_icon(...);
+        xerintosh_draw_list_icon(...);
       }
     }
     else if (...) {
@@ -107,11 +107,11 @@ void astra_draw_list_item()
       // button_item: 仅绘制图标
     }
 
-    astra_set_font(NULL);
+    xerintosh_set_font(NULL);
     if (_y_list_item + oled_get_str_height() / 2 > LIST_INFO_BAR_HEIGHT &&
         _y_list_item + oled_get_str_height() / 2 < SCREEN_HEIGHT) {
       oled_draw_UTF8(10 + _x_list_item, _y_list_item + oled_get_str_height() / 2,
-                   astra_selector.selected_item->parent->child_list_item[i]->content);
+                   xerintosh_selector.selected_item->parent->child_list_item[i]->content);
     }
   }
 }
@@ -174,18 +174,18 @@ void astra_draw_list_item()
 *📄 Source: [ui_drawer.c](../../src/ui/ui_drawer.c#L384-L404)*
 
 ```c
-void astra_draw_selector()
+void xerintosh_draw_selector()
 {
-  int16_t _x_selector = astra_camera.x_camera + LIST_ITEM_LEFT_MARGIN;
-  int16_t _y_selector = astra_selector.y_selector + astra_camera.y_camera;
+  int16_t _x_selector = xerintosh_camera.x_camera + LIST_ITEM_LEFT_MARGIN;
+  int16_t _y_selector = xerintosh_selector.y_selector + xerintosh_camera.y_camera;
 
-  hal_draw_xor_rect(_x_selector, _y_selector, astra_selector.w_selector, astra_selector.h_selector);
+  hal_draw_xor_rect(_x_selector, _y_selector, xerintosh_selector.w_selector, xerintosh_selector.h_selector);
 
   oled_set_draw_color(1);
-  for (int16_t i = astra_selector.w_selector + _x_selector;
-       i <= astra_selector.w_selector + _x_selector + 7; i += 2) {
+  for (int16_t i = xerintosh_selector.w_selector + _x_selector;
+       i <= xerintosh_selector.w_selector + _x_selector + 7; i += 2) {
     for (int16_t j = _y_selector;
-         j <= _y_selector + astra_selector.h_selector - 1; j++) {
+         j <= _y_selector + xerintosh_selector.h_selector - 1; j++) {
       if (j % 2 == 0)
         oled_draw_pixel(i + 1, j);
       if (j % 2 == 1)
@@ -224,32 +224,32 @@ void astra_draw_selector()
 *📄 Source: [ui_drawer.c](../../src/ui/ui_drawer.c#L151-L189)*
 
 ```c
-void astra_draw_pop_up()
+void xerintosh_draw_pop_up()
 {
-  if (!astra_pop_up.is_running) return;
+  if (!xerintosh_pop_up.is_running) return;
 
-  if (astra_pop_up.y_pop_up == astra_pop_up.y_pop_up_trg)
-    astra_pop_up.time = get_ticks();
+  if (xerintosh_pop_up.y_pop_up == xerintosh_pop_up.y_pop_up_trg)
+    xerintosh_pop_up.time = get_ticks();
 
-  if (astra_pop_up.time - astra_pop_up.time_start >= astra_pop_up.span) {
-    astra_pop_up.y_pop_up_trg = 0 - 2 * POP_UP_HEIGHT;
-    if (astra_pop_up.y_pop_up == astra_pop_up.y_pop_up_trg)
-      astra_pop_up.is_running = false;
+  if (xerintosh_pop_up.time - xerintosh_pop_up.time_start >= xerintosh_pop_up.span) {
+    xerintosh_pop_up.y_pop_up_trg = 0 - 2 * POP_UP_HEIGHT;
+    if (xerintosh_pop_up.y_pop_up == xerintosh_pop_up.y_pop_up_trg)
+      xerintosh_pop_up.is_running = false;
   }
 
   // 绘制三层嵌套圆角矩形，营造"浮雕"边框效果
   oled_set_draw_color(1);
-  oled_draw_R_box(_x_pop_up + 1, (int16_t)astra_pop_up.y_pop_up + 3, ...);   // 外层阴影
+  oled_draw_R_box(_x_pop_up + 1, (int16_t)xerintosh_pop_up.y_pop_up + 3, ...);   // 外层阴影
 
   oled_set_draw_color(0);
-  oled_draw_R_box((int16_t)(SCREEN_WIDTH/2 - (astra_pop_up.w_pop_up + 4)/2 - 2), ...); // 中层底色
+  oled_draw_R_box((int16_t)(SCREEN_WIDTH/2 - (xerintosh_pop_up.w_pop_up + 4)/2 - 2), ...); // 中层底色
 
   oled_set_draw_color(1);
-  oled_draw_R_box(_x_pop_up - 2, (int16_t)astra_pop_up.y_pop_up, ...);       // 内层主体
+  oled_draw_R_box(_x_pop_up - 2, (int16_t)xerintosh_pop_up.y_pop_up, ...);       // 内层主体
 
   oled_draw_UTF8(_x_pop_up + 3,
-                 (int16_t)(astra_pop_up.y_pop_up + oled_get_str_height() + 1),
-                 astra_pop_up.content);
+                 (int16_t)(xerintosh_pop_up.y_pop_up + oled_get_str_height() + 1),
+                 xerintosh_pop_up.content);
 }
 ```
 
@@ -288,7 +288,7 @@ void astra_draw_pop_up()
 }
 ```
 
-**自动消失机制**：弹窗到达展开位置后记录当前时间，超过 `span` 毫秒后自动将目标位置设为屏幕外。`astra_animation()` 负责平滑收回。
+**自动消失机制**：弹窗到达展开位置后记录当前时间，超过 `span` 毫秒后自动将目标位置设为屏幕外。`xerintosh_animation()` 负责平滑收回。
 
 ### 信息栏（Info Bar）
 
@@ -300,8 +300,8 @@ void astra_draw_pop_up()
 
 ## 与其他组件的关系
 
-- **ui_core**：主循环中按顺序调用 `astra_draw_list()` → `astra_draw_widget()` → `astra_draw_exit_animation()`
-- **ui_item**：读取 `astra_selector`、`astra_camera`、`astra_info_bar`、`astra_pop_up` 的状态数据
+- **ui_core**：主循环中按顺序调用 `xerintosh_draw_list()` → `xerintosh_draw_widget()` → `xerintosh_draw_exit_animation()`
+- **ui_item**：读取 `xerintosh_selector`、`xerintosh_camera`、`xerintosh_info_bar`、`xerintosh_pop_up` 的状态数据
 - **hal_display**：所有 `oled_*` 宏最终落入 `hal_draw_*`，在 M5Canvas 上执行实际像素操作
 
 ---

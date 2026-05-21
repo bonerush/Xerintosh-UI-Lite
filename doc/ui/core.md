@@ -20,7 +20,7 @@
 *📄 Source: [ui_core.c](../../src/ui/ui_core.c#L24-L31)*
 
 ```c
-void astra_animation(float *_pos, float _posTrg, float _speed)
+void xerintosh_animation(float *_pos, float _posTrg, float _speed)
 {
   if (*_pos != _posTrg)
   {
@@ -61,17 +61,17 @@ void astra_animation(float *_pos, float _posTrg, float _speed)
 *📄 Source: [ui_core.c](../../src/ui/ui_core.c#L45-L56)*
 
 ```c
-void astra_refresh_camera_position()
+void xerintosh_refresh_camera_position()
 {
   // 15为selector的高度
-  if (astra_camera.selector->y_selector_trg + 15 + astra_camera.y_camera_trg > SCREEN_HEIGHT)
-    astra_camera.y_camera_trg = SCREEN_HEIGHT - astra_camera.selector->y_selector_trg - 15;
+  if (xerintosh_camera.selector->y_selector_trg + 15 + xerintosh_camera.y_camera_trg > SCREEN_HEIGHT)
+    xerintosh_camera.y_camera_trg = SCREEN_HEIGHT - xerintosh_camera.selector->y_selector_trg - 15;
 
-  if (astra_camera.selector->y_selector_trg + astra_camera.y_camera_trg < 0)
-    astra_camera.y_camera_trg = 0 - astra_camera.selector->y_selector_trg + LIST_FONT_TOP_MARGIN;
+  if (xerintosh_camera.selector->y_selector_trg + xerintosh_camera.y_camera_trg < 0)
+    xerintosh_camera.y_camera_trg = 0 - xerintosh_camera.selector->y_selector_trg + LIST_FONT_TOP_MARGIN;
 
-  astra_animation(&astra_camera.x_camera, astra_camera.x_camera_trg, 96);
-  astra_animation(&astra_camera.y_camera, astra_camera.y_camera_trg, 96);
+  xerintosh_animation(&xerintosh_camera.x_camera, xerintosh_camera.x_camera_trg, 96);
+  xerintosh_animation(&xerintosh_camera.y_camera, xerintosh_camera.y_camera_trg, 96);
 }
 ```
 
@@ -103,21 +103,21 @@ void astra_refresh_camera_position()
 *📄 Source: [ui_core.c](../../src/ui/ui_core.c#L89-L100)*
 
 ```c
-void astra_refresh_selector_position()
+void xerintosh_refresh_selector_position()
 {
-  astra_set_font(NULL);
-  astra_selector.y_selector_trg = astra_selector.selected_item->y_list_item_trg - oled_get_str_height() + 1;
+  xerintosh_set_font(NULL);
+  xerintosh_selector.y_selector_trg = xerintosh_selector.selected_item->y_list_item_trg - oled_get_str_height() + 1;
 
-  if (astra_selector.selected_item->type == switch_item || astra_selector.selected_item->type == slider_item)
-    astra_selector.w_selector_trg = SCREEN_WIDTH - 18;
+  if (xerintosh_selector.selected_item->type == switch_item || xerintosh_selector.selected_item->type == slider_item)
+    xerintosh_selector.w_selector_trg = SCREEN_WIDTH - 18;
   else
-    astra_selector.w_selector_trg = oled_get_UTF8_width(astra_selector.selected_item->content) + 12;
+    xerintosh_selector.w_selector_trg = oled_get_UTF8_width(xerintosh_selector.selected_item->content) + 12;
 
-  astra_selector.h_selector_trg = 15;
+  xerintosh_selector.h_selector_trg = 15;
 
-  astra_animation(&astra_selector.y_selector, astra_selector.y_selector_trg, 92);
-  astra_animation(&astra_selector.w_selector, astra_selector.w_selector_trg, 92);
-  astra_animation(&astra_selector.h_selector, astra_selector.h_selector_trg, 93);
+  xerintosh_animation(&xerintosh_selector.y_selector, xerintosh_selector.y_selector_trg, 92);
+  xerintosh_animation(&xerintosh_selector.w_selector, xerintosh_selector.w_selector_trg, 92);
+  xerintosh_animation(&xerintosh_selector.h_selector, xerintosh_selector.h_selector_trg, 93);
 }
 ```
 
@@ -151,17 +151,17 @@ void astra_refresh_selector_position()
 *📄 Source: [ui_core.c](../../src/ui/ui_core.c#L113-L158)*
 
 ```c
-void astra_ui_main_core()
+void xerintosh_ui_main_core()
 {
-  if (!in_astra) return;
+  if (!in_xerintosh) return;
 
   // 处理进入 user_item 的逻辑
-  if (astra_selector.selected_item->type == user_item
-      && !astra_to_user_item(astra_selector.selected_item)->in_user_item)
+  if (xerintosh_selector.selected_item->type == user_item
+      && !xerintosh_to_user_item(xerintosh_selector.selected_item)->in_user_item)
   {
-    astra_user_item_t *_selected_user_item = astra_to_user_item(astra_selector.selected_item);
+    xerintosh_user_item_t *_selected_user_item = xerintosh_to_user_item(xerintosh_selector.selected_item);
 
-    if (_selected_user_item->entering_user_item && astra_exit_animation_status == 1)
+    if (_selected_user_item->entering_user_item && xerintosh_exit_animation_status == 1)
     {
       if (_selected_user_item->init_function != NULL)
         _selected_user_item->init_function();
@@ -170,30 +170,30 @@ void astra_ui_main_core()
   }
 
   // 渲染分支
-  if (astra_selector.selected_item->type == user_item
-      && astra_to_user_item(astra_selector.selected_item)->in_user_item)
+  if (xerintosh_selector.selected_item->type == user_item
+      && xerintosh_to_user_item(xerintosh_selector.selected_item)->in_user_item)
   {
-    astra_user_item_t* _selected_user_item = astra_to_user_item(astra_selector.selected_item);
+    xerintosh_user_item_t* _selected_user_item = xerintosh_to_user_item(xerintosh_selector.selected_item);
 
     if (_selected_user_item->loop_function != NULL)
       _selected_user_item->loop_function();
 
-    if (_selected_user_item->exiting_user_item && astra_exit_animation_status == 1)
+    if (_selected_user_item->exiting_user_item && xerintosh_exit_animation_status == 1)
     {
         if (_selected_user_item->exit_function != NULL)
             _selected_user_item->exit_function();
         _selected_user_item->in_user_item = 0;
     }
   } else {
-    astra_refresh_camera_position();
-    astra_refresh_main_core_position();
-    astra_refresh_selector_position();
-    astra_draw_list();
+    xerintosh_refresh_camera_position();
+    xerintosh_refresh_main_core_position();
+    xerintosh_refresh_selector_position();
+    xerintosh_draw_list();
   }
 
   // 退场动画遮罩
-  if (!astra_exit_animation_finished)
-    astra_draw_exit_animation();
+  if (!xerintosh_exit_animation_finished)
+    xerintosh_draw_exit_animation();
 }
 ```
 
@@ -241,21 +241,21 @@ void astra_ui_main_core()
 *📄 Source: [ui_core.c](../../src/ui/ui_core.c#L14-L17)*
 
 ```c
-void ad_astra()
+void ad_xerintosh()
 {
   /* Splash screen / long-press entry removed for TFT build */
 }
 ```
 
-原始 OLED 框架有长按 2.5 秒进入的开屏动画。移植到 TFT 版本时已完全移除，`main.cpp` 中直接设置 `in_astra = true` 进入主界面。
+原始 OLED 框架有长按 2.5 秒进入的开屏动画。移植到 TFT 版本时已完全移除，`main.cpp` 中直接设置 `in_xerintosh = true` 进入主界面。
 
 ---
 
 ## 与其他组件的关系
 
-- **ui_item**：读取 `astra_selector`、`astra_camera` 的状态，修改它们的目标坐标
-- **ui_drawer**：主循环中调用 `astra_draw_list()` 和 `astra_draw_exit_animation()`
-- **main.cpp**：`loop()` 中按顺序调用 `input_process()` → `astra_ui_main_core()` → `astra_ui_widget_core()` → `hal_display_flush()`
+- **ui_item**：读取 `xerintosh_selector`、`xerintosh_camera` 的状态，修改它们的目标坐标
+- **ui_drawer**：主循环中调用 `xerintosh_draw_list()` 和 `xerintosh_draw_exit_animation()`
+- **main.cpp**：`loop()` 中按顺序调用 `input_process()` → `xerintosh_ui_main_core()` → `xerintosh_ui_widget_core()` → `hal_display_flush()`
 
 ---
 
