@@ -16,6 +16,7 @@ void wifi_mgr_on_switch_toggle(void) {}
 #include <WiFi.h>
 #include <Arduino.h>
 #include <string.h>
+#include <esp_log.h>
 
 #include "app/wifi_manager.h"
 
@@ -35,9 +36,11 @@ extern bool wifi_on;   // defined in main.cpp
 static wifi_mgr_state_t g_state           = WIFI_MGR_IDLE;
 static bool             g_wifi_enabled    = false;
 
-static xerintosh_list_item_t *g_settings_list  = NULL;  // "Settings" list_item
-static xerintosh_list_item_t *g_networks_list  = NULL;  // "Networks" list_item (child of Settings)
-static xerintosh_list_item_t *g_scan_button    = NULL;
+static xerintosh_list_item_t *g_settings_list      = NULL;  // "Settings" list_item
+static xerintosh_list_item_t *g_networks_list      = NULL;  // "Networks" list_item (child of Settings)
+static xerintosh_list_item_t *g_saved_container    = NULL;  // "Saved" list_item (child of Networks)
+static xerintosh_list_item_t *g_available_container = NULL; // "Available" list_item (child of Networks)
+static xerintosh_list_item_t *g_scan_button        = NULL;
 
 static bool  g_connecting = false;
 static char  g_connecting_ssid[STORAGE_SSID_MAX_LEN] = {0};
@@ -45,18 +48,22 @@ static char  g_connecting_pass[STORAGE_PASS_MAX_LEN] = {0};
 
 static unsigned long g_wifi_scan_start_time = 0;
 static unsigned long g_warmup_start_time   = 0;
+static unsigned long g_connect_start_time  = 0;
 static int g_scan_retry_count = 0;
 
-#define WIFI_WARMUP_DELAY_MS 3000
-#define WIFI_SCAN_TIMEOUT_MS 30000
+#define WIFI_WARMUP_DELAY_MS    3000
+#define WIFI_SCAN_TIMEOUT_MS    30000
+#define WIFI_CONNECT_TIMEOUT_MS 15000
 
 /* ─── Forward declarations (callbacks) ─── */
 
 static void on_network_button_pressed(void);
-static void on_reconnect_pressed(void);
-static void on_delete_pressed(void);
+static void on_saved_connect_pressed(void);
+static void on_saved_delete_pressed(void);
 static void on_scan_pressed(void);
 static void rebuild_network_list(int scan_count);
+static void suppress_wifi_logs(void);
+static void restore_wifi_logs(void);
 
 /* ─── Public getters ─── */
 
@@ -102,8 +109,23 @@ void wifi_mgr_enable(void)
     rebuild_network_list(0);
 }
 
+/* ─── Log suppression helpers ─── */
+
+static void suppress_wifi_logs(void)
+{
+    esp_log_level_set("wifi", ESP_LOG_ERROR);
+}
+
+static void restore_wifi_logs(void)
+{
+    esp_log_level_set("wifi", ESP_LOG_WARN);
+}
+
 void wifi_mgr_disable(void)
 {
+    if (g_connecting) {
+        restore_wifi_logs();
+    }
     WiFi.disconnect();
     WiFi.mode(WIFI_OFF);
     g_wifi_enabled = false;
@@ -124,9 +146,11 @@ void wifi_mgr_disable(void)
         g_networks_list = NULL;
     }
 
-    g_scan_button = NULL;
-    g_connecting  = false;
-    g_state       = WIFI_MGR_IDLE;
+    g_saved_container     = NULL;
+    g_available_container = NULL;
+    g_scan_button         = NULL;
+    g_connecting          = false;
+    g_state               = WIFI_MGR_IDLE;
 }
 
 /* ─── Switch toggle (called as exit_function of WiFi switch) ─── */
@@ -178,41 +202,44 @@ static void rebuild_network_list(int scan_count)
 
     xerintosh_clear_children_of_list(g_networks_list);
 
-    /* Cap to 9 results (MAX_LIST_CHILD_NUM - 1 for Scan button) */
+    /* ─── 1. 已保存网络容器 ─── */
+    g_saved_container = xerintosh_new_list_item("已保存", list_icon);
+    xerintosh_push_item_to_list(g_networks_list, g_saved_container);
+
+    int saved_count = storage_wifi_get_count();
+    for (int i = 0; i < saved_count; i++) {
+        char ssid[STORAGE_SSID_MAX_LEN];
+        char pass[STORAGE_PASS_MAX_LEN];
+        if (!storage_wifi_get(i, ssid, pass)) {
+            continue;
+        }
+
+        xerintosh_list_item_t *net_item = xerintosh_new_list_item(ssid, list_icon);
+        xerintosh_list_item_t *connect_btn = xerintosh_new_button_item("连接", on_saved_connect_pressed, default_icon);
+        xerintosh_list_item_t *del_btn = xerintosh_new_button_item("删除", on_saved_delete_pressed, default_icon);
+        xerintosh_push_item_to_list(net_item, connect_btn);
+        xerintosh_push_item_to_list(net_item, del_btn);
+        xerintosh_push_item_to_list(g_saved_container, net_item);
+    }
+
+    /* ─── 2. 可用网络容器（仅未保存的扫描结果） ─── */
+    g_available_container = xerintosh_new_list_item("可用网络", list_icon);
+    xerintosh_push_item_to_list(g_networks_list, g_available_container);
+
     int show_count = scan_count;
     if (show_count > 9) {
         show_count = 9;
     }
-
     for (int i = 0; i < show_count; i++) {
         String ssid = WiFi.SSID(i);
-        int8_t saved_idx = storage_wifi_find(ssid.c_str());
-
-        /* Display name: "SSID" for unconfigured, "SSID*" for saved */
-        char display_name[STORAGE_SSID_MAX_LEN + 2];
-        if (saved_idx >= 0) {
-            snprintf(display_name, sizeof(display_name), "%s*", ssid.c_str());
-        } else {
-            snprintf(display_name, sizeof(display_name), "%s", ssid.c_str());
+        if (storage_wifi_find(ssid.c_str()) >= 0) {
+            continue; /* skip already-saved networks */
         }
-
-        xerintosh_list_item_t *item;
-        if (saved_idx >= 0) {
-            /* Saved network -> list_item with Reconnect / Delete children */
-            item = xerintosh_new_list_item(display_name, list_icon);
-            xerintosh_list_item_t *reconnect = xerintosh_new_button_item("重新连接", on_reconnect_pressed, default_icon);
-            xerintosh_list_item_t *del        = xerintosh_new_button_item("删除",    on_delete_pressed,    default_icon);
-            xerintosh_push_item_to_list(item, reconnect);
-            xerintosh_push_item_to_list(item, del);
-        } else {
-            /* Unknown network -> button_item triggers serial password input */
-            item = xerintosh_new_button_item(display_name, on_network_button_pressed, default_icon);
-        }
-
-        xerintosh_push_item_to_list(g_networks_list, item);
+        xerintosh_list_item_t *item = xerintosh_new_button_item(ssid.c_str(), on_network_button_pressed, default_icon);
+        xerintosh_push_item_to_list(g_available_container, item);
     }
 
-    /* Append Scan button at the end */
+    /* ─── 3. 扫描按钮 ─── */
     g_scan_button = xerintosh_new_button_item("扫描", on_scan_pressed, default_icon);
     xerintosh_push_item_to_list(g_networks_list, g_scan_button);
 
@@ -241,53 +268,42 @@ static void on_network_button_pressed(void)
     g_state = WIFI_MGR_CONNECTING;
 }
 
-static void on_reconnect_pressed(void)
+static void on_saved_connect_pressed(void)
 {
-    const char *parent_content = xerintosh_selector.selected_item->parent->content;
-    if (!parent_content) {
+    const char *content = xerintosh_selector.selected_item->parent->content;
+    if (!content) {
         return;
     }
 
-    /* Strip trailing '*' marker */
     char ssid[STORAGE_SSID_MAX_LEN];
-    strlcpy(ssid, parent_content, sizeof(ssid));
-    size_t len = strlen(ssid);
-    if (len > 0 && ssid[len - 1] == '*') {
-        ssid[len - 1] = '\0';
-    }
-
     char pass[STORAGE_PASS_MAX_LEN];
-    int idx = storage_wifi_find(ssid);
+    int idx = storage_wifi_find(content);
     if (idx < 0) {
         return;
     }
-    storage_wifi_get(idx, ssid, pass);
+    if (!storage_wifi_get(idx, ssid, pass)) {
+        return;
+    }
 
+    suppress_wifi_logs();
     WiFi.disconnect();
     WiFi.begin(ssid, pass);
     strncpy(g_connecting_ssid, ssid, STORAGE_SSID_MAX_LEN);
     g_connecting = true;
+    g_connect_start_time = millis();
     xerintosh_push_pop_up("连接中...", 3000);
 
     xerintosh_selector_exit_current_item();
 }
 
-static void on_delete_pressed(void)
+static void on_saved_delete_pressed(void)
 {
-    const char *parent_content = xerintosh_selector.selected_item->parent->content;
-    if (!parent_content) {
+    const char *content = xerintosh_selector.selected_item->parent->content;
+    if (!content) {
         return;
     }
 
-    /* Strip trailing '*' marker */
-    char ssid[STORAGE_SSID_MAX_LEN];
-    strlcpy(ssid, parent_content, sizeof(ssid));
-    size_t len = strlen(ssid);
-    if (len > 0 && ssid[len - 1] == '*') {
-        ssid[len - 1] = '\0';
-    }
-
-    int idx = storage_wifi_find(ssid);
+    int idx = storage_wifi_find(content);
     if (idx >= 0) {
         storage_wifi_remove(idx);
     }
@@ -299,6 +315,11 @@ static void on_delete_pressed(void)
 
 static void on_scan_pressed(void)
 {
+    if (g_connecting) {
+        WiFi.disconnect();
+        restore_wifi_logs();
+        g_connecting = false;
+    }
     WiFi.scanDelete();          /* free any stale results first */
     int16_t scan_ret = WiFi.scanNetworks(true);    /* async */
     if (scan_ret == -2) {
@@ -378,30 +399,48 @@ void wifi_mgr_update(void)
             const char *input  = serial_get_input();
             const char *target = serial_get_target_name();
             if (input && target) {
+                suppress_wifi_logs();
                 WiFi.disconnect();
                 WiFi.begin(target, input);
                 strncpy(g_connecting_ssid, target, STORAGE_SSID_MAX_LEN);
                 strncpy(g_connecting_pass, input,  STORAGE_PASS_MAX_LEN);
                 g_connecting = true;
+                g_connect_start_time = millis();
                 Serial.println("CONNECTING...");
                 xerintosh_push_pop_up("连接中...", 3000);
             }
         } else if (ss == SERIAL_STATE_CANCELLED) {
+            restore_wifi_logs();
+            g_connecting = false;
             g_state = WIFI_MGR_SCAN_DONE;
             xerintosh_push_pop_up("已取消", 1500);
         }
 
         /* Check WiFi connection status */
         if (g_connecting) {
+            /* 连接超时检查 */
+            if (millis() - g_connect_start_time >= WIFI_CONNECT_TIMEOUT_MS) {
+                WiFi.disconnect();
+                restore_wifi_logs();
+                g_connecting = false;
+                Serial.println("TIMEOUT");
+                xerintosh_push_pop_up("连接超时", 2000);
+                g_state = WIFI_MGR_CONNECT_FAILED;
+                break;
+            }
+
             wl_status_t status = WiFi.status();
             if (status == WL_CONNECTED) {
+                restore_wifi_logs();
                 g_connecting = false;
                 storage_wifi_add(g_connecting_ssid, g_connecting_pass);
                 Serial.println("OK");
                 xerintosh_push_pop_up("已连接", 2000);
                 g_state = WIFI_MGR_CONNECTED;
+                rebuild_network_list(WiFi.scanComplete());
             } else if (status == WL_CONNECT_FAILED ||
                        status == WL_NO_SSID_AVAIL) {
+                restore_wifi_logs();
                 g_connecting = false;
                 Serial.println("FAIL");
                 xerintosh_push_pop_up("连接失败", 2000);

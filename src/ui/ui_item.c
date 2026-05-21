@@ -391,7 +391,6 @@ bool xerintosh_push_item_to_list(xerintosh_list_item_t *_parent, xerintosh_list_
   if (_parent->layer >= MAX_LIST_LAYER) return false;
 
   _child->layer = _parent->layer + 1;
-  _child->child_num = 0;
 
   xerintosh_set_font(hal_get_cn_font());
   if (_parent->child_num == 0) _child->y_list_item_trg = oled_get_str_height() + LIST_FONT_TOP_MARGIN - 1;

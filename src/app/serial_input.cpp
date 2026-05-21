@@ -74,6 +74,7 @@ static void enter_waiting_state(serial_state_t waiting_state,
 
 void serial_request_wifi_password(const char *ssid)
 {
+    Serial.println();
     Serial.print("PASSWORD for ");
     Serial.print(ssid);
     Serial.print(": ");
