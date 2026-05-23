@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>UI Layout Designer — Test Suite</title>
+    <style>
+        body { font-family: monospace; background: #1a1a2e; color: #e8e8e8; padding: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #2d3561; border-radius: 8px; }
+        .pass { color: #00c851; }
+        .fail { color: #ff4444; }
+        .info { color: #8892b0; }
+        h2 { margin-top: 0; font-size: 16px; }
+        .summary { font-size: 18px; margin: 20px 0; padding: 15px; border: 2px solid; border-radius: 8px; }
+        pre { background: #0a0a0a; padding: 10px; border-radius: 4px; overflow-x: auto; font-size: 12px; }
+        canvas { border: 2px solid #2d3561; display: block; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <h1>UI Layout Designer — Test Suite</h1>
+    <div id="results"></div>
+
+    <script src="elements.js?v=5"></script>
+    <script src="exporter.js?v=5"></script>
+    <script src="canvas.js?v=5"></script>
+
+    <script>
+    (function() {
+        'use strict';
+
+        const results = document.getElementById('results');
+        let total = 0, passed = 0;
+
+        function section(name) {
+            const div = document.createElement('div');
+            div.className = 'test-section';
+            div.innerHTML = `<h2>${name}</h2>`;
+            results.appendChild(div);
+            return div;
+        }
+
+        function log(container, status, msg) {
+            total++;
+            if (status === 'PASS') passed++;
+            const p = document.createElement('p');
+            p.className = status.toLowerCase();
+            p.textContent = `[${status}] ${msg}`;
+            container.appendChild(p);
+        }
+
+        /* ═══ Test 1: Element Creation ═══ */
+        const s1 = section('Test 1: Element Creation');
+
+        // Rect
+        const rect = UIElements.create('rect', { x: 10, y: 10, w: 20, h: 15, color: '#FFFFFF' });
+        log(s1, rect && rect.subtype === 'rectangle' ? 'PASS' : 'FAIL',
+            `rect tool maps to rectangle subtype (got: ${rect?.subtype})`);
+        log(s1, rect && rect.fill === false ? 'PASS' : 'FAIL',
+            `rect has fill=false (got: ${rect?.fill})`);
+
+        // Filled rect
+        const frect = UIElements.create('filled-rect', { x: 0, y: 0, w: 10, h: 10, color: '#FF0000' });
+        log(s1, frect && frect.fill === true ? 'PASS' : 'FAIL',
+            `filled-rect has fill=true (got: ${frect?.fill})`);
+
+        // Circle (x,y is top-left of bounding box; center is at x+r, y+r)
+        const circle = UIElements.create('circle', { x: 0, y: 0, r: 8, color: '#00FF00' });
+        log(s1, circle && circle.r === 8 ? 'PASS' : 'FAIL',
+            `circle radius set correctly (got: ${circle?.r})`);
+
+        // Text
+        const text = UIElements.create('text', { x: 0, y: 0, text: 'Hello', fontSize: 8, color: '#FFFFFF' });
+        log(s1, text && text.text === 'Hello' ? 'PASS' : 'FAIL',
+            `text content preserved (got: "${text?.text}")`);
+
+        // Icon
+        const icon = UIElements.create('icon', { x: 0, y: 0, iconName: 'wifi', w: 8, h: 8, color: '#FFFFFF' });
+        log(s1, icon && icon.iconName === 'wifi' ? 'PASS' : 'FAIL',
+            `icon name preserved (got: "${icon?.iconName}")`);
+
+        // Control
+        const ctrl = UIElements.create('control', { x: 0, y: 0, subtype: 'switch_item', label: 'WiFi', color: '#FFFFFF' });
+        log(s1, ctrl && ctrl.subtype === 'switch_item' ? 'PASS' : 'FAIL',
+            `control subtype preserved (got: "${ctrl?.subtype}")`);
+
+        /* ═══ Test 2: Color Handling ═══ */
+        const s2 = section('Test 2: Color Handling');
+
+        log(s2, /^#[0-9A-Fa-f]{6}$/.test('#00E000') ? 'PASS' : 'FAIL',
+            `accent color #00E000 is valid 6-digit HEX`);
+        log(s2, !/^#[0-9A-Fa-f]{6}$/.test('#07E0') ? 'PASS' : 'FAIL',
+            `old color #07E0 is NOT valid 6-digit HEX (was RGB565)`);
+        log(s2, rect && rect.color === '#FFFFFF' ? 'PASS' : 'FAIL',
+            `element color set correctly (got: ${rect?.color})`);
+
+        /* ═══ Test 3: Rendering (offscreen canvas) ═══ */
+        const s3 = section('Test 3: Offscreen Rendering');
+        const c = document.createElement('canvas');
+        c.width = 80; c.height = 160;
+        const ctx = c.getContext('2d');
+        c.id = 'test-canvas';
+        s3.appendChild(c);
+
+        ctx.fillStyle = '#000000';
+        ctx.fillRect(0, 0, 80, 160);
+
+        // Render rect
+        UIElements.render(ctx, rect);
+        const rectPixels = ctx.getImageData(10, 10, 1, 1).data;
+        log(s3, rectPixels[0] > 200 && rectPixels[1] > 200 && rectPixels[2] > 200 ? 'PASS' : 'FAIL',
+            `white rect rendered at (10,10) — pixel is whiteish`);
+
+        // Render filled rect
+        UIElements.render(ctx, frect);
+        const frectPixels = ctx.getImageData(5, 5, 1, 1).data;
+        log(s3, frectPixels[0] > 200 && frectPixels[1] < 50 && frectPixels[2] < 50 ? 'PASS' : 'FAIL',
+            `red filled-rect rendered — pixel is reddish`);
+
+        // Render text
+        UIElements.render(ctx, text);
+        const textPixels = ctx.getImageData(2, 2, 1, 1).data;
+        // Text may or may not have pixels at (2,2), just check no error thrown
+        log(s3, 'PASS', `text rendered without throwing error`);
+
+        // Render icon
+        UIElements.render(ctx, icon);
+        log(s3, 'PASS', `icon rendered without throwing error`);
+
+        /* ═══ Test 3b: Control Rendering (Regression) ═══ */
+        const s3b = section('Test 3b: Control Rendering');
+        const ctrlCanvas = document.createElement('canvas');
+        ctrlCanvas.width = 80; ctrlCanvas.height = 160;
+        const ctrlCtx = ctrlCanvas.getContext('2d');
+        ctrlCanvas.id = 'test-control-canvas';
+        s3b.appendChild(ctrlCanvas);
+
+        // Create controls of each subtype
+        const listCtrl   = UIElements.create('control', { x: 0, y: 10, w: 80, h: 18, subtype: 'list_item',   label: 'List',   color: '#FFFFFF' });
+        const switchCtrl = UIElements.create('control', { x: 0, y: 30, w: 80, h: 18, subtype: 'switch_item', label: 'Switch', color: '#FFFFFF' });
+        const sliderCtrl = UIElements.create('control', { x: 0, y: 50, w: 80, h: 18, subtype: 'slider_item', label: 'Slider', color: '#FFFFFF' });
+        const buttonCtrl = UIElements.create('control', { x: 0, y: 70, w: 80, h: 18, subtype: 'button_item', label: 'Button', color: '#FFFFFF' });
+        const userCtrl   = UIElements.create('control', { x: 0, y: 90, w: 80, h: 18, subtype: 'user_item',   label: 'App',    color: '#FFFFFF' });
+
+        ctrlCtx.fillStyle = '#000000';
+        ctrlCtx.fillRect(0, 0, 80, 160);
+
+        // Render each control and sample a pixel inside it
+        function testControlRender(ctx, el, sx, sy, name) {
+            UIElements.render(ctx, el);
+            const px = ctx.getImageData(sx, sy, 1, 1).data;
+            // After rendering, there should be SOME non-black pixel inside the control
+            const hasContent = px[0] > 30 || px[1] > 30 || px[2] > 30;
+            log(s3b, hasContent ? 'PASS' : 'FAIL',
+                `${name} control renders visible content at (${sx},${sy})`);
+        }
+        // Sample at x=2 (inside the accent stripe) for reliable visibility
+        testControlRender(ctrlCtx, listCtrl,   2, 19, 'list');
+        testControlRender(ctrlCtx, switchCtrl, 2, 39, 'switch');
+        testControlRender(ctrlCtx, sliderCtrl, 2, 59, 'slider');
+        testControlRender(ctrlCtx, buttonCtrl, 2, 79, 'button');
+        testControlRender(ctrlCtx, userCtrl,   2, 99, 'user');
+
+        /* ═══ Test 4: Hit Testing ═══ */
+        const s4 = section('Test 4: Hit Testing');
+
+        log(s4, UIElements.hitTest(rect, 15, 15) ? 'PASS' : 'FAIL',
+            `point (15,15) hits rect`);
+        log(s4, !UIElements.hitTest(rect, 50, 50) ? 'PASS' : 'FAIL',
+            `point (50,50) misses rect`);
+        // circle center is at (x+r, y+r) = (8, 8)
+        log(s4, UIElements.hitTest(circle, 8, 8) ? 'PASS' : 'FAIL',
+            `point (8,8) hits circle (center)`);
+        log(s4, UIElements.hitTest(text, 2, 2) ? 'PASS' : 'FAIL',
+            `point (2,2) hits text element`);
+
+        /* ═══ Test 5: Export / Import ═══ */
+        const s5 = section('Test 5: Export / Import Roundtrip');
+
+        const testElements = [rect, text, icon, ctrl];
+        const json = UIExporter.toJSON(testElements, { device: 'M5Stick', width: 80, height: 160 });
+        log(s5, json.includes('"device": "M5Stick"') ? 'PASS' : 'FAIL',
+            `export JSON contains device metadata`);
+        log(s5, json.includes('"type": "rectangle"') ? 'PASS' : 'FAIL',
+            `export JSON uses 'rectangle' type (not 'rect')`);
+
+        const imported = UIExporter.fromJSON(json);
+        log(s5, imported.elements.length === 4 ? 'PASS' : 'FAIL',
+            `import restores 4 elements (got: ${imported.elements.length})`);
+        log(s5, imported.elements[0].subtype === 'rectangle' ? 'PASS' : 'FAIL',
+            `imported first element subtype is 'rectangle' (got: ${imported.elements[0]?.subtype})`);
+        log(s5, imported.meta.device === 'M5Stick' ? 'PASS' : 'FAIL',
+            `imported metadata device is 'M5Stick' (got: ${imported.meta?.device})`);
+
+        /* ═══ Test 6: LLM Prompt ═══ */
+        const s6 = section('Test 6: LLM Prompt Generation');
+        const prompt = UIExporter.toLLMPrompt(testElements, { device: 'M5Stick', width: 80, height: 160 });
+        log(s6, prompt.includes('Xerintosh UI Layout') ? 'PASS' : 'FAIL',
+            `prompt contains project title`);
+        log(s6, prompt.includes('hal_draw_rect') ? 'PASS' : 'FAIL',
+            `prompt references HAL API 'hal_draw_rect'`);
+        log(s6, prompt.includes('COLOR_FG = 0xFFFF') ? 'PASS' : 'FAIL',
+            `prompt includes color constants`);
+
+        /* ═══ Test 7: Control Properties (Bug Repro) ═══ */
+        const s7 = section('Test 7: Control Properties — Bug Repro');
+
+        const listCtrl2 = UIElements.create('control', { x: 0, y: 0, w: 80, h: 18, subtype: 'list_item', content: 'MyItem', color: '#FFFFFF' });
+        log(s7, listCtrl2 && listCtrl2.content === 'MyItem' ? 'PASS' : 'FAIL',
+            `control preserves content (label) property (got: "${listCtrl2?.content}")`);
+        log(s7, listCtrl2 && listCtrl2.fontSize !== undefined ? 'PASS' : 'FAIL',
+            `control has fontSize property (got: ${listCtrl2?.fontSize})`);
+
+        const propFields = UIElements.getPropFields(listCtrl2);
+        log(s7, propFields.includes('content') ? 'PASS' : 'FAIL',
+            `getPropFields includes 'content' for control (got: ${propFields})`);
+        log(s7, propFields.includes('fontSize') ? 'PASS' : 'FAIL',
+            `getPropFields includes 'fontSize' for control (got: ${propFields})`);
+
+        /* ═══ Test 8: Control Rendering — Right Arrow (Bug Repro) ═══ */
+        const s8 = section('Test 8: Control Right Arrow — Bug Repro');
+        const arrowCanvas = document.createElement('canvas');
+        arrowCanvas.width = 80; arrowCanvas.height = 160;
+        const arrowCtx = arrowCanvas.getContext('2d');
+        s8.appendChild(arrowCanvas);
+
+        // Helper: check if any pixel in a region is non-black
+        function hasNonBlackPixel(ctx, x, y, w, h) {
+            const d = ctx.getImageData(x, y, w, h).data;
+            for (let i = 0; i < d.length; i += 4) {
+                if (d[i] > 30 || d[i+1] > 30 || d[i+2] > 30) return true;
+            }
+            return false;
+        }
+
+        // list_item: should NOT have right arrow
+        arrowCtx.fillStyle = '#000000';
+        arrowCtx.fillRect(0, 0, 80, 160);
+        const li = UIElements.create('control', { x: 0, y: 10, w: 80, h: 18, subtype: 'list_item', content: 'List', color: '#FFFFFF' });
+        UIElements.render(arrowCtx, li);
+        const listHasArrow = hasNonBlackPixel(arrowCtx, 62, 10, 15, 18);
+        log(s8, !listHasArrow ? 'PASS' : 'FAIL',
+            `list_item has NO right-side arrow at x=62+ (should be clean)`);
+
+        // button_item: SHOULD have right arrow
+        arrowCtx.fillStyle = '#000000';
+        arrowCtx.fillRect(0, 0, 80, 160);
+        const bi = UIElements.create('control', { x: 0, y: 10, w: 80, h: 18, subtype: 'button_item', content: 'Btn', color: '#FFFFFF' });
+        UIElements.render(arrowCtx, bi);
+        const btnHasArrow = hasNonBlackPixel(arrowCtx, 62, 10, 15, 18);
+        log(s8, btnHasArrow ? 'PASS' : 'FAIL',
+            `button_item HAS right-side arrow at x=62+`);
+
+        // user_item: SHOULD have right arrow
+        arrowCtx.fillStyle = '#000000';
+        arrowCtx.fillRect(0, 0, 80, 160);
+        const ui = UIElements.create('control', { x: 0, y: 10, w: 80, h: 18, subtype: 'user_item', content: 'App', color: '#FFFFFF' });
+        UIElements.render(arrowCtx, ui);
+        const userHasArrow = hasNonBlackPixel(arrowCtx, 62, 10, 15, 18);
+        log(s8, userHasArrow ? 'PASS' : 'FAIL',
+            `user_item HAS right-side arrow at x=62+`);
+
+        /* ═══ Test 9: Control Font Size Rendering (Bug Repro) ═══ */
+        const s9 = section('Test 9: Control Font Size — Bug Repro');
+        const fontCanvas = document.createElement('canvas');
+        fontCanvas.width = 80; fontCanvas.height = 40;
+        const fontCtx = fontCanvas.getContext('2d');
+        s9.appendChild(fontCanvas);
+
+        fontCtx.fillStyle = '#000000';
+        fontCtx.fillRect(0, 0, 80, 40);
+        const smallFontCtrl = UIElements.create('control', { x: 0, y: 10, w: 80, h: 18, subtype: 'list_item', content: 'Aa', fontSize: 6, color: '#FFFFFF' });
+        UIElements.render(fontCtx, smallFontCtrl);
+        const smallHasText = hasNonBlackPixel(fontCtx, 14, 10, 40, 18);
+        log(s9, smallHasText ? 'PASS' : 'FAIL',
+            `control renders text with fontSize=6 (custom fontSize)`);
+
+        fontCtx.fillStyle = '#000000';
+        fontCtx.fillRect(0, 0, 80, 40);
+        const largeFontCtrl = UIElements.create('control', { x: 0, y: 10, w: 80, h: 18, subtype: 'list_item', content: 'Aa', fontSize: 16, color: '#FFFFFF' });
+        UIElements.render(fontCtx, largeFontCtrl);
+        const largeHasText = hasNonBlackPixel(fontCtx, 14, 10, 40, 18);
+        log(s9, largeHasText ? 'PASS' : 'FAIL',
+            `control renders text with fontSize=16 (custom fontSize)`);
+
+        /* ═══ Summary ═══ */
+        const summary = document.createElement('div');
+        summary.className = 'summary';
+        const allPass = passed === total;
+        summary.style.borderColor = allPass ? '#00c851' : '#ff4444';
+        summary.innerHTML = allPass
+            ? `<span class="pass">ALL TESTS PASSED</span> — ${passed}/${total}`
+            : `<span class="fail">SOME TESTS FAILED</span> — ${passed}/${total} passed`;
+        results.insertBefore(summary, results.firstChild);
+
+        console.log(`Test Results: ${passed}/${total} passed`);
+    })();
+    </script>
+</body>
+</html>

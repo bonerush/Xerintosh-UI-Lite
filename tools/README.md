@@ -67,3 +67,31 @@ xerintosh_set_item_bitmap(item, icon_wifi_icon_bitmap, ICON_WIFI_ICON_WIDTH, ICO
 - 输出格式为 **XBM**（X BitMap），每像素 1 bit
 - 字节内 bit 顺序从 LSB 到 MSB，与 `hal_draw_xbitmap()` 接口完全兼容
 - 建议图标尺寸不超过 16x16 像素，以适配小屏幕设备
+
+---
+
+# UI Layout Designer — UI 布局设计器
+
+在像素级精度下设计嵌入式设备 UI 界面，并导出 JSON 布局文件供 LLM 阅读生成代码。
+
+## 快速开始
+
+```bash
+open tools/ui-layout-designer/index.html
+```
+
+无需服务器，直接用浏览器打开即可使用。
+
+## 功能
+
+- **像素级画板**：按目标设备分辨率生成画布（默认 80×160）
+- **绘制工具**：矩形、圆角矩形、圆形、直线、文字
+- **图标库**：8 种常用图标（WiFi、蓝牙、电池等）
+- **控件占位符**：list/switch/slider/button/user 五种控件
+- **属性编辑**：精确调整坐标、尺寸、颜色、图层
+- **导出 JSON**：生成机器可读的布局文件
+- **LLM Prompt**：一键生成结构化自然语言描述，供大语言模型生成 C 代码
+
+## 文档
+
+详见 [tools/ui-layout-designer/README.md](ui-layout-designer/README.md)。
