@@ -281,6 +281,143 @@
         log(s9, largeHasText ? 'PASS' : 'FAIL',
             `control renders text with fontSize=16 (custom fontSize)`);
 
+        /* ═══ Test 10: List Element Creation ═══ */
+        const s10 = section('Test 10: List Element Creation');
+        try {
+            const list = UIElements.create('list', { x: 0, y: 0 });
+            log(s10, list && list.type === 'list' ? 'PASS' : 'FAIL',
+                `list element created with type='list' (got: "${list?.type}")`);
+            log(s10, list && Array.isArray(list.children) ? 'PASS' : 'FAIL',
+                `list has children array (got: ${Array.isArray(list?.children)})`);
+            log(s10, list && list.selectedIndex === 0 ? 'PASS' : 'FAIL',
+                `list default selectedIndex is 0 (got: ${list?.selectedIndex})`);
+            log(s10, list && list.w === 80 && list.h === 160 ? 'PASS' : 'FAIL',
+                `list dimensions default to screen size (w=${list?.w}, h=${list?.h})`);
+        } catch (e) {
+            log(s10, 'FAIL', `List creation API not implemented: ${e.message}`);
+        }
+
+        /* ═══ Test 11: List Auto Layout ═══ */
+        const s11 = section('Test 11: List Auto Layout');
+        try {
+            const list = UIElements.create('list', { x: 0, y: 0 });
+            const c1 = UIElements.create('control', { subtype: 'list_item', content: 'Item1', color: '#FFFFFF' });
+            const c2 = UIElements.create('control', { subtype: 'switch_item', content: 'Item2', color: '#FFFFFF' });
+            const c3 = UIElements.create('control', { subtype: 'slider_item', content: 'Item3', color: '#FFFFFF' });
+            list.children = [c1, c2, c3];
+
+            if (typeof UILayoutEngine !== 'undefined' && UILayoutEngine.layoutListChildren) {
+                UILayoutEngine.layoutListChildren(list);
+                const fontHeight = 12;
+                const firstY = fontHeight + 6 - 1; // 17
+                log(s11, c1.y === firstY ? 'PASS' : 'FAIL',
+                    `first child y=${firstY} (got: ${c1.y})`);
+                log(s11, c2.y === firstY + 18 ? 'PASS' : 'FAIL',
+                    `second child y=${firstY + 18} (got: ${c2.y})`);
+                log(s11, c3.y === firstY + 36 ? 'PASS' : 'FAIL',
+                    `third child y=${firstY + 36} (got: ${c3.y})`);
+
+                // Remove middle child, re-layout
+                list.children.splice(1, 1);
+                UILayoutEngine.layoutListChildren(list);
+                log(s11, list.children[0].y === firstY && list.children[1].y === firstY + 18 ? 'PASS' : 'FAIL',
+                    `after removal, y coords re-layout correctly (${list.children[0].y}, ${list.children[1].y})`);
+            } else {
+                log(s11, 'FAIL', `UILayoutEngine.layoutListChildren not implemented`);
+            }
+        } catch (e) {
+            log(s11, 'FAIL', `List auto layout not implemented: ${e.message}`);
+        }
+
+        /* ═══ Test 12: List Selector Position ═══ */
+        const s12 = section('Test 12: List Selector Position');
+        try {
+            const list = UIElements.create('list', { x: 0, y: 0 });
+            const c1 = UIElements.create('control', { subtype: 'list_item', content: 'A', color: '#FFFFFF' });
+            const c2 = UIElements.create('control', { subtype: 'switch_item', content: 'B', color: '#FFFFFF' });
+            list.children = [c1, c2];
+            if (typeof UILayoutEngine !== 'undefined' && UILayoutEngine.layoutListChildren) {
+                UILayoutEngine.layoutListChildren(list);
+            }
+
+            if (typeof UILayoutEngine !== 'undefined' && UILayoutEngine.computeSelectorRect) {
+                list.selectedIndex = 0;
+                const sel0 = UILayoutEngine.computeSelectorRect(list);
+                const fontHeight = 12;
+                const firstY = fontHeight + 6 - 1;
+                const expectedSelY = firstY - fontHeight + 1;
+                log(s12, sel0.y === expectedSelY ? 'PASS' : 'FAIL',
+                    `selector y for index 0 = ${expectedSelY} (got: ${sel0.y})`);
+                log(s12, sel0.h === fontHeight + 4 ? 'PASS' : 'FAIL',
+                    `selector h = ${fontHeight + 4} (got: ${sel0.h})`);
+
+                list.selectedIndex = 1;
+                const sel1 = UILayoutEngine.computeSelectorRect(list);
+                const expectedSelY1 = (firstY + 18) - fontHeight + 1;
+                log(s12, sel1.y === expectedSelY1 ? 'PASS' : 'FAIL',
+                    `selector y for index 1 = ${expectedSelY1} (got: ${sel1.y})`);
+
+                // switch_item should have full-width selector
+                const selSwitch = UILayoutEngine.computeSelectorRect(list);
+                log(s12, selSwitch.w === 62 ? 'PASS' : 'FAIL',
+                    `switch selector w = 62 (SCREEN_WIDTH - 18) (got: ${selSwitch.w})`);
+            } else {
+                log(s12, 'FAIL', `UILayoutEngine.computeSelectorRect not implemented`);
+            }
+        } catch (e) {
+            log(s12, 'FAIL', `List selector position not implemented: ${e.message}`);
+        }
+
+        /* ═══ Test 13: List Camera Offset ═══ */
+        const s13 = section('Test 13: List Camera Offset');
+        try {
+            if (typeof UILayoutEngine !== 'undefined' && UILayoutEngine.computeCameraOffset) {
+                const list = UIElements.create('list', { x: 0, y: 0, w: 80, h: 160 });
+                // Simulate selector at y=150 (would be below screen)
+                const cameraY = UILayoutEngine.computeCameraOffset(150, 160, 15);
+                log(s13, cameraY < 0 ? 'PASS' : 'FAIL',
+                    `camera offsets upward when selector below screen (got: ${cameraY})`);
+
+                // Simulate selector at y=-10 (would be above screen)
+                const cameraY2 = UILayoutEngine.computeCameraOffset(-10, 160, 15);
+                log(s13, cameraY2 > 0 ? 'PASS' : 'FAIL',
+                    `camera offsets downward when selector above screen (got: ${cameraY2})`);
+            } else {
+                log(s13, 'FAIL', `UILayoutEngine.computeCameraOffset not implemented`);
+            }
+        } catch (e) {
+            log(s13, 'FAIL', `List camera offset not implemented: ${e.message}`);
+        }
+
+        /* ═══ Test 14: List Export/Import with Children ═══ */
+        const s14 = section('Test 14: List Export/Import with Children');
+        try {
+            const list = UIElements.create('list', { x: 0, y: 0, selectedIndex: 1 });
+            const c1 = UIElements.create('control', { subtype: 'list_item', content: 'A', color: '#FFFFFF' });
+            const c2 = UIElements.create('control', { subtype: 'switch_item', content: 'B', color: '#FFFFFF' });
+            list.children = [c1, c2];
+            const elements = [list];
+            const json = UIExporter.toJSON(elements, { device: 'M5Stick', width: 80, height: 160 });
+
+            log(s14, json.includes('"type":"list"') ? 'PASS' : 'FAIL',
+                `export JSON contains list type`);
+            log(s14, json.includes('"children"') ? 'PASS' : 'FAIL',
+                `export JSON contains children array`);
+            log(s14, json.includes('"selectedIndex":1') ? 'PASS' : 'FAIL',
+                `export JSON contains selectedIndex`);
+
+            const imported = UIExporter.fromJSON(json);
+            const importedList = imported.elements.find(e => e.type === 'list');
+            log(s14, importedList && Array.isArray(importedList.children) ? 'PASS' : 'FAIL',
+                `import restores list with children array`);
+            log(s14, importedList && importedList.children.length === 2 ? 'PASS' : 'FAIL',
+                `import restores 2 children (got: ${importedList?.children?.length})`);
+            log(s14, importedList && importedList.selectedIndex === 1 ? 'PASS' : 'FAIL',
+                `import restores selectedIndex=1 (got: ${importedList?.selectedIndex})`);
+        } catch (e) {
+            log(s14, 'FAIL', `List export/import not implemented: ${e.message}`);
+        }
+
         /* ═══ Summary ═══ */
         const summary = document.createElement('div');
         summary.className = 'summary';
