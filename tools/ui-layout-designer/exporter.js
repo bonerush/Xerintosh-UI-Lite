@@ -27,9 +27,9 @@
         if (el.text)    out.text    = el.text;
         if (el.fontSize) out.font_size = el.fontSize;
         if (el.iconName) out.icon_name = el.iconName;
-        if (el.subtype === 'control') {
+        if (el.type === 'control') {
             out.subtype = el.subtype;
-            out.label   = el.label || '';
+            out.label   = el.content || '';
         }
         if (el.type === 'list') {
             out.selectedIndex = el.selectedIndex || 0;
@@ -175,9 +175,9 @@ Your task is to generate embedded C code that reproduces this layout exactly.
             prompt += `\n`;
             if (el.text)        prompt += `- Text: "${el.text}" (font size ${el.fontSize || 8}px)\n`;
             if (el.iconName)    prompt += `- Icon: ${el.iconName} (${el.w}x${el.h})\n`;
-            if (el.subtype === 'control') {
+            if (el.type === 'control') {
                 prompt += `- Control type: ${el.subtype}\n`;
-                prompt += `- Label: "${el.label || ''}"\n`;
+                prompt += `- Label: "${el.content || ''}"\n`;
             }
             if (el.layer)       prompt += `- Layer: ${el.layer}\n`;
             prompt += `\n`;

@@ -195,13 +195,6 @@
 
     /* ═══ 渲染器 — 所有函数接收 (ctx, el, scale)，在已缩放的 ctx 上绘制 ═══ */
 
-    function hexToRgb565(hex) {
-        const r = parseInt(hex.slice(1, 3), 16);
-        const g = parseInt(hex.slice(3, 5), 16);
-        const b = parseInt(hex.slice(5, 7), 16);
-        return ((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3);
-    }
-
     function setColor(ctx, hex) {
         ctx.strokeStyle = hex;
         ctx.fillStyle   = hex;
@@ -498,6 +491,8 @@
     function drawListIcon(ctx, icon, x, y, color) {
         setColor(ctx, color);
         switch (icon) {
+            case 'default_icon':
+                break;
             case 'list_icon':
                 // 固件：三条横线
                 ctx.fillRect(2 + x, y - 2, 4, 1);

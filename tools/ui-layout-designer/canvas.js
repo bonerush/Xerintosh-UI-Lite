@@ -108,11 +108,10 @@
             }
         }
 
-        // 绘制智能对齐提示线
-        if (this.dragState.active && (this.dragState.moving || this.dragState.resizing) && this.dragState.element) {
-            const guides = this._computeSnapGuides(this.dragState.element, this.elements);
-            if (guides.length > 0) {
-                this._drawSnapGuides(ctx, guides, w, h);
+        // 绘制智能对齐提示线（复用 dragState 中已计算的 guides）
+        if (this.dragState.active && (this.dragState.moving || this.dragState.resizing) && this.dragState.snapGuides) {
+            if (this.dragState.snapGuides.length > 0) {
+                this._drawSnapGuides(ctx, this.dragState.snapGuides, w, h);
             }
         }
 
@@ -233,6 +232,7 @@
     };
 
     CanvasEngine.prototype._drawSnapGuides = function(ctx, guides, w, h) {
+        ctx.save();
         ctx.strokeStyle = '#FFD700';
         ctx.lineWidth   = 0.5;
         ctx.setLineDash([2, 2]);
@@ -247,7 +247,7 @@
             }
             ctx.stroke();
         }
-        ctx.setLineDash([]);
+        ctx.restore();
     };
 
     CanvasEngine.prototype._snapToGuides = function(el, guides) {
@@ -298,26 +298,25 @@
     CanvasEngine.prototype._drawSelection = function(ctx, el) {
         const type = el.subtype || el.type;
 
+        ctx.save();
+        ctx.strokeStyle = '#FFD700';
+        ctx.lineWidth   = 1;
+        ctx.setLineDash([2, 2]);
+
         if (type === 'line') {
-            ctx.strokeStyle = '#FFD700';
-            ctx.lineWidth   = 1;
-            ctx.setLineDash([2, 2]);
             ctx.beginPath();
             ctx.moveTo(el.x, el.y);
             ctx.lineTo(el.x2, el.y2);
             ctx.stroke();
-            ctx.setLineDash([]);
+            ctx.restore();
             this._drawHandle(ctx, el.x,  el.y);
             this._drawHandle(ctx, el.x2, el.y2);
             return;
         }
 
         if (type === 'circle' || type === 'filled-circle') {
-            ctx.strokeStyle = '#FFD700';
-            ctx.lineWidth   = 1;
-            ctx.setLineDash([2, 2]);
             ctx.strokeRect(el.x, el.y, el.r * 2, el.r * 2);
-            ctx.setLineDash([]);
+            ctx.restore();
             this._drawHandle(ctx, el.x,         el.y);
             this._drawHandle(ctx, el.x + el.r*2, el.y);
             this._drawHandle(ctx, el.x,         el.y + el.r*2);
@@ -326,11 +325,8 @@
         }
 
         // 矩形类通用
-        ctx.strokeStyle = '#FFD700';
-        ctx.lineWidth   = 1;
-        ctx.setLineDash([2, 2]);
         ctx.strokeRect(el.x, el.y, el.w, el.h);
-        ctx.setLineDash([]);
+        ctx.restore();
 
         // 4 角手柄
         this._drawHandle(ctx, el.x,     el.y);
@@ -341,6 +337,8 @@
 
     CanvasEngine.prototype._drawHover = function(ctx, el) {
         const type = el.subtype || el.type;
+
+        ctx.save();
         ctx.strokeStyle = 'rgba(255,255,255,0.3)';
         ctx.lineWidth   = 1;
         ctx.setLineDash([2, 2]);
@@ -355,7 +353,8 @@
         } else {
             ctx.strokeRect(el.x, el.y, el.w, el.h);
         }
-        ctx.setLineDash([]);
+
+        ctx.restore();
     };
 
     CanvasEngine.prototype._drawHandle = function(ctx, x, y) {

@@ -542,10 +542,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 ds.element.x2 = ds.element.x + (ds.origX2 - ds.origX);
                 ds.element.y2 = ds.element.y + (ds.origY2 - ds.origY);
             }
-            // 智能对齐吸附
-            const guides = engine._computeSnapGuides(ds.element, engine.elements);
-            if (guides.length > 0) {
-                engine._snapToGuides(ds.element, guides);
+            // 智能对齐吸附（缓存 guides 供 render 复用）
+            ds.snapGuides = engine._computeSnapGuides(ds.element, engine.elements);
+            if (ds.snapGuides.length > 0) {
+                engine._snapToGuides(ds.element, ds.snapGuides);
             }
             engine.render();
             updatePropertiesPanel();
@@ -757,7 +757,13 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!el) {
             panel.style.opacity = '0.5';
             for (const key in propInputs) {
-                if (propInputs[key]) propInputs[key].value = '';
+                if (propInputs[key]) {
+                    if (propInputs[key].type === 'checkbox') {
+                        propInputs[key].checked = false;
+                    } else {
+                        propInputs[key].value = '';
+                    }
+                }
             }
             $('prop-color-hex').textContent = '';
             return;
