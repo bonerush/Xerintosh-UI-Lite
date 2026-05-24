@@ -19,9 +19,9 @@
     <h1>UI Layout Designer — Test Suite</h1>
     <div id="results"></div>
 
-    <script src="elements.js?v=5"></script>
-    <script src="exporter.js?v=5"></script>
-    <script src="canvas.js?v=5"></script>
+    <script src="elements.js?v=6"></script>
+    <script src="exporter.js?v=6"></script>
+    <script src="canvas.js?v=6"></script>
 
     <script>
     (function() {
@@ -133,12 +133,12 @@
         ctrlCanvas.id = 'test-control-canvas';
         s3b.appendChild(ctrlCanvas);
 
-        // Create controls of each subtype
-        const listCtrl   = UIElements.create('control', { x: 0, y: 10, w: 80, h: 18, subtype: 'list_item',   label: 'List',   color: '#FFFFFF' });
-        const switchCtrl = UIElements.create('control', { x: 0, y: 30, w: 80, h: 18, subtype: 'switch_item', label: 'Switch', color: '#FFFFFF' });
-        const sliderCtrl = UIElements.create('control', { x: 0, y: 50, w: 80, h: 18, subtype: 'slider_item', label: 'Slider', color: '#FFFFFF' });
-        const buttonCtrl = UIElements.create('control', { x: 0, y: 70, w: 80, h: 18, subtype: 'button_item', label: 'Button', color: '#FFFFFF' });
-        const userCtrl   = UIElements.create('control', { x: 0, y: 90, w: 80, h: 18, subtype: 'user_item',   label: 'App',    color: '#FFFFFF' });
+        // Create controls of each subtype (fontSize=12 matches firmware default)
+        const listCtrl   = UIElements.create('control', { x: 0, y: 10, w: 80, h: 18, subtype: 'list_item',   content: 'List',   color: '#FFFFFF', fontSize: 12 });
+        const switchCtrl = UIElements.create('control', { x: 0, y: 30, w: 80, h: 18, subtype: 'switch_item', content: 'Switch', color: '#FFFFFF', fontSize: 12 });
+        const sliderCtrl = UIElements.create('control', { x: 0, y: 50, w: 80, h: 18, subtype: 'slider_item', content: 'Slider', color: '#FFFFFF', fontSize: 12 });
+        const buttonCtrl = UIElements.create('control', { x: 0, y: 70, w: 80, h: 18, subtype: 'button_item', content: 'Button', color: '#FFFFFF', fontSize: 12 });
+        const userCtrl   = UIElements.create('control', { x: 0, y: 90, w: 80, h: 18, subtype: 'user_item',   content: 'App',    color: '#FFFFFF', fontSize: 12 });
 
         ctrlCtx.fillStyle = '#000000';
         ctrlCtx.fillRect(0, 0, 80, 160);
@@ -152,12 +152,12 @@
             log(s3b, hasContent ? 'PASS' : 'FAIL',
                 `${name} control renders visible content at (${sx},${sy})`);
         }
-        // Sample at x=2 (inside the accent stripe) for reliable visibility
-        testControlRender(ctrlCtx, listCtrl,   2, 19, 'list');
-        testControlRender(ctrlCtx, switchCtrl, 2, 39, 'switch');
-        testControlRender(ctrlCtx, sliderCtrl, 2, 59, 'slider');
-        testControlRender(ctrlCtx, buttonCtrl, 2, 79, 'button');
-        testControlRender(ctrlCtx, userCtrl,   2, 99, 'user');
+        // Icons start at x=4 (LIST_ITEM_LEFT_MARGIN), icon content begins around x=6
+        testControlRender(ctrlCtx, listCtrl,   6, 19, 'list');
+        testControlRender(ctrlCtx, switchCtrl, 6, 39, 'switch');
+        testControlRender(ctrlCtx, sliderCtrl, 6, 59, 'slider');
+        testControlRender(ctrlCtx, buttonCtrl, 6, 79, 'button');
+        testControlRender(ctrlCtx, userCtrl,   6, 103, 'user');
 
         /* ═══ Test 4: Hit Testing ═══ */
         const s4 = section('Test 4: Hit Testing');
@@ -240,23 +240,23 @@
         log(s8, !listHasArrow ? 'PASS' : 'FAIL',
             `list_item has NO right-side arrow at x=62+ (should be clean)`);
 
-        // button_item: SHOULD have right arrow
+        // button_item: no right arrow in firmware-aligned implementation
         arrowCtx.fillStyle = '#000000';
         arrowCtx.fillRect(0, 0, 80, 160);
         const bi = UIElements.create('control', { x: 0, y: 10, w: 80, h: 18, subtype: 'button_item', content: 'Btn', color: '#FFFFFF' });
         UIElements.render(arrowCtx, bi);
         const btnHasArrow = hasNonBlackPixel(arrowCtx, 62, 10, 15, 18);
-        log(s8, btnHasArrow ? 'PASS' : 'FAIL',
-            `button_item HAS right-side arrow at x=62+`);
+        log(s8, !btnHasArrow ? 'PASS' : 'FAIL',
+            `button_item has NO right-side arrow (firmware-aligned)`);
 
-        // user_item: SHOULD have right arrow
+        // user_item: no right arrow in firmware-aligned implementation
         arrowCtx.fillStyle = '#000000';
         arrowCtx.fillRect(0, 0, 80, 160);
         const ui = UIElements.create('control', { x: 0, y: 10, w: 80, h: 18, subtype: 'user_item', content: 'App', color: '#FFFFFF' });
         UIElements.render(arrowCtx, ui);
         const userHasArrow = hasNonBlackPixel(arrowCtx, 62, 10, 15, 18);
-        log(s8, userHasArrow ? 'PASS' : 'FAIL',
-            `user_item HAS right-side arrow at x=62+`);
+        log(s8, !userHasArrow ? 'PASS' : 'FAIL',
+            `user_item has NO right-side arrow (firmware-aligned)`);
 
         /* ═══ Test 9: Control Font Size Rendering (Bug Repro) ═══ */
         const s9 = section('Test 9: Control Font Size — Bug Repro');
@@ -399,11 +399,11 @@
             const elements = [list];
             const json = UIExporter.toJSON(elements, { device: 'M5Stick', width: 80, height: 160 });
 
-            log(s14, json.includes('"type":"list"') ? 'PASS' : 'FAIL',
+            log(s14, json.includes('"type": "list"') ? 'PASS' : 'FAIL',
                 `export JSON contains list type`);
             log(s14, json.includes('"children"') ? 'PASS' : 'FAIL',
                 `export JSON contains children array`);
-            log(s14, json.includes('"selectedIndex":1') ? 'PASS' : 'FAIL',
+            log(s14, json.includes('"selectedIndex": 1') ? 'PASS' : 'FAIL',
                 `export JSON contains selectedIndex`);
 
             const imported = UIExporter.fromJSON(json);

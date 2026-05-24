@@ -9,6 +9,37 @@
 
     /* ═══ JSON 导出 ═══ */
 
+    /* 辅助函数：序列化单个元素（递归处理 list children） */
+    function serializeElement(el) {
+        const out = {
+            id:    el.id,
+            type:  el.subtype || el.type,
+            x:     el.x,
+            y:     el.y,
+            color: el.color,
+            layer: el.layer || 0,
+        };
+        if (el.w)       out.w       = el.w;
+        if (el.h)       out.h       = el.h;
+        if (el.r)       out.r       = el.r;
+        if (el.fill)    out.fill    = true;
+        if (el.x2 !== undefined) { out.x2 = el.x2; out.y2 = el.y2; }
+        if (el.text)    out.text    = el.text;
+        if (el.fontSize) out.font_size = el.fontSize;
+        if (el.iconName) out.icon_name = el.iconName;
+        if (el.subtype === 'control') {
+            out.subtype = el.subtype;
+            out.label   = el.label || '';
+        }
+        if (el.type === 'list') {
+            out.selectedIndex = el.selectedIndex || 0;
+            if (el.children && el.children.length > 0) {
+                out.children = el.children.map(serializeElement);
+            }
+        }
+        return out;
+    }
+
     Exporter.toJSON = function(elements, meta) {
         return JSON.stringify({
             meta: {
@@ -16,77 +47,63 @@
                 screen_width:  meta.width   || 80,
                 screen_height: meta.height  || 160,
                 orientation:   meta.orientation || 'portrait',
-                version:       '1.0',
+                version:       '2.0',
                 exported_at:   new Date().toISOString(),
             },
-            elements: elements.map(el => {
-                const out = {
-                    id:    el.id,
-                    type:  el.subtype || el.type,
-                    x:     el.x,
-                    y:     el.y,
-                    color: el.color,
-                    layer: el.layer || 0,
-                };
-                if (el.w)       out.w       = el.w;
-                if (el.h)       out.h       = el.h;
-                if (el.r)       out.r       = el.r;
-                if (el.fill)    out.fill    = true;
-                if (el.x2 !== undefined) { out.x2 = el.x2; out.y2 = el.y2; }
-                if (el.text)    out.text    = el.text;
-                if (el.fontSize) out.font_size = el.fontSize;
-                if (el.iconName) out.icon_name = el.iconName;
-                if (el.subtype === 'control') {
-                    out.subtype = el.subtype;
-                    out.label   = el.label || '';
-                }
-                return out;
-            }),
+            elements: elements.map(serializeElement),
         }, null, 2);
     };
+
+    /* 辅助函数：反序列化单个元素（递归处理 list children） */
+    function deserializeElement(item) {
+        const typeMap = {
+            rectangle: 'rectangle',
+            'filled-rect': 'filled-rect',
+            'round-rect': 'round-rect',
+            'filled-round-rect': 'filled-round-rect',
+            circle: 'circle',
+            'filled-circle': 'filled-circle',
+            line: 'line',
+            text: 'text',
+            icon: 'icon',
+            control: 'control',
+            list: 'list',
+        };
+
+        const type = typeMap[item.type] || item.type;
+        const attrs = {
+            id:        item.id,
+            x:         item.x,
+            y:         item.y,
+            color:     item.color || '#FFFFFF',
+            layer:     item.layer || 0,
+        };
+        if (item.w)       attrs.w       = item.w;
+        if (item.h)       attrs.h       = item.h;
+        if (item.r)       attrs.r       = item.r;
+        if (item.fill)    attrs.fill    = true;
+        if (item.x2 !== undefined) { attrs.x2 = item.x2; attrs.y2 = item.y2; }
+        if (item.text || item.text === '')    attrs.text    = item.text;
+        if (item.font_size) attrs.fontSize = item.font_size;
+        if (item.icon_name) attrs.iconName = item.icon_name;
+        if (item.subtype)   attrs.subtype  = item.subtype;
+        if (item.label || item.label === '')  attrs.label   = item.label;
+        if (item.selectedIndex !== undefined) attrs.selectedIndex = item.selectedIndex;
+        if (item.children && item.children.length > 0) {
+            attrs.children = item.children.map(deserializeElement);
+        }
+
+        if (typeof global.UIElements !== 'undefined') {
+            return global.UIElements.create(type, attrs);
+        }
+        return { type, ...attrs };
+    }
 
     /* ═══ JSON 导入 ═══ */
 
     Exporter.fromJSON = function(jsonStr) {
         const data = JSON.parse(jsonStr);
-        const elements = (data.elements || []).map(item => {
-            const typeMap = {
-                rectangle: 'rectangle',
-                'filled-rect': 'filled-rect',
-                'round-rect': 'round-rect',
-                'filled-round-rect': 'filled-round-rect',
-                circle: 'circle',
-                'filled-circle': 'filled-circle',
-                line: 'line',
-                text: 'text',
-                icon: 'icon',
-                control: 'control',
-            };
-
-            const type = typeMap[item.type] || item.type;
-            const attrs = {
-                id:        item.id,
-                x:         item.x,
-                y:         item.y,
-                color:     item.color || '#FFFFFF',
-                layer:     item.layer || 0,
-            };
-            if (item.w)       attrs.w       = item.w;
-            if (item.h)       attrs.h       = item.h;
-            if (item.r)       attrs.r       = item.r;
-            if (item.fill)    attrs.fill    = true;
-            if (item.x2 !== undefined) { attrs.x2 = item.x2; attrs.y2 = item.y2; }
-            if (item.text || item.text === '')    attrs.text    = item.text;
-            if (item.font_size) attrs.fontSize = item.font_size;
-            if (item.icon_name) attrs.iconName = item.icon_name;
-            if (item.subtype)   attrs.subtype  = item.subtype;
-            if (item.label || item.label === '')  attrs.label   = item.label;
-
-            if (typeof global.UIElements !== 'undefined') {
-                return global.UIElements.create(type, attrs);
-            }
-            return { type, ...attrs };
-        });
+        const elements = (data.elements || []).map(deserializeElement);
 
         return {
             meta:     data.meta || {},

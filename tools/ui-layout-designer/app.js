@@ -542,6 +542,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 ds.element.x2 = ds.element.x + (ds.origX2 - ds.origX);
                 ds.element.y2 = ds.element.y + (ds.origY2 - ds.origY);
             }
+            // 智能对齐吸附
+            const guides = engine._computeSnapGuides(ds.element, engine.elements);
+            if (guides.length > 0) {
+                engine._snapToGuides(ds.element, guides);
+            }
             engine.render();
             updatePropertiesPanel();
         } else if (ds.resizing && ds.element) {
@@ -740,6 +745,7 @@ document.addEventListener('DOMContentLoaded', function () {
         text: $('prop-text'),
         font: $('prop-font-size'),
         label: $('prop-label'),
+        fill: $('prop-fill'),
         color: $('prop-color'),
         layer: $('prop-layer'),
     };
@@ -782,6 +788,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
         $('prop-label-group').style.display = (el.type === 'control') ? 'block' : 'none';
         if (el.type === 'control') $('prop-label').value = el.content || '';
+
+        // Fill 复选框：仅对支持 fill 的形状显示
+        const hasFill = (el.fill !== undefined);
+        $('prop-fill-group').style.display = hasFill ? 'block' : 'none';
+        if (hasFill) $('prop-fill').checked = !!el.fill;
     }
 
     function bindPropInput(input, key, isNumber) {
@@ -816,6 +827,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
     $('prop-color').addEventListener('input', () => {
         $('prop-color-hex').textContent = $('prop-color').value;
+    });
+
+    $('prop-fill').addEventListener('change', () => {
+        const el = engine.selectedId ? engine.getElement(engine.selectedId) : null;
+        if (!el) return;
+        el.fill = $('prop-fill').checked;
+        engine.render();
+        saveHistory();
     });
 
     /* ═══ 属性面板按钮 ═══ */

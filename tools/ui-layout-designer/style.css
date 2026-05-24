@@ -509,6 +509,16 @@ body {
     width: 40px;
 }
 
+#prop-fill-group label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+#prop-fill-group input { cursor: pointer; }
+
 .prop-actions {
     display: flex;
     gap: 6px;

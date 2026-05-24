@@ -108,6 +108,14 @@
             }
         }
 
+        // 绘制智能对齐提示线
+        if (this.dragState.active && (this.dragState.moving || this.dragState.resizing) && this.dragState.element) {
+            const guides = this._computeSnapGuides(this.dragState.element, this.elements);
+            if (guides.length > 0) {
+                this._drawSnapGuides(ctx, guides, w, h);
+            }
+        }
+
         // 绘制选择高亮
         if (this.selectedId) {
             const sel = this.elements.find(e => e.id === this.selectedId);
@@ -158,11 +166,140 @@
 
     /* ── 选择高亮 ── */
 
+    /* ── 智能对齐提示线 ── */
+
+    CanvasEngine.prototype._getSnapEdges = function(el) {
+        const type = el.subtype || el.type;
+        let left, right, top, bottom, cx, cy;
+
+        if (type === 'circle' || type === 'filled-circle') {
+            left   = el.x;
+            right  = el.x + el.r * 2;
+            top    = el.y;
+            bottom = el.y + el.r * 2;
+        } else if (type === 'line') {
+            left   = Math.min(el.x, el.x2);
+            right  = Math.max(el.x, el.x2);
+            top    = Math.min(el.y, el.y2);
+            bottom = Math.max(el.y, el.y2);
+        } else {
+            left   = el.x;
+            right  = el.x + (el.w || 0);
+            top    = el.y;
+            bottom = el.y + (el.h || 0);
+        }
+        cx = (left + right) / 2;
+        cy = (top + bottom) / 2;
+
+        return {
+            x: [left, cx, right],
+            y: [top, cy, bottom],
+        };
+    };
+
+    CanvasEngine.prototype._computeSnapGuides = function(dragEl, allElements) {
+        const SNAP_TOLERANCE = 2; // 逻辑像素容差
+        const dragEdges = this._getSnapEdges(dragEl);
+        const guides = [];
+
+        for (const other of allElements) {
+            if (other.id === dragEl.id) continue;
+            const otherEdges = this._getSnapEdges(other);
+
+            for (const dx of dragEdges.x) {
+                for (const ox of otherEdges.x) {
+                    if (Math.abs(dx - ox) <= SNAP_TOLERANCE) {
+                        guides.push({ type: 'x', value: ox });
+                    }
+                }
+            }
+            for (const dy of dragEdges.y) {
+                for (const oy of otherEdges.y) {
+                    if (Math.abs(dy - oy) <= SNAP_TOLERANCE) {
+                        guides.push({ type: 'y', value: oy });
+                    }
+                }
+            }
+        }
+
+        // 去重
+        const seen = new Set();
+        return guides.filter(g => {
+            const key = g.type + ':' + g.value;
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+        });
+    };
+
+    CanvasEngine.prototype._drawSnapGuides = function(ctx, guides, w, h) {
+        ctx.strokeStyle = '#FFD700';
+        ctx.lineWidth   = 0.5;
+        ctx.setLineDash([2, 2]);
+        for (const g of guides) {
+            ctx.beginPath();
+            if (g.type === 'x') {
+                ctx.moveTo(g.value, 0);
+                ctx.lineTo(g.value, h);
+            } else {
+                ctx.moveTo(0, g.value);
+                ctx.lineTo(w, g.value);
+            }
+            ctx.stroke();
+        }
+        ctx.setLineDash([]);
+    };
+
+    CanvasEngine.prototype._snapToGuides = function(el, guides) {
+        const edges = this._getSnapEdges(el);
+        let offsetX = 0;
+        let offsetY = 0;
+        let snappedX = false;
+        let snappedY = false;
+
+        for (const g of guides) {
+            if (g.type === 'x' && !snappedX) {
+                for (let i = 0; i < edges.x.length; i++) {
+                    if (Math.abs(edges.x[i] - g.value) <= 2) {
+                        offsetX = g.value - edges.x[i];
+                        snappedX = true;
+                        break;
+                    }
+                }
+            }
+            if (g.type === 'y' && !snappedY) {
+                for (let i = 0; i < edges.y.length; i++) {
+                    if (Math.abs(edges.y[i] - g.value) <= 2) {
+                        offsetY = g.value - edges.y[i];
+                        snappedY = true;
+                        break;
+                    }
+                }
+            }
+        }
+
+        const type = el.subtype || el.type;
+        if (offsetX !== 0 || offsetY !== 0) {
+            if (type === 'line') {
+                el.x += offsetX;
+                el.y += offsetY;
+                el.x2 += offsetX;
+                el.y2 += offsetY;
+            } else if (type === 'circle' || type === 'filled-circle') {
+                el.x += offsetX;
+                el.y += offsetY;
+            } else {
+                el.x += offsetX;
+                el.y += offsetY;
+            }
+        }
+    };
+
     CanvasEngine.prototype._drawSelection = function(ctx, el) {
         const type = el.subtype || el.type;
 
         if (type === 'line') {
-            ctx.strokeStyle = '#07E0';
+            ctx.strokeStyle = '#FFD700';
             ctx.lineWidth   = 1;
             ctx.setLineDash([2, 2]);
             ctx.beginPath();
@@ -176,7 +313,7 @@
         }
 
         if (type === 'circle' || type === 'filled-circle') {
-            ctx.strokeStyle = '#07E0';
+            ctx.strokeStyle = '#FFD700';
             ctx.lineWidth   = 1;
             ctx.setLineDash([2, 2]);
             ctx.strokeRect(el.x, el.y, el.r * 2, el.r * 2);
@@ -189,7 +326,7 @@
         }
 
         // 矩形类通用
-        ctx.strokeStyle = '#07E0';
+        ctx.strokeStyle = '#FFD700';
         ctx.lineWidth   = 1;
         ctx.setLineDash([2, 2]);
         ctx.strokeRect(el.x, el.y, el.w, el.h);
@@ -222,7 +359,7 @@
     };
 
     CanvasEngine.prototype._drawHandle = function(ctx, x, y) {
-        ctx.fillStyle   = '#07E0';
+        ctx.fillStyle   = '#FFD700';
         ctx.strokeStyle = '#000';
         ctx.lineWidth   = 1;
         const r = 2.5;

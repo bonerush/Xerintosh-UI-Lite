@@ -83,9 +83,18 @@
                     ...base,
                     subtype: attrs.subtype || 'list_item',
                     content: attrs.content || '',
-                    fontSize: attrs.fontSize || FONT_SIZE,
+                    fontSize: attrs.fontSize || 8,   /* 固件默认 small 字体 */
                     w:       attrs.w || 80,
-                    h:       attrs.h || 18,
+                    h:       attrs.h || 18,          /* LIST_ITEM_SPACING = 18，固定不变 */
+                };
+            case 'list':
+                return {
+                    ...base,
+                    subtype: 'list',
+                    w:       attrs.w || 80,
+                    h:       attrs.h || 160,
+                    children: attrs.children || [],
+                    selectedIndex: typeof attrs.selectedIndex === 'number' ? attrs.selectedIndex : 0,
                 };
             default:
                 return base;
@@ -116,6 +125,73 @@
         _measureCtx.font = `${fontSize}px ${FONT_FAMILY}`;
         return Math.ceil(_measureCtx.measureText(String(text)).width);
     }
+
+    /* ═══ 布局引擎（与固件 ui_item.c / ui_core.c 对齐）═══ */
+
+    const UILayoutEngine = {
+        FONT_HEIGHT: 12,
+        LIST_ITEM_SPACING: 18,
+        LIST_FONT_TOP_MARGIN: 6,
+        LIST_ITEM_LEFT_MARGIN: 4,
+        LIST_ITEM_RIGHT_MARGIN: 20,
+        SCREEN_WIDTH: 80,
+        SCREEN_HEIGHT: 160,
+
+        /**
+         * 自动布局 list 内所有子项的 y 坐标
+         * 与固件 xerintosh_push_item_to_list 计算逻辑对齐
+         */
+        layoutListChildren(list) {
+            const firstY = list.y + this.FONT_HEIGHT + this.LIST_FONT_TOP_MARGIN - 1;
+            for (let i = 0; i < list.children.length; i++) {
+                const child = list.children[i];
+                child.x = list.x;
+                child.y = firstY + i * this.LIST_ITEM_SPACING;
+                child.w = list.w;
+                child.h = this.LIST_ITEM_SPACING;
+            }
+        },
+
+        /**
+         * 计算选择器高亮框的位置与尺寸
+         * 与固件 xerintosh_refresh_selector_position 对齐
+         */
+        computeSelectorRect(list) {
+            const fontHeight = this.FONT_HEIGHT;
+            const selectedChild = list.children[list.selectedIndex];
+            if (!selectedChild) {
+                return { x: list.x + this.LIST_ITEM_LEFT_MARGIN, y: list.y, w: list.w, h: fontHeight + 4 };
+            }
+
+            const y = selectedChild.y - fontHeight + 1;
+            const h = fontHeight + 4;
+            let w;
+            const subtype = selectedChild.subtype;
+            if (subtype === 'switch_item' || subtype === 'slider_item') {
+                w = this.SCREEN_WIDTH - 18; // 62
+            } else {
+                const textWidth = measureTextWidth(selectedChild.content || '', selectedChild.fontSize || fontHeight);
+                w = textWidth + 12;
+            }
+            return { x: list.x + this.LIST_ITEM_LEFT_MARGIN, y: y, w: w, h: h };
+        },
+
+        /**
+         * 计算相机偏移，确保选择器始终在可视区域内
+         * 与固件 xerintosh_refresh_camera_position 对齐
+         */
+        computeCameraOffset(selectorY, screenHeight, selectorHeight) {
+            // 向下越界：selector 底部超出屏幕
+            if (selectorY + selectorHeight > screenHeight) {
+                return screenHeight - selectorY - selectorHeight;
+            }
+            // 向上越界：selector 顶部在屏幕上方
+            if (selectorY < 0) {
+                return -selectorY + this.LIST_FONT_TOP_MARGIN;
+            }
+            return 0;
+        },
+    };
 
     /* ═══ 渲染器 — 所有函数接收 (ctx, el, scale)，在已缩放的 ctx 上绘制 ═══ */
 
@@ -189,21 +265,6 @@
         ctx.lineTo(el.x2 + 0.5, el.y2 + 0.5);
         ctx.stroke();
     };
-
-    // 简单像素字体宽度估算：每个字符约 0.6 * fontSize
-    function measureTextWidth(text, fontSize) {
-        let w = 0;
-        for (const ch of String(text)) {
-            const code = ch.charCodeAt(0);
-            // CJK 字符占全宽
-            if (code >= 0x4e00 && code <= 0x9fff) {
-                w += fontSize;
-            } else {
-                w += Math.max(1, Math.floor(fontSize * 0.6));
-            }
-        }
-        return w;
-    }
 
     Renderers.text = function(ctx, el) {
         if (!el.text) return;
@@ -425,46 +486,65 @@
     const LIST_FONT_TOP_MARGIN = 6;    /* ui_item.h */
 
     /**
-     * 像素级图标绘制（与固件 xerintosh_draw_list_icon 对齐）
-     * @param x 图标左上角 x（图标以 y 为中心）
-     * @param y 图标中心 y
+     * 像素级图标绘制（与固件 xerintosh_draw_list_icon 逐像素对齐）
+     *
+     * 固件语义：
+     *   - x 为图标左上角 x
+     *   - y 为图标中心 y（文字基线锚点 yBaseline 减去字体高度的一半）
+     *
+     * 设计器对齐方式：
+     *   所有 fillRect / arc / stroke 的坐标均与固件 HAL 调用一一对应。
      */
     function drawListIcon(ctx, icon, x, y, color) {
         setColor(ctx, color);
         switch (icon) {
             case 'list_icon':
+                // 固件：三条横线
                 ctx.fillRect(2 + x, y - 2, 4, 1);
                 ctx.fillRect(2 + x, y,     5, 1);
                 ctx.fillRect(2 + x, y + 2, 3, 1);
                 break;
             case 'switch_icon':
-                ctx.beginPath(); ctx.arc(4 + x, y + 1, 3, 0, Math.PI * 2); ctx.stroke();
+                // 固件：圆(4+x, y+1, r=3) + 竖线(4+x, y, 长3)
+                ctx.beginPath();
+                ctx.arc(4 + x, y + 1, 3, 0, Math.PI * 2);
+                ctx.stroke();
                 ctx.fillRect(4 + x, y, 1, 3);
                 break;
             case 'plus_icon':
-                ctx.beginPath(); ctx.arc(4 + x, y + 1, 3, 0, Math.PI * 2); ctx.stroke();
+                // 固件：圆(4+x, y+1, r=3) + 竖线(4+x, y, 长3) + 横线(3+x, y+1, 长3)
+                ctx.beginPath();
+                ctx.arc(4 + x, y + 1, 3, 0, Math.PI * 2);
+                ctx.stroke();
                 ctx.fillRect(4 + x, y, 1, 3);
                 ctx.fillRect(3 + x, y + 1, 3, 1);
                 break;
             case 'slider_icon':
+                // 固件：两根竖条 + 两个方块
                 ctx.fillRect(3 + x, y - 1, 1, 5);
                 ctx.fillRect(6 + x, y - 1, 1, 5);
                 ctx.fillRect(2 + x, y - 2, 3, 3);
                 ctx.fillRect(5 + x, y + 2, 3, 3);
                 break;
             case 'user_icon':
+                // 固件：hal_draw_string(2+x, y + hal_get_font_height()/2, "-", ...)
+                // y 参数为文字基线，即图标中心 + fontSize/2
                 ctx.font = `${FONT_SIZE}px ${FONT_FAMILY}`;
-                ctx.textBaseline = 'middle';
+                ctx.textBaseline = 'alphabetic';
                 ctx.fillText('-', 2 + x, y + FONT_SIZE / 2);
                 break;
             case 'flag_icon':
+                // 固件：竖线(6+x, y-1, 长5) + fillRect(3+x, y-2, 4, 3)
                 ctx.fillRect(6 + x, y - 1, 1, 5);
                 ctx.fillRect(3 + x, y - 2, 4, 3);
                 break;
             case 'power_icon':
-                ctx.beginPath(); ctx.arc(4 + x, y + 1, 3, 0, Math.PI * 2); ctx.stroke();
+                // 固件：圆(4+x, y+1, r=3) + 竖线(4+x, y-2, 长3)
+                // 然后覆盖 (x+3, y-2) 和 (x+5, y-2) 为背景色
+                ctx.beginPath();
+                ctx.arc(4 + x, y + 1, 3, 0, Math.PI * 2);
+                ctx.stroke();
                 ctx.fillRect(4 + x, y - 2, 1, 3);
-                // 覆盖顶端像素（与固件一致）
                 ctx.fillStyle = '#000';
                 ctx.fillRect(x + 3, y - 2, 1, 1);
                 ctx.fillRect(x + 5, y - 2, 1, 1);
@@ -478,7 +558,21 @@
         const subtype = el.subtype || 'list_item';
         const content = el.content || '';
         const fontSize = el.fontSize || FONT_SIZE;
-        const yCenter = el.y + Math.floor(el.h / 2);
+
+        /* ═══ 与固件对齐的垂直坐标系 ═══
+         *
+         * 固件中列表项的 y_list_item 是文字基线锚点：
+         *   - 第一项 y_list_item = hal_get_font_height() + LIST_FONT_TOP_MARGIN - 1
+         *   - 图标中心 = y_list_item - hal_get_font_height()/2
+         *   - 文字基线 = y_list_item
+         *
+         * 设计器 control 元素是一个矩形 (el.x, el.y, el.w, el.h)。
+         * 为保持视觉一致，定义：
+         *   - yBaseline  = el.y + el.h - 1   // 文字基线，对应固件 y_list_item
+         *   - yIconCenter = yBaseline - Math.floor(fontSize / 2)  // 图标中心
+         */
+        const yBaseline   = el.y + el.h - 1;
+        const yIconCenter = yBaseline - Math.floor(fontSize / 2);
 
         /* 1. 左侧图标（与固件像素级对齐） */
         const iconMap = {
@@ -489,65 +583,167 @@
             user_item:   'user_icon',
         };
         drawListIcon(ctx, iconMap[subtype] || 'list_icon',
-                     el.x + LIST_ITEM_LEFT_MARGIN, yCenter, el.color);
+                     el.x + LIST_ITEM_LEFT_MARGIN, yIconCenter, el.color);
 
         /* 2. 文字（content） */
         if (content) {
             setColor(ctx, el.color);
             ctx.font = `${fontSize}px ${FONT_FAMILY}`;
-            ctx.textBaseline = 'middle';
+            ctx.textBaseline = 'alphabetic';
 
+            /* 固件中仅 switch_item / slider_item 需要右侧控件空间（LIST_ITEM_RIGHT_MARGIN=20）
+               list_item / button_item / user_item 的右侧 margin 只有 4 像素 */
             const hasRightControl = (subtype === 'switch_item' || subtype === 'slider_item');
-            const hasRightArrow   = (subtype === 'button_item' || subtype === 'user_item');
-            const rightMargin = hasRightControl || hasRightArrow ? LIST_ITEM_RIGHT_MARGIN : 4;
+            const rightMargin = hasRightControl ? LIST_ITEM_RIGHT_MARGIN : 4;
             let availWidth = el.w - LIST_ITEM_LEFT_MARGIN - 10 - rightMargin;
             if (subtype === 'switch_item') availWidth -= 11;
             else if (subtype === 'slider_item') availWidth -= 11;
 
             const textX = el.x + LIST_ITEM_LEFT_MARGIN + 10;
 
+            /* 裁剪区域与固件 hal_set_clip_rect 对齐：
+               固件：clip_y = _y_list_item - hal_get_font_height()/2 - 2
+                     clip_h = hal_get_font_height() + 4
+               设计器：clip_y = yIconCenter - Math.floor(fontSize/2) - 2
+                       clip_h = fontSize + 4                       */
+            const clipY = yIconCenter - Math.floor(fontSize / 2) - 2;
+            const clipH = fontSize + 4;
+
             ctx.save();
             ctx.beginPath();
-            ctx.rect(textX, el.y, availWidth, el.h);
+            ctx.rect(textX, clipY, availWidth, clipH);
             ctx.clip();
-            ctx.fillText(content, textX, yCenter + 1);
+            // 固件：hal_draw_utf8(x, y_list_item + hal_get_font_height()/2, content, ...)
+            // 其中 y_list_item + hal_get_font_height()/2 正是 yBaseline（因为 yBaseline = y_list_item）
+            ctx.fillText(content, textX, yBaseline);
             ctx.restore();
         }
 
         /* 3. 右侧控件（与固件像素级对齐） */
         const rightX = el.x + el.w - LIST_ITEM_RIGHT_MARGIN;
         if (subtype === 'switch_item') {
-            // 开关外框 11×7（固件 draw_list_item_switch）
+            // 固件 draw_list_item_switch：
+            //   hal_draw_rect(SCREEN_WIDTH - LIST_ITEM_RIGHT_MARGIN - 7, _y - 2, 11, 7)
+            //   _y = y_list_item - hal_get_font_height()/2 = yIconCenter
             setColor(ctx, el.color);
-            ctx.strokeRect(rightX - 7, yCenter - 2, 11, 7);
+            ctx.strokeRect(rightX - 7, yIconCenter - 2, 11, 7);
             // 开启态：方块靠右
-            ctx.fillRect(rightX - 1, yCenter,     3, 3);
-            ctx.fillRect(rightX - 4, yCenter + 1, 1, 1);
+            ctx.fillRect(rightX - 1, yIconCenter,     3, 3);
+            ctx.fillRect(rightX - 4, yIconCenter + 1, 1, 1);
+            // 注意：设计器只显示一种状态（默认 ON），实际固件会根据 *value 切换
         } else if (subtype === 'slider_item') {
-            // 数值文本 + 反色圆角矩形背景（固件 xerintosh_draw_slider_overlays）
+            // 固件在未确认态下直接显示数值；确认态有反色背景。
+            // 设计器默认显示数值（未确认态）
             const valueStr = String(el.value !== undefined ? el.value : 50);
             const valueWidth = measureTextWidth(valueStr, fontSize);
             const xValue = rightX - valueWidth + 2;
-            // 反色背景框
-            ctx.fillStyle = '#000';
-            ctx.fillRect(xValue, yCenter - 2, valueWidth + 4, fontSize - 2);
-            // 数值文字
+
+            // 固件未确认态：hal_draw_string(_x_value + 2, _y + hal_get_font_height()/2, ...)
+            // _y + hal_get_font_height()/2 = yIconCenter + fontSize/2 = yBaseline
             setColor(ctx, el.color);
             ctx.font = `${fontSize}px ${FONT_FAMILY}`;
-            ctx.textBaseline = 'middle';
-            ctx.fillText(valueStr, xValue + 2, yCenter + fontSize / 2);
-        } else if (subtype === 'button_item' || subtype === 'user_item') {
-            // button_item / user_item：右侧箭头
-            setColor(ctx, el.color);
-            const ay = yCenter + 1;
-            ctx.beginPath();
-            ctx.moveTo(rightX + 2, ay - 3);
-            ctx.lineTo(rightX + 7, ay);
-            ctx.lineTo(rightX + 2, ay + 3);
-            ctx.closePath();
-            ctx.fill();
+            ctx.textBaseline = 'alphabetic';
+            ctx.fillText(valueStr, xValue + 2, yBaseline);
         }
-        // list_item: 不绘制任何右侧控件
+        // list_item / button_item / user_item: 不绘制任何右侧控件
+        // （固件中 button_item / user_item 没有右侧箭头，进入提示由选择器虚线装饰承担）
+    };
+
+    /* ═══ List 容器渲染（与固件 ui_drawer.c 对齐）═══ */
+
+    Renderers.list = function(ctx, el) {
+        const engine = UILayoutEngine;
+        engine.layoutListChildren(el);
+
+        /* ── 1. 列表外观（与 xerintosh_draw_list_appearance 像素级对齐）── */
+        setColor(ctx, el.color);
+
+        // 顶部装饰横线
+        ctx.fillRect(el.x, el.y + 1, 66, 1);
+        ctx.fillRect(el.x, el.y, 67, 1);
+
+        // 顶部右侧装饰像素
+        const decoPixels = [
+            [67, 1], [69, 1], [71, 1], [73, 1], [75, 1], [77, 1], [79, 1], [81, 1], [83, 1], [85, 1], [87, 1], [89, 1], [91, 1], [93, 1], [95, 1], [97, 1], [99, 1],
+            [68, 0], [70, 0], [72, 0], [74, 0], [76, 0], [78, 0], [80, 0], [82, 0], [84, 0], [86, 0], [88, 0], [90, 0], [92, 0], [94, 0], [96, 0], [98, 0], [100, 0],
+            [102, 1], [105, 1], [108, 1], [111, 1],
+            [103, 0], [106, 0], [109, 0], [112, 0],
+            [115, 1], [120, 1], [125, 1],
+            [116, 0], [121, 0], [126, 0],
+        ];
+        for (const [dx, dy] of decoPixels) {
+            if (dx < el.w) ctx.fillRect(el.x + dx, el.y + dy, 1, 1);
+        }
+
+        // 右侧边框竖线
+        ctx.fillRect(el.x + el.w - 5, el.y, 1, el.h);
+        ctx.fillRect(el.x + el.w - 1, el.y, 1, el.h);
+
+        // 滚动条
+        const childCount = el.children.length;
+        if (childCount > 0) {
+            const lengthEachPart = Math.ceil((el.h - 10) / childCount);
+            const scrollY = 5 + el.selectedIndex * lengthEachPart;
+            ctx.fillRect(el.x + el.w - 4, el.y + scrollY, 3, lengthEachPart);
+
+            // 滚动条内部高光线（背景色覆盖）
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(el.x + el.w - 4, el.y + lengthEachPart + scrollY, 3, 1);
+            if (lengthEachPart >= 9) {
+                ctx.fillRect(el.x + el.w - 4, el.y + Math.floor(lengthEachPart - 2 + scrollY), 3, 1);
+                ctx.fillRect(el.x + el.w - 4, el.y + Math.floor(lengthEachPart + 2 + scrollY), 3, 1);
+            }
+            setColor(ctx, el.color);
+        }
+
+        // 滚动条上下端点
+        ctx.fillRect(el.x + el.w - 4, el.y, 3, 4);
+        ctx.fillRect(el.x + el.w - 4, el.y + el.h - 4, 3, 4);
+        ctx.fillStyle = '#000000';
+        ctx.fillRect(el.x + el.w - 4, el.y + 2, 3, 1);
+        ctx.fillRect(el.x + el.w - 3, el.y + 1, 1, 1);
+        ctx.fillRect(el.x + el.w - 4, el.y + el.h - 3, 3, 1);
+        ctx.fillRect(el.x + el.w - 3, el.y + el.h - 2, 1, 1);
+        setColor(ctx, el.color);
+
+        /* ── 2. 计算相机偏移 ── */
+        const selRect = engine.computeSelectorRect(el);
+        const cameraY = engine.computeCameraOffset(selRect.y - el.y, el.h, selRect.h);
+
+        /* ── 3. 绘制子元素（带相机偏移）── */
+        ctx.save();
+        for (const child of el.children) {
+            const origY = child.y;
+            child.y = origY + cameraY;
+            Elements.render(ctx, child);
+            child.y = origY;
+        }
+        ctx.restore();
+
+        /* ── 4. 绘制选择器高亮框（与固件 xerintosh_draw_selector 对齐）── */
+        const selX = selRect.x;
+        const selY = selRect.y + cameraY;
+        const selW = selRect.w;
+        const selH = selRect.h;
+
+        // XOR 反色矩形效果：用黄色虚线矩形模拟
+        ctx.strokeStyle = '#FFD700';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([2, 2]);
+        ctx.strokeRect(selX, selY, selW, selH);
+        ctx.setLineDash([]);
+
+        // 右侧虚线装饰
+        setColor(ctx, el.color);
+        for (let i = selX + selW; i <= selX + selW + 7; i += 2) {
+            for (let j = selY; j <= selY + selH - 1; j++) {
+                if (Math.floor(j) % 2 === 0) {
+                    ctx.fillRect(i + 1, j, 1, 1);
+                } else {
+                    ctx.fillRect(i, j, 1, 1);
+                }
+            }
+        }
     };
 
     /* ═══ 公共渲染入口 ═══ */
@@ -609,6 +805,9 @@
             case 'user_item':
                 return x >= el.x - t && x <= el.x + el.w + t &&
                        y >= el.y - t && y <= el.y + el.h + t;
+            case 'list':
+                return x >= el.x - t && x <= el.x + el.w + t &&
+                       y >= el.y - t && y <= el.y + el.h + t;
             default:
                 return false;
         }
@@ -617,6 +816,9 @@
     /* ═══ 调整大小手柄 ═══ */
 
     Elements.getHandles = function(el) {
+        /* 系统控件和 list 大小固定，不提供 resize 手柄 */
+        if (el.type === 'control' || el.type === 'list') return [];
+
         const type = el.subtype || el.type;
         if (type === 'line') {
             return [
@@ -685,12 +887,17 @@
                 return [...common, 'text', 'fontSize'];
             case 'icon':
                 return [...common, 'w', 'h', 'iconName'];
+            case 'list':
+                return [...common, 'w', 'h', 'selectedIndex'];
             default:
                 return common;
         }
     };
 
     Elements.getDisplayName = function(el) {
+        if (el.type === 'list') {
+            return `List (${el.children.length})`;
+        }
         if (el.type === 'control') {
             return el.content || el.subtype;
         }
@@ -708,5 +915,6 @@
 
     global.UIElements = Elements;
     global.ICON_BITMAPS = ICON_BITMAPS;
+    global.UILayoutEngine = UILayoutEngine;
 
 })(window);
