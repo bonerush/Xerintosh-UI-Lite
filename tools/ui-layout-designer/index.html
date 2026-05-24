@@ -245,10 +245,16 @@
                     <div class="prop-group" id="prop-font-group">
                         <label data-i18n="font_size">Font Size</label>
                         <select id="prop-font-size">
-                            <option value="6">6px (tiny)</option>
-                            <option value="8">8px (small)</option>
-                            <option value="12">12px (medium)</option>
-                            <option value="16">16px (large)</option>
+                            <option value="4">4px</option>
+                            <option value="6">6px</option>
+                            <option value="8">8px</option>
+                            <option value="10">10px</option>
+                            <option value="12">12px</option>
+                            <option value="14">14px</option>
+                            <option value="16">16px</option>
+                            <option value="18">18px</option>
+                            <option value="20">20px</option>
+                            <option value="24">24px</option>
                         </select>
                     </div>
                     <div class="prop-group" id="prop-label-group">
@@ -265,6 +271,13 @@
                         <div class="prop-color-row">
                             <input type="color" id="prop-color">
                             <span id="prop-color-hex">#FFFFFF</span>
+                        </div>
+                    </div>
+                    <div class="prop-group">
+                        <label data-i18n="text_color">Text Color</label>
+                        <div class="prop-color-row">
+                            <input type="color" id="prop-text-color">
+                            <span id="prop-text-color-hex">#FFFFFF</span>
                         </div>
                     </div>
                     <div class="prop-group">
@@ -294,7 +307,14 @@
                         <div><kbd>Del</kbd> Delete</div>
                         <div><kbd>Arrows</kbd> Nudge</div>
                         <div><kbd>Ctrl+Z</kbd> Undo</div>
+                        <div><kbd>Ctrl+Shift+Z</kbd> Redo</div>
                         <div><kbd>Ctrl+Y</kbd> Redo</div>
+                        <div><kbd>Ctrl+C</kbd> Copy</div>
+                        <div><kbd>Ctrl+V</kbd> Paste</div>
+                        <div><kbd>Ctrl+D</kbd> Duplicate</div>
+                        <div><kbd>Ctrl+A</kbd> Select All</div>
+                        <div><kbd>Esc</kbd> Deselect</div>
+                        <div><kbd>Dbl-click</kbd> Edit Text</div>
                     </div>
                 </div>
             </aside>

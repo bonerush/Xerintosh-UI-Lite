@@ -48,6 +48,7 @@ const i18n = {
         enter_text: 'Enter Text',
         enter_text_ph: 'Enter text...',
         cancel: 'Cancel',
+        text_color: 'Text Color',
         ok: 'OK',
         custom_screen_size: 'Custom Screen Size',
         llm_prompt: 'LLM Prompt',
@@ -101,6 +102,7 @@ const i18n = {
         enter_text: '输入文字',
         enter_text_ph: '请输入文字...',
         cancel: '取消',
+        text_color: '文字颜色',
         ok: '确定',
         custom_screen_size: '自定义屏幕尺寸',
         llm_prompt: 'LLM 提示词',
@@ -511,21 +513,101 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
+    /* ═══ 双击就地文本编辑 ═══ */
+
+    engine.canvas.addEventListener('dblclick', e => {
+        if (state.tool !== 'select') return;
+        const pos = engine.toLogical(e.clientX, e.clientY);
+        const hit = engine.hitTest(pos.x, pos.y);
+        if (!hit) return;
+
+        engine.setSelected(hit.id);
+        updateElementList();
+        updatePropertiesPanel();
+
+        const rect = engine.canvas.getBoundingClientRect();
+        const scale = engine.scale;
+        let inputX, inputY, inputW, inputH;
+
+        const type = hit.subtype || hit.type;
+        if (type === 'text') {
+            inputX = rect.left + hit.x * scale;
+            inputY = rect.top + hit.y * scale;
+            inputW = Math.max(60, (hit.w || 20) * scale);
+            inputH = Math.max(20, (hit.h || 12) * scale);
+        } else {
+            inputX = rect.left + hit.x * scale;
+            inputY = rect.top + hit.y * scale;
+            inputW = Math.max(60, (hit.w || 20) * scale);
+            inputH = Math.max(20, (hit.h || 12) * scale);
+        }
+
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.value = hit.text || '';
+        input.style.cssText = `
+            position: fixed;
+            left: ${inputX}px;
+            top: ${inputY}px;
+            width: ${inputW}px;
+            height: ${inputH}px;
+            font-family: "Share Tech Mono", monospace;
+            font-size: ${Math.max(12, (hit.fontSize || 12) * scale / 4)}px;
+            color: ${hit.textColor || hit.color};
+            background: rgba(0,0,0,0.7);
+            border: 1px solid ${hit.textColor || hit.color};
+            outline: none;
+            padding: 2px 4px;
+            z-index: 10000;
+            box-sizing: border-box;
+        `;
+
+        function finishEdit(save) {
+            if (!input.parentNode) return;
+            if (save) {
+                hit.text = input.value;
+                engine.render();
+                updatePropertiesPanel();
+                saveHistory();
+            }
+            input.remove();
+        }
+
+        input.addEventListener('keydown', ev => {
+            if (ev.key === 'Enter') { finishEdit(true); ev.preventDefault(); }
+            if (ev.key === 'Escape') { finishEdit(false); ev.preventDefault(); }
+        });
+        input.addEventListener('blur', () => finishEdit(true));
+
+        document.body.appendChild(input);
+        input.focus();
+        input.select();
+    });
+
     window.addEventListener('mousemove', e => {
         const pos = engine.toLogical(e.clientX, e.clientY);
         mouseCoords.textContent = `x: ${pos.x}, y: ${pos.y}`;
 
         // 悬停检测
         if (!engine.dragState.active) {
-            const hit = engine.hitTest(pos.x, pos.y);
-            if (hit && hit.id !== engine.hoveredId) {
-                engine.hoveredId = hit.id;
-                engine.canvas.style.cursor = state.tool === 'select' ? 'pointer' : '';
-                engine.render();
-            } else if (!hit && engine.hoveredId) {
-                engine.hoveredId = null;
-                engine.canvas.style.cursor = '';
-                engine.render();
+            let cursor = '';
+            if (state.tool === 'select') {
+                const handle = engine.hitHandle(pos.x, pos.y);
+                if (handle) {
+                    cursor = engine.getHandleCursor(handle);
+                } else {
+                    const hit = engine.hitTest(pos.x, pos.y);
+                    if (hit) {
+                        engine.hoveredId = hit.id;
+                        cursor = 'pointer';
+                    } else if (engine.hoveredId) {
+                        engine.hoveredId = null;
+                        engine.render();
+                    }
+                }
+            }
+            if (engine.canvas.style.cursor !== cursor) {
+                engine.canvas.style.cursor = cursor;
             }
         }
 
@@ -582,6 +664,18 @@ document.addEventListener('DOMContentLoaded', function () {
                 } else if (ds.handle === 'bottom-right') {
                     el.w = Math.max(1, ds.origW + dx);
                     el.h = Math.max(1, ds.origH + dy);
+                } else if (ds.handle === 'top') {
+                    const ny = Math.min(ds.origY + dy, ds.origY + ds.origH - 1);
+                    el.h = ds.origY + ds.origH - ny;
+                    el.y = ny;
+                } else if (ds.handle === 'bottom') {
+                    el.h = Math.max(1, ds.origH + dy);
+                } else if (ds.handle === 'left') {
+                    const nx = Math.min(ds.origX + dx, ds.origX + ds.origW - 1);
+                    el.w = ds.origX + ds.origW - nx;
+                    el.x = nx;
+                } else if (ds.handle === 'right') {
+                    el.w = Math.max(1, ds.origW + dx);
                 }
             }
             engine.render();
@@ -671,11 +765,78 @@ document.addEventListener('DOMContentLoaded', function () {
         if (e.key === 'Escape') $('text-cancel').click();
     });
 
+    /* ═══ 剪贴板 ═══ */
+
+    let clipboardElement = null;
+
+    async function copySelected() {
+        const el = engine.selectedId ? engine.getElement(engine.selectedId) : null;
+        if (!el) return;
+        const copy = JSON.parse(JSON.stringify(el));
+        delete copy.id;
+        clipboardElement = copy;
+        try {
+            await navigator.clipboard.writeText(JSON.stringify(copy));
+        } catch (err) {
+            // 降级：仅使用内存剪贴板
+        }
+    }
+
+    async function pasteElement() {
+        let data = clipboardElement;
+        if (!data) {
+            try {
+                const text = await navigator.clipboard.readText();
+                data = JSON.parse(text);
+            } catch (err) {
+                return;
+            }
+        }
+        if (!data) return;
+        const pasted = UIElements.create(data.type || data.subtype || 'rect', {
+            ...data,
+            x: data.x + 5,
+            y: data.y + 5,
+        });
+        engine.addElement(pasted);
+        engine.setSelected(pasted.id);
+        saveHistory();
+        updateElementList();
+        updatePropertiesPanel();
+        updateStatus();
+    }
+
+    function duplicateSelected() {
+        const el = engine.selectedId ? engine.getElement(engine.selectedId) : null;
+        if (!el) return;
+        const clone = UIElements.clone(el);
+        engine.addElement(clone);
+        engine.setSelected(clone.id);
+        saveHistory();
+        updateElementList();
+        updatePropertiesPanel();
+        updateStatus();
+    }
+
     /* ═══ 键盘快捷键 ═══ */
 
     window.addEventListener('keydown', e => {
-        // 忽略在输入框中的按键
-        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+        // 忽略在输入框中的按键（但允许 Escape）
+        if ((e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') && e.key !== 'Escape') return;
+
+        // Escape: 关闭弹窗或取消选择
+        if (e.key === 'Escape') {
+            const modals = document.querySelectorAll('.modal.active');
+            if (modals.length > 0) {
+                modals.forEach(m => m.classList.remove('active'));
+            } else {
+                engine.setSelected(null);
+                updateElementList();
+                updatePropertiesPanel();
+            }
+            e.preventDefault();
+            return;
+        }
 
         // 工具切换
         const keyMap = {
@@ -691,12 +852,44 @@ document.addEventListener('DOMContentLoaded', function () {
         // Undo / Redo
         if (e.ctrlKey && e.key.toLowerCase() === 'z') {
             e.preventDefault();
-            undo();
+            if (e.shiftKey) {
+                redo();
+            } else {
+                undo();
+            }
             return;
         }
         if (e.ctrlKey && e.key.toLowerCase() === 'y') {
             e.preventDefault();
             redo();
+            return;
+        }
+
+        // Copy / Paste / Duplicate
+        if (e.ctrlKey && e.key.toLowerCase() === 'c') {
+            e.preventDefault();
+            copySelected();
+            return;
+        }
+        if (e.ctrlKey && e.key.toLowerCase() === 'v') {
+            e.preventDefault();
+            pasteElement();
+            return;
+        }
+        if (e.ctrlKey && e.key.toLowerCase() === 'd') {
+            e.preventDefault();
+            duplicateSelected();
+            return;
+        }
+
+        // Select All
+        if (e.ctrlKey && e.key.toLowerCase() === 'a') {
+            e.preventDefault();
+            if (engine.elements.length > 0) {
+                engine.setSelected(engine.elements[engine.elements.length - 1].id);
+                updateElementList();
+                updatePropertiesPanel();
+            }
             return;
         }
 
@@ -747,6 +940,7 @@ document.addEventListener('DOMContentLoaded', function () {
         label: $('prop-label'),
         fill: $('prop-fill'),
         color: $('prop-color'),
+        textColor: $('prop-text-color'),
         layer: $('prop-layer'),
     };
 
@@ -778,6 +972,8 @@ document.addEventListener('DOMContentLoaded', function () {
         propInputs.y.value      = el.y;
         propInputs.color.value  = el.color;
         $('prop-color-hex').textContent = el.color;
+        propInputs.textColor.value = el.textColor || el.color;
+        $('prop-text-color-hex').textContent = el.textColor || el.color;
         propInputs.layer.value  = el.layer || 0;
 
         // 显示/隐藏特定属性
@@ -786,11 +982,12 @@ document.addEventListener('DOMContentLoaded', function () {
         $('prop-radius-group').style.display = (el.r !== undefined) ? 'block' : 'none';
         if (el.r !== undefined) $('prop-r').value = el.r;
 
-        $('prop-text-group').style.display = (type === 'text') ? 'block' : 'none';
-        if (type === 'text') $('prop-text').value = el.text || '';
+        // 所有元素都支持 text 属性
+        $('prop-text-group').style.display = 'block';
+        $('prop-text').value = el.text || '';
 
-        $('prop-font-group').style.display = (type === 'text' || el.type === 'control') ? 'block' : 'none';
-        if (type === 'text' || el.type === 'control') $('prop-font-size').value = el.fontSize || 12;
+        $('prop-font-group').style.display = 'block';
+        $('prop-font-size').value = el.fontSize || 8;
 
         $('prop-label-group').style.display = (el.type === 'control') ? 'block' : 'none';
         if (el.type === 'control') $('prop-label').value = el.content || '';
@@ -830,9 +1027,13 @@ document.addEventListener('DOMContentLoaded', function () {
     bindPropInput($('prop-font-size'), 'fontSize', true);
     bindPropInput($('prop-label'), 'content', false);
     bindPropInput($('prop-color'), 'color', false);
+    bindPropInput($('prop-text-color'), 'textColor', false);
 
     $('prop-color').addEventListener('input', () => {
         $('prop-color-hex').textContent = $('prop-color').value;
+    });
+    $('prop-text-color').addEventListener('input', () => {
+        $('prop-text-color-hex').textContent = $('prop-text-color').value;
     });
 
     $('prop-fill').addEventListener('change', () => {

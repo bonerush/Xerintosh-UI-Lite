@@ -39,6 +39,7 @@
                     ...base,
                     fill: type === 'filled-rect',
                     subtype: 'rectangle',
+                    fontSize: attrs.fontSize || 8,
                 };
             case 'round-rect':
             case 'filled-round-rect':
@@ -47,6 +48,7 @@
                     r: attrs.r || 3,
                     fill: type === 'filled-round-rect',
                     subtype: 'round-rect',
+                    fontSize: attrs.fontSize || 8,
                 };
             case 'circle':
             case 'filled-circle':
@@ -55,6 +57,7 @@
                     r: attrs.r || 5,
                     fill: type === 'filled-circle',
                     subtype: 'circle',
+                    fontSize: attrs.fontSize || 8,
                 };
             case 'line':
                 return {
@@ -62,6 +65,7 @@
                     x2: attrs.x2 || (base.x + 10),
                     y2: attrs.y2 || (base.y + 10),
                     subtype: 'line',
+                    fontSize: attrs.fontSize || 8,
                 };
             case 'text':
                 return {
@@ -741,6 +745,56 @@
         }
     };
 
+    /* ═══ 元素内部文本绘制 ═══ */
+
+    function drawElementText(ctx, el) {
+        if (!el.text) return;
+        const fs = el.fontSize || 8;
+        const tw = measureTextWidth(el.text, fs);
+        const th = fs;
+
+        let tx, ty, clipX, clipY, clipW, clipH;
+        const type = el.subtype || el.type;
+
+        if (type === 'circle' || type === 'filled-circle') {
+            const cx = el.x + el.r;
+            const cy = el.y + el.r;
+            tx = cx - tw / 2;
+            ty = cy - th / 2;
+            clipX = el.x;
+            clipY = el.y;
+            clipW = el.r * 2;
+            clipH = el.r * 2;
+        } else if (type === 'line') {
+            const cx = (el.x + el.x2) / 2;
+            const cy = (el.y + el.y2) / 2;
+            tx = cx - tw / 2;
+            ty = cy - th / 2;
+            clipX = Math.min(el.x, el.x2);
+            clipY = Math.min(el.y, el.y2);
+            clipW = Math.abs(el.x2 - el.x);
+            clipH = Math.abs(el.y2 - el.y);
+        } else {
+            // 矩形类通用：居中
+            tx = el.x + (el.w - tw) / 2;
+            ty = el.y + (el.h - th) / 2;
+            clipX = el.x;
+            clipY = el.y;
+            clipW = el.w;
+            clipH = el.h;
+        }
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(clipX, clipY, clipW, clipH);
+        ctx.clip();
+        setColor(ctx, el.textColor || el.color);
+        ctx.font = `${fs}px ${FONT_FAMILY}`;
+        ctx.textBaseline = 'top';
+        ctx.fillText(el.text, tx, ty);
+        ctx.restore();
+    }
+
     /* ═══ 公共渲染入口 ═══ */
 
     Elements.render = function(ctx, el) {
@@ -750,6 +804,10 @@
         const renderer = Renderers[subtype];
         if (renderer) {
             renderer(ctx, el);
+        }
+        // 为所有非 text / control / list / icon 类型绘制内部文本
+        if (el.text && subtype !== 'text' && subtype !== 'control' && subtype !== 'list' && subtype !== 'icon') {
+            drawElementText(ctx, el);
         }
     };
 
@@ -817,31 +875,36 @@
         const type = el.subtype || el.type;
         if (type === 'line') {
             return [
-                { x: el.x,  y: el.y,  name: 'start' },
-                { x: el.x2, y: el.y2, name: 'end' },
+                { x: el.x,  y: el.y,  name: 'start', kind: 'corner' },
+                { x: el.x2, y: el.y2, name: 'end', kind: 'corner' },
             ];
         }
         if (type === 'circle' || type === 'filled-circle') {
             return [
-                { x: el.x, y: el.y, name: 'top-left' },
-                { x: el.x + el.r * 2, y: el.y, name: 'top-right' },
-                { x: el.x, y: el.y + el.r * 2, name: 'bottom-left' },
-                { x: el.x + el.r * 2, y: el.y + el.r * 2, name: 'bottom-right' },
+                { x: el.x, y: el.y, name: 'top-left', kind: 'corner' },
+                { x: el.x + el.r * 2, y: el.y, name: 'top-right', kind: 'corner' },
+                { x: el.x, y: el.y + el.r * 2, name: 'bottom-left', kind: 'corner' },
+                { x: el.x + el.r * 2, y: el.y + el.r * 2, name: 'bottom-right', kind: 'corner' },
             ];
         }
-        // 矩形类通用 4 角
+        // 矩形类通用 4 角 + 4 边中点
         return [
-            { x: el.x,      y: el.y,      name: 'top-left' },
-            { x: el.x + el.w, y: el.y,      name: 'top-right' },
-            { x: el.x,      y: el.y + el.h, name: 'bottom-left' },
-            { x: el.x + el.w, y: el.y + el.h, name: 'bottom-right' },
+            { x: el.x,          y: el.y,          name: 'top-left',     kind: 'corner' },
+            { x: el.x + el.w / 2, y: el.y,          name: 'top',          kind: 'edge' },
+            { x: el.x + el.w,   y: el.y,          name: 'top-right',    kind: 'corner' },
+            { x: el.x,          y: el.y + el.h / 2, name: 'left',         kind: 'edge' },
+            { x: el.x + el.w,   y: el.y + el.h / 2, name: 'right',        kind: 'edge' },
+            { x: el.x,          y: el.y + el.h,   name: 'bottom-left',  kind: 'corner' },
+            { x: el.x + el.w / 2, y: el.y + el.h,   name: 'bottom',       kind: 'edge' },
+            { x: el.x + el.w,   y: el.y + el.h,   name: 'bottom-right', kind: 'corner' },
         ];
     };
 
     Elements.hitHandle = function(el, x, y) {
         const handles = Elements.getHandles(el);
         for (const h of handles) {
-            if (Math.abs(x - h.x) <= 2 && Math.abs(y - h.y) <= 2) {
+            const tolerance = h.kind === 'corner' ? 2.5 : 3;
+            if (Math.abs(x - h.x) <= tolerance && Math.abs(y - h.y) <= tolerance) {
                 return h.name;
             }
         }

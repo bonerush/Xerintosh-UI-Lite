@@ -512,12 +512,41 @@ body {
 #prop-fill-group label {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
     font-size: 12px;
     cursor: pointer;
+    color: var(--text);
 }
 
-#prop-fill-group input { cursor: pointer; }
+#prop-fill-group input[type="checkbox"] {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    background: var(--bg);
+    cursor: pointer;
+    position: relative;
+    flex-shrink: 0;
+}
+
+#prop-fill-group input[type="checkbox"]:checked {
+    background: var(--accent);
+    border-color: var(--accent);
+}
+
+#prop-fill-group input[type="checkbox"]:checked::after {
+    content: "";
+    position: absolute;
+    left: 4px;
+    top: 1px;
+    width: 5px;
+    height: 9px;
+    border: solid var(--bg);
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+}
 
 .prop-actions {
     display: flex;

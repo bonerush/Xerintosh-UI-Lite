@@ -328,11 +328,15 @@
         ctx.strokeRect(el.x, el.y, el.w, el.h);
         ctx.restore();
 
-        // 4 角手柄
-        this._drawHandle(ctx, el.x,     el.y);
-        this._drawHandle(ctx, el.x + el.w, el.y);
-        this._drawHandle(ctx, el.x,     el.y + el.h);
-        this._drawHandle(ctx, el.x + el.w, el.y + el.h);
+        // 8 个手柄：4 角（圆形）+ 4 边中点（方形）
+        this._drawHandle(ctx, el.x,         el.y);
+        this._drawEdgeHandle(ctx, el.x + el.w / 2, el.y);
+        this._drawHandle(ctx, el.x + el.w,   el.y);
+        this._drawEdgeHandle(ctx, el.x,         el.y + el.h / 2);
+        this._drawEdgeHandle(ctx, el.x + el.w,   el.y + el.h / 2);
+        this._drawHandle(ctx, el.x,         el.y + el.h);
+        this._drawEdgeHandle(ctx, el.x + el.w / 2, el.y + el.h);
+        this._drawHandle(ctx, el.x + el.w,   el.y + el.h);
     };
 
     CanvasEngine.prototype._drawHover = function(ctx, el) {
@@ -364,6 +368,21 @@
         const r = 2.5;
         ctx.beginPath();
         ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+    };
+
+    CanvasEngine.prototype._drawEdgeHandle = function(ctx, x, y) {
+        ctx.fillStyle   = '#FFD700';
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth   = 1;
+        const s = 2.5;
+        ctx.beginPath();
+        ctx.moveTo(x, y - s);
+        ctx.lineTo(x + s, y);
+        ctx.lineTo(x, y + s);
+        ctx.lineTo(x - s, y);
+        ctx.closePath();
         ctx.fill();
         ctx.stroke();
     };
@@ -433,6 +452,17 @@
         const el = this.getElement(this.selectedId);
         if (!el || typeof global.UIElements === 'undefined') return null;
         return global.UIElements.hitHandle(el, x, y);
+    };
+
+    CanvasEngine.prototype.getHandleCursor = function(handleName) {
+        switch (handleName) {
+            case 'top': case 'bottom': return 'ns-resize';
+            case 'left': case 'right': return 'ew-resize';
+            case 'top-left': case 'bottom-right': return 'nwse-resize';
+            case 'top-right': case 'bottom-left': return 'nesw-resize';
+            case 'start': case 'end': return 'move';
+            default: return 'default';
+        }
     };
 
     /* ── 图层操作 ── */
