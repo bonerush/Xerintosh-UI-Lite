@@ -458,20 +458,37 @@ document.addEventListener('DOMContentLoaded', function () {
 
         if (state.tool === 'select') {
             const hit = engine.hitTest(pos.x, pos.y);
+            const ctrlOrMeta = e.ctrlKey || e.metaKey;
             if (hit) {
-                engine.setSelected(hit.id);
-                dragEl = hit;
+                if (ctrlOrMeta) {
+                    engine.toggleSelected(hit.id);
+                    dragEl = null;
+                } else {
+                    engine.setSelected(hit.id);
+                    dragEl = hit;
+                    engine.dragState = {
+                        active: true,
+                        moving: true,
+                        element: hit,
+                        startX: pos.x,
+                        startY: pos.y,
+                        origX:  hit.x,
+                        origY:  hit.y,
+                    };
+                }
+            } else {
+                if (!ctrlOrMeta) {
+                    engine.clearSelection();
+                }
+                // 启动框选
                 engine.dragState = {
                     active: true,
-                    moving: true,
-                    element: hit,
+                    marquee: { x: pos.x, y: pos.y, w: 0, h: 0 },
                     startX: pos.x,
                     startY: pos.y,
-                    origX:  hit.x,
-                    origY:  hit.y,
+                    origX: pos.x,
+                    origY: pos.y,
                 };
-            } else {
-                engine.setSelected(null);
                 dragEl = null;
             }
             updateElementList();
@@ -617,6 +634,20 @@ document.addEventListener('DOMContentLoaded', function () {
         const dx = pos.x - ds.startX;
         const dy = pos.y - ds.startY;
 
+        if (ds.marquee) {
+            // 更新框选矩形
+            const mx = Math.min(ds.origX, pos.x);
+            const my = Math.min(ds.origY, pos.y);
+            const mw = Math.abs(pos.x - ds.origX);
+            const mh = Math.abs(pos.y - ds.origY);
+            ds.marquee.x = mx;
+            ds.marquee.y = my;
+            ds.marquee.w = mw;
+            ds.marquee.h = mh;
+            engine.render();
+            return;
+        }
+
         if (ds.moving && ds.element) {
             ds.element.x = Math.max(0, Math.min(state.screenW - (ds.element.w || 1), ds.origX + dx));
             ds.element.y = Math.max(0, Math.min(state.screenH - (ds.element.h || 1), ds.origY + dy));
@@ -705,6 +736,36 @@ document.addEventListener('DOMContentLoaded', function () {
     window.addEventListener('mouseup', () => {
         if (!isMouseDown) return;
         isMouseDown = false;
+
+        if (engine.dragState.marquee) {
+            // 框选结束
+            const mq = engine.dragState.marquee;
+            if (mq.w > 2 || mq.h > 2) {
+                const shiftAdd = e && e.shiftKey;
+                if (!shiftAdd) {
+                    engine.clearSelection();
+                }
+                for (const el of engine.elements) {
+                    const bounds = engine._getBounds(el);
+                    const intersects = !(bounds.right < mq.x || bounds.left > mq.x + mq.w ||
+                                         bounds.bottom < mq.y || bounds.top > mq.y + mq.h);
+                    if (intersects) {
+                        if (shiftAdd) {
+                            engine.toggleSelected(el.id);
+                        } else {
+                            engine.selectedIds.add(el.id);
+                            engine.selectedId = el.id;
+                        }
+                    }
+                }
+                engine.render();
+                updateElementList();
+                updatePropertiesPanel();
+            }
+            engine.dragState = { active: false };
+            dragEl = null;
+            return;
+        }
 
         if (engine.dragState.drawing && engine.dragState.preview) {
             const el = engine.dragState.preview;
@@ -886,16 +947,60 @@ document.addEventListener('DOMContentLoaded', function () {
         if (e.ctrlKey && e.key.toLowerCase() === 'a') {
             e.preventDefault();
             if (engine.elements.length > 0) {
-                engine.setSelected(engine.elements[engine.elements.length - 1].id);
+                engine.selectedIds.clear();
+                for (const el of engine.elements) {
+                    engine.selectedIds.add(el.id);
+                }
+                engine.selectedId = engine.elements[engine.elements.length - 1].id;
+                engine.render();
                 updateElementList();
                 updatePropertiesPanel();
             }
             return;
         }
 
+        // 对齐快捷键
+        if (e.ctrlKey && e.shiftKey) {
+            const alignModes = {
+                'ArrowLeft': 'left',
+                'ArrowRight': 'right',
+                'ArrowUp': 'top',
+                'ArrowDown': 'bottom',
+                'h': 'h-center',
+                'v': 'v-center',
+            };
+            const distModes = {
+                '[': 'h-space',
+                ']': 'v-space',
+            };
+            if (alignModes[e.key]) {
+                e.preventDefault();
+                engine.align(alignModes[e.key]);
+                saveHistory();
+                updatePropertiesPanel();
+                return;
+            }
+            if (distModes[e.key]) {
+                e.preventDefault();
+                engine.distribute(distModes[e.key]);
+                saveHistory();
+                updatePropertiesPanel();
+                return;
+            }
+        }
+
         // 删除
         if (e.key === 'Delete' || e.key === 'Backspace') {
-            if (engine.selectedId) {
+            if (engine.selectedIds && engine.selectedIds.size > 0) {
+                const ids = Array.from(engine.selectedIds);
+                for (const id of ids) {
+                    engine.removeElement(id);
+                }
+                saveHistory();
+                updateElementList();
+                updatePropertiesPanel();
+                updateStatus();
+            } else if (engine.selectedId) {
                 engine.removeElement(engine.selectedId);
                 saveHistory();
                 updateElementList();
@@ -906,8 +1011,27 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
-        // 方向键微调
-        if (engine.selectedId) {
+        // 方向键微调（对所有选中元素）
+        if (engine.selectedIds && engine.selectedIds.size > 0) {
+            const step = e.shiftKey ? 5 : 1;
+            let moved = false;
+            for (const id of engine.selectedIds) {
+                const el = engine.getElement(id);
+                if (!el) continue;
+                switch (e.key) {
+                    case 'ArrowUp':    el.y = Math.max(0, el.y - step); moved = true; break;
+                    case 'ArrowDown':  el.y = Math.min(state.screenH - 1, el.y + step); moved = true; break;
+                    case 'ArrowLeft':  el.x = Math.max(0, el.x - step); moved = true; break;
+                    case 'ArrowRight': el.x = Math.min(state.screenW - 1, el.x + step); moved = true; break;
+                }
+            }
+            if (moved) {
+                engine.render();
+                updatePropertiesPanel();
+                saveHistory();
+                e.preventDefault();
+            }
+        } else if (engine.selectedId) {
             const el = engine.getElement(engine.selectedId);
             if (!el) return;
             const step = e.shiftKey ? 5 : 1;
@@ -947,6 +1071,27 @@ document.addEventListener('DOMContentLoaded', function () {
     function updatePropertiesPanel() {
         const el = engine.selectedId ? engine.getElement(engine.selectedId) : null;
         const panel = $('properties-panel');
+        const multiInfo = $('prop-multi-info');
+
+        // 多选时显示简化信息
+        if (engine.selectedIds && engine.selectedIds.size > 1) {
+            panel.style.opacity = '1';
+            if (multiInfo) {
+                multiInfo.style.display = 'block';
+                multiInfo.textContent = `${engine.selectedIds.size} ${i18n[state.lang].elements} selected`;
+            }
+            // 隐藏单个元素属性
+            for (const key in propInputs) {
+                if (propInputs[key] && propInputs[key].type !== 'checkbox') {
+                    propInputs[key].value = '';
+                }
+            }
+            $('prop-color-hex').textContent = '';
+            $('prop-text-color-hex').textContent = '';
+            return;
+        }
+
+        if (multiInfo) multiInfo.style.display = 'none';
 
         if (!el) {
             panel.style.opacity = '0.5';
@@ -1063,7 +1208,16 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     $('btn-delete').addEventListener('click', () => {
-        if (engine.selectedId) {
+        if (engine.selectedIds && engine.selectedIds.size > 0) {
+            const ids = Array.from(engine.selectedIds);
+            for (const id of ids) {
+                engine.removeElement(id);
+            }
+            saveHistory();
+            updateElementList();
+            updatePropertiesPanel();
+            updateStatus();
+        } else if (engine.selectedId) {
             engine.removeElement(engine.selectedId);
             saveHistory();
             updateElementList();
@@ -1073,16 +1227,84 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     $('btn-duplicate').addEventListener('click', () => {
-        const el = engine.selectedId ? engine.getElement(engine.selectedId) : null;
-        if (!el) return;
-        const clone = UIElements.clone(el);
-        engine.addElement(clone);
-        engine.setSelected(clone.id);
-        saveHistory();
-        updateElementList();
-        updatePropertiesPanel();
-        updateStatus();
+        if (engine.selectedIds && engine.selectedIds.size > 0) {
+            const ids = Array.from(engine.selectedIds);
+            let lastClone = null;
+            for (const id of ids) {
+                const el = engine.getElement(id);
+                if (!el) continue;
+                const clone = UIElements.clone(el);
+                clone.x += 5;
+                clone.y += 5;
+                engine.addElement(clone);
+                lastClone = clone;
+            }
+            if (lastClone) {
+                engine.setSelected(lastClone.id);
+            }
+            saveHistory();
+            updateElementList();
+            updatePropertiesPanel();
+            updateStatus();
+        } else if (engine.selectedId) {
+            const el = engine.getElement(engine.selectedId);
+            if (!el) return;
+            const clone = UIElements.clone(el);
+            engine.addElement(clone);
+            engine.setSelected(clone.id);
+            saveHistory();
+            updateElementList();
+            updatePropertiesPanel();
+            updateStatus();
+        }
     });
+
+    /* ═══ 吸附开关 ═══ */
+
+    const snapToggle = $('toggle-snap');
+    if (snapToggle) {
+        snapToggle.addEventListener('click', () => {
+            engine.enableSnap = !engine.enableSnap;
+            snapToggle.classList.toggle('active', engine.enableSnap);
+            snapToggle.title = engine.enableSnap ? 'Snap On' : 'Snap Off';
+        });
+    }
+
+    /* ═══ 对齐工具栏 ═══ */
+
+    const alignButtons = {
+        'align-left': 'left',
+        'align-h-center': 'h-center',
+        'align-right': 'right',
+        'align-top': 'top',
+        'align-v-center': 'v-center',
+        'align-bottom': 'bottom',
+    };
+    const distButtons = {
+        'dist-h-space': 'h-space',
+        'dist-v-space': 'v-space',
+    };
+
+    for (const [btnId, mode] of Object.entries(alignButtons)) {
+        const btn = $(btnId);
+        if (btn) {
+            btn.addEventListener('click', () => {
+                engine.align(mode);
+                saveHistory();
+                updatePropertiesPanel();
+            });
+        }
+    }
+    for (const [btnId, mode] of Object.entries(distButtons)) {
+        const btn = $(btnId);
+        if (btn) {
+            btn.addEventListener('click', () => {
+                engine.distribute(mode);
+                saveHistory();
+                updatePropertiesPanel();
+            });
+        }
+    }
 
     /* ═══ 元素列表 ═══ */
 
@@ -1092,13 +1314,19 @@ document.addEventListener('DOMContentLoaded', function () {
         const sorted = [...engine.elements].sort((a, b) => (a.layer || 0) - (b.layer || 0));
         sorted.forEach(el => {
             const item = document.createElement('div');
-            item.className = 'element-item' + (el.id === engine.selectedId ? ' selected' : '');
+            const isSelected = engine.selectedIds && engine.selectedIds.has(el.id);
+            const isPrimary = el.id === engine.selectedId;
+            item.className = 'element-item' + (isSelected ? ' selected' : '') + (isPrimary ? ' primary' : '');
             item.innerHTML = `
                 <span class="el-name">${UIElements.getDisplayName(el)}</span>
                 <span class="el-type">${el.subtype || el.type}</span>
             `;
-            item.addEventListener('click', () => {
-                engine.setSelected(el.id);
+            item.addEventListener('click', (e) => {
+                if (e.ctrlKey || e.metaKey) {
+                    engine.toggleSelected(el.id);
+                } else {
+                    engine.setSelected(el.id);
+                }
                 updateElementList();
                 updatePropertiesPanel();
             });

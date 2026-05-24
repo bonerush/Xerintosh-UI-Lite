@@ -19,9 +19,9 @@
     <h1>UI Layout Designer — Test Suite</h1>
     <div id="results"></div>
 
-    <script src="elements.js?v=6"></script>
-    <script src="exporter.js?v=6"></script>
-    <script src="canvas.js?v=6"></script>
+    <script src="elements.js?v=7"></script>
+    <script src="exporter.js?v=7"></script>
+    <script src="canvas.js?v=7"></script>
 
     <script>
     (function() {
@@ -416,6 +416,168 @@
                 `import restores selectedIndex=1 (got: ${importedList?.selectedIndex})`);
         } catch (e) {
             log(s14, 'FAIL', `List export/import not implemented: ${e.message}`);
+        }
+
+        /* ═══ Test 15: Multi-Selection API ═══ */
+        const s15 = section('Test 15: Multi-Selection API');
+        try {
+            const msCanvas = document.createElement('canvas');
+            msCanvas.id = 'test-multi-select';
+            msCanvas.width = 80; msCanvas.height = 160;
+            document.body.appendChild(msCanvas);
+            const msEngine = new CanvasEngine('test-multi-select', { width: 80, height: 160, scale: 1 });
+
+            const e1 = UIElements.create('rect', { x: 5, y: 5, w: 10, h: 10, color: '#FFFFFF' });
+            const e2 = UIElements.create('rect', { x: 20, y: 20, w: 10, h: 10, color: '#FFFFFF' });
+            const e3 = UIElements.create('rect', { x: 40, y: 40, w: 10, h: 10, color: '#FFFFFF' });
+            msEngine.addElement(e1);
+            msEngine.addElement(e2);
+            msEngine.addElement(e3);
+
+            // setSelected should support addToSelection
+            msEngine.setSelected(e1.id);
+            log(s15, msEngine.selectedId === e1.id ? 'PASS' : 'FAIL',
+                `setSelected sets primary selection (got: ${msEngine.selectedId})`);
+
+            // toggleSelected
+            if (typeof msEngine.toggleSelected === 'function') {
+                msEngine.toggleSelected(e2.id);
+                log(s15, msEngine.selectedIds && msEngine.selectedIds.has(e2.id) ? 'PASS' : 'FAIL',
+                    `toggleSelected adds to selection`);
+                msEngine.toggleSelected(e2.id);
+                log(s15, msEngine.selectedIds && !msEngine.selectedIds.has(e2.id) ? 'PASS' : 'FAIL',
+                    `toggleSelected removes from selection`);
+            } else {
+                log(s15, 'FAIL', `toggleSelected not implemented`);
+                log(s15, 'FAIL', `toggleSelected remove not tested`);
+            }
+
+            // clearSelection
+            if (typeof msEngine.clearSelection === 'function') {
+                msEngine.clearSelection();
+                log(s15, msEngine.selectedId === null ? 'PASS' : 'FAIL',
+                    `clearSelection resets primary selection`);
+            } else {
+                log(s15, 'FAIL', `clearSelection not implemented`);
+            }
+
+            // isSelected
+            if (typeof msEngine.isSelected === 'function') {
+                msEngine.setSelected(e1.id);
+                log(s15, msEngine.isSelected(e1.id) ? 'PASS' : 'FAIL',
+                    `isSelected returns true for selected element`);
+                log(s15, !msEngine.isSelected(e2.id) ? 'PASS' : 'FAIL',
+                    `isSelected returns false for unselected element`);
+            } else {
+                log(s15, 'FAIL', `isSelected not implemented`);
+                log(s15, 'FAIL', `isSelected false not tested`);
+            }
+        } catch (e) {
+            log(s15, 'FAIL', `Multi-selection API error: ${e.message}`);
+        }
+
+        /* ═══ Test 16: Alignment ═══ */
+        const s16 = section('Test 16: Alignment');
+        try {
+            const alignCanvas = document.createElement('canvas');
+            alignCanvas.id = 'test-align';
+            alignCanvas.width = 80; alignCanvas.height = 160;
+            document.body.appendChild(alignCanvas);
+            const alignEngine = new CanvasEngine('test-align', { width: 80, height: 160, scale: 1 });
+
+            const a1 = UIElements.create('rect', { x: 5, y: 5, w: 10, h: 10, color: '#FFFFFF' });
+            const a2 = UIElements.create('rect', { x: 30, y: 20, w: 15, h: 8, color: '#FFFFFF' });
+            const a3 = UIElements.create('rect', { x: 50, y: 40, w: 8, h: 12, color: '#FFFFFF' });
+            alignEngine.addElement(a1);
+            alignEngine.addElement(a2);
+            alignEngine.addElement(a3);
+
+            if (typeof alignEngine.align === 'function') {
+                // Left align: a1 is primary (last setSelected), all left edges = 5
+                alignEngine.setSelected(a1.id);
+                alignEngine.selectedIds = new Set([a1.id, a2.id, a3.id]);
+                alignEngine.align('left');
+                log(s16, a1.x === 5 && a2.x === 5 && a3.x === 5 ? 'PASS' : 'FAIL',
+                    `align left: all x = primary x (5) (got: ${a1.x}, ${a2.x}, ${a3.x})`);
+
+                // Reset and test top align
+                a1.x = 5; a2.x = 30; a3.x = 50;
+                a1.y = 5; a2.y = 20; a3.y = 40;
+                alignEngine.align('top');
+                log(s16, a1.y === 5 && a2.y === 5 && a3.y === 5 ? 'PASS' : 'FAIL',
+                    `align top: all y = primary y (5) (got: ${a1.y}, ${a2.y}, ${a3.y})`);
+
+                // Reset and test h-center align
+                a1.x = 5; a2.x = 30; a3.x = 50;
+                a1.y = 5; a2.y = 20; a3.y = 40;
+                alignEngine.align('h-center');
+                const primaryCX = a1.x + a1.w / 2; // 10
+                log(s16, a2.x + a2.w / 2 === 10 && a3.x + a3.w / 2 === 10 ? 'PASS' : 'FAIL',
+                    `align h-center: all centers match primary (10) (got: ${a2.x + a2.w / 2}, ${a3.x + a3.w / 2})`);
+            } else {
+                log(s16, 'FAIL', `align() not implemented`);
+                log(s16, 'FAIL', `align top not tested`);
+                log(s16, 'FAIL', `align h-center not tested`);
+            }
+        } catch (e) {
+            log(s16, 'FAIL', `Alignment error: ${e.message}`);
+        }
+
+        /* ═══ Test 17: Distribution ═══ */
+        const s17 = section('Test 17: Distribution');
+        try {
+            const distCanvas = document.createElement('canvas');
+            distCanvas.id = 'test-dist';
+            distCanvas.width = 80; distCanvas.height = 160;
+            document.body.appendChild(distCanvas);
+            const distEngine = new CanvasEngine('test-dist', { width: 80, height: 160, scale: 1 });
+
+            const d1 = UIElements.create('rect', { x: 10, y: 10, w: 10, h: 10, color: '#FFFFFF' });
+            const d2 = UIElements.create('rect', { x: 20, y: 10, w: 10, h: 10, color: '#FFFFFF' });
+            const d3 = UIElements.create('rect', { x: 50, y: 10, w: 10, h: 10, color: '#FFFFFF' });
+            distEngine.addElement(d1);
+            distEngine.addElement(d2);
+            distEngine.addElement(d3);
+
+            if (typeof distEngine.distribute === 'function') {
+                distEngine.selectedIds = new Set([d1.id, d2.id, d3.id]);
+                distEngine.distribute('h-space');
+                // After h-space: centers should be evenly spaced
+                // Leftmost center = 15, rightmost center = 55, gap = 40, 2 gaps -> 20 each
+                // Expected centers: 15, 35, 55
+                const c1 = d1.x + d1.w / 2;
+                const c2 = d2.x + d2.w / 2;
+                const c3 = d3.x + d3.w / 2;
+                log(s17, c1 === 15 && c2 === 35 && c3 === 55 ? 'PASS' : 'FAIL',
+                    `distribute h-space: centers evenly spaced (got: ${c1}, ${c2}, ${c3})`);
+            } else {
+                log(s17, 'FAIL', `distribute() not implemented`);
+            }
+        } catch (e) {
+            log(s17, 'FAIL', `Distribution error: ${e.message}`);
+        }
+
+        /* ═══ Test 18: Snap Toggle ═══ */
+        const s18 = section('Test 18: Snap Toggle');
+        try {
+            const snapCanvas = document.createElement('canvas');
+            snapCanvas.id = 'test-snap';
+            snapCanvas.width = 80; snapCanvas.height = 160;
+            document.body.appendChild(snapCanvas);
+            const snapEngine = new CanvasEngine('test-snap', { width: 80, height: 160, scale: 1 });
+
+            if (typeof snapEngine.enableSnap !== 'undefined') {
+                log(s18, snapEngine.enableSnap === true ? 'PASS' : 'FAIL',
+                    `enableSnap defaults to true (got: ${snapEngine.enableSnap})`);
+                snapEngine.enableSnap = false;
+                log(s18, snapEngine.enableSnap === false ? 'PASS' : 'FAIL',
+                    `enableSnap can be set to false`);
+            } else {
+                log(s18, 'FAIL', `enableSnap not implemented`);
+                log(s18, 'FAIL', `enableSnap toggle not tested`);
+            }
+        } catch (e) {
+            log(s18, 'FAIL', `Snap toggle error: ${e.message}`);
         }
 
         /* ═══ Summary ═══ */

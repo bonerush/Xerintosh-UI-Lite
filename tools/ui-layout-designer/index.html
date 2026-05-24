@@ -31,6 +31,7 @@
                 <span id="zoom-level">4×</span>
                 <button id="zoom-in">+</button>
                 <button id="toggle-grid" class="toggle active" data-i18n="grid">Grid</button>
+                <button id="toggle-snap" class="toggle active" title="Snap to Guides">Snap</button>
             </div>
             <div class="file-actions">
                 <button id="btn-new" data-i18n="new">New</button>
@@ -291,6 +292,43 @@
                     <div class="prop-actions">
                         <button id="btn-delete" class="btn-danger" data-i18n="delete">Delete</button>
                         <button id="btn-duplicate" data-i18n="duplicate">Duplicate</button>
+                    </div>
+
+                    <!-- 多选信息 -->
+                    <div id="prop-multi-info" class="prop-multi-info" style="display:none;"></div>
+
+                    <!-- 对齐工具栏 -->
+                    <div class="align-toolbar" id="align-toolbar">
+                        <h4>Align</h4>
+                        <div class="align-grid">
+                            <button id="align-left" title="Align Left (Ctrl+Shift+←)">
+                                <svg viewBox="0 0 16 16"><rect x="2" y="2" width="8" height="4" fill="currentColor"/><rect x="2" y="8" width="12" height="4" fill="currentColor"/><line x1="2" y1="1" x2="2" y2="15" stroke="currentColor" stroke-width="1.5"/></svg>
+                            </button>
+                            <button id="align-h-center" title="Align Horizontal Center (Ctrl+Shift+H)">
+                                <svg viewBox="0 0 16 16"><rect x="4" y="2" width="8" height="4" fill="currentColor"/><rect x="2" y="8" width="12" height="4" fill="currentColor"/><line x1="8" y1="1" x2="8" y2="15" stroke="currentColor" stroke-width="1.5"/></svg>
+                            </button>
+                            <button id="align-right" title="Align Right (Ctrl+Shift+→)">
+                                <svg viewBox="0 0 16 16"><rect x="6" y="2" width="8" height="4" fill="currentColor"/><rect x="2" y="8" width="12" height="4" fill="currentColor"/><line x1="14" y1="1" x2="14" y2="15" stroke="currentColor" stroke-width="1.5"/></svg>
+                            </button>
+                            <button id="align-top" title="Align Top (Ctrl+Shift+↑)">
+                                <svg viewBox="0 0 16 16"><rect x="2" y="2" width="4" height="8" fill="currentColor"/><rect x="8" y="2" width="4" height="12" fill="currentColor"/><line x1="1" y1="2" x2="15" y2="2" stroke="currentColor" stroke-width="1.5"/></svg>
+                            </button>
+                            <button id="align-v-center" title="Align Vertical Center (Ctrl+Shift+V)">
+                                <svg viewBox="0 0 16 16"><rect x="2" y="4" width="4" height="8" fill="currentColor"/><rect x="8" y="2" width="4" height="12" fill="currentColor"/><line x1="1" y1="8" x2="15" y2="8" stroke="currentColor" stroke-width="1.5"/></svg>
+                            </button>
+                            <button id="align-bottom" title="Align Bottom (Ctrl+Shift+↓)">
+                                <svg viewBox="0 0 16 16"><rect x="2" y="6" width="4" height="8" fill="currentColor"/><rect x="8" y="2" width="4" height="12" fill="currentColor"/><line x1="1" y1="14" x2="15" y2="14" stroke="currentColor" stroke-width="1.5"/></svg>
+                            </button>
+                        </div>
+                        <h4>Distribute</h4>
+                        <div class="align-grid">
+                            <button id="dist-h-space" title="Distribute Horizontal (Ctrl+Shift+[)">
+                                <svg viewBox="0 0 16 16"><rect x="2" y="4" width="3" height="8" fill="currentColor"/><rect x="11" y="4" width="3" height="8" fill="currentColor"/><line x1="6" y1="8" x2="10" y2="8" stroke="currentColor" stroke-width="1" stroke-dasharray="1,1"/></svg>
+                            </button>
+                            <button id="dist-v-space" title="Distribute Vertical (Ctrl+Shift+])">
+                                <svg viewBox="0 0 16 16"><rect x="4" y="2" width="8" height="3" fill="currentColor"/><rect x="4" y="11" width="8" height="3" fill="currentColor"/><line x1="8" y1="6" x2="8" y2="10" stroke="currentColor" stroke-width="1" stroke-dasharray="1,1"/></svg>
+                            </button>
+                        </div>
                     </div>
                 </div>
 

@@ -21,7 +21,9 @@
 
         this.elements     = [];
         this.selectedId   = null;
+        this.selectedIds  = new Set();
         this.hoveredId    = null;
+        this.enableSnap   = true;
 
         // 拖拽状态
         this.dragState = {
@@ -115,10 +117,23 @@
             }
         }
 
-        // 绘制选择高亮
-        if (this.selectedId) {
+        // 绘制选择高亮（多选）
+        if (this.selectedIds && this.selectedIds.size > 0) {
+            for (const id of this.selectedIds) {
+                const sel = this.elements.find(e => e.id === id);
+                if (sel) {
+                    const isPrimary = id === this.selectedId;
+                    this._drawSelection(ctx, sel, isPrimary);
+                }
+            }
+        } else if (this.selectedId) {
             const sel = this.elements.find(e => e.id === this.selectedId);
-            if (sel) this._drawSelection(ctx, sel);
+            if (sel) this._drawSelection(ctx, sel, true);
+        }
+
+        // 绘制框选矩形
+        if (this.dragState.active && this.dragState.marquee) {
+            this._drawMarquee(ctx, this.dragState.marquee);
         }
 
         // 绘制悬停预览
@@ -197,6 +212,7 @@
     };
 
     CanvasEngine.prototype._computeSnapGuides = function(dragEl, allElements) {
+        if (this.enableSnap === false) return [];
         const SNAP_TOLERANCE = 2; // 逻辑像素容差
         const dragEdges = this._getSnapEdges(dragEl);
         const guides = [];
@@ -251,6 +267,7 @@
     };
 
     CanvasEngine.prototype._snapToGuides = function(el, guides) {
+        if (this.enableSnap === false) return;
         const edges = this._getSnapEdges(el);
         let offsetX = 0;
         let offsetY = 0;
@@ -295,11 +312,12 @@
         }
     };
 
-    CanvasEngine.prototype._drawSelection = function(ctx, el) {
+    CanvasEngine.prototype._drawSelection = function(ctx, el, isPrimary) {
         const type = el.subtype || el.type;
+        const color = isPrimary !== false ? '#FFD700' : '#B8860B';
 
         ctx.save();
-        ctx.strokeStyle = '#FFD700';
+        ctx.strokeStyle = color;
         ctx.lineWidth   = 1;
         ctx.setLineDash([2, 2]);
 
@@ -309,18 +327,22 @@
             ctx.lineTo(el.x2, el.y2);
             ctx.stroke();
             ctx.restore();
-            this._drawHandle(ctx, el.x,  el.y);
-            this._drawHandle(ctx, el.x2, el.y2);
+            if (isPrimary !== false) {
+                this._drawHandle(ctx, el.x,  el.y);
+                this._drawHandle(ctx, el.x2, el.y2);
+            }
             return;
         }
 
         if (type === 'circle' || type === 'filled-circle') {
             ctx.strokeRect(el.x, el.y, el.r * 2, el.r * 2);
             ctx.restore();
-            this._drawHandle(ctx, el.x,         el.y);
-            this._drawHandle(ctx, el.x + el.r*2, el.y);
-            this._drawHandle(ctx, el.x,         el.y + el.r*2);
-            this._drawHandle(ctx, el.x + el.r*2, el.y + el.r*2);
+            if (isPrimary !== false) {
+                this._drawHandle(ctx, el.x,         el.y);
+                this._drawHandle(ctx, el.x + el.r*2, el.y);
+                this._drawHandle(ctx, el.x,         el.y + el.r*2);
+                this._drawHandle(ctx, el.x + el.r*2, el.y + el.r*2);
+            }
             return;
         }
 
@@ -328,15 +350,195 @@
         ctx.strokeRect(el.x, el.y, el.w, el.h);
         ctx.restore();
 
-        // 8 个手柄：4 角（圆形）+ 4 边中点（方形）
-        this._drawHandle(ctx, el.x,         el.y);
-        this._drawEdgeHandle(ctx, el.x + el.w / 2, el.y);
-        this._drawHandle(ctx, el.x + el.w,   el.y);
-        this._drawEdgeHandle(ctx, el.x,         el.y + el.h / 2);
-        this._drawEdgeHandle(ctx, el.x + el.w,   el.y + el.h / 2);
-        this._drawHandle(ctx, el.x,         el.y + el.h);
-        this._drawEdgeHandle(ctx, el.x + el.w / 2, el.y + el.h);
-        this._drawHandle(ctx, el.x + el.w,   el.y + el.h);
+        // 只有主选才显示 8 个手柄
+        if (isPrimary !== false) {
+            this._drawHandle(ctx, el.x,         el.y);
+            this._drawEdgeHandle(ctx, el.x + el.w / 2, el.y);
+            this._drawHandle(ctx, el.x + el.w,   el.y);
+            this._drawEdgeHandle(ctx, el.x,         el.y + el.h / 2);
+            this._drawEdgeHandle(ctx, el.x + el.w,   el.y + el.h / 2);
+            this._drawHandle(ctx, el.x,         el.y + el.h);
+            this._drawEdgeHandle(ctx, el.x + el.w / 2, el.y + el.h);
+            this._drawHandle(ctx, el.x + el.w,   el.y + el.h);
+        }
+    };
+
+    /* ── 框选矩形 ── */
+
+    CanvasEngine.prototype._drawMarquee = function(ctx, marquee) {
+        ctx.save();
+        ctx.strokeStyle = '#FFD700';
+        ctx.lineWidth   = 0.5;
+        ctx.setLineDash([2, 2]);
+        ctx.fillStyle   = 'rgba(255, 215, 0, 0.1)';
+        ctx.fillRect(marquee.x, marquee.y, marquee.w, marquee.h);
+        ctx.strokeRect(marquee.x, marquee.y, marquee.w, marquee.h);
+        ctx.restore();
+    };
+
+    /* ── 元素边界（统一处理各种形状）── */
+
+    CanvasEngine.prototype._getBounds = function(el) {
+        const type = el.subtype || el.type;
+        let left, right, top, bottom, cx, cy;
+
+        if (type === 'circle' || type === 'filled-circle') {
+            left   = el.x;
+            right  = el.x + el.r * 2;
+            top    = el.y;
+            bottom = el.y + el.r * 2;
+        } else if (type === 'line') {
+            left   = Math.min(el.x, el.x2);
+            right  = Math.max(el.x, el.x2);
+            top    = Math.min(el.y, el.y2);
+            bottom = Math.max(el.y, el.y2);
+        } else {
+            left   = el.x;
+            right  = el.x + (el.w || 0);
+            top    = el.y;
+            bottom = el.y + (el.h || 0);
+        }
+        cx = (left + right) / 2;
+        cy = (top + bottom) / 2;
+
+        return { left, right, top, bottom, cx, cy, w: right - left, h: bottom - top };
+    };
+
+    /* ── 对齐 ── */
+
+    CanvasEngine.prototype.align = function(mode) {
+        if (!this.selectedId || !this.selectedIds || this.selectedIds.size < 2) return;
+
+        const primary = this.getElement(this.selectedId);
+        if (!primary) return;
+
+        const primaryBounds = this._getBounds(primary);
+        const ids = Array.from(this.selectedIds);
+
+        for (const id of ids) {
+            if (id === this.selectedId) continue;
+            const el = this.getElement(id);
+            if (!el) continue;
+            const type = el.subtype || el.type;
+            const b = this._getBounds(el);
+
+            switch (mode) {
+                case 'left':
+                    if (type === 'line') {
+                        const dx = primaryBounds.left - b.left;
+                        el.x += dx; el.x2 += dx;
+                    } else {
+                        el.x = primaryBounds.left;
+                    }
+                    break;
+                case 'h-center':
+                    if (type === 'line') {
+                        const dx = primaryBounds.cx - b.cx;
+                        el.x += dx; el.x2 += dx;
+                    } else if (type === 'circle' || type === 'filled-circle') {
+                        el.x = primaryBounds.cx - el.r;
+                    } else {
+                        el.x = primaryBounds.cx - (el.w || 0) / 2;
+                    }
+                    break;
+                case 'right':
+                    if (type === 'line') {
+                        const dx = primaryBounds.right - b.right;
+                        el.x += dx; el.x2 += dx;
+                    } else if (type === 'circle' || type === 'filled-circle') {
+                        el.x = primaryBounds.right - el.r * 2;
+                    } else {
+                        el.x = primaryBounds.right - (el.w || 0);
+                    }
+                    break;
+                case 'top':
+                    if (type === 'line') {
+                        const dy = primaryBounds.top - b.top;
+                        el.y += dy; el.y2 += dy;
+                    } else {
+                        el.y = primaryBounds.top;
+                    }
+                    break;
+                case 'v-center':
+                    if (type === 'line') {
+                        const dy = primaryBounds.cy - b.cy;
+                        el.y += dy; el.y2 += dy;
+                    } else if (type === 'circle' || type === 'filled-circle') {
+                        el.y = primaryBounds.cy - el.r;
+                    } else {
+                        el.y = primaryBounds.cy - (el.h || 0) / 2;
+                    }
+                    break;
+                case 'bottom':
+                    if (type === 'line') {
+                        const dy = primaryBounds.bottom - b.bottom;
+                        el.y += dy; el.y2 += dy;
+                    } else if (type === 'circle' || type === 'filled-circle') {
+                        el.y = primaryBounds.bottom - el.r * 2;
+                    } else {
+                        el.y = primaryBounds.bottom - (el.h || 0);
+                    }
+                    break;
+            }
+        }
+        this.render();
+    };
+
+    /* ── 分布 ── */
+
+    CanvasEngine.prototype.distribute = function(mode) {
+        if (!this.selectedIds || this.selectedIds.size < 3) return;
+
+        const ids = Array.from(this.selectedIds);
+        const elements = ids.map(id => this.getElement(id)).filter(Boolean);
+        if (elements.length < 3) return;
+
+        if (mode === 'h-space') {
+            // 按中心 x 排序
+            const sorted = elements.map(el => ({ el, bounds: this._getBounds(el) }))
+                .sort((a, b) => a.bounds.cx - b.bounds.cx);
+            const first = sorted[0];
+            const last = sorted[sorted.length - 1];
+            const totalSpan = last.bounds.cx - first.bounds.cx;
+            const step = totalSpan / (sorted.length - 1);
+
+            for (let i = 1; i < sorted.length - 1; i++) {
+                const item = sorted[i];
+                const targetCX = first.bounds.cx + step * i;
+                const type = item.el.subtype || item.el.type;
+                if (type === 'line') {
+                    const dx = targetCX - item.bounds.cx;
+                    item.el.x += dx; item.el.x2 += dx;
+                } else if (type === 'circle' || type === 'filled-circle') {
+                    item.el.x = targetCX - item.el.r;
+                } else {
+                    item.el.x = targetCX - (item.el.w || 0) / 2;
+                }
+            }
+        } else if (mode === 'v-space') {
+            // 按中心 y 排序
+            const sorted = elements.map(el => ({ el, bounds: this._getBounds(el) }))
+                .sort((a, b) => a.bounds.cy - b.bounds.cy);
+            const first = sorted[0];
+            const last = sorted[sorted.length - 1];
+            const totalSpan = last.bounds.cy - first.bounds.cy;
+            const step = totalSpan / (sorted.length - 1);
+
+            for (let i = 1; i < sorted.length - 1; i++) {
+                const item = sorted[i];
+                const targetCY = first.bounds.cy + step * i;
+                const type = item.el.subtype || item.el.type;
+                if (type === 'line') {
+                    const dy = targetCY - item.bounds.cy;
+                    item.el.y += dy; item.el.y2 += dy;
+                } else if (type === 'circle' || type === 'filled-circle') {
+                    item.el.y = targetCY - item.el.r;
+                } else {
+                    item.el.y = targetCY - (item.el.h || 0) / 2;
+                }
+            }
+        }
+        this.render();
     };
 
     CanvasEngine.prototype._drawHover = function(ctx, el) {
@@ -411,6 +613,7 @@
             this.elements.splice(idx, 1);
             if (this.selectedId === id) this.selectedId = null;
             if (this.hoveredId === id)  this.hoveredId  = null;
+            if (this.selectedIds) this.selectedIds.delete(id);
             this.render();
             return true;
         }
@@ -421,14 +624,49 @@
         return this.elements.find(e => e.id === id);
     };
 
-    CanvasEngine.prototype.setSelected = function(id) {
-        this.selectedId = id || null;
+    CanvasEngine.prototype.setSelected = function(id, addToSelection) {
+        if (!addToSelection) {
+            this.selectedIds.clear();
+        }
+        if (id) {
+            this.selectedId = id;
+            this.selectedIds.add(id);
+        } else {
+            this.selectedId = null;
+        }
         this.render();
+    };
+
+    CanvasEngine.prototype.toggleSelected = function(id) {
+        if (!id) return;
+        if (this.selectedIds.has(id)) {
+            this.selectedIds.delete(id);
+            if (this.selectedId === id) {
+                // 如果删除的是主选，将主选设为最后一个选中的
+                const ids = Array.from(this.selectedIds);
+                this.selectedId = ids.length > 0 ? ids[ids.length - 1] : null;
+            }
+        } else {
+            this.selectedIds.add(id);
+            this.selectedId = id;
+        }
+        this.render();
+    };
+
+    CanvasEngine.prototype.clearSelection = function() {
+        this.selectedId = null;
+        this.selectedIds.clear();
+        this.render();
+    };
+
+    CanvasEngine.prototype.isSelected = function(id) {
+        return this.selectedIds.has(id);
     };
 
     CanvasEngine.prototype.clear = function() {
         this.elements = [];
         this.selectedId = null;
+        this.selectedIds.clear();
         this.hoveredId = null;
         this.render();
     };
