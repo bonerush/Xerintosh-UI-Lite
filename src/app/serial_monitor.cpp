@@ -117,10 +117,23 @@ void sm_buffer_get_line(const sm_buffer_t *buf, int16_t offset,
 
     int16_t idx = (buf->head - 1 - offset + SM_TERM_LINES) % SM_TERM_LINES;
     const sm_line_t *line = &buf->lines[idx];
-    /* 使用单字符前缀节省屏幕宽度，竖屏 80px 下每行约 13 字符 */
-    snprintf(out, out_len, "%c%s",
-             line->from_host ? '<' : '>',
-             line->text);
+    strncpy(out, line->text, out_len - 1);
+    out[out_len - 1] = '\0';
+}
+
+/**
+ * @brief  获取指定偏移行是否来自主机
+ * @param  buf    缓冲区指针（const）
+ * @param  offset 偏移量（0 = 最新行）
+ * @return true = 主机发送，false = MCU 发出或无效偏移
+ */
+bool sm_buffer_get_line_source(const sm_buffer_t *buf, int16_t offset)
+{
+    if (!buf) return false;
+    if (offset < 0 || offset >= buf->count) return false;
+
+    int16_t idx = (buf->head - 1 - offset + SM_TERM_LINES) % SM_TERM_LINES;
+    return buf->lines[idx].from_host;
 }
 
 /**
@@ -182,8 +195,8 @@ static void draw_info_bar(void)
 {
     int16_t font_h = hal_get_font_height();
 
-    /* 信息栏高度 = 字体高度 + 上下各 2px padding */
-    int16_t bar_h = font_h + 4;
+    /* 信息栏高度 = 字体高度 + 1px padding（矮按钮，与终端拉开间距） */
+    int16_t bar_h = font_h + 1;
     int16_t bar_y = 1;
 
     /* 按钮宽度基于文字动态计算 + 4px padding */
@@ -231,9 +244,9 @@ static void draw_info_bar(void)
 static void draw_terminal(void)
 {
     int16_t font_h = hal_get_font_height();
-    int16_t bar_h = font_h + 4;   /* 与 draw_info_bar 一致 */
+    int16_t bar_h = font_h + 1;   /* 与 draw_info_bar 一致 */
 
-    int16_t term_y = bar_h + 2;   /* 信息栏下方 2px 间距 */
+    int16_t term_y = bar_h + 3;   /* 信息栏下方 3px 间距 */
     int16_t term_h = SCREEN_HEIGHT - term_y - 1;  /* 底部留 1px 安全边距 */
 
     if (term_h < font_h) term_h = font_h;  /* 至少能显示一行 */
@@ -247,25 +260,35 @@ static void draw_terminal(void)
 
     /* 逐行显示 */
     char line_buf[SM_TERM_LINE_LEN];
+    char prefix[12];
     int16_t max_line_width = SCREEN_WIDTH - 4;  /* 左右各留 2px 边距 */
     for (int16_t i = 0; i < visible_lines; i++) {
         int16_t offset = sm_buffer.scroll + i;
         sm_buffer_get_line(&sm_buffer, offset, line_buf, sizeof(line_buf));
         if (line_buf[0] != '\0') {
             int16_t ly = term_y + 1 + i * font_h + font_h / 2;
-            /* 若行内容超出屏幕宽度，截断显示 */
-            int16_t lw = hal_get_string_width(line_buf);
-            if (lw > max_line_width) {
-                /* 从尾部截断，保留前缀 */
-                int16_t chars_to_show = 0;
+            bool from_host = sm_buffer_get_line_source(&sm_buffer, offset);
+            const char *prefix_label = from_host ? "[Master]:" : "[Slave]:";
+            uint16_t prefix_color = from_host ? COLOR_RED : COLOR_ACCENT;
+            snprintf(prefix, sizeof(prefix), "%s", prefix_label);
+            int16_t prefix_w = hal_get_string_width(prefix);
+            int16_t text_x = 2 + prefix_w;
+
+            /* 若行内容超出屏幕宽度，从尾部截断文本部分 */
+            int16_t text_w = hal_get_string_width(line_buf);
+            int16_t available_w = max_line_width - prefix_w;
+            if (available_w < 0) available_w = 0;
+            if (text_w > available_w) {
+                int16_t chars_to_show;
                 for (chars_to_show = (int16_t)strlen(line_buf); chars_to_show > 0; chars_to_show--) {
                     line_buf[chars_to_show] = '\0';
-                    if (hal_get_string_width(line_buf) <= max_line_width) {
+                    if (hal_get_string_width(line_buf) <= available_w) {
                         break;
                     }
                 }
             }
-            hal_draw_string(2, ly, line_buf, COLOR_FG);
+            hal_draw_string(2, ly, prefix, prefix_color);
+            hal_draw_string(text_x, ly, line_buf, COLOR_FG);
         }
     }
 }

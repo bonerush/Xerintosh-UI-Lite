@@ -34,6 +34,9 @@ extern void on_anim_enabled_change_cb(void);
 extern void on_screen_rotation_change_cb(void);
 extern void on_serial_baud_change_cb(void);
 
+/* 波特率选择回调（前向声明）*/
+static void on_baud_selected_cb(void);
+
 /* ═══ 菜单构建 ═══ */
 
 /**
@@ -47,6 +50,13 @@ extern void on_serial_baud_change_cb(void);
  *        │   ├── 动画效果（开关）
  *        │   ├── 动画速度（滑块 1-10）
  *        │   └── 横屏/竖屏（开关）
+ *        │   └── 波特率（子菜单）
+ *        │       ├── 9600（按钮）
+ *        │       ├── 19200（按钮）
+ *        │       ├── 38400（按钮）
+ *        │       ├── 57600（按钮）
+ *        │       ├── 115200（按钮）
+ *        │       └── 230400（按钮）
  *        └── 关于（user_item）
  */
 void app_init_ui(void)
@@ -72,9 +82,18 @@ void app_init_ui(void)
         NULL, on_anim_speed_change_cb, default_icon);
     xerintosh_list_item_t* sw_rot = xerintosh_new_switch_item(
         "横屏/竖屏", &g_is_landscape, NULL, on_screen_rotation_change_cb, default_icon);
-    xerintosh_list_item_t* sl_baud = xerintosh_new_slider_item(
-        "波特率", &g_serial_baud_rate, 1, 1, 6,
-        NULL, on_serial_baud_change_cb, default_icon);
+
+    /* 波特率子菜单 */
+    xerintosh_list_item_t* baud_menu = xerintosh_new_list_item("波特率", list_icon);
+    const int32_t baud_values[] = {9600, 19200, 38400, 57600, 115200, 230400};
+    const char *baud_labels[] = {"9600", "19200", "38400", "57600", "115200", "230400"};
+    int16_t baud_levels[] = {1, 2, 3, 4, 5, 6};
+    for (int i = 0; i < 6; i++) {
+        xerintosh_list_item_t* btn = xerintosh_new_button_item(
+            baud_labels[i], on_baud_selected_cb, default_icon);
+        btn->user_data = (void*)(intptr_t)baud_levels[i];
+        xerintosh_push_item_to_list(baud_menu, btn);
+    }
 
     xerintosh_push_item_to_list(root, item1);
     xerintosh_push_item_to_list(root, item2);
@@ -85,7 +104,22 @@ void app_init_ui(void)
     xerintosh_push_item_to_list(item1, sw_anim);
     xerintosh_push_item_to_list(item1, sl_anim);
     xerintosh_push_item_to_list(item1, sw_rot);
-    xerintosh_push_item_to_list(item1, sl_baud);
+    xerintosh_push_item_to_list(item1, baud_menu);
+}
+
+/* ═══ 波特率选择回调 ═══ */
+
+/**
+ * @brief 波特率子菜单选项确认回调
+ * @note  通过 user_data 获取目标波特率等级，设置后触发变更回调并返回父菜单
+ */
+static void on_baud_selected_cb(void)
+{
+    xerintosh_list_item_t *item = g_xerintosh_selector.selected_item;
+    int16_t level = (int16_t)(intptr_t)item->user_data;
+    g_serial_baud_rate = level;
+    on_serial_baud_change_cb();
+    xerintosh_selector_exit_current_item();
 }
 
 /* ═══ 管理器初始化 ═══ */

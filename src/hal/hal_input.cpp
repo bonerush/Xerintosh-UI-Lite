@@ -68,6 +68,10 @@ bool hal_input_get_mode(hal_button_t btn) {
 
 #include <M5Unified.h>
 
+#define BOOT_INPUT_GUARD_MS  300  /* 启动后首 300ms 忽略输入，防止 GPIO 上电毛刺 */
+
+static uint32_t g_boot_time_ms = 0;  /* hal_input_init 被调用时的毫秒时间戳 */
+
 /**
  * @brief 内部按键状态结构
  * @note  使用 hal_input_double_click.h 中的双击检测状态机
@@ -85,6 +89,7 @@ static struct btn_state g_btn_b;  /* 按键 B 状态 */
 void hal_input_init(void) {
     hal_input_dc_init(&g_btn_a.dc);
     hal_input_dc_init(&g_btn_b.dc);
+    g_boot_time_ms = millis();
 }
 
 /**
@@ -116,6 +121,11 @@ static hal_event_t check_button_event(struct btn_state *st, bool wasPressed, boo
  */
 hal_event_t hal_input_get_event(hal_button_t btn)
 {
+  /* 启动保护：忽略开机后首 300ms 内的所有按键事件，防止 GPIO 上电毛刺触发 LONG_PRESS */
+  if (millis() - g_boot_time_ms < BOOT_INPUT_GUARD_MS) {
+      return HAL_EVENT_NONE;
+  }
+
   struct btn_state *st = NULL;
   if (btn == HAL_BTN_A) st = &g_btn_a;
   else if (btn == HAL_BTN_B) st = &g_btn_b;

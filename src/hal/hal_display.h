@@ -32,6 +32,7 @@ extern int16_t g_screen_height;  /* 运行时屏幕高度 */
 #define COLOR_BG      0x0000  /* 背景色：黑色 */
 #define COLOR_FG      0xFFFF  /* 前景色：白色 */
 #define COLOR_ACCENT  0x07E0  /* 强调色：绿色 */
+#define COLOR_RED     0xF800  /* 红色：用于 Master 前缀 */
 
 /* ═══ 生命周期 ═══ */
 
