@@ -216,8 +216,8 @@ static void draw_info_bar(void)
     /* START/STOP 按钮 */
     draw_button(start_x, bar_y, start_w, bar_h, start_label, sm_selected == 0);
 
-    /* 波特率显示（中间），文字颜色与未选中按钮一致（黑字） */
-    hal_draw_string(rate_x, rate_y_text, rate_str, COLOR_BG);
+    /* 波特率显示（中间） */
+    hal_draw_string(rate_x, rate_y_text, rate_str, COLOR_FG);
 
     /* NORM/DEBUG 按钮 */
     draw_button(mode_x, bar_y, mode_w, bar_h, mode_label, sm_selected == 1);
