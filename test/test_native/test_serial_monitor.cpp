@@ -24,6 +24,7 @@ void sm_buffer_init(sm_buffer_t *buf);
 bool sm_buffer_add_line(sm_buffer_t *buf, const char *text, bool from_host);
 void sm_buffer_get_line(const sm_buffer_t *buf, int16_t offset,
                          char *out, size_t out_len);
+bool sm_buffer_get_line_source(const sm_buffer_t *buf, int16_t offset);
 void sm_buffer_clear(sm_buffer_t *buf);
 }
 
@@ -48,7 +49,10 @@ TEST(SerialMonitorBufferTest, AddLineAndRetrieve)
 
     char out[64];
     sm_buffer_get_line(&buf, 0, out, sizeof(out));
-    EXPECT_STREQ(out, "<Hello");
+    EXPECT_STREQ(out, "Hello");
+
+    /* 验证 source 查询 */
+    EXPECT_TRUE(sm_buffer_get_line_source(&buf, 0));
 }
 
 TEST(SerialMonitorBufferTest, AddMultipleLines)
@@ -62,13 +66,16 @@ TEST(SerialMonitorBufferTest, AddMultipleLines)
 
     char out[64];
     sm_buffer_get_line(&buf, 0, out, sizeof(out));
-    EXPECT_STREQ(out, "<Line3");  /* 最新行 */
+    EXPECT_STREQ(out, "Line3");  /* 最新行 */
+    EXPECT_TRUE(sm_buffer_get_line_source(&buf, 0));
 
     sm_buffer_get_line(&buf, 1, out, sizeof(out));
-    EXPECT_STREQ(out, ">Line2");  /* 次新行 */
+    EXPECT_STREQ(out, "Line2");  /* 次新行 */
+    EXPECT_FALSE(sm_buffer_get_line_source(&buf, 1));
 
     sm_buffer_get_line(&buf, 2, out, sizeof(out));
-    EXPECT_STREQ(out, "<Line1");  /* 最旧行 */
+    EXPECT_STREQ(out, "Line1");  /* 最旧行 */
+    EXPECT_TRUE(sm_buffer_get_line_source(&buf, 2));
 }
 
 TEST(SerialMonitorBufferTest, BufferWrapsAround)
@@ -89,10 +96,12 @@ TEST(SerialMonitorBufferTest, BufferWrapsAround)
     /* 验证最旧行被覆盖：最新的是 L24，最旧保留的是 L5 */
     char out[64];
     sm_buffer_get_line(&buf, 0, out, sizeof(out));
-    EXPECT_STREQ(out, "<L24");   /* 最新 */
+    EXPECT_STREQ(out, "L24");   /* 最新 */
+    EXPECT_TRUE(sm_buffer_get_line_source(&buf, 0));
 
     sm_buffer_get_line(&buf, SM_TERM_LINES - 1, out, sizeof(out));
-    EXPECT_STREQ(out, "<L5");    /* 最旧保留 */
+    EXPECT_STREQ(out, "L5");    /* 最旧保留 */
+    EXPECT_TRUE(sm_buffer_get_line_source(&buf, SM_TERM_LINES - 1));
 }
 
 TEST(SerialMonitorBufferTest, ClearRemovesAll)
@@ -120,13 +129,27 @@ TEST(SerialMonitorBufferTest, OffsetOutOfRangeReturnsEmpty)
 
     char out[64];
     sm_buffer_get_line(&buf, 0, out, sizeof(out));
-    EXPECT_STREQ(out, "<OnlyOne");
+    EXPECT_STREQ(out, "OnlyOne");
+    EXPECT_TRUE(sm_buffer_get_line_source(&buf, 0));
 
     sm_buffer_get_line(&buf, 1, out, sizeof(out));
     EXPECT_STREQ(out, "");
 
     sm_buffer_get_line(&buf, -1, out, sizeof(out));
     EXPECT_STREQ(out, "");
+}
+
+TEST(SerialMonitorBufferTest, GetLineSourceOutOfRangeReturnsFalse)
+{
+    sm_buffer_t buf;
+    sm_buffer_init(&buf);
+
+    sm_buffer_add_line(&buf, "Test", false);
+    EXPECT_FALSE(sm_buffer_get_line_source(&buf, 0));
+
+    /* 超出范围返回 false */
+    EXPECT_FALSE(sm_buffer_get_line_source(&buf, 1));
+    EXPECT_FALSE(sm_buffer_get_line_source(&buf, -1));
 }
 
 TEST(SerialMonitorBufferTest, LongTextTruncated)
@@ -144,9 +167,9 @@ TEST(SerialMonitorBufferTest, LongTextTruncated)
     char out[128];
     sm_buffer_get_line(&buf, 0, out, sizeof(out));
 
-    /* 验证前缀 > 存在，且内容被截断到 SM_TERM_LINE_LEN - 1 */
-    EXPECT_EQ(out[0], '>');
-    EXPECT_EQ(strlen(out), 1 + SM_TERM_LINE_LEN - 1);
+    /* 验证无前缀，内容被截断到 SM_TERM_LINE_LEN - 1 */
+    EXPECT_EQ(strlen(out), (size_t)(SM_TERM_LINE_LEN - 1));
+    EXPECT_FALSE(sm_buffer_get_line_source(&buf, 0));
 }
 
 TEST(SerialMonitorBufferTest, NullPointerSafety)
