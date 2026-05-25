@@ -101,6 +101,11 @@ extern "C" void on_screen_rotation_change_cb(void)
     M5.Display.setRotation(gfx_rotation);
     storage_set_screen_rotation((uint8_t)g_screen_rotation_level);
     hal_display_init();
+
+    /* 强制重置退场动画状态机，避免 static 变量 _temp_h/_temp_h_trg
+     * 残留旧屏幕尺寸的目标值，导致后续 user_item 进场动画卡死 */
+    g_xerintosh_exit_animation_finished = true;
+    g_xerintosh_exit_animation_status = 0;
 }
 
 /* ═══ 入口 ═══ */

@@ -146,7 +146,7 @@ void sm_buffer_clear(sm_buffer_t *buf)
  * @param  h       高度
  * @param  label   按钮文字
  * @param  selected 是否被选中
- * @note   选中时以 500ms 周期反色闪烁
+ * @note   未选中：白底黑字；选中时以 500ms 周期反色闪烁（白底黑字 ↔ 黑底白字）
  */
 static void draw_button(int16_t x, int16_t y, int16_t w, int16_t h,
                         const char *label, bool selected)
@@ -154,11 +154,14 @@ static void draw_button(int16_t x, int16_t y, int16_t w, int16_t h,
     uint16_t bg_color, text_color;
 
     if (selected && sm_blink_on) {
-        bg_color = COLOR_FG;   /* 白底 */
-        text_color = COLOR_BG; /* 黑字 */
+        bg_color = COLOR_FG;   /* 闪烁亮：白底 */
+        text_color = COLOR_BG; /* 闪烁亮：黑字 */
+    } else if (selected && !sm_blink_on) {
+        bg_color = COLOR_BG;   /* 闪烁灭：黑底 */
+        text_color = COLOR_FG; /* 闪烁灭：白字 */
     } else {
-        bg_color = COLOR_BG;   /* 黑底 */
-        text_color = COLOR_FG; /* 白字 */
+        bg_color = COLOR_FG;   /* 未选中：白底（同边框） */
+        text_color = COLOR_BG; /* 未选中：黑字 */
     }
 
     hal_draw_fill_rect(x, y, w, h, bg_color);
@@ -166,72 +169,76 @@ static void draw_button(int16_t x, int16_t y, int16_t w, int16_t h,
 
     int16_t tw = hal_get_string_width(label);
     int16_t tx = x + (w - tw) / 2;
-    int16_t ty = y + (h - hal_get_font_height()) / 2
-                 + hal_get_font_height() / 2;
+    int16_t ty = y + (h + hal_get_font_height()) / 2 - 3;
     hal_draw_string(tx, ty, label, text_color);
 }
 
 /**
  * @brief  绘制信息栏（顶部控制区）
- * @note   包含 START/STOP 按钮、波特率显示、NORM/DEBUG 按钮
- *         根据 g_is_landscape 选择横竖屏两套坐标
+ * @note   包含 START/STOP 按钮、波特率显示、NORM/DEBUG 按钮。
+ *         布局基于 SCREEN_WIDTH 和字体高度动态计算，适配任意屏幕尺寸。
  */
 static void draw_info_bar(void)
 {
-    bool landscape = g_is_landscape;
+    int16_t font_h = hal_get_font_height();
 
-    /* 布局参数 */
-    int16_t btn_h, btn_y, rate_x, rate_y, norm_x, norm_w;
+    /* 信息栏高度 = 字体高度 + 上下各 2px padding */
+    int16_t bar_h = font_h + 4;
+    int16_t bar_y = 1;
 
-    if (!landscape) {
-        /* 竖屏 80x160 */
-        btn_h = 10;
-        btn_y = 1;
-        rate_x = 22;
-        rate_y = 3;
-        norm_x = 55;
-        norm_w = 24;
-    } else {
-        /* 横屏 160x80 */
-        btn_h = 12;
-        btn_y = 1;
-        rate_x = 30;
-        rate_y = 4;
-        norm_x = 132;
-        norm_w = 27;
-    }
-
-    /* START/STOP 按钮（左侧） */
+    /* 按钮宽度基于文字动态计算 + 4px padding */
     const char *start_label = sm_running ? "STOP" : "RUN";
-    int16_t start_w = landscape ? 24 : 19;
-    draw_button(1, btn_y, start_w, btn_h, start_label, sm_selected == 0);
+    const char *mode_label = sm_debug ? "DBG" : "NORM";
+    int16_t start_w = hal_get_string_width(start_label) + 4;
+    int16_t mode_w  = hal_get_string_width(mode_label) + 4;
 
-    /* 波特率显示（中间） */
+    /* 波特率文本 */
     char rate_str[16];
     int32_t baud = settings_serial_baud_hw_value(g_serial_baud_rate);
-    snprintf(rate_str, sizeof(rate_str), "%ld", (long)baud);
-    hal_draw_string(rate_x, rate_y, rate_str, COLOR_FG);
+    snprintf(rate_str, sizeof(rate_str), "RATE:%ld", (long)baud);
+    int16_t rate_w = hal_get_string_width(rate_str);
 
-    /* NORM/DEBUG 按钮（右侧） */
-    const char *mode_label = sm_debug ? "DBG" : "NORM";
-    draw_button(norm_x, btn_y, norm_w, btn_h, mode_label, sm_selected == 1);
+    /* 三个元素水平居中分布：
+     * 可用空间 = SCREEN_WIDTH - 左右margin(2+2) - 元素间距(4+4)
+     * 剩余空间平分到元素间 */
+    int16_t total_w = start_w + rate_w + mode_w;
+    int16_t spacing = (SCREEN_WIDTH - 4 - total_w) / 2;  /* 左右各 2px margin */
+    if (spacing < 2) spacing = 2;
+
+    int16_t start_x = 2;
+    int16_t rate_x  = start_x + start_w + spacing;
+    int16_t mode_x  = rate_x + rate_w + spacing;
+
+    /* 按钮纵向居中于信息栏 */
+    int16_t btn_y_text = bar_y + (bar_h + font_h) / 2 - 3;
+    int16_t rate_y_text = bar_y + (bar_h + font_h) / 2 - 3;
+
+    /* START/STOP 按钮 */
+    draw_button(start_x, bar_y, start_w, bar_h, start_label, sm_selected == 0);
+
+    /* 波特率显示（中间），文字颜色与未选中按钮一致（黑字） */
+    hal_draw_string(rate_x, rate_y_text, rate_str, COLOR_BG);
+
+    /* NORM/DEBUG 按钮 */
+    draw_button(mode_x, bar_y, mode_w, bar_h, mode_label, sm_selected == 1);
 }
 
 /**
  * @brief  绘制终端区域
- * @note   根据屏幕方向和字体高度计算可见行数，
- *         从缓冲区底部向上取行显示，应用 scroll 偏移
+ * @note   基于字体高度和屏幕尺寸动态计算可见行数和终端区域位置。
+ *         终端区域从信息栏下方开始，到屏幕底部结束。
  */
 static void draw_terminal(void)
 {
-    int16_t sh = SCREEN_HEIGHT;
-    bool landscape = g_is_landscape;
-
-    int16_t term_y = landscape ? 16 : 14;
-    int16_t term_h = sh - term_y;
     int16_t font_h = hal_get_font_height();
-    int16_t visible_lines = term_h / font_h;
+    int16_t bar_h = font_h + 4;   /* 与 draw_info_bar 一致 */
 
+    int16_t term_y = bar_h + 2;   /* 信息栏下方 2px 间距 */
+    int16_t term_h = SCREEN_HEIGHT - term_y - 1;  /* 底部留 1px 安全边距 */
+
+    if (term_h < font_h) term_h = font_h;  /* 至少能显示一行 */
+
+    int16_t visible_lines = term_h / font_h;
     if (visible_lines < 1) visible_lines = 1;
     if (visible_lines > SM_TERM_LINES) visible_lines = SM_TERM_LINES;
 
@@ -280,6 +287,8 @@ void serial_monitor_init(void)
 
 #ifndef NATIVE_TEST
     sm_rx_len = 0;
+    /* 进入串口监视器时启用双击检测（用于终端滚动） */
+    hal_input_set_double_click_enabled(true);
 #endif
 }
 
@@ -390,6 +399,10 @@ void serial_monitor_exit(void)
     if (!sm_debug) {
         sm_buffer_clear(&sm_buffer);
     }
+#ifndef NATIVE_TEST
+    /* 退出串口监视器时禁用双击检测，恢复菜单即时响应 */
+    hal_input_set_double_click_enabled(false);
+#endif
 }
 
 /**
