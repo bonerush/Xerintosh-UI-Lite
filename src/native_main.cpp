@@ -23,6 +23,7 @@ void on_brightness_change_cb(void) {}
 void on_anim_speed_change_cb(void) {}
 void on_anim_enabled_change_cb(void) {}
 void on_screen_rotation_change_cb(void) {}
+void on_serial_baud_change_cb(void) {}
 
 /* 外部状态标志桩 */
 bool wifi_on = true;

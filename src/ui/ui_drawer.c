@@ -32,7 +32,16 @@ void xerintosh_draw_exit_animation()
 {
   static float _temp_h = -8;
   static float _temp_h_trg = -999;
-  if (_temp_h_trg < 0) _temp_h_trg = SCREEN_HEIGHT + 8;
+  static bool _last_finished = true;
+
+  /* 每次新动画开始时强制重置状态，避免 static 变量残留导致卡死 */
+  if (_last_finished && !g_xerintosh_exit_animation_finished)
+  {
+    _temp_h = -8;
+    _temp_h_trg = SCREEN_HEIGHT + 8;
+    g_xerintosh_exit_animation_status = 0;
+  }
+  _last_finished = g_xerintosh_exit_animation_finished;
 
   /* 绘制全屏黑色遮罩，高度由 _temp_h 控制 */
   g_xerintosh_draw_color = COLOR_BG;
@@ -105,9 +114,10 @@ void xerintosh_draw_exit_animation()
 
   xerintosh_animation(&_temp_h, _temp_h_trg, ANIM_SPEED_EXIT);
 
-  /* 状态机转换 */
-  if (g_xerintosh_exit_animation_status == 0 && _temp_h == _temp_h_trg && _temp_h == SCREEN_HEIGHT + 8)
+  /* 状态机转换：使用范围判断代替浮点精确相等，避免多次循环后卡死 */
+  if (g_xerintosh_exit_animation_status == 0 && _temp_h >= SCREEN_HEIGHT + 8 - 1.0f)
   {
+    _temp_h = SCREEN_HEIGHT + 8;
     g_xerintosh_exit_animation_status = 1;
     return;
   }
@@ -119,7 +129,7 @@ void xerintosh_draw_exit_animation()
     return;
   }
 
-  if (g_xerintosh_exit_animation_status == 2 && _temp_h == _temp_h_trg && _temp_h == -8)
+  if (g_xerintosh_exit_animation_status == 2 && _temp_h <= -8 + 1.0f)
   {
     g_xerintosh_exit_animation_finished = true;
     g_xerintosh_exit_animation_status = 0;

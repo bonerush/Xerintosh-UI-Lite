@@ -18,6 +18,7 @@ int16_t g_anim_speed_level       = 5;                        /* 默认动画速�
 extern bool g_anim_enabled;                                  /* 动画开关（定义在 ui_core.h） */
 int16_t g_screen_rotation_level  = ORIENTATION_LANDSCAPE;    /* 默认横屏 */
 bool    g_is_landscape           = true;                     /* 默认横屏 */
+int16_t g_serial_baud_rate       = 5;                        /* 默认波特率等级 5 = 115200 */
 
 /* ═══ 从存储加载 ═══ */
 
@@ -67,6 +68,14 @@ void settings_load_from_storage(void)
 
     /* 同步到 bool 开关 */
     g_is_landscape = (g_screen_rotation_level == ORIENTATION_LANDSCAPE);
+
+    /* 波特率等级（1-6） */
+    int16_t saved_baud = storage_get_serial_baud_rate();
+    if (saved_baud >= 1 && saved_baud <= 6) {
+        g_serial_baud_rate = saved_baud;
+    } else {
+        g_serial_baud_rate = 5; /* 默认 115200 */
+    }
 }
 
 /* ═══ 值转换 ═══ */
@@ -88,4 +97,33 @@ int16_t settings_brightness_hw_value(void)
 int16_t settings_anim_speed_value(void)
 {
     return 40 + g_anim_speed_level * 5;
+}
+
+/* ═══ 波特率映射表 ═══ */
+
+static const int32_t s_baud_rate_table[] = {
+    9600,    /* level 1 */
+    19200,   /* level 2 */
+    38400,   /* level 3 */
+    57600,   /* level 4 */
+    115200,  /* level 5 */
+    230400   /* level 6 */
+};
+#define BAUD_RATE_TABLE_SIZE (sizeof(s_baud_rate_table) / sizeof(s_baud_rate_table[0]))
+
+/**
+ * @brief  将波特率等级转换为实际波特率值
+ * @param  level 等级 1-6
+ * @return 实际波特率值
+ * @note   无效低值回退到默认值 115200，无效高值回退到最大值 230400
+ */
+int32_t settings_serial_baud_hw_value(int16_t level)
+{
+    if (level < 1) {
+        return 115200; /* 默认值 */
+    }
+    if (level > (int16_t)BAUD_RATE_TABLE_SIZE) {
+        return s_baud_rate_table[BAUD_RATE_TABLE_SIZE - 1]; /* 最大值 */
+    }
+    return s_baud_rate_table[level - 1];
 }

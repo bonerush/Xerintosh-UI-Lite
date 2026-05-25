@@ -173,6 +173,20 @@ uint8_t  storage_get_screen_rotation(void);
  */
 void     storage_set_screen_rotation(uint8_t val);
 
+/* ═══ 串口波特率 ═══ */
+
+/**
+ * @brief  从存储读取串口波特率等级
+ * @return 波特率等级（1-6）；未设置时默认返回 5（115200）
+ */
+int16_t  storage_get_serial_baud_rate(void);
+
+/**
+ * @brief  保存串口波特率等级到存储
+ * @param  val 波特率等级（1-6）
+ */
+void     storage_set_serial_baud_rate(int16_t val);
+
 #ifdef __cplusplus
 }
 #endif

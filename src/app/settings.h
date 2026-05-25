@@ -33,6 +33,7 @@ extern int16_t g_anim_speed_level;       /* 动画速度等级 1-10 */
 extern bool    g_anim_enabled;           /* 动画开关 */
 extern int16_t g_screen_rotation_level;  /* 屏幕方向 1=竖屏, 2=横屏 */
 extern bool    g_is_landscape;           /* 横屏开关：true=横屏, false=竖屏 */
+extern int16_t g_serial_baud_rate;       /* 串口波特率等级 1-6 */
 
 /* ═══ 生命周期 ═══ */
 
@@ -54,6 +55,14 @@ int16_t settings_brightness_hw_value(void);
  * @return 内部动画速度值
  */
 int16_t settings_anim_speed_value(void);
+
+/**
+ * @brief  将波特率等级转换为实际波特率值
+ * @param  level 等级 1-6
+ * @return 实际波特率值（9600, 19200, 38400, 57600, 115200, 230400）
+ * @note   无效值回退到默认值 115200（level 5）
+ */
+int32_t settings_serial_baud_hw_value(int16_t level);
 
 #ifdef __cplusplus
 }

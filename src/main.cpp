@@ -35,6 +35,7 @@ bool bt_on = true;    /* 蓝牙默认开关状态 */
 #include "ui/ui_item.h"
 #include "ui/ui_drawer.h"
 #include "app/serial_input.h"
+#include "app/serial_monitor.h"
 #include "app/wifi_manager.h"
 #include "app/bt_manager.h"
 #include "app/boot_screen.h"
@@ -73,6 +74,17 @@ extern "C" void on_anim_enabled_change_cb(void)
 }
 
 /**
+ * @brief 波特率变更回调
+ * @note  保存新波特率等级到 NVS，并重新初始化 Serial
+ */
+extern "C" void on_serial_baud_change_cb(void)
+{
+    storage_set_serial_baud_rate(g_serial_baud_rate);
+    Serial.end();
+    Serial.begin(settings_serial_baud_hw_value(g_serial_baud_rate));
+}
+
+/**
  * @brief 屏幕方向变更回调
  * @note  M5StickC 实测 rotation 效果：
  *        setRotation(0) → 正常竖屏 (portrait)
@@ -101,7 +113,7 @@ void setup()
 {
     M5.begin();
 
-    Serial.begin(115200);
+    Serial.begin(settings_serial_baud_hw_value(g_serial_baud_rate));
     delay(200);
     Serial.println("\n\n=== M5Stick BOOT ===");
 
@@ -135,6 +147,7 @@ void setup()
 void loop()
 {
     M5.update();
+    serial_monitor_update();  /* DEBUG 模式下后台持续读取串口 */
     app_input_process();
     wifi_mgr_update();
     bt_mgr_update();

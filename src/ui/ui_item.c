@@ -446,6 +446,7 @@ bool g_xerintosh_exit_animation_finished = true;
 static void handle_user_item_enter(xerintosh_user_item_t *_user_item)
 {
   g_xerintosh_exit_animation_finished = false;
+  g_xerintosh_exit_animation_status = 0;  /* 重置动画状态机 */
   _user_item->entering_user_item = true;
   _user_item->exiting_user_item = false;
   _user_item->user_item_inited = false;

@@ -10,6 +10,7 @@
 
 #include "hal_input.h"
 #include "hal_system.h"
+#include "hal_input_double_click.h"
 
 #ifdef NATIVE_TEST
 
@@ -55,27 +56,23 @@ bool hal_input_get_mode(hal_button_t btn) {
 
 #include <M5Unified.h>
 
-#define LONG_PRESS_DURATION_MS  500  /* 长按触发阈值（毫秒） */
-
 /**
- * @brief 内部按键状态结构（简化版，仅保留必要字段）
+ * @brief 内部按键状态结构
+ * @note  使用 hal_input_double_click.h 中的双击检测状态机
  */
 struct btn_state {
-    bool pressed;              /* 是否处于按下态 */
-    uint32_t press_time;       /* 按下起始时间 */
-    bool long_fired;           /* 长按事件是否已触发 */
-    uint32_t press_duration_ms; /* 当前按下持续时间 */
+    hal_input_dc_state_t dc;  /* 双击检测状态机 */
 };
 
-static struct btn_state g_btn_a = {false, 0, false, 0};  /* 按键 A 状态 */
-static struct btn_state g_btn_b = {false, 0, false, 0};  /* 按键 B 状态 */
+static struct btn_state g_btn_a;  /* 按键 A 状态 */
+static struct btn_state g_btn_b;  /* 按键 B 状态 */
 
 /**
  * @brief 初始化按键状态
  */
 void hal_input_init(void) {
-    g_btn_a = {false, 0, false, 0};
-    g_btn_b = {false, 0, false, 0};
+    hal_input_dc_init(&g_btn_a.dc);
+    hal_input_dc_init(&g_btn_b.dc);
 }
 
 /**
@@ -94,32 +91,7 @@ void hal_input_update(void) {
  */
 static hal_event_t check_button_event(struct btn_state *st, bool wasPressed, bool wasReleased)
 {
-  if (wasPressed)
-  {
-    st->pressed = true;
-    st->press_time = millis();
-    st->long_fired = false;
-    st->press_duration_ms = 0;
-  }
-  if (wasReleased)
-  {
-    st->pressed = false;
-    st->press_duration_ms = 0;
-    if (!st->long_fired)
-    {
-      return HAL_EVENT_SHORT_PRESS;
-    }
-  }
-  if (st->pressed && !st->long_fired)
-  {
-    st->press_duration_ms = millis() - st->press_time;
-    if (st->press_duration_ms >= LONG_PRESS_DURATION_MS)
-    {
-      st->long_fired = true;
-      return HAL_EVENT_LONG_PRESS;
-    }
-  }
-  return HAL_EVENT_NONE;
+    return hal_input_dc_process(&st->dc, wasPressed, wasReleased, millis());
 }
 
 /**
@@ -150,16 +122,16 @@ bool hal_input_is_pressed(hal_button_t btn) {
     if (btn == HAL_BTN_A) {
         st = &g_btn_a;
         bool pressed = M5.BtnA.isPressed();
-        if (pressed && st->pressed) {
-            st->press_duration_ms = millis() - st->press_time;
+        if (pressed && st->dc.pressed) {
+            st->dc.press_duration_ms = millis() - st->dc.press_time;
         }
         return pressed;
     }
     if (btn == HAL_BTN_B) {
         st = &g_btn_b;
         bool pressed = M5.BtnB.isPressed();
-        if (pressed && st->pressed) {
-            st->press_duration_ms = millis() - st->press_time;
+        if (pressed && st->dc.pressed) {
+            st->dc.press_duration_ms = millis() - st->dc.press_time;
         }
         return pressed;
     }
@@ -182,7 +154,7 @@ uint32_t hal_input_get_press_duration(hal_button_t btn) {
     if (btn == HAL_BTN_A) st = &g_btn_a;
     else if (btn == HAL_BTN_B) st = &g_btn_b;
     else return 0;
-    return st->press_duration_ms;
+    return st->dc.press_duration_ms;
 }
 
 #endif

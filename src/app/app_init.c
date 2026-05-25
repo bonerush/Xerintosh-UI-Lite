@@ -15,6 +15,7 @@
 #include "wifi_manager.h"
 #include "bt_manager.h"
 #include "serial_input.h"
+#include "serial_monitor.h"
 
 #include "ui/ui_item.h"
 #include "ui/ui_core.h"
@@ -31,6 +32,7 @@ extern void on_brightness_change_cb(void);
 extern void on_anim_speed_change_cb(void);
 extern void on_anim_enabled_change_cb(void);
 extern void on_screen_rotation_change_cb(void);
+extern void on_serial_baud_change_cb(void);
 
 /* ═══ 菜单构建 ═══ */
 
@@ -53,6 +55,8 @@ void app_init_ui(void)
 
     xerintosh_list_item_t* item1 = xerintosh_new_list_item("设置", list_icon);
     xerintosh_list_item_t* item2 = xerintosh_new_list_item("关于", user_icon);
+    xerintosh_list_item_t* item3 = xerintosh_new_user_item(
+        "串口监视器", serial_monitor_init, serial_monitor_loop, serial_monitor_exit, default_icon);
 
     xerintosh_list_item_t* sw1 = xerintosh_new_switch_item(
         "WiFi", &wifi_on, NULL, wifi_mgr_on_switch_toggle, default_icon);
@@ -68,15 +72,20 @@ void app_init_ui(void)
         NULL, on_anim_speed_change_cb, default_icon);
     xerintosh_list_item_t* sw_rot = xerintosh_new_switch_item(
         "横屏/竖屏", &g_is_landscape, NULL, on_screen_rotation_change_cb, default_icon);
+    xerintosh_list_item_t* sl_baud = xerintosh_new_slider_item(
+        "波特率", &g_serial_baud_rate, 1, 1, 6,
+        NULL, on_serial_baud_change_cb, default_icon);
 
     xerintosh_push_item_to_list(root, item1);
     xerintosh_push_item_to_list(root, item2);
+    xerintosh_push_item_to_list(root, item3);
     xerintosh_push_item_to_list(item1, sw1);
     xerintosh_push_item_to_list(item1, sw2);
     xerintosh_push_item_to_list(item1, sl1);
     xerintosh_push_item_to_list(item1, sw_anim);
     xerintosh_push_item_to_list(item1, sl_anim);
     xerintosh_push_item_to_list(item1, sw_rot);
+    xerintosh_push_item_to_list(item1, sl_baud);
 }
 
 /* ═══ 管理器初始化 ═══ */
@@ -105,6 +114,16 @@ void app_init_managers(void)
  */
 void app_input_process(void)
 {
+    /* 若处于 user_item 内部，框架输入由 App 自身接管 */
+    if (xerintosh_is_in_user_item()) {
+        return;
+    }
+
+    /* 进/退场动画期间禁止框架输入，避免误触发 */
+    if (!g_xerintosh_exit_animation_finished) {
+        return;
+    }
+
     hal_input_update();
 
     hal_event_t event_a = hal_input_get_event(HAL_BTN_A);
