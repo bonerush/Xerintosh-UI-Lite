@@ -100,6 +100,21 @@ extern bool hal_input_get_mode(hal_button_t btn);
  */
 extern uint32_t hal_input_get_press_duration(hal_button_t btn);
 
+/* ═══ 双击开关 ═══ */
+
+/**
+ * @brief  设置是否启用双击检测
+ * @param  enabled true=启用双击检测（含 300ms 窗口延迟），false=禁用（即时短按响应）
+ * @note   默认禁用。菜单模式应禁用双击避免延迟；App 模式可启用以支持双击操作。
+ */
+extern void hal_input_set_double_click_enabled(bool enabled);
+
+/**
+ * @brief  查询双击检测是否启用
+ * @return true 启用，false 禁用
+ */
+extern bool hal_input_is_double_click_enabled(void);
+
 #ifdef __cplusplus
 }
 #endif

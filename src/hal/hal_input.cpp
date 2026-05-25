@@ -12,6 +12,18 @@
 #include "hal_system.h"
 #include "hal_input_double_click.h"
 
+/* ═══ 双击开关（全局状态）═══ */
+
+static bool g_double_click_enabled = false;
+
+void hal_input_set_double_click_enabled(bool enabled) {
+    g_double_click_enabled = enabled;
+}
+
+bool hal_input_is_double_click_enabled(void) {
+    return g_double_click_enabled;
+}
+
 #ifdef NATIVE_TEST
 
 /* ═══ Native 测试环境：输入桩 ═══ */
@@ -88,10 +100,15 @@ void hal_input_update(void) {
  * @param  wasPressed  本帧是否检测到按下边沿
  * @param  wasReleased 本帧是否检测到释放边沿
  * @return 事件类型
+ * @note   根据 g_double_click_enabled 选择简单状态机或双击状态机
  */
 static hal_event_t check_button_event(struct btn_state *st, bool wasPressed, bool wasReleased)
 {
-    return hal_input_dc_process(&st->dc, wasPressed, wasReleased, millis());
+    uint32_t now = millis();
+    if (g_double_click_enabled) {
+        return hal_input_dc_process(&st->dc, wasPressed, wasReleased, now);
+    }
+    return hal_input_simple_process(&st->dc, wasPressed, wasReleased, now);
 }
 
 /**

@@ -66,6 +66,53 @@ hal_event_t hal_input_dc_process(hal_input_dc_state_t *st,
                                   bool was_released,
                                   uint32_t now_ms);
 
+/**
+ * @brief  简单按键事件检测（无双击检测，即时响应）
+ * @param  st           状态机指针
+ * @param  was_pressed  本帧是否检测到按下边沿
+ * @param  was_released 本帧是否检测到释放边沿
+ * @param  now_ms       当前时间戳（毫秒）
+ * @return 事件类型；无事件时返回 HAL_EVENT_NONE
+ * @note   与 hal_input_dc_process 不同，此函数释放时立即返回 SHORT_PRESS，
+ *         无 300ms 双击窗口期延迟。适用于菜单导航等不需要双击的场景。
+ *
+ * 中文伪代码拆解：
+ *
+ * 函数 简单按键处理(状态, 按下边沿, 释放边沿, 当前时间) {
+ *     // 第一步：按下边沿 → 记录时间，重置长按标记
+ *     if (按下边沿) {
+ *         标记按下态
+ *         记录按下时间
+ *         重置长按已触发
+ *     }
+ *
+ *     // 第二步：释放边沿 → 非长按则立即返回短按
+ *     if (释放边沿) {
+ *         标记释放态
+ *         if (长按未触发) {
+ *             重置所有标志
+ *             返回 短按事件
+ *         }
+ *         重置所有标志
+ *     }
+ *
+ *     // 第三步：持续按下中检测长按
+ *     if (按下态 且 长按未触发) {
+ *         计算持续时间
+ *         if (持续时间 >= 阈值) {
+ *             标记长按已触发
+ *             返回 长按事件
+ *         }
+ *     }
+ *
+ *     返回 无事件
+ * }
+ */
+hal_event_t hal_input_simple_process(hal_input_dc_state_t *st,
+                                      bool was_pressed,
+                                      bool was_released,
+                                      uint32_t now_ms);
+
 #ifdef __cplusplus
 }
 #endif
