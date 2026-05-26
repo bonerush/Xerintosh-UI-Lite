@@ -158,6 +158,25 @@ kern_dentry_t *kern_path_resolve(const char *path)
     return path_walk(&g_root_dentry, path, false);
 }
 
+int kern_vfs_mkdir(const char *path)
+{
+    if (!g_vfs_initialized) return KERN_ERR;
+    if (path == NULL) return KERN_EINVAL;
+
+    /* 若已存在则幂等返回 */
+    kern_dentry_t *existing = kern_path_resolve(path);
+    if (existing != NULL) {
+        return KERN_OK;
+    }
+
+    kern_dentry_t *dentry = path_walk(&g_root_dentry, path, true);
+    if (dentry == NULL) {
+        return KERN_ENOENT;
+    }
+
+    return KERN_OK;
+}
+
 /* ═══ 文件描述符分配 ═══ */
 
 static kern_fd_t fd_alloc(void)

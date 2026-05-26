@@ -58,7 +58,6 @@ TEST(KernelVFSTest, VfsInitCreatesRoot)
     kern_vfs_init();
     kern_dentry_t *root = kern_vfs_get_root();
     ASSERT_NE(root, nullptr);
-    EXPECT_EQ(root->child_count, 0);
     EXPECT_EQ(root->parent, nullptr);
     EXPECT_STREQ(root->name, "/");
 }

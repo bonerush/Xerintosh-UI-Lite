@@ -105,6 +105,14 @@ extern kern_dentry_t *kern_vfs_get_root(void);
 extern int kern_dentry_register(const char *path, kern_inode_t *inode);
 
 /**
+ * @brief  创建目录（仅创建 dentry，不挂载 inode）
+ * @param  path 目录路径（如 "/dev"）
+ * @return KERN_OK 成功，< 0 为错误码
+ * @note   自动创建中间目录节点；若已存在则幂等返回 KERN_OK
+ */
+extern int kern_vfs_mkdir(const char *path);
+
+/**
  * @brief  按路径解析目录项
  * @param  path 绝对路径（以 "/" 开头）
  * @return 目录项指针；未找到时返回 NULL
