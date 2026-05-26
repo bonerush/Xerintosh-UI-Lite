@@ -37,8 +37,6 @@ extern int16_t g_anim_speed;  /* 全局动画速度基准值 */
 
 /* ═══ 字体 ═══ */
 
-static const void* g_xerintosh_font;  /* 当前字体指针 */
-
 /**
  * @brief 设置当前绘图字体
  * @param _font 字体指针
@@ -228,19 +226,7 @@ typedef struct xerintosh_user_item_t
   void (*init_function)();           /* 进入时调用一次 */
   void (*loop_function)();           /* 每帧调用 */
   void (*exit_function)();           /* 退出时调用一次 */
-  bool user_item_inited;             /* init_function 是否已执行 */
-  bool user_item_looping;            /* loop_function 是否正在运行 */
 } xerintosh_user_item_t;
-
-/**
- * @brief  为列表项设置自定义位图图标
- * @param  _item  列表项指针
- * @param  bitmap XBM 位图数据指针
- * @param  w      位图宽度（像素）
- * @param  h      位图高度（像素）
- * @note   设置后该项的 icon 会自动变为 custom_icon
- */
-extern void xerintosh_set_item_bitmap(xerintosh_list_item_t *_item, const uint8_t *bitmap, uint8_t w, uint8_t h);
 
 /* ═══ 列表项操作 ═══ */
 
@@ -431,12 +417,6 @@ typedef struct xerintosh_camera_t
 } xerintosh_camera_t;
 
 extern xerintosh_camera_t g_xerintosh_camera;  /* 全局相机实例 */
-
-/**
- * @brief  获取相机指针
- * @return 相机指针
- */
-extern xerintosh_camera_t* xerintosh_get_camera(void);
 
 /**
  * @brief  将选择器绑定到相机

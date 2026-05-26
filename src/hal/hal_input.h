@@ -38,23 +38,6 @@ typedef enum {
     HAL_EVENT_DOUBLE_CLICK    /* 双击 */
 } hal_event_t;
 
-/**
- * @brief 按键状态结构体
- * @note  用于输入模块内部维护每个按键的消抖和时序状态
- */
-typedef struct {
-    bool pressed;            /* 当前是否处于按下态 */
-    bool mode;               /* 0 = mode1, 1 = mode2，由双击切换 */
-    uint32_t pressTime;      /* 本次按下的起始时间戳 */
-    uint32_t lastReleaseTime;/* 上次释放的时间戳 */
-    uint8_t debounceCount;   /* 消抖计数器 */
-    bool debouncedState;     /* 消抖后的稳定状态 */
-    bool lastRawState;       /* 上一次原始状态 */
-    bool longPressFired;     /* 长按事件是否已触发 */
-    uint32_t lastRepeatTime; /* 上次连发时间 */
-    uint32_t press_duration_ms; /* 当前按下的持续时间 */
-} hal_button_state_t;
-
 /* ═══ 生命周期 ═══ */
 
 /**
@@ -86,14 +69,6 @@ extern hal_event_t hal_input_get_event(hal_button_t btn);
 extern bool hal_input_is_pressed(hal_button_t btn);
 
 /**
- * @brief  获取按键的模式状态
- * @param  btn 按键标识
- * @return true  mode2
- * @return false mode1
- */
-extern bool hal_input_get_mode(hal_button_t btn);
-
-/**
  * @brief  获取按键当前按下的持续时间
  * @param  btn 按键标识
  * @return 持续时间（毫秒）
@@ -114,6 +89,13 @@ extern void hal_input_set_double_click_enabled(bool enabled);
  * @return true 启用，false 禁用
  */
 extern bool hal_input_is_double_click_enabled(void);
+
+/**
+ * @brief  重置所有按键的事件状态机
+ * @note   在 user_item 的 init/exit 中调用，清除跨模式的残留状态，
+ *         防止进入/退出 App 时按键边沿丢失导致的僵死状态。
+ */
+extern void hal_input_reset_events(void);
 
 #ifdef __cplusplus
 }

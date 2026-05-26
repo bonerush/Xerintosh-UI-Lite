@@ -85,7 +85,6 @@ void app_init_ui(void)
 
     /* 波特率子菜单 */
     xerintosh_list_item_t* baud_menu = xerintosh_new_list_item("波特率", list_icon);
-    const int32_t baud_values[] = {9600, 19200, 38400, 57600, 115200, 230400};
     const char *baud_labels[] = {"9600", "19200", "38400", "57600", "115200", "230400"};
     int16_t baud_levels[] = {1, 2, 3, 4, 5, 6};
     for (int i = 0; i < 6; i++) {

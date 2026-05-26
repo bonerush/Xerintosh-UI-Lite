@@ -21,15 +21,6 @@ bool g_anim_enabled = true;                  /* 动画是否启用 */
 /* ═══ 生命周期 ═══ */
 
 /**
- * @brief 进入 Xerintosh UI（保留接口，当前实现为空）
- * @note  旧版本的长按进入逻辑已在 TFT 移植中移除
- */
-void ad_xerintosh()
-{
-  /* Splash screen / long-press entry removed for TFT build */
-}
-
-/**
  * @brief 查询当前是否处于 user_item 内部
  * @return true  当前选中项为 user_item 且已处于运行态
  */
@@ -224,6 +215,7 @@ void xerintosh_ui_main_core()
         if (_selected_user_item->exit_function != NULL)
             _selected_user_item->exit_function();
         _selected_user_item->in_user_item = 0;
+        _selected_user_item->exiting_user_item = false;
     }
   } else
   {

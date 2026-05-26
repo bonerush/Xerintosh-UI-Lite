@@ -47,17 +47,14 @@ hal_event_t hal_input_get_event(hal_button_t btn) {
 }
 
 /**
+ * @brief  重置所有按键的事件状态机（native 桩）
+ */
+void hal_input_reset_events(void) {}
+
+/**
  * @brief 查询按键是否按下（始终返回 false）
  */
 bool hal_input_is_pressed(hal_button_t btn) {
-    (void)btn;
-    return false;
-}
-
-/**
- * @brief 获取按键模式（始终返回 false）
- */
-bool hal_input_get_mode(hal_button_t btn) {
     (void)btn;
     return false;
 }
@@ -166,14 +163,6 @@ bool hal_input_is_pressed(hal_button_t btn) {
 }
 
 /**
- * @brief 获取按键的模式状态（当前未实现，预留接口）
- */
-bool hal_input_get_mode(hal_button_t btn) {
-    (void)btn;
-    return false;
-}
-
-/**
  * @brief 获取按键当前按下的持续时间
  */
 uint32_t hal_input_get_press_duration(hal_button_t btn) {
@@ -182,6 +171,15 @@ uint32_t hal_input_get_press_duration(hal_button_t btn) {
     else if (btn == HAL_BTN_B) st = &g_btn_b;
     else return 0;
     return st->dc.press_duration_ms;
+}
+
+/**
+ * @brief  重置所有按键的事件状态机
+ * @note   在 user_item 的 init/exit 中调用，清除跨模式的残留状态
+ */
+void hal_input_reset_events(void) {
+    hal_input_dc_init(&g_btn_a.dc);
+    hal_input_dc_init(&g_btn_b.dc);
 }
 
 #endif

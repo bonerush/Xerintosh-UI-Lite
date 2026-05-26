@@ -17,8 +17,6 @@
 extern "C" {
 #endif
 
-#define ALLOW_EXIT_ASTRA_UI_BY_USER 1
-
 /* ═══ 全局状态 ═══ */
 
 extern bool g_in_xerintosh;                  /* UI 是否处于激活状态 */
