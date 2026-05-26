@@ -8,7 +8,7 @@
 
 #include "sm_ui.h"
 #include "sm_app.h"
-#include "app/settings.h"
+#include "app/settings/settings.h"
 #include "hal/hal_display.h"
 #include "hal/hal_system.h"
 #include <stdio.h>

@@ -29,7 +29,7 @@ int16_t anim_speed = 40 + g_anim_speed_level * 5;          /* 实际速度 45-95
 
 ## 模块结构
 
-*📄 Source: [settings.h](../../src/app/settings.h)*
+*📄 Source: [settings.h](../../src/app/settings/settings.h)*
 
 ```c
 extern int16_t g_brightness_level;
@@ -61,7 +61,7 @@ extern int16_t g_screen_rotation_level;
 
 ### 从存储加载
 
-*📄 Source: [settings.c](../../src/app/settings.c#L19-L55)*
+*📄 Source: [settings.c](../../src/app/settings/settings.c#L19-L55)*
 
 ```c
 void settings_load_from_storage(void);
@@ -75,7 +75,7 @@ void settings_load_from_storage(void);
 
 ### 值转换
 
-*📄 Source: [settings.c](../../src/app/settings.c#L57-L65)*
+*📄 Source: [settings.c](../../src/app/settings/settings.c#L57-L65)*
 
 ```c
 int16_t settings_brightness_hw_value(void);   /* 档位 → 0-255 硬件值 */

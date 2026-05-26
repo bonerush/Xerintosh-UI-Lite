@@ -11,7 +11,7 @@
 
 #ifdef NATIVE_TEST
 
-#include "app/bt_manager.h"
+#include "app/bluetooth/bt_manager.h"
 
 void bt_mgr_init(void) {}
 void bt_mgr_enable(void) {}
@@ -27,11 +27,11 @@ void bt_mgr_on_switch_toggle(void) {}
 #include <Arduino.h>
 #include <NimBLEDevice.h>
 
-#include "app/bt_manager.h"
+#include "app/bluetooth/bt_manager.h"
 
 extern "C" {
-#include "app/storage.h"
-#include "app/serial_input.h"
+#include "app/storage/storage.h"
+#include "app/serial_input/serial_input.h"
 #include "ui/ui_item.h"
 #include "ui/ui_core.h"
 }

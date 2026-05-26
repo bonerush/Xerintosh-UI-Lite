@@ -10,12 +10,12 @@
 #include "app_init.h"
 
 #include <stddef.h>
-#include "settings.h"
-#include "storage.h"
-#include "wifi_manager.h"
-#include "bt_manager.h"
-#include "serial_input.h"
-#include "serial_monitor.h"
+#include "settings/settings.h"
+#include "storage/storage.h"
+#include "wifi/wifi_manager.h"
+#include "bluetooth/bt_manager.h"
+#include "serial_input/serial_input.h"
+#include "serial_monitor/serial_monitor.h"
 
 #include "ui/ui_item.h"
 #include "ui/ui_core.h"

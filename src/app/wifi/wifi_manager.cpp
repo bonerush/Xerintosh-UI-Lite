@@ -11,7 +11,7 @@
 
 #ifdef NATIVE_TEST
 
-#include "app/wifi_manager.h"
+#include "app/wifi/wifi_manager.h"
 
 void wifi_mgr_init(void) {}
 void wifi_mgr_enable(void) {}
@@ -29,11 +29,11 @@ void wifi_mgr_on_switch_toggle(void) {}
 #include <string.h>
 #include <esp_log.h>
 
-#include "app/wifi_manager.h"
+#include "app/wifi/wifi_manager.h"
 
 extern "C" {
-#include "app/storage.h"
-#include "app/serial_input.h"
+#include "app/storage/storage.h"
+#include "app/serial_input/serial_input.h"
 #include "ui/ui_item.h"
 #include "ui/ui_core.h"
 }

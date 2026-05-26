@@ -8,8 +8,8 @@
 
 #include "sm_app.h"
 #include "sm_ui.h"
-#include "app/settings.h"
-#include "app/serial_input.h"
+#include "app/settings/settings.h"
+#include "app/serial_input/serial_input.h"
 #include "hal/hal_display.h"
 #include "hal/hal_input.h"
 #include "hal/hal_system.h"

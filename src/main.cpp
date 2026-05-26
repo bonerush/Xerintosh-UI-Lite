@@ -9,8 +9,8 @@
 
 #include <stdint.h>
 
-#include "app/storage.h"
-#include "app/settings.h"
+#include "app/storage/storage.h"
+#include "app/settings/settings.h"
 #include "app/app_init.h"
 
 extern "C" {
@@ -34,11 +34,11 @@ bool bt_on = true;    /* 蓝牙默认开关状态 */
 #include "ui/ui_core.h"
 #include "ui/ui_item.h"
 #include "ui/ui_drawer.h"
-#include "app/serial_input.h"
-#include "app/serial_monitor.h"
-#include "app/wifi_manager.h"
-#include "app/bt_manager.h"
-#include "app/boot_screen.h"
+#include "app/serial_input/serial_input.h"
+#include "app/serial_monitor/serial_monitor.h"
+#include "app/wifi/wifi_manager.h"
+#include "app/bluetooth/bt_manager.h"
+#include "app/boot/boot_screen.h"
 
 /* ═══ 设置变更回调（由 app_init.c 引用）═══ */
 

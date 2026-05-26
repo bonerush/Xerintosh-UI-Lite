@@ -17,10 +17,16 @@ Project Root
 │   ├── [项目系统](ui/item.md)          ← 列表项、开关、滑条、按钮、用户页
 │   ├── [核心引擎](ui/core.md)          ← 动画插值、相机、选择器、主循环
 │   └── [绘制管线](ui/drawer.md)        ← 列表外观、选择器高亮、弹窗、信息栏
-├── App 层
-│   ├── [设置管理](app/settings.md)     ← 亮度/动画/方向配置与存储
-│   ├── [应用初始化](app/app-init.md)   ← 菜单构建、管理器初始化、输入处理
-│   └── [编码风格规范](coding-style.md) ← C OOP 命名、封装、继承规范
+├── App 层（每个 App 独立子目录）
+│   ├── app_init.c/h        ← 菜单构建、管理器初始化、输入处理
+│   ├── boot/               ← 开机画面
+│   ├── settings/           ← 亮度/动画/方向设置 + 旋转兼容转换
+│   ├── storage/            ← NVS 持久化存储
+│   ├── wifi/               ← WiFi 状态机（扫描/连接/密码输入）
+│   ├── bluetooth/          ← 蓝牙管理器（NimBLE 扫描/配对）
+│   ├── serial_input/       ← 串口 CLI 输入（WiFi 密码/蓝牙配对码）
+│   └── serial_monitor/     ← 串口监视器 App（缓冲区/状态机/界面）
+├── [编码风格规范](coding-style.md)     ← C OOP 命名、封装、继承规范
 ├── 教程
 │   └── [从零开始创建 App](tutorials/your-first-app.md) ← 面向初学者的 App 开发教程
 └── 入口
@@ -47,6 +53,10 @@ Project Root
 - **动画插值公式**：`current += (target - current) / (100.0f - speed)`
 
 ## 文档树
+
+### App 层
+- **[应用初始化](app/app-init.md)** — 菜单树构建、管理器初始化、按键映射
+- **[设置管理](app/settings.md)** — 亮度/动画/方向/波特率配置与存储
 
 ### 入门教程
 - **[从零开始创建 App](tutorials/your-first-app.md)** — 面向初学者的完整教程，手把手教你创建第一个 `user_item` App

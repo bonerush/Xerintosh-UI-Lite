@@ -7,7 +7,7 @@
  */
 
 #include <stdint.h>
-#include "settings.h"
+#include "app/settings/settings.h"
 
 /**
  * @brief  将存储中读取的旋转值解析为新的等级格式

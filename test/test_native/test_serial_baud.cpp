@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
 
 extern "C" {
-#include "app/settings.h"
+#include "app/settings/settings.h"
 }
 
 /* ═══ Phase 2: 波特率等级映射测试 ═══ */

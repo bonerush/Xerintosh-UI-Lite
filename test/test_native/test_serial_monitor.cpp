@@ -2,7 +2,7 @@
 #include <string.h>
 
 extern "C" {
-#include "app/serial_monitor.h"
+#include "app/serial_monitor/serial_monitor.h"
 
 /* 前向声明内部缓冲区函数（仅供测试使用） */
 #define SM_TERM_LINES    20
