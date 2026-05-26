@@ -32,6 +32,7 @@ protected:
         kern_clear_panic();
         kern_devfs_init();
         kern_log_set_level(KERN_LOG_ERROR);
+        hal_display_init();
         hal_input_reset_events();
     }
 };

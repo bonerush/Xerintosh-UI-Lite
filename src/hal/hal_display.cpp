@@ -319,6 +319,14 @@ void hal_set_clip_rect(int16_t x, int16_t y, int16_t w, int16_t h) {
 void hal_clear_clip_rect(void) {
 }
 
+/* ─── 测试钩子 ─── */
+
+uint16_t hal_test_fb_read(int16_t x, int16_t y)
+{
+    if (x < 0 || x >= SCREEN_WIDTH || y < 0 || y >= SCREEN_HEIGHT) return 0;
+    return g_framebuffer[y * SCREEN_WIDTH + x];
+}
+
 #else
 
 /* ═══ 硬件环境：M5GFX 加速 ═══ */

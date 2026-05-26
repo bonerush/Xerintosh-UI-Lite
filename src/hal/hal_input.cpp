@@ -28,6 +28,9 @@ bool hal_input_is_double_click_enabled(void) {
 
 /* ═══ Native 测试环境：输入桩 ═══ */
 
+static hal_event_t g_test_events[HAL_BTN_COUNT];
+static bool g_test_event_pending[HAL_BTN_COUNT];
+
 /**
  * @brief 初始化输入（空操作）
  */
@@ -39,17 +42,37 @@ void hal_input_init(void) {}
 void hal_input_update(void) {}
 
 /**
- * @brief 获取按键事件（始终返回无事件）
+ * @brief 获取按键事件（优先返回测试注入事件）
  */
 hal_event_t hal_input_get_event(hal_button_t btn) {
-    (void)btn;
+    if (btn >= HAL_BTN_COUNT) return HAL_EVENT_NONE;
+    if (g_test_event_pending[btn]) {
+        g_test_event_pending[btn] = false;
+        return g_test_events[btn];
+    }
     return HAL_EVENT_NONE;
+}
+
+/**
+ * @brief  注入测试按键事件（测试代码调用）
+ */
+void hal_test_inject_event(hal_button_t btn, hal_event_t ev)
+{
+    if (btn < HAL_BTN_COUNT) {
+        g_test_events[btn] = ev;
+        g_test_event_pending[btn] = true;
+    }
 }
 
 /**
  * @brief  重置所有按键的事件状态机（native 桩）
  */
-void hal_input_reset_events(void) {}
+void hal_input_reset_events(void)
+{
+    for (int i = 0; i < HAL_BTN_COUNT; i++) {
+        g_test_event_pending[i] = false;
+    }
+}
 
 /**
  * @brief 查询按键是否按下（始终返回 false）

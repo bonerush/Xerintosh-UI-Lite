@@ -227,6 +227,18 @@ extern void hal_set_clip_rect(int16_t x, int16_t y, int16_t w, int16_t h);
  */
 extern void hal_clear_clip_rect(void);
 
+/* ═══ 测试钩子（仅 NATIVE_TEST） ═══ */
+
+#ifdef NATIVE_TEST
+/**
+ * @brief  读取帧缓冲中指定坐标的像素值（测试验证用）
+ * @param  x x 坐标
+ * @param  y y 坐标
+ * @return RGB565 颜色值；越界返回 0
+ */
+uint16_t hal_test_fb_read(int16_t x, int16_t y);
+#endif
+
 #ifdef __cplusplus
 }
 #endif

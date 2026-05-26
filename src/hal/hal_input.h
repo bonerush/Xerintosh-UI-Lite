@@ -97,6 +97,17 @@ extern bool hal_input_is_double_click_enabled(void);
  */
 extern void hal_input_reset_events(void);
 
+/* ═══ 测试钩子（仅 NATIVE_TEST） ═══ */
+
+#ifdef NATIVE_TEST
+/**
+ * @brief  注入测试按键事件（测试代码调用）
+ * @param  btn 按键标识
+ * @param  ev  事件类型
+ */
+void hal_test_inject_event(hal_button_t btn, hal_event_t ev);
+#endif
+
 #ifdef __cplusplus
 }
 #endif
