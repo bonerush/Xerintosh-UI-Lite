@@ -163,6 +163,25 @@ extern ssize_t kern_write(kern_fd_t fd, const char *buf, size_t len);
  */
 extern int kern_ioctl(kern_fd_t fd, unsigned int cmd, unsigned long arg);
 
+/* ═══ 匿名文件描述符操作（供 IPC 等子系统使用） ═══ */
+
+/**
+ * @brief  分配一个匿名文件描述符（不绑定路径）
+ * @param  fops         操作函数表
+ * @param  flags        打开标志（KERN_O_RDONLY / KERN_O_WRONLY / KERN_O_RDWR）
+ * @param  private_data 私有数据（如 pipe 结构体指针）
+ * @return >= 0 为文件描述符，< 0 为错误码
+ */
+extern kern_fd_t kern_vfs_fd_create(kern_file_ops_t *fops, unsigned int flags,
+                                     void *private_data);
+
+/**
+ * @brief  获取文件描述符关联的私有数据
+ * @param  fd 文件描述符
+ * @return 私有数据指针；fd 无效时返回 NULL
+ */
+extern void *kern_vfs_fd_get_private(kern_fd_t fd);
+
 #ifdef __cplusplus
 }
 #endif

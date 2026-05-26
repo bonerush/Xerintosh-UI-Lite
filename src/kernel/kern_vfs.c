@@ -201,6 +201,35 @@ static kern_file_t *fd_get(kern_fd_t fd)
     return &g_fd_table[fd];
 }
 
+/* ═══ 匿名文件描述符（供 IPC 等子系统使用） ═══ */
+
+kern_fd_t kern_vfs_fd_create(kern_file_ops_t *fops, unsigned int flags,
+                               void *private_data)
+{
+    if (!g_vfs_initialized) return KERN_ERR;
+    if (fops == NULL) return KERN_EINVAL;
+
+    kern_fd_t fd = fd_alloc();
+    if (fd < 0) return fd;
+
+    kern_file_t *f = &g_fd_table[fd];
+    f->dentry = NULL;
+    f->inode = NULL;
+    f->fops = fops;
+    f->flags = flags;
+    f->f_pos = 0;
+    f->private_data = private_data;
+
+    return fd;
+}
+
+void *kern_vfs_fd_get_private(kern_fd_t fd)
+{
+    kern_file_t *f = fd_get(fd);
+    if (f == NULL) return NULL;
+    return f->private_data;
+}
+
 /* ═══ 文件操作 ═══ */
 
 kern_fd_t kern_open(const char *path, unsigned int flags)
