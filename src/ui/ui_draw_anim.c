@@ -38,6 +38,16 @@ void xerintosh_draw_exit_animation()
   }
   _last_finished = g_xerintosh_exit_animation_finished;
 
+  /* 屏幕方向/尺寸切换时，防止 _temp_h/_temp_h_trg 残留旧尺寸的目标值导致动画异常 */
+  static int16_t _prev_screen_height = -1;
+  if (_prev_screen_height != SCREEN_HEIGHT)
+  {
+    float max_h = SCREEN_HEIGHT + 8;
+    if (_temp_h > max_h) _temp_h = max_h;
+    if (g_xerintosh_exit_animation_status == 0) _temp_h_trg = max_h;
+    _prev_screen_height = SCREEN_HEIGHT;
+  }
+
   /* 绘制全屏黑色遮罩，高度由 _temp_h 控制 */
   g_xerintosh_draw_color = COLOR_BG;
   hal_draw_fill_rect(0, 0, SCREEN_WIDTH, _temp_h, g_xerintosh_draw_color);
