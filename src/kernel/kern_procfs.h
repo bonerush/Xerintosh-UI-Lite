@@ -4,10 +4,12 @@
  * @details 定义 kern_procfs_init() 接口，将内核状态信息以文件形式
  *          挂载到 VFS 的 /proc/ 路径下，遵循 "一切皆文件" 哲学。
  *
- *          目前支持三个静态文件：
- *          - /proc/tasks   — 任务列表
- *          - /proc/uptime  — 内核运行时间
- *          - /proc/version — 内核版本
+ *          目前支持的静态文件：
+ *          - /proc/tasks     — 任务列表
+ *          - /proc/uptime    — 内核运行时间
+ *          - /proc/version   — 内核版本及编译信息
+ *          - /proc/meminfo   — 堆内存统计
+ *          - /proc/developer — 开发者与项目信息
  *
  * @copyright Copyright (c) 2026
  */

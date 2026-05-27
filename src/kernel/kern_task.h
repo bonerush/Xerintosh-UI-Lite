@@ -31,6 +31,8 @@ extern "C" {
 
 #ifdef NATIVE_TEST
 typedef ucontext_t    kern_ctx_t;
+#elif defined(XEROS_NATIVE_SCHED)
+#include "kern_ctx_esp32.h"
 #endif
 
 /* ═══ 任务控制块（TCB） ═══ */
@@ -46,14 +48,15 @@ typedef struct kern_task {
     kern_task_state_t   state;          /* 任务状态 */
 
     /* 动态栈管理（Native: 堆分配+ucontext；ESP32: FreeRTOS 管理栈） */
-    uint8_t            *stack_base;     /* 栈底指针（Native 堆分配；ESP32 未使用） */
+    uint8_t            *stack_base;     /* 栈底指针 */
     size_t              stack_size;     /* 栈大小（字节） */
 
     /* 上下文保存 */
-#ifdef NATIVE_TEST
-    kern_ctx_t          ctx;            /* Native: ucontext_t */
-#endif
-#ifndef NATIVE_TEST
+#if defined(NATIVE_TEST)
+    kern_ctx_t          ctx;            /* ucontext */
+#elif defined(XEROS_NATIVE_SCHED)
+    kern_ctx_t          ctx;            /* setjmp/longjmp */
+#else
     TaskHandle_t        rtos_handle;    /* FreeRTOS 任务句柄 */
 #endif
 
@@ -65,9 +68,16 @@ typedef struct kern_task {
     void              (*entry)(void *arg);  /* 任务主函数 */
     void               *arg;            /* 入口参数 */
 
+    /* 标志位 */
+    uint8_t             flags;          /* KERN_TASK_FLAG_* */
+
     /* 链表指针 */
     struct kern_task   *next;           /* 下一个任务（就绪/睡眠队列） */
 } kern_task_t;
+
+/* ═══ 任务标志位 ═══ */
+
+#define KERN_TASK_FLAG_VIRTUAL  0x01   /* 虚任务：无独立上下文，不参与调度 */
 
 /* ═══ 调度器生命周期 ═══ */
 
@@ -124,6 +134,34 @@ extern kern_task_t *kern_task_get(kern_pid_t pid);
 extern kern_task_t *kern_task_list_head(void);
 extern size_t kern_task_stack_usage(kern_task_t *task);
 extern uint32_t kern_task_stack_canary(kern_task_t *task);
+
+/* ═══ 虚任务管理 ═══ */
+
+/**
+ * @brief  注册虚任务到内核任务链表
+ * @param  name 任务名称（用于 /proc/tasks 显示）
+ * @return PID >= 0 成功，< 0 为错误码
+ * @note   虚任务不创建 FreeRTOS 上下文，不参与调度。
+ *         仅用于内核可观测性（/proc/tasks 可见、kill 可终止）。
+ *         当 App 退出时必须调用 kern_task_unregister_virtual() 注销。
+ */
+extern kern_pid_t kern_task_register_virtual(const char *name);
+
+/**
+ * @brief  注销虚任务
+ * @param  pid 要注销的虚任务 PID
+ * @note   将任务标记为 ZOMBIE，并回收 TCB 内存。
+ *         仅对虚任务有效。
+ */
+extern void kern_task_unregister_virtual(kern_pid_t pid);
+
+/**
+ * @brief  检查任务是否为受保护的系统任务
+ * @param  task 任务指针
+ * @return true  系统关键任务，不可终止
+ * @return false 普通任务，可以终止
+ */
+extern bool kern_task_is_protected(kern_task_t *task);
 
 #ifdef __cplusplus
 }

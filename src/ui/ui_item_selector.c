@@ -9,6 +9,7 @@
 #include "ui_item.h"
 #include "ui_core.h"
 #include "ui_drawer.h"
+#include "kernel/kern_task.h"
 #include <stddef.h>
 
 /* ═══ 选择器 ═══ */
@@ -153,6 +154,11 @@ static void handle_user_item_enter(xerintosh_user_item_t *_user_item)
   g_xerintosh_exit_animation_status = 0;  /* 重置动画状态机 */
   _user_item->entering_user_item = true;
   _user_item->exiting_user_item = false;
+
+  /* 注册虚任务，使 App 对内核可见（/proc/tasks 可见、kill 可终止） */
+  if (_user_item->kernel_pid == KERN_PID_INVALID) {
+    _user_item->kernel_pid = kern_task_register_virtual(_user_item->base_item.content);
+  }
 }
 
 /**
@@ -164,6 +170,12 @@ static void handle_user_item_exit(xerintosh_user_item_t *_user_item)
   g_xerintosh_exit_animation_finished = false;
   _user_item->entering_user_item = false;
   _user_item->exiting_user_item = true;
+
+  /* 注销虚任务，从内核任务链表移除 */
+  if (_user_item->kernel_pid != KERN_PID_INVALID) {
+    kern_task_unregister_virtual(_user_item->kernel_pid);
+    _user_item->kernel_pid = KERN_PID_INVALID;
+  }
 }
 
 /**

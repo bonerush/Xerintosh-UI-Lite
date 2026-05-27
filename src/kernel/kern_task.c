@@ -20,8 +20,13 @@
 
 #ifdef NATIVE_TEST
 #include <ucontext.h>
+#elif defined(XEROS_NATIVE_SCHED)
+/* ESP32 setjmp/longjmp 协作式调度器（实验性） */
+#include "kern_ctx_esp32.h"
+#include <setjmp.h>
+#include <esp_timer.h>
 #else
-// ESP32: 使用 FreeRTOS 任务 + 二值信号量实现协作式调度
+/* ESP32: FreeRTOS 任务容器 + 双信号量协作调度（默认） */
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <freertos/semphr.h>
@@ -191,6 +196,20 @@ void kern_sched_tick(void)
     if (!g_sched_initialized) return;
 
     g_sched_ticks++;
+
+    /* 栈使用率监控：超过 75% 时警告 */
+    if (g_current_task != NULL && g_current_task != g_idle_task
+        && (g_sched_ticks % 500) == 0) {  /* 每 500 tick 检查一次 */
+        size_t usage = kern_task_stack_usage(g_current_task);
+        if (usage > 0 && g_current_task->stack_size > 0
+            && usage > g_current_task->stack_size * 3 / 4) {
+            kern_log(KERN_LOG_WARN,
+                     "task %s stack usage %zu/%zu (>75%%)",
+                     g_current_task->name,
+                     usage,
+                     g_current_task->stack_size);
+        }
+    }
 
     kern_task_t *volatile next = pick_next_ready();
     if (next == NULL) return;
@@ -508,6 +527,91 @@ kern_task_t *kern_task_get(kern_pid_t pid)
 kern_task_t *kern_task_list_head(void)
 {
     return g_task_list;
+}
+
+/* ═══ 虚任务管理 ═══ */
+
+kern_pid_t kern_task_register_virtual(const char *name)
+{
+    if (g_task_count >= MAX_TASKS) return KERN_ENOSPC;
+
+    kern_task_t *task = (kern_task_t *)calloc(1, sizeof(kern_task_t));
+    if (task == NULL) return KERN_ENOMEM;
+
+    task->pid = g_next_pid++;
+    task->state = KERN_TASK_RUNNING;
+    task->flags = KERN_TASK_FLAG_VIRTUAL;
+    task->priority = 128;
+    task->stack_base = NULL;
+    task->stack_size = 0;
+    task->entry = NULL;
+    task->arg = NULL;
+
+    if (name != NULL) {
+        strncpy(task->name, name, KERN_TASK_NAME_LEN);
+        task->name[KERN_TASK_NAME_LEN] = '\0';
+    } else {
+        snprintf(task->name, KERN_TASK_NAME_LEN, "vtask_%d", task->pid);
+    }
+
+    /* 插入任务链表头部 */
+    task->next = g_task_list;
+    g_task_list = task;
+    g_task_count++;
+
+    kern_log(KERN_LOG_DEBUG, "virtual task %d (%s) registered", task->pid, task->name);
+    return task->pid;
+}
+
+void kern_task_unregister_virtual(kern_pid_t pid)
+{
+    kern_task_t *task = kern_task_get(pid);
+    if (task == NULL) return;
+    if (!(task->flags & KERN_TASK_FLAG_VIRTUAL)) {
+        kern_log(KERN_LOG_WARN, "task %d is not virtual, refusing unregister", pid);
+        return;
+    }
+
+    task->state = KERN_TASK_ZOMBIE;
+    kern_log(KERN_LOG_DEBUG, "virtual task %d (%s) unregistered", task->pid, task->name);
+
+    /* 立即从链表中移除并回收（虚任务无需等待调度器） */
+    kern_task_t *prev = NULL;
+    kern_task_t *t = g_task_list;
+    while (t != NULL) {
+        if (t == task) {
+            if (prev != NULL) {
+                prev->next = t->next;
+            } else {
+                g_task_list = t->next;
+            }
+            if (g_last_picked == task) g_last_picked = NULL;
+            g_task_count--;
+            free(task);
+            return;
+        }
+        prev = t;
+        t = t->next;
+    }
+}
+
+/* ═══ 系统任务保护检查 ═══ */
+
+bool kern_task_is_protected(kern_task_t *task)
+{
+    if (task == NULL) return false;
+
+    /* 虚任务自身不是系统关键任务，但 taskmgr 自身受保护 */
+    static const char *protected_names[] = {
+        "idle", "shell", "ui", "taskmgr", NULL
+    };
+
+    for (int i = 0; protected_names[i] != NULL; i++) {
+        if (strcmp(task->name, protected_names[i]) == 0) {
+            return true;
+        }
+    }
+    return false;
 }
 
 #ifdef NATIVE_TEST

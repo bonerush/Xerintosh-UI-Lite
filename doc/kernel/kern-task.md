@@ -283,6 +283,26 @@ void kern_task_create(kern_task_t *task, const char *name,
 
 调度器初始化时自动创建 `[idle]` 任务。当没有就绪任务时启动 idle 任务，避免调度器无所适从。idle 任务内部由 `kern_idle_entry()` 实现，循环调用 `sys_yield()`。
 
+### 虚任务（Virtual Task）
+
+虚任务是为 `user_item` App 提供内核可观测性的轻量机制。
+
+特点：
+- **无独立 FreeRTOS 上下文**：不创建 FreeRTOS 任务，不参与调度
+- **仅用于可观测性**：`/proc/tasks` 可见、`kill` 可终止、任务管理器可管理
+- **生命周期绑定 App**：进入 user_item 时 `kern_task_register_virtual()`，退出时 `kern_task_unregister_virtual()`
+- **终止行为**：被 kill 后通过 `g_xerintosh_exit_requested` 标志通知 UI 任务退出当前 App
+
+```c
+// 注册虚任务（在 user_item enter 时调用）
+kern_pid_t pid = kern_task_register_virtual("serial_monitor");
+
+// 注销虚任务（在 user_item exit 时调用）
+kern_task_unregister_virtual(pid);
+```
+
+虚任务在 `/proc/tasks` 中的 stack 字段显示为 `n/a`，因为其没有独立栈。标志位 `KERN_TASK_FLAG_VIRTUAL` 用于区分虚任务和真实任务。
+
 ---
 
 ## 与其他组件的关系

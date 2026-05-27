@@ -24,10 +24,8 @@
 
 /* ─── 外部函数 ─── */
 extern void app_input_process(void);
-extern void wifi_mgr_update(void);
-extern void bt_mgr_update(void);
-/* WiFi/BT 任务函数已打包为 wifi_mgr_task_main/bt_mgr_task_main，
-   待 UI/网络操作彻底解耦后可切换到独立内核任务 */
+/* WiFi/BT 管理器已作为独立内核任务运行（wifi_mgr_task_main / bt_mgr_task_main），
+   不再在 UI 任务中调用 _update() */
 
 /* ═══ UI 任务入口 ═══ */
 
@@ -49,8 +47,6 @@ void ui_task_main(void *arg)
         }
 
         app_input_process();
-        wifi_mgr_update();
-        bt_mgr_update();
 
         hal_display_clear();
         xerintosh_ui_main_core();

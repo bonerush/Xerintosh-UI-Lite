@@ -17,6 +17,7 @@
 bool g_in_xerintosh = false;                 /* UI 是否处于激活状态 */
 uint16_t g_xerintosh_draw_color = 0xFFFF;    /* 当前前景色（默认白色） */
 bool g_anim_enabled = true;                  /* 动画是否启用 */
+bool g_xerintosh_exit_requested = false;     /* 外部请求退出当前 user_item（由 kill 等设置） */
 
 /* ═══ 生命周期 ═══ */
 
@@ -196,6 +197,7 @@ void xerintosh_ui_main_core()
       if (_selected_user_item->init_function != NULL)
         _selected_user_item->init_function();
       _selected_user_item->in_user_item = 1;
+      _selected_user_item->entering_user_item = false;  /* 进入完成，重置标志 */
     }
   }
 
@@ -210,12 +212,24 @@ void xerintosh_ui_main_core()
       _selected_user_item->loop_function();
     }
 
+    /* 外部 kill 请求：触发 user_item 退出 */
+    if (g_xerintosh_exit_requested) {
+      g_xerintosh_exit_requested = false;
+      _selected_user_item->exiting_user_item = true;
+    }
+
     if (_selected_user_item->exiting_user_item && g_xerintosh_exit_animation_status == 1)
     {
         if (_selected_user_item->exit_function != NULL)
             _selected_user_item->exit_function();
         _selected_user_item->in_user_item = 0;
         _selected_user_item->exiting_user_item = false;
+    }
+
+    /* 兜底：动画已完成但标志未重置时强制清理，防止退出状态残留 */
+    if (_selected_user_item->exiting_user_item && g_xerintosh_exit_animation_finished) {
+      _selected_user_item->in_user_item = 0;
+      _selected_user_item->exiting_user_item = false;
     }
   } else
   {

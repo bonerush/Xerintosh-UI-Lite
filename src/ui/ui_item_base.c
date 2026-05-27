@@ -194,5 +194,6 @@ xerintosh_list_item_t *xerintosh_new_user_item(const char *_content, void (*_ini
   _item->init_function = _init_function;
   _item->loop_function = _loop_function;
   _item->exit_function = _exit_function;
+  _item->kernel_pid    = KERN_PID_INVALID;
   return (xerintosh_list_item_t*)_item;
 }

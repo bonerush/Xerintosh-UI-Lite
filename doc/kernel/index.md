@@ -34,6 +34,10 @@ FreeRTOS 继续在底层为 WiFi/BT 协议栈服务，Xeros 运行在 Arduino `l
 │  │  sysfs   │ │   IPC    │ │  Shell   │ │ Syscall  │       │
 │  │(/sys/*)  │ │(pipe/mq) │ │(ttyS0)   │ │dispatch  │       │
 │  └──────────┘ └──────────┘ └──────────┘ └──────────┘       │
+│  ┌──────────┐                                               │
+│  │  gpiofs  │                                               │
+│  │(/sys/gpio)│                                              │
+│  └──────────┘                                               │
 ├─────────────────────────────────────────────────────────────┤
 │ HAL / FreeRTOS（底层，不动）                                   │
 │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐       │
@@ -55,6 +59,8 @@ FreeRTOS 继续在底层为 WiFi/BT 协议栈服务，Xeros 运行在 Arduino `l
 | IPC | [kern-ipc.md](kern-ipc.md) | `kern_ipc.c/h` | 匿名 pipe（环形缓冲区）+ 命名消息队列 |
 | 系统调用 | [kern-syscall.md](kern-syscall.md) | `kern_syscall.c/h` | 统一 syscall 分发器 + 用户态封装 |
 | Shell | [kern-shell.md](kern-shell.md) | `kern_shell.c/h` | 串口交互式命令行（ls/cd/pwd/ps/cat/echo...） |
+| GPIO 桥接 | [kern-gpiofs.md](kern-gpiofs.md) | `kern_gpiofs.c/h` | /sys/gpio 引脚状态映射与读写 |
+| 版本信息 | [kern-version.md](kern-version.md) | `kern_version.h` | 版本号与开发者信息集中管理 |
 | 物理设备 | [kern-devices.md](kern-devices.md) | `devices/kern_devices.c` | `/dev/fb0` 帧缓冲、`/dev/input0` 按键、`/dev/ttyS0` 串口 |
 
 ## 关键设计决策
@@ -108,14 +114,25 @@ main.cpp setup():
 ├── proc/
 │   ├── tasks             ← 任务列表（只读）
 │   ├── uptime            ← 内核运行时间（只读）
-│   └── version           ← 内核版本号（只读）
+│   ├── version           ← 内核版本号（只读）
+│   ├── meminfo           ← 堆内存统计（只读）
+│   └── developer         ← 开发者信息（只读）
 ├── sys/
 │   ├── brightness        ← 亮度（0-255，可读写）
 │   ├── rotation          ← 屏幕方向（0-3，可读写）
 │   ├── anim_speed        ← 动画速度（0-100，可读写）
 │   ├── anim_enabled      ← 动画开关（0/1，可读写）
-│   └── kernel/
-│       └── log_level     ← 日志级别（0-3，可读写）
+│   ├── kernel/
+│   │   └── log_level     ← 日志级别（0-3，可读写）
+│   └── gpio/
+│       ├── list          ← 所有引脚状态汇总表
+│       ├── 0             ← GPIO0 状态（读写）
+│       ├── 25            ← GPIO25 状态（读写）
+│       ├── 26            ← GPIO26 状态（读写）
+│       ├── 32            ← GPIO32 状态（读写）
+│       ├── 33            ← GPIO33 状态（读写）
+│       ├── 36            ← GPIO36 状态（只读）
+│       └── 37            ← GPIO37 状态（只读）
 └── tmp/                  ← 临时目录（可 touch/rm）
 ```
 

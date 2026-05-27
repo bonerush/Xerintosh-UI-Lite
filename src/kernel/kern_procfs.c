@@ -14,10 +14,17 @@
 #include "kern_vfs.h"
 #include "kern_task.h"
 #include "kern_init.h"
+#include "kern_version.h"
 
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <inttypes.h>
+
+#ifndef NATIVE_TEST
+#include <esp_timer.h>
+#include <esp_heap_caps.h>
+#endif
 
 /* ═══ 内部常量 ═══ */
 
@@ -26,9 +33,11 @@
 /* ═══ procfs 文件类型枚举（存入 inode->private_data） ═══ */
 
 typedef enum {
-    KERN_PROCFS_TASKS   = 1,
-    KERN_PROCFS_UPTIME  = 2,
-    KERN_PROCFS_VERSION = 3,
+    KERN_PROCFS_TASKS     = 1,
+    KERN_PROCFS_UPTIME    = 2,
+    KERN_PROCFS_VERSION   = 3,
+    KERN_PROCFS_MEMINFO   = 4,
+    KERN_PROCFS_DEVELOPER = 5,
 } kern_procfs_file_type_t;
 
 /* ═══ 内部状态 ═══ */
@@ -93,20 +102,70 @@ static size_t procfs_tasks_generate(char *content, size_t max_len)
 
 /**
  * @brief 生成 /proc/uptime 内容
- * @note  当前返回占位符 "0"；未来可接入 kern_sched_ticks 全局计数器
+ * @note  使用 esp_timer_get_time()（ESP32）或时钟计数（Native）获取实际运行时间
  */
 static size_t procfs_uptime_generate(char *content, size_t max_len)
 {
+#ifndef NATIVE_TEST
+    int64_t us = esp_timer_get_time();
+    uint32_t seconds = (uint32_t)(us / 1000000);
+    int written = snprintf(content, max_len, "%" PRIu32 ".%02" PRIu32 "\n",
+                           seconds, (uint32_t)((us / 10000) % 100));
+#else
     int written = snprintf(content, max_len, "0\n");
+#endif
     return (written > 0) ? (size_t)written : 0;
 }
 
 /**
  * @brief 生成 /proc/version 内容
+ * @note  使用 kern_version.h 统一定义的版本号和开发者信息
  */
 static size_t procfs_version_generate(char *content, size_t max_len)
 {
-    int written = snprintf(content, max_len, "Xeros 0.1.0\n");
+    int written = snprintf(content, max_len,
+        "Xeros " XEROS_VERSION_STRING " (" XEROS_CODENAME ")\n"
+        "Developer: " XEROS_DEVELOPER "\n"
+        "Platform: " XEROS_PLATFORM "\n"
+        "Compiled: " __DATE__ " " __TIME__ "\n");
+    return (written > 0) ? (size_t)written : 0;
+}
+
+/**
+ * @brief 生成 /proc/meminfo 内容（新增）
+ * @note  显示堆内存使用情况
+ */
+static size_t procfs_meminfo_generate(char *content, size_t max_len)
+{
+#ifndef NATIVE_TEST
+    uint32_t free_heap  = esp_get_free_heap_size();
+    uint32_t min_free   = esp_get_minimum_free_heap_size();
+    uint32_t total_heap = heap_caps_get_total_size(MALLOC_CAP_DEFAULT);
+    uint32_t used_heap  = total_heap - free_heap;
+
+    int written = snprintf(content, max_len,
+                           "MemTotal: %" PRIu32 " kB\n"
+                           "MemFree:  %" PRIu32 " kB\n"
+                           "MemUsed:  %" PRIu32 " kB\n"
+                           "MinFree:  %" PRIu32 " kB\n",
+                           total_heap / 1024,
+                           free_heap / 1024,
+                           used_heap / 1024,
+                           min_free / 1024);
+#else
+    int written = snprintf(content, max_len, "MemTotal: N/A (native)\n");
+#endif
+    return (written > 0) ? (size_t)written : 0;
+}
+
+/**
+ * @brief 生成 /proc/developer 内容（新增）
+ */
+static size_t procfs_developer_generate(char *content, size_t max_len)
+{
+    int written = snprintf(content, max_len,
+        "Developer: " XEROS_DEVELOPER "\n"
+        "Project: " XEROS_CODENAME " (Xerintosh UI)\n");
     return (written > 0) ? (size_t)written : 0;
 }
 
@@ -133,6 +192,12 @@ static ssize_t procfs_read(kern_file_t *f, char *buf, size_t len)
         break;
     case KERN_PROCFS_VERSION:
         content_len = procfs_version_generate(content, sizeof(content));
+        break;
+    case KERN_PROCFS_MEMINFO:
+        content_len = procfs_meminfo_generate(content, sizeof(content));
+        break;
+    case KERN_PROCFS_DEVELOPER:
+        content_len = procfs_developer_generate(content, sizeof(content));
         break;
     default:
         return KERN_EINVAL;
@@ -201,7 +266,7 @@ void kern_procfs_init(void)
     /* 创建 /proc 目录 */
     kern_vfs_mkdir("/proc");
 
-    /* 注册三个静态文件（单个失败不阻塞其他文件注册） */
+    /* 注册文件 */
     int rc;
     rc = procfs_register_file("tasks", KERN_PROCFS_TASKS);
     if (rc != KERN_OK) {
@@ -214,6 +279,14 @@ void kern_procfs_init(void)
     rc = procfs_register_file("version", KERN_PROCFS_VERSION);
     if (rc != KERN_OK) {
         kern_log(KERN_LOG_WARN, "procfs: failed to register /proc/version");
+    }
+    rc = procfs_register_file("meminfo", KERN_PROCFS_MEMINFO);
+    if (rc != KERN_OK) {
+        kern_log(KERN_LOG_WARN, "procfs: failed to register /proc/meminfo");
+    }
+    rc = procfs_register_file("developer", KERN_PROCFS_DEVELOPER);
+    if (rc != KERN_OK) {
+        kern_log(KERN_LOG_WARN, "procfs: failed to register /proc/developer");
     }
 
     g_procfs_initialized = true;

@@ -13,7 +13,9 @@ Project Root
 │   ├── [调度器](kernel/kern-task.md)           ← 协作式 Round-Robin + 动态栈
 │   ├── [VFS 核心](kernel/kern-vfs.md)          ← inode / dentry / file 三级结构
 │   ├── [设备文件系统](kernel/kern-devfs.md)     ← /dev/ 设备注册
-│   ├── [/proc 与 /sys](kernel/kern-procfs-sysfs.md) ← 虚拟文件系统
+│   ├── [/proc 与 /sys](kernel/kern-procfs-sysfs.md) ← 虚拟文件系统（含 /sys/gpio）
+│   ├── [GPIO 桥接](kernel/kern-gpiofs.md)       ← /sys/gpio 引脚状态映射
+│   ├── [版本信息](kernel/kern-version.md)        ← 版本号与开发者信息管理
 │   ├── [IPC 机制](kernel/kern-ipc.md)           ← pipe + 命名消息队列
 │   ├── [系统调用](kernel/kern-syscall.md)       ← 统一 syscall 分发与封装
 │   ├── [内核 Shell](kernel/kern-shell.md)        ← 串口交互式命令行
@@ -35,7 +37,8 @@ Project Root
 │   ├── wifi/               ← WiFi 状态机（扫描/连接/密码输入）
 │   ├── bluetooth/          ← 蓝牙管理器（NimBLE 扫描/配对）
 │   ├── serial_input/       ← 串口 CLI 输入（WiFi 密码/蓝牙配对码）
-│   └── serial_monitor/     ← 串口监视器 App（缓冲区/状态机/界面）
+│   ├── serial_monitor/     ← 串口监视器 App（缓冲区/状态机/界面）
+│   └── taskmgr/             ← 任务管理器 App（进程列表/终止/保护）
 ├── [编码风格规范](coding-style.md)     ← C OOP 命名、封装、继承规范
 ├── 教程
 │   └── [从零开始创建 App](tutorials/your-first-app.md) ← 面向初学者的 App 开发教程
@@ -97,6 +100,8 @@ FreeRTOS 继续在底层为 WiFi/BT 协议栈服务；Xeros 内核运行在 Ardu
 - **[VFS 虚拟文件系统](kernel/kern-vfs.md)** — inode/dentry/file 三级结构与路径解析
 - **[设备文件系统](kernel/kern-devfs.md)** — /dev/ 设备注册流程
 - **[/proc 与 /sys](kernel/kern-procfs-sysfs.md)** — 内核状态信息与系统配置文件系统
+- **[GPIO 桥接](kernel/kern-gpiofs.md)** — /sys/gpio 引脚状态映射与读写
+- **[版本信息管理](kernel/kern-version.md)** — 版本号与开发者信息集中管理
 - **[IPC 进程间通信](kernel/kern-ipc.md)** — 匿名 pipe + 命名消息队列
 - **[系统调用接口](kernel/kern-syscall.md)** — 统一分发器与用户态封装
 - **[内核 Shell](kernel/kern-shell.md)** — 串口交互式命令行（ls/cd/ps/cat/echo...）
@@ -105,6 +110,7 @@ FreeRTOS 继续在底层为 WiFi/BT 协议栈服务；Xeros 内核运行在 Ardu
 ### App 层
 - **[应用初始化](app/app-init.md)** — 菜单树构建、管理器初始化、按键映射
 - **[设置管理](app/settings.md)** — 亮度/动画/方向/波特率配置与存储
+- **[任务管理器](app/taskmgr.md)** — 进程列表查看与安全终止
 
 ### 入门教程
 - **[从零开始创建 App](tutorials/your-first-app.md)** — 面向初学者的完整教程，手把手教你创建第一个 `user_item` App

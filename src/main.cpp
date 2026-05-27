@@ -49,6 +49,7 @@ bool bt_on = true;    /* 蓝牙默认开关状态 */
 #include "kernel/kern_devfs.h"
 #include "kernel/kern_procfs.h"
 #include "kernel/kern_sysfs.h"
+#include "kernel/kern_gpiofs.h"
 #include "kernel/devices/kern_devices.h"
 #include "kernel/devices/dev_ttyS0.h"
 #include "kernel/kern_shell.h"
@@ -193,6 +194,55 @@ static void deferred_kernel_init(void)
     kern_devfs_init();
     kern_procfs_init();
     kern_sysfs_init();
+
+    /* ── GPIO 文件系统 ── */
+    kern_gpiofs_init();
+
+    /* ── sysfs → 硬件双向绑定 ── */
+
+    /* brightness: sysfs 写入时同步到 M5 屏幕背光 */
+    kern_sysfs_bind(KERN_SYSFS_BRIGHTNESS,
+        [](kern_sysfs_attr_t attr, int32_t val, void *ud) {
+            (void)attr; (void)ud;
+            uint8_t hw = (uint8_t)(val > 255 ? 255 : val);
+            M5.Display.setBrightness(hw);
+            brightness = (int16_t)val;
+            storage_set_brightness(val);
+        }, NULL);
+
+    /* rotation: sysfs 写入时同步到 M5 屏幕方向 */
+    kern_sysfs_bind(KERN_SYSFS_ROTATION,
+        [](kern_sysfs_attr_t attr, int32_t val, void *ud) {
+            (void)attr; (void)ud;
+            if (val < 0 || val > 3) return;
+            M5.Display.setRotation((int32_t)val);
+            g_screen_rotation_level = (val == 0 || val == 2)
+                                      ? ORIENTATION_PORTRAIT
+                                      : ORIENTATION_LANDSCAPE;
+            g_is_landscape = (g_screen_rotation_level == ORIENTATION_LANDSCAPE);
+            storage_set_screen_rotation((uint8_t)g_screen_rotation_level);
+            hal_display_init();
+            g_xerintosh_exit_animation_finished = true;
+            g_xerintosh_exit_animation_status = 0;
+        }, NULL);
+
+    /* anim_speed: sysfs 写入时同步到全局动画速度 */
+    kern_sysfs_bind(KERN_SYSFS_ANIM_SPEED,
+        [](kern_sysfs_attr_t attr, int32_t val, void *ud) {
+            (void)attr; (void)ud;
+            if (val < 0 || val > 100) return;
+            g_anim_speed = (int16_t)val;
+            storage_set_anim_speed((uint8_t)val);
+        }, NULL);
+
+    /* anim_enabled: sysfs 写入时同步到全局开关 */
+    kern_sysfs_bind(KERN_SYSFS_ANIM_ENABLED,
+        [](kern_sysfs_attr_t attr, int32_t val, void *ud) {
+            (void)attr; (void)ud;
+            g_anim_enabled = (val != 0);
+            storage_set_anim_enabled(g_anim_enabled);
+        }, NULL);
+
     kern_devices_init();
     Serial.printf("[  OK  ] Kernel subsystems, free_heap=%u\n", ESP.getFreeHeap());
 
@@ -204,8 +254,11 @@ static void deferred_kernel_init(void)
     kern_pid_t ui_pid = kern_spawn("ui", ui_task_main, NULL, 4096);
     Serial.printf("[  OK  ] UI task spawned (pid=%d)\n", ui_pid);
 
-    /* WiFi/BT 管理器当前仍在 UI 任务中运行（_update() 需中断开启，
-       独立内核任务迁移待 UI/网络操作彻底解耦后完成） */
+    /* WiFi/BT 管理器作为独立内核任务运行，与 UI 任务解耦 */
+    kern_spawn("wifi-mgr", wifi_mgr_task_main, NULL, 4096);
+    Serial.println("[  OK  ] WiFi manager spawned as kernel task");
+    kern_spawn("bt-mgr",   bt_mgr_task_main, NULL, 4096);
+    Serial.println("[  OK  ] BT manager spawned as kernel task");
 
     /* 让出 CPU 给 FreeRTOS，使刚创建的任务有机会启动并阻塞在调度信号量上 */
     delay(10);

@@ -14,6 +14,10 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+/* 内核 PID 类型前向声明（避免循环依赖） */
+typedef int16_t kern_pid_t;
+#define KERN_PID_INVALID (-1)
+
 /* 全局绘制颜色（定义在 ui_core.c） */
 extern uint16_t g_xerintosh_draw_color;
 
@@ -226,6 +230,7 @@ typedef struct xerintosh_user_item_t
   void (*init_function)();           /* 进入时调用一次 */
   void (*loop_function)();           /* 每帧调用 */
   void (*exit_function)();           /* 退出时调用一次 */
+  kern_pid_t kernel_pid;             /* 内核虚任务 PID（-1=未注册） */
 } xerintosh_user_item_t;
 
 /* ═══ 列表项操作 ═══ */

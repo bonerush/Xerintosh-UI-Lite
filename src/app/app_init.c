@@ -16,6 +16,7 @@
 #include "bluetooth/bt_manager.h"
 #include "serial_input/serial_input.h"
 #include "serial_monitor/serial_monitor.h"
+#include "taskmgr/taskmgr.h"
 
 #include "ui/ui_item.h"
 #include "kernel/kern_task.h"
@@ -58,14 +59,15 @@ static void on_baud_selected_cb(void);
  *        │       ├── 57600（按钮）
  *        │       ├── 115200（按钮）
  *        │       └── 230400（按钮）
- *        └── 关于（user_item）
+ *        └── 任务管理器（user_item）
  */
 void app_init_ui(void)
 {
     xerintosh_list_item_t* root = xerintosh_get_root_list();
 
     xerintosh_list_item_t* item1 = xerintosh_new_list_item("设置", list_icon);
-    xerintosh_list_item_t* item2 = xerintosh_new_list_item("关于", user_icon);
+    xerintosh_list_item_t* item2 = xerintosh_new_user_item(
+        "任务管理器", taskmgr_init, taskmgr_loop, taskmgr_exit, user_icon);
     xerintosh_list_item_t* item3 = xerintosh_new_user_item(
         "串口监视器", serial_monitor_init, serial_monitor_loop, serial_monitor_exit, default_icon);
 
