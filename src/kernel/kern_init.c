@@ -13,8 +13,6 @@
 #include <string.h>
 
 #ifndef NATIVE_TEST
-#include <freertos/FreeRTOS.h>
-#include <freertos/semphr.h>
 #include "debug_serial.h"
 #endif
 
@@ -27,7 +25,7 @@ static bool g_has_panic = false;                 /* 是否发生过 panic */
 static uint32_t g_init_count = 0;                /* 初始化次数（幂等性） */
 
 #ifndef NATIVE_TEST
-static SemaphoreHandle_t g_log_mutex = NULL;     /* 日志互斥锁 */
+static volatile bool g_log_locked = false;        /* 日志自旋锁（替代 FreeRTOS 互斥锁） */
 #endif
 
 /* ═══ 初始化 ═══ */
@@ -41,10 +39,6 @@ void kern_init(void)
 
     g_kern_initialized = true;
     g_init_count = 1;
-
-#ifndef NATIVE_TEST
-    g_log_mutex = xSemaphoreCreateMutex();
-#endif
 
     kern_log(KERN_LOG_INFO, "Xeros kernel initialized");
 }
@@ -96,17 +90,14 @@ void kern_vlog(kern_log_level_t level, const char *fmt, va_list args)
     vfprintf(stdout, fmt, args);
     fprintf(stdout, "\n");
 #else
-    /* 硬件环境：输出到串口（互斥保护，避免多任务竞争） */
-    if (g_log_mutex != NULL) {
-        xSemaphoreTake(g_log_mutex, portMAX_DELAY);
+    /* 硬件环境：输出到串口（自旋锁保护，避免与 FreeRTOS WiFi/BT 任务竞争） */
+    while (__sync_lock_test_and_set(&g_log_locked, true)) {
+        /* 自旋等待：协作式调度下锁持有者不会阻塞，短暂自旋即可 */
     }
-    /* 使用 debug_printf 确保输出到硬件串口 */
     debug_printf("[%s] ", log_level_str(level));
     debug_vprintf(fmt, args);
     debug_printf("\n");
-    if (g_log_mutex != NULL) {
-        xSemaphoreGive(g_log_mutex);
-    }
+    __sync_lock_release(&g_log_locked);
 #endif
 }
 

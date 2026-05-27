@@ -15,12 +15,10 @@
 #define KERN_TASK_H
 
 #include "kern_types.h"
+#include "kern_port.h"
 
 #ifdef NATIVE_TEST
 #include <ucontext.h>
-#else
-#include <freertos/FreeRTOS.h>
-#include <freertos/task.h>
 #endif
 
 #ifdef __cplusplus
@@ -57,7 +55,7 @@ typedef struct kern_task {
 #elif defined(XEROS_NATIVE_SCHED)
     kern_ctx_t          ctx;            /* setjmp/longjmp */
 #else
-    TaskHandle_t        rtos_handle;    /* FreeRTOS 任务句柄 */
+    kern_port_thread_t  port_thread;    /* 底层执行上下文句柄 */
 #endif
 
     /* 调度信息 */

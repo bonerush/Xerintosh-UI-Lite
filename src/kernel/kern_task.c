@@ -13,6 +13,7 @@
 
 #include "kern_task.h"
 #include "kern_init.h"
+#include "kern_port.h"
 
 #include <string.h>
 #include <stdlib.h>
@@ -26,17 +27,14 @@
 #include <setjmp.h>
 #include <esp_timer.h>
 #else
-/* ESP32: FreeRTOS 任务容器 + 双信号量协作调度（默认） */
-#include <freertos/FreeRTOS.h>
-#include <freertos/task.h>
-#include <freertos/semphr.h>
+/* ESP32: FreeRTOS 任务容器 + 双信号量协作调度（默认）
+ * 所有 FreeRTOS 调用已封装到 kern_port.c */
 #endif
 
-/* ═══ 内部常量 ═══ */
+/* ═══ IDLE 任务配置 ═══ */
 
 #define MAX_TASKS          KERN_MAX_TASKS
 #define IDLE_STACK_MIN     2048   /* idle FreeRTOS 任务栈（需容纳 printf 调用） */
-#define WRAPPER_STACK_MIN  4096   /* FreeRTOS 任务包装器栈大小 */
 
 /* ═══ 全局调度状态 ═══ */
 
@@ -72,23 +70,9 @@ static void task_write_canary(kern_task_t *task);
 #ifdef NATIVE_TEST
 static void task_entry_trampoline(void);
 #else
-static void task_wrapper(void *arg);
-
-/* FreeRTOS 协作调度：双信号量实现令牌传递
- *
- * 原设计使用单个二值信号量，调度器 give 后立即 take，
- * 在单核上没有阻塞窗口让任务运行，导致任务永远拿不到令牌。
- *
- * 新设计：
- *   g_token_sem  — CPU 令牌，任务获取后才能运行
- *   g_done_sem   — 任务完成信号，任务 yield 时通知调度器
- *
- * 流程：
- *   调度器: give(token) → take(done)   (阻塞等待任务完成)
- *   任务:   take(token) → 执行 → give(done) → yield → take(token)
- */
-static SemaphoreHandle_t g_token_sem = NULL;       /* CPU 令牌 */
-static SemaphoreHandle_t g_done_sem  = NULL;       /* 任务完成通知 */
+/* ESP32: FreeRTOS 任务容器 + 双信号量协作调度（默认）
+ * 所有 FreeRTOS 调用已封装到 kern_port.c
+ * 调度协议见 kern_port.c 的 task_wrapper */
 #endif
 
 /* ═══ 初始化 ═══ */
@@ -142,12 +126,8 @@ void kern_sched_init(void)
     if (g_sched_initialized) return;
     g_sched_initialized = true;
 
-    /* 创建双信号量 */
-    g_token_sem = xSemaphoreCreateBinary();
-    configASSERT(g_token_sem != NULL);
-    g_done_sem = xSemaphoreCreateBinary();
-    configASSERT(g_done_sem != NULL);
-    /* 两个信号量初始 count 均为 0，调度器持有概念上的令牌 */
+    /* 初始化可移植层（创建调度基础设施） */
+    kern_port_init();
 
     /* 创建 idle 任务 */
     g_idle_task = (kern_task_t *)calloc(1, sizeof(kern_task_t));
@@ -162,18 +142,19 @@ void kern_sched_init(void)
     strncpy(g_idle_task->name, "idle", KERN_TASK_NAME_LEN);
     g_idle_task->entry = idle_entry;
     g_idle_task->arg = NULL;
+    g_idle_task->stack_size = IDLE_STACK_MIN;
 
-    /* idle 任务也需要 FreeRTOS 任务承载 */
-    BaseType_t ret = xTaskCreate(
-        task_wrapper,           /* 包装函数 */
-        "xidle",                /* FreeRTOS 任务名 */
-        IDLE_STACK_MIN,         /* 栈大小 */
-        g_idle_task,            /* 参数 = kern_task_t* */
-        tskIDLE_PRIORITY,       /* 最低优先级 */
-        &g_idle_task->rtos_handle
+    /* 通过可移植层创建底层线程 */
+    g_idle_task->port_thread = kern_port_thread_spawn(
+        NULL,                    /* entry 为 NULL：使用 task_wrapper（由 port 层管理） */
+        g_idle_task,             /* arg = TCB */
+        "xidle",
+        IDLE_STACK_MIN,
+        g_idle_task
     );
-    if (ret != pdPASS) {
-        kern_panic("failed to create idle FreeRTOS task");
+    if (g_idle_task->port_thread == KERN_PORT_THREAD_NULL) {
+        kern_panic("failed to create idle thread");
+        free(g_idle_task);
         return;
     }
 
@@ -219,23 +200,22 @@ void kern_sched_tick(void)
     swapcontext(&g_sched_ctx, &next->ctx);
 }
 
-#else /* ESP32: 协作式 tick，释放令牌给下一个任务 */
+#else /* ESP32: 协作式 tick，通过可移植层释放令牌给下一个任务 */
 
 void kern_sched_tick(void)
 {
     if (!g_sched_initialized) return;
-    if (g_token_sem == NULL || g_done_sem == NULL) return;
 
     g_sched_ticks++;
 
     kern_task_t *next = pick_next_ready();
     
     if (next == NULL) {
-        /* 无就绪任务，短暂让出 CPU 让 FreeRTOS 处理其它事务 */
+        /* 无就绪任务，通过可移植层短暂让出 CPU */
         if (g_sched_ticks % 1000 == 0) {
             kern_log(KERN_LOG_WARN, "sched tick=%u: no ready tasks", g_sched_ticks);
         }
-        vTaskDelay(1);
+        kern_port_idle();
         return;
     }
 
@@ -244,27 +224,8 @@ void kern_sched_tick(void)
         next->state = KERN_TASK_RUNNING;
     }
 
-    /*
-     * 双信号量协议：
-     *   1. give(token) — 把 CPU 令牌交给选中的任务
-     *   2. take(done)  — 阻塞等待任务 yield 时归还令牌
-     *
-     * 任务侧（kern_yield / task_wrapper）：
-     *   take(token) → 执行 → give(done) → yield → take(token)
-     */
-    if (xSemaphoreGive(g_token_sem) != pdTRUE) {
-        kern_log(KERN_LOG_ERROR, "sched: give token failed for task %d (%s)",
-                 next->pid, next->name);
-        return;
-    }
-
-    /* 等待任务完成（5 秒超时防止崩溃导致死锁） */
-    if (xSemaphoreTake(g_done_sem, pdMS_TO_TICKS(5000)) != pdTRUE) {
-        kern_log(KERN_LOG_ERROR, "sched: task %d (%s) timeout - marking ZOMBIE",
-                 next->pid, next->name);
-        next->state = KERN_TASK_ZOMBIE;
-        g_current_task = g_idle_task;
-    }
+    /* 通过可移植层切换到目标任务（阻塞等待任务 yield/exit） */
+    kern_port_switch_to(next);
 }
 
 #endif
@@ -359,23 +320,22 @@ kern_pid_t kern_spawn(const char *name, void (*entry)(void *arg),
         snprintf(task->name, KERN_TASK_NAME_LEN, "task_%d", task->pid);
     }
 
-    /* 创建 FreeRTOS 任务承载此 Xeros 任务 */
-    size_t stack_sz = (stack_min > 0) ? stack_min : (size_t)WRAPPER_STACK_MIN;
-    if (stack_sz < WRAPPER_STACK_MIN) stack_sz = WRAPPER_STACK_MIN;
+    /* 通过可移植层创建底层线程承载此 Xeros 任务 */
+    size_t stack_sz = (stack_min > 0) ? stack_min : (size_t)KERN_PORT_STACK_MIN;
+    if (stack_sz < KERN_PORT_STACK_MIN) stack_sz = KERN_PORT_STACK_MIN;
 
     /* 记录栈信息用于调试 */
     task->stack_size = stack_sz;
 
-    BaseType_t ret = xTaskCreate(
-        task_wrapper,           /* 包装函数 */
-        name ? name : "xtask",  /* FreeRTOS 任务名 */
-        (uint32_t)stack_sz,     /* 栈大小（字） */ 
-        task,                   /* 参数 = kern_task_t* */
-        tskIDLE_PRIORITY + 1,   /* 优先级略高于 idle */
-        &task->rtos_handle
+    task->port_thread = kern_port_thread_spawn(
+        NULL,                              /* entry 由 port 层 task_wrapper 内部读取 task->entry */
+        task,                              /* arg = TCB */
+        name ? name : "xtask",
+        stack_sz,
+        task
     );
-    if (ret != pdPASS) {
-        kern_log(KERN_LOG_WARN, "FreeRTOS task create failed for %s", task->name);
+    if (task->port_thread == KERN_PORT_THREAD_NULL) {
+        kern_log(KERN_LOG_WARN, "port: thread spawn failed for %s", task->name);
         free(task);
         return KERN_ENOMEM;
     }
@@ -411,7 +371,7 @@ void kern_yield(void)
     swapcontext(&cur->ctx, &g_sched_ctx);
 }
 
-#else /* ESP32: yield = 释放调度锁，让调度器选择下一任务 */
+#else /* ESP32: yield = 通过可移植层释放 CPU */
 
 void kern_yield(void)
 {
@@ -420,13 +380,8 @@ void kern_yield(void)
 
     cur->state = KERN_TASK_READY;
 
-    /*
-     * 双信号量协议：
-     *   1. give(done) — 通知调度器本任务已完成当前时间片
-     *   2. take(token) — 等待调度器再次分配 CPU 令牌
-     */
-    xSemaphoreGive(g_done_sem);
-    xSemaphoreTake(g_token_sem, portMAX_DELAY);
+    /* 通过可移植层归还令牌并等待下次调度 */
+    kern_port_task_yield();
 
     /* 被唤醒：调度器已把我们设为 RUNNING */
 }
@@ -449,7 +404,7 @@ void kern_exit(void)
     setcontext(&g_sched_ctx);
 }
 
-#else /* ESP32: exit = 将任务标记为 ZOMBIE，通知调度器，删除自身 */
+#else /* ESP32: exit = 标记 ZOMBIE，通过可移植层销毁自身 */
 
 void kern_exit(void)
 {
@@ -461,11 +416,8 @@ void kern_exit(void)
 
     g_current_task = g_idle_task;
 
-    /* 通知调度器任务结束 */
-    xSemaphoreGive(g_done_sem);
-
-    /* 删除当前 FreeRTOS 任务（不会返回） */
-    vTaskDelete(NULL);
+    /* 通过可移植层归还令牌并销毁当前线程（不会返回） */
+    kern_port_task_exit();
 }
 
 #endif
@@ -658,14 +610,9 @@ uint32_t kern_task_stack_canary(kern_task_t *task)
 size_t kern_task_stack_usage(kern_task_t *task)
 {
     if (task == NULL) return 0;
-    /* FreeRTOS 提供高水位线查询 */
-    if (task->rtos_handle != NULL) {
-        UBaseType_t high_water = uxTaskGetStackHighWaterMark(task->rtos_handle);
-        /* 高水位线 = 剩余字数，总栈 - 剩余 = 使用量 */
-        size_t total_words = task->stack_size / sizeof(StackType_t);
-        if (high_water <= total_words) {
-            return (total_words - high_water) * sizeof(StackType_t);
-        }
+    /* 通过可移植层查询栈使用量 */
+    if (task->port_thread != KERN_PORT_THREAD_NULL) {
+        return kern_port_thread_stack_usage(task->port_thread);
     }
     return 0;
 }
@@ -769,41 +716,9 @@ static void task_write_canary(kern_task_t *task)
 #else /* ═══════════════ ESP32 (FreeRTOS 任务容器) ═══════════════ */
 
 /*
- * ─── FreeRTOS 任务包装器 ───
- *
- * 每个 Xeros 任务包装在一个 FreeRTOS 任务中。
- * 使用双信号量协议与调度器同步：
- *   take(token) → 执行任务 → (任务内部 yield 时) give(done)/take(token)
- *
- * 首次运行时，任务阻塞在 take(token) 上，直到调度器分配令牌。
+ * task_wrapper 已移至 kern_port.c（可移植层）。
+ * 以下为 ESP32 专用的辅助函数。
  */
-static void task_wrapper(void *arg)
-{
-    kern_task_t *task = (kern_task_t *)arg;
-
-    /* 等待调度器给我们令牌（首次运行或 yield 后恢复） */
-    xSemaphoreTake(g_token_sem, portMAX_DELAY);
-
-    /* 获得了令牌：现在是我们运行的时间片 */
-    task->state = KERN_TASK_RUNNING;
-    g_current_task = task;
-
-    /* 执行任务入口 */
-    if (task->entry != NULL) {
-        task->entry(task->arg);
-    }
-
-    /* 入口返回：任务结束 */
-    task->state = KERN_TASK_ZOMBIE;
-    kern_log(KERN_LOG_DEBUG, "task %d (%s) exited", task->pid, task->name);
-    g_current_task = g_idle_task;
-
-    /* 归还令牌（通过 done 信号量） */
-    xSemaphoreGive(g_done_sem);
-
-    /* 删除自身（不会返回） */
-    vTaskDelete(NULL);
-}
 
 /* ─── Round-Robin 就绪任务选择 ─── */
 

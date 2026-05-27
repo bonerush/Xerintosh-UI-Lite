@@ -16,6 +16,7 @@ Project Root
 │   ├── [/proc 与 /sys](kernel/kern-procfs-sysfs.md) ← 虚拟文件系统（含 /sys/gpio）
 │   ├── [GPIO 桥接](kernel/kern-gpiofs.md)       ← /sys/gpio 引脚状态映射
 │   ├── [版本信息](kernel/kern-version.md)        ← 版本号与开发者信息管理
+│   ├── [可移植层](kernel/kern-port.md)          ← 调度原语抽象（FreeRTOS/原生双后端）
 │   ├── [IPC 机制](kernel/kern-ipc.md)           ← pipe + 命名消息队列
 │   ├── [系统调用](kernel/kern-syscall.md)       ← 统一 syscall 分发与封装
 │   ├── [内核 Shell](kernel/kern-shell.md)        ← 串口交互式命令行
@@ -102,6 +103,7 @@ FreeRTOS 继续在底层为 WiFi/BT 协议栈服务；Xeros 内核运行在 Ardu
 - **[/proc 与 /sys](kernel/kern-procfs-sysfs.md)** — 内核状态信息与系统配置文件系统
 - **[GPIO 桥接](kernel/kern-gpiofs.md)** — /sys/gpio 引脚状态映射与读写
 - **[版本信息管理](kernel/kern-version.md)** — 版本号与开发者信息集中管理
+- **[可移植层](kernel/kern-port.md)** — 调度原语抽象（FreeRTOS/原生双后端）
 - **[IPC 进程间通信](kernel/kern-ipc.md)** — 匿名 pipe + 命名消息队列
 - **[系统调用接口](kernel/kern-syscall.md)** — 统一分发器与用户态封装
 - **[内核 Shell](kernel/kern-shell.md)** — 串口交互式命令行（ls/cd/ps/cat/echo...）
