@@ -11,16 +11,11 @@
 
 #include <stdio.h>
 #include <string.h>
-#include <stdlib.h>
 
 #ifndef NATIVE_TEST
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
 #include "debug_serial.h"
-#endif
-
-#ifdef NATIVE_TEST
-#include <stdio.h>  /* 在 native 环境 printf 输出到 stdout */
 #endif
 
 /* ═══ 内部状态 ═══ */

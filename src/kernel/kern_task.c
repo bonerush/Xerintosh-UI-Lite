@@ -60,18 +60,13 @@ static kern_task_t   *g_switch_to_task = NULL;
 /* ═══ 前向声明 ═══ */
 
 static void idle_entry(void *arg);
+static kern_task_t *pick_next_ready(void);
+static void task_stack_init(kern_task_t *task, size_t stack_size);
+static void task_write_canary(kern_task_t *task);
 
 #ifdef NATIVE_TEST
-static kern_task_t *pick_next_ready(void);
-static void task_stack_init(kern_task_t *task, size_t stack_size);
-static void task_write_canary(kern_task_t *task);
 static void task_entry_trampoline(void);
-#endif
-
-#ifndef NATIVE_TEST
-static kern_task_t *pick_next_ready(void);
-static void task_stack_init(kern_task_t *task, size_t stack_size);
-static void task_write_canary(kern_task_t *task);
+#else
 static void task_wrapper(void *arg);
 
 /* FreeRTOS 协作调度：双信号量实现令牌传递
@@ -89,7 +84,6 @@ static void task_wrapper(void *arg);
  */
 static SemaphoreHandle_t g_token_sem = NULL;       /* CPU 令牌 */
 static SemaphoreHandle_t g_done_sem  = NULL;       /* 任务完成通知 */
-static TaskHandle_t      g_scheduler_task = NULL;  /* 调度器所在的 FreeRTOS 任务 */
 #endif
 
 /* ═══ 初始化 ═══ */
@@ -149,9 +143,6 @@ void kern_sched_init(void)
     g_done_sem = xSemaphoreCreateBinary();
     configASSERT(g_done_sem != NULL);
     /* 两个信号量初始 count 均为 0，调度器持有概念上的令牌 */
-
-    /* 记录调度器所在 FreeRTOS 任务（即 main loop 的任务） */
-    g_scheduler_task = xTaskGetCurrentTaskHandle();
 
     /* 创建 idle 任务 */
     g_idle_task = (kern_task_t *)calloc(1, sizeof(kern_task_t));
@@ -586,8 +577,6 @@ uint32_t kern_task_stack_canary(kern_task_t *task)
 
 /* ═══ 内部函数（Native） ═══ */
 
-#ifdef NATIVE_TEST
-
 static void idle_entry(void *arg)
 {
     (void)arg;
@@ -595,6 +584,8 @@ static void idle_entry(void *arg)
         kern_yield();
     }
 }
+
+#ifdef NATIVE_TEST
 
 static void task_entry_trampoline(void)
 {
@@ -672,14 +663,6 @@ static void task_write_canary(kern_task_t *task)
 }
 
 #else /* ═══════════════ ESP32 (FreeRTOS 任务容器) ═══════════════ */
-
-static void idle_entry(void *arg)
-{
-    (void)arg;
-    while (1) {
-        kern_yield();
-    }
-}
 
 /*
  * ─── FreeRTOS 任务包装器 ───

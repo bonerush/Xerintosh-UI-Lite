@@ -10,7 +10,6 @@
 #include "kern_devfs.h"
 #include "kern_init.h"
 
-#include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
 

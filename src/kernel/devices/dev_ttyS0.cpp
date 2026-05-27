@@ -13,9 +13,6 @@
 #include "kernel/devices/dev_ttyS0.h"
 
 #ifdef NATIVE_TEST
-#include <string.h>
-#include <stdio.h>
-
 #define TTY_BUF_SIZE  512
 
 static char  g_tty_buf[TTY_BUF_SIZE];

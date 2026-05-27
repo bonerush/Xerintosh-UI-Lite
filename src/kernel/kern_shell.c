@@ -14,7 +14,6 @@
 
 #include <string.h>
 #include <stdio.h>
-#include <stdlib.h>
 
 #ifndef NATIVE_TEST
 #include <esp_system.h>

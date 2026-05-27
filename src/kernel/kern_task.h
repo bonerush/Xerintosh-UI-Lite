@@ -53,7 +53,6 @@ typedef struct kern_task {
 #ifdef NATIVE_TEST
     kern_ctx_t          ctx;            /* Native: ucontext_t */
 #endif
-    bool                has_run;        /* 是否已首次运行 */
 #ifndef NATIVE_TEST
     TaskHandle_t        rtos_handle;    /* FreeRTOS 任务句柄 */
 #endif
