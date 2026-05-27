@@ -1,0 +1,24 @@
+# App 层索引
+
+> **Parent:** [知识地图](../index.md)
+
+## 概述
+
+App 层是用户应用代码所在。每个 App 在独立子目录中，通过 `app_init.c` 挂载到 UI 菜单树。
+
+## 模块列表
+
+| 模块 | 文档 | 源码 | 说明 |
+|------|------|------|------|
+| 应用初始化 | [app-init.md](app-init.md) | `src/app/app_init.c/h` | 菜单树构建、管理器初始化、按键映射 |
+| 设置管理 | [settings.md](settings.md) | `src/app/settings/settings.c/h` | 亮度/动画/方向配置与存储 |
+| 开机画面 | — | `src/app/boot/` | Macintosh 128K 风格开机动画 |
+| 存储 | — | `src/app/storage.cpp/h` | NVS 持久化存储封装 |
+| WiFi 管理 | — | `src/app/wifi/wifi_manager.cpp/h` | WiFi 状态机（扫描/连接/密码输入） |
+| 蓝牙管理 | — | `src/app/bluetooth/bt_manager.cpp/h` | 蓝牙管理器（NimBLE 扫描/配对） |
+| 串口输入 | — | `src/app/serial_input/serial_input.cpp/h` | 串口 CLI 输入（WiFi/蓝牙密码） |
+| 串口监视器 | — | `src/app/serial_monitor/` | 串口监视器 App（缓冲区/状态机/界面） |
+
+---
+
+> **See Also:** [HAL 层](../hal/index.md) | [UI 核心层](../ui/index.md) | [内核层](../kernel/index.md)

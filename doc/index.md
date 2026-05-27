@@ -4,10 +4,20 @@
 
 本项目是将 `reference/oled-ui-Xerintosh-lite`（128×64 OLED 菜单框架）移植到 **M5Stick-C**（80×160 TFT，ESP32-PICO）的固件项目。
 
-采用 **分层架构**：
+采用 **四层架构**：
 
 ```
 Project Root
+├── Xeros 内核层（协作式微内核）
+│   ├── [类型系统与日志](kernel/kern-types.md)  ← 错误码、常量、日志框架
+│   ├── [调度器](kernel/kern-task.md)           ← 协作式 Round-Robin + 动态栈
+│   ├── [VFS 核心](kernel/kern-vfs.md)          ← inode / dentry / file 三级结构
+│   ├── [设备文件系统](kernel/kern-devfs.md)     ← /dev/ 设备注册
+│   ├── [/proc 与 /sys](kernel/kern-procfs-sysfs.md) ← 虚拟文件系统
+│   ├── [IPC 机制](kernel/kern-ipc.md)           ← pipe + 命名消息队列
+│   ├── [系统调用](kernel/kern-syscall.md)       ← 统一 syscall 分发与封装
+│   ├── [内核 Shell](kernel/kern-shell.md)        ← 串口交互式命令行
+│   └── [物理设备](kernel/kern-devices.md)       ← /dev/fb0, /dev/input0, /dev/ttyS0
 ├── HAL 层（硬件抽象）
 │   ├── [显示驱动](hal/display.md)      ← TFT 双缓冲 / Native 内存帧缓冲
 │   ├── [输入系统](hal/input.md)        ← 按键消抖 + 短按/长按/双击状态机
@@ -34,6 +44,31 @@ Project Root
     └── src/native_main.cpp            ← GoogleTest 桌面测试入口
 ```
 
+## 架构层次关系
+
+```
+┌─────────────────────────────────────────────┐
+│ App 层  (user_item, settings, wifi, bt...)  │  用户代码
+├─────────────────────────────────────────────┤
+│ UI 核心层 (item / core / drawer / driver)    │  菜单框架
+├─────────────────────────────────────────────┤
+│ Xeros 内核层                                 │
+│  ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐      │
+│  │Sched  │ │ VFS  │ │ devfs│ │ IPC  │       │  协作式微内核
+│  │coop   │ │(vrtl)│ │(dev) │ │(pipe)│      │
+│  └──────┘ └──────┘ └──────┘ └──────┘      │
+│  ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐      │
+│  │sysfs  │ │procfs│ │Shell │ │Syscll│      │  "一切皆文件"
+│  └──────┘ └──────┘ └──────┘ └──────┘      │
+├─────────────────────────────────────────────┤
+│ HAL 层 (display / input / system)           │  硬件抽象
+├─────────────────────────────────────────────┤
+│ FreeRTOS + Arduino (WiFi / BT 协议栈)       │  底层运行时
+└─────────────────────────────────────────────┘
+```
+
+FreeRTOS 继续在底层为 WiFi/BT 协议栈服务；Xeros 内核运行在 Arduino `loop()` 的单一线程内，作为"逻辑进程层"，与底层不冲突。
+
 ## 渲染管线（每帧顺序）
 
 1. 清除后台缓冲区
@@ -51,8 +86,21 @@ Project Root
 - **XOR 选择器高亮**：TFT 不支持 OLED 的 `draw_color(2)` 反色，改用像素级 `color ^ 0xFFFF`
 - **C 风格面向对象**：基类 `xerintosh_list_item_t` 作为结构体第一个成员，派生类通过强制类型转换实现多态
 - **动画插值公式**：`current += (target - current) / (100.0f - speed)`
+- **协作式微内核**：Round-Robin 调度 + 动态栈管理 + VFS"一切皆文件" + pipe/mq IPC
 
 ## 文档树
+
+### 内核层
+- **[内核子系统总览](kernel/index.md)** — 架构总览、子模块导航
+- **[类型系统与日志](kernel/kern-types.md)** — 错误码、常量定义、日志框架
+- **[协作式调度器](kernel/kern-task.md)** — 任务控制块、Round-Robin、动态栈管理
+- **[VFS 虚拟文件系统](kernel/kern-vfs.md)** — inode/dentry/file 三级结构与路径解析
+- **[设备文件系统](kernel/kern-devfs.md)** — /dev/ 设备注册流程
+- **[/proc 与 /sys](kernel/kern-procfs-sysfs.md)** — 内核状态信息与系统配置文件系统
+- **[IPC 进程间通信](kernel/kern-ipc.md)** — 匿名 pipe + 命名消息队列
+- **[系统调用接口](kernel/kern-syscall.md)** — 统一分发器与用户态封装
+- **[内核 Shell](kernel/kern-shell.md)** — 串口交互式命令行（ls/cd/ps/cat/echo...）
+- **[物理设备驱动](kernel/kern-devices.md)** — /dev/fb0 / /dev/input0 / /dev/ttyS0
 
 ### App 层
 - **[应用初始化](app/app-init.md)** — 菜单树构建、管理器初始化、按键映射
@@ -77,3 +125,5 @@ Project Root
 - [主入口点](../src/main.cpp)
 - [测试入口点](../src/native_main.cpp)
 - [PlatformIO 配置](../platformio.ini)
+- [编码风格规范](coding-style.md)
+- [开发者指南](developer-guide.md)
