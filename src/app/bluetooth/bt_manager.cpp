@@ -34,6 +34,7 @@ extern "C" {
 #include "app/serial_input/serial_input.h"
 #include "ui/ui_item.h"
 #include "ui/ui_core.h"
+#include "kernel/kern_task.h"
 }
 
 extern bool bt_on;  /* 定义在 main.cpp */
@@ -320,8 +321,10 @@ void bt_mgr_update(void) {
 
     switch (g_state) {
     case BT_MGR_WARMUP: {
+        /* 预热完成后直接进入就绪状态。
+         * 设备列表已于 bt_mgr_enable() 中创建，无需在此重建。 */
         if (millis() - g_warmup_start_time >= BT_WARMUP_DELAY_MS) {
-            on_bt_scan_pressed();
+            g_state = BT_MGR_SCAN_DONE;
         }
         break;
     }
@@ -368,6 +371,21 @@ void bt_mgr_on_switch_toggle(void) {
         bt_mgr_enable();
     } else {
         bt_mgr_disable();
+    }
+}
+
+/* ═══ 内核任务入口 ═══ */
+
+/**
+ * @brief BT 管理器内核任务入口
+ * @note  每 50ms 轮询一次状态机。
+ */
+extern "C" void bt_mgr_task_main(void *arg)
+{
+    (void)arg;
+    for (;;) {
+        bt_mgr_update();
+        kern_sleep_ms(50);
     }
 }
 

@@ -113,6 +113,22 @@ extern int kern_dentry_register(const char *path, kern_inode_t *inode);
 extern int kern_vfs_mkdir(const char *path);
 
 /**
+ * @brief  删除文件或空目录
+ * @param  path 要删除的路径
+ * @return KERN_OK 成功，< 0 为错误码
+ * @note   仅从目录树中移除 dentry；非空目录返回 KERN_ENOTEMPTY
+ */
+extern int kern_vfs_unlink(const char *path);
+
+/**
+ * @brief  创建空文件
+ * @param  path 文件路径（如 "/tmp/notes"）
+ * @return KERN_OK 成功，KERN_EEXIST 已存在，< 0 为其他错误
+ * @note   自动创建中间目录节点
+ */
+extern int kern_vfs_touch(const char *path);
+
+/**
  * @brief  按路径解析目录项
  * @param  path 绝对路径（以 "/" 开头）
  * @return 目录项指针；未找到时返回 NULL

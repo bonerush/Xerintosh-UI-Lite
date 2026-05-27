@@ -177,6 +177,100 @@ int kern_vfs_mkdir(const char *path)
     return KERN_OK;
 }
 
+/* ─── unlink —— 删除文件或空目录 ─── */
+
+int kern_vfs_unlink(const char *path)
+{
+    if (!g_vfs_initialized) return KERN_ERR;
+    if (path == NULL || path[0] != '/') return KERN_EINVAL;
+
+    kern_dentry_t *dentry = kern_path_resolve(path);
+    if (dentry == NULL) return KERN_ENOENT;
+
+    /* 不允许删除根目录 */
+    if (dentry == &g_root_dentry) return KERN_EACCES;
+    if (dentry->parent == NULL) return KERN_EACCES;
+
+    /* 非空目录不可删除 */
+    if (dentry->child_count > 0) return KERN_ENOTEMPTY;
+
+    /* 从父节点的 children 数组中移除 */
+    kern_dentry_t *parent = dentry->parent;
+    for (uint8_t i = 0; i < parent->child_count; i++) {
+        if (parent->children[i] == dentry) {
+            /* 将后续元素前移 */
+            for (uint8_t j = i; j < parent->child_count - 1; j++) {
+                parent->children[j] = parent->children[j + 1];
+            }
+            parent->children[parent->child_count - 1] = NULL;
+            parent->child_count--;
+            break;
+        }
+    }
+
+    free(dentry);
+    return KERN_OK;
+}
+
+/* ─── touch —— 创建空文件 ─── */
+
+/* 最小化的文件操作：read 返回 EOF，write 接受一切 */
+static ssize_t ramfile_read(kern_file_t *f, char *buf, size_t len)
+{
+    (void)f;
+    (void)buf;
+    (void)len;
+    return 0;  /* EOF */
+}
+
+static ssize_t ramfile_write(kern_file_t *f, const char *buf, size_t len)
+{
+    (void)f;
+    (void)buf;
+    return (ssize_t)len;  /* 接受所有写入（类似 /dev/null） */
+}
+
+static int ramfile_release(kern_file_t *f)
+{
+    (void)f;
+    return KERN_OK;
+}
+
+static kern_file_ops_t g_ramfile_fops = {
+    .read    = ramfile_read,
+    .write   = ramfile_write,
+    .ioctl   = NULL,
+    .release = ramfile_release,
+};
+
+int kern_vfs_touch(const char *path)
+{
+    if (!g_vfs_initialized) return KERN_ERR;
+    if (path == NULL || path[0] != '/') return KERN_EINVAL;
+
+    /* 若已存在则返回 EEXIST */
+    kern_dentry_t *existing = kern_path_resolve(path);
+    if (existing != NULL && existing->inode != NULL) {
+        return KERN_EEXIST;
+    }
+
+    /* 分配 inode */
+    kern_inode_t *inode = (kern_inode_t *)calloc(1, sizeof(kern_inode_t));
+    if (inode == NULL) return KERN_ENOMEM;
+
+    inode->type = KERN_FILE_REGULAR;
+    inode->fops = &g_ramfile_fops;
+    inode->private_data = NULL;
+
+    int ret = kern_dentry_register(path, inode);
+    if (ret != KERN_OK) {
+        free(inode);
+        return ret;
+    }
+
+    return KERN_OK;
+}
+
 /* ═══ 文件描述符分配 ═══ */
 
 static kern_fd_t fd_alloc(void)

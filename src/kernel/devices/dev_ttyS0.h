@@ -25,6 +25,12 @@ extern "C" {
  */
 extern kern_file_ops_t *dev_ttyS0_get_fops(void);
 
+/**
+ * @brief 设备轮询：将数据从硬件串口传输到环形缓冲区（仅 ESP32）
+ * @note  必须在主 loop() 中调用，线程安全（单核操作）。
+ */
+extern void dev_ttyS0_poll(void);
+
 #ifdef __cplusplus
 }
 #endif

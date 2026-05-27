@@ -74,6 +74,11 @@ static kern_file_ops_t g_sysfs_fops = {
  */
 static ssize_t sysfs_read(kern_file_t *f, char *buf, size_t len)
 {
+    /* sysfs 文件内容为单行整数，读取一次后返回 EOF */
+    if (f->f_pos > 0) {
+        return 0;
+    }
+
     /* 从 inode 的 private_data 获取属性索引 */
     int attr_idx = (int)(intptr_t)f->inode->private_data;
     if (attr_idx < 0 || attr_idx >= KERN_SYSFS_ATTR_COUNT) {
@@ -93,6 +98,7 @@ static ssize_t sysfs_read(kern_file_t *f, char *buf, size_t len)
     size_t copy_len = (size_t)n < len ? (size_t)n : len;
     memcpy(buf, tmp, copy_len);
 
+    f->f_pos += copy_len;
     return (ssize_t)copy_len;
 }
 

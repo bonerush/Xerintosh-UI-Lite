@@ -82,6 +82,14 @@ bool hal_input_is_pressed(hal_button_t btn) {
     return false;
 }
 
+/**
+ * @brief 获取按键当前按下的持续时间（始终返回 0）
+ */
+uint32_t hal_input_get_press_duration(hal_button_t btn) {
+    (void)btn;
+    return 0;
+}
+
 #else
 
 /* ═══ 硬件环境：M5Unified 按键处理 ═══ */
@@ -114,9 +122,12 @@ void hal_input_init(void) {
 
 /**
  * @brief 更新输入状态
- * @note  M5.update() 在 main.cpp 的 loop() 中先行调用，此处仅作占位
+ * @note  调用 M5.update() 以刷新按键边沿标志。
+ *        在微内核架构下，按键读取发生在 ui_task 中，
+ *        必须在此处调用 M5.update() 以保证边沿标志最新。
  */
 void hal_input_update(void) {
+    M5.update();
 }
 
 /**

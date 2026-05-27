@@ -18,6 +18,7 @@
 #include "serial_monitor/serial_monitor.h"
 
 #include "ui/ui_item.h"
+#include "kernel/kern_task.h"
 #include "ui/ui_core.h"
 #include "ui/ui_drawer.h"
 #include "hal/hal_input.h"
@@ -133,6 +134,9 @@ void app_init_managers(void)
 
     if (wifi_on) wifi_mgr_enable();
     if (bt_on)   bt_mgr_enable();
+
+    /* WiFi/BT 内核任务由 setup() 在 xerintosh_init_core() 之后启动，
+       确保 g_xerintosh_selector 已初始化，避免 LoadStoreError */
 }
 
 /* ═══ 输入处理 ═══ */
@@ -147,6 +151,12 @@ void app_init_managers(void)
  */
 void app_input_process(void)
 {
+    /* 无论处于何种模式，每帧都必须调用 hal_input_update()，
+       确保 M5.update() 刷新按键边沿标志。
+       user_item 内部虽然不处理框架导航，但 user_item 自身
+       的 loop 会调用 hal_input_get_event() 读取按键。 */
+    hal_input_update();
+
     /* 若处于 user_item 内部，框架输入由 App 自身接管 */
     if (xerintosh_is_in_user_item()) {
         return;
@@ -156,8 +166,6 @@ void app_input_process(void)
     if (!g_xerintosh_exit_animation_finished) {
         return;
     }
-
-    hal_input_update();
 
     hal_event_t event_a = hal_input_get_event(HAL_BTN_A);
     hal_event_t event_b = hal_input_get_event(HAL_BTN_B);

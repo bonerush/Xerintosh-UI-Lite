@@ -15,6 +15,8 @@
 
 extern "C" {
 int16_t g_anim_speed = 92;  /* 全局动画速度默认值 */
+void wifi_mgr_task_main(void *arg);
+void bt_mgr_task_main(void *arg);
 }
 
 #ifndef NATIVE_TEST
@@ -39,6 +41,20 @@ bool bt_on = true;    /* 蓝牙默认开关状态 */
 #include "app/wifi/wifi_manager.h"
 #include "app/bluetooth/bt_manager.h"
 #include "app/boot/boot_screen.h"
+
+/* Xeros 内核 */
+#include "kernel/kern_init.h"
+#include "kernel/kern_task.h"
+#include "kernel/kern_vfs.h"
+#include "kernel/kern_devfs.h"
+#include "kernel/kern_procfs.h"
+#include "kernel/kern_sysfs.h"
+#include "kernel/devices/kern_devices.h"
+#include "kernel/devices/dev_ttyS0.h"
+#include "kernel/kern_shell.h"
+
+/* UI 任务入口 */
+extern "C" void ui_task_main(void *arg);
 
 /* ═══ 设置变更回调（由 app_init.c 引用）═══ */
 
@@ -116,14 +132,18 @@ extern "C" void on_screen_rotation_change_cb(void)
  */
 void setup()
 {
-    M5.begin();
+    /* 最早进行串口初始化，确保后续 printf/日志能立即输出 */
+    Serial.begin(115200);
+    delay(100);
+    Serial.println("\n[  BOOT] M5Stick-P1 kernel starting...");
 
-    Serial.begin(settings_serial_baud_hw_value(g_serial_baud_rate));
-    delay(200);
-    Serial.println("\n\n=== M5Stick BOOT ===");
+    M5.begin();
+    Serial.println("[  OK  ] M5.begin()");
 
     storage_init();
+    Serial.println("[  OK  ] NVS storage");
     settings_load_from_storage();
+    Serial.println("[  OK  ] Settings loaded from NVS");
 
     brightness = g_brightness_level * 10;
     M5.Display.setBrightness((uint8_t)settings_brightness_hw_value());
@@ -136,39 +156,88 @@ void setup()
     int16_t gfx_rotation = g_is_landscape ? 1 : 0;
     M5.Display.setRotation(gfx_rotation);
 
+    Serial.printf("[  OK  ] Display driver, free_heap=%u\n", ESP.getFreeHeap());
     xerintosh_ui_driver_init();
+
     boot_screen_show();
+    Serial.println("[  OK  ] Boot screen");
+
     app_init_ui();
+    Serial.println("[  OK  ] UI initialised");
+
+    Serial.printf("[  OK  ] App managers, free_heap=%u\n", ESP.getFreeHeap());
     app_init_managers();
 
     xerintosh_init_core();
+    Serial.println("[  OK  ] Xeros core");
     g_in_xerintosh = true;
+
+    /* 内核初始化延迟到 loop() 第一帧，避免 setup() 累积时间
+     * 触发 TG1 系统看门狗（FreeRTOS idle 任务在 setup 返回后喂狗） */
+    Serial.println("[  OK  ] Hardware init complete, deferring kernel init");
+}
+
+/* ═══ 延迟内核初始化（loop() 第一帧）═══ */
+
+static bool g_kernel_inited = false;
+
+static void deferred_kernel_init(void)
+{
+    if (g_kernel_inited) return;
+    g_kernel_inited = true;
+
+    /* ── 内核子系统初始化 ── */
+    kern_init();
+    kern_log_set_level(KERN_LOG_INFO);
+    kern_vfs_init();
+    kern_devfs_init();
+    kern_procfs_init();
+    kern_sysfs_init();
+    kern_devices_init();
+    Serial.printf("[  OK  ] Kernel subsystems, free_heap=%u\n", ESP.getFreeHeap());
+
+    /* ── 启动 Shell ── */
+    kern_shell_init();
+    Serial.println("[  OK  ] Shell spawned on /dev/ttyS0");
+
+    /* ── 启动 UI 任务 ── */
+    kern_pid_t ui_pid = kern_spawn("ui", ui_task_main, NULL, 4096);
+    Serial.printf("[  OK  ] UI task spawned (pid=%d)\n", ui_pid);
+
+    /* WiFi/BT 管理器当前仍在 UI 任务中运行（_update() 需中断开启，
+       独立内核任务迁移待 UI/网络操作彻底解耦后完成） */
+
+    /* 让出 CPU 给 FreeRTOS，使刚创建的任务有机会启动并阻塞在调度信号量上 */
+    delay(10);
+
+    kern_log(KERN_LOG_INFO, "Xeros kernel boot complete, entering scheduler");
+    Serial.println("[  OK  ] Kernel boot complete, entering scheduler loop");
 }
 
 /**
- * @brief Arduino loop()：主循环
- * @note  每帧执行：输入处理 → 管理器更新 → 清屏 → UI 渲染 → 长按提示 → 刷新
+ * @brief Arduino loop()：Xeros 内核调度入口
+ * @note  M5.update() 已迁移至 hal_input_update()（由 ui_task 在按键读取前调用），
+ *        避免 FreeRTOS 多任务环境下跨任务边沿标志丢失。
+ *        每个 kern_sched_tick() 运行一个任务切片后返回。
  */
 void loop()
 {
-    M5.update();
-    serial_monitor_update();  /* DEBUG 模式下后台持续读取串口 */
-    app_input_process();
-    wifi_mgr_update();
-    bt_mgr_update();
-    hal_display_clear();
-    xerintosh_ui_main_core();
-    xerintosh_ui_widget_core();
+    deferred_kernel_init();
 
-    uint32_t dur_a = hal_input_get_press_duration(HAL_BTN_A);
-    uint32_t dur_b = hal_input_get_press_duration(HAL_BTN_B);
-    if (dur_a > 0 && dur_a < 500) {
-        xerintosh_draw_long_press_hint(dur_a, 500);
-    } else if (dur_b > 0 && dur_b < 500) {
-        xerintosh_draw_long_press_hint(dur_b, 500);
+    static uint32_t last_heartbeat = 0;
+    uint32_t now = millis();
+#if 0
+    /* 心跳日志：每 5 秒报告一次内存状态（调试用） */
+    if (now - last_heartbeat >= 5000) {
+        Serial.printf("[LOOP] heartbeat, free_heap=%u\n", ESP.getFreeHeap());
+        last_heartbeat = now;
     }
-
-    hal_display_flush();
+#else
+    (void)now;
+    (void)last_heartbeat;
+#endif
+    dev_ttyS0_poll();    /* 在 FreeRTOS 上下文传输串口数据到环形缓冲区 */
+    kern_sched_tick();
 }
 
 #endif /* NATIVE_TEST */

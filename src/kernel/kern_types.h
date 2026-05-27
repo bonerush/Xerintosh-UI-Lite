@@ -36,6 +36,7 @@ extern "C" {
 #define KERN_EPIPE      (-32)   /* 管道损坏 */
 #define KERN_EBADF      (-9)    /* 无效文件描述符 */
 #define KERN_ENOTTY     (-25)   /* 不支持的 ioctl */
+#define KERN_ENOTEMPTY  (-39)   /* 目录非空 */
 
 /* ═══ 任务相关常量 ═══ */
 

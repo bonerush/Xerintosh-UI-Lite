@@ -13,6 +13,12 @@
 #include <string.h>
 #include <stdlib.h>
 
+#ifndef NATIVE_TEST
+#include <freertos/FreeRTOS.h>
+#include <freertos/semphr.h>
+#include "debug_serial.h"
+#endif
+
 #ifdef NATIVE_TEST
 #include <stdio.h>  /* 在 native 环境 printf 输出到 stdout */
 #endif
@@ -25,6 +31,10 @@ static char g_last_panic[128] = {0};             /* 上次 panic 消息 */
 static bool g_has_panic = false;                 /* 是否发生过 panic */
 static uint32_t g_init_count = 0;                /* 初始化次数（幂等性） */
 
+#ifndef NATIVE_TEST
+static SemaphoreHandle_t g_log_mutex = NULL;     /* 日志互斥锁 */
+#endif
+
 /* ═══ 初始化 ═══ */
 
 void kern_init(void)
@@ -36,6 +46,10 @@ void kern_init(void)
 
     g_kern_initialized = true;
     g_init_count = 1;
+
+#ifndef NATIVE_TEST
+    g_log_mutex = xSemaphoreCreateMutex();
+#endif
 
     kern_log(KERN_LOG_INFO, "Xeros kernel initialized");
 }
@@ -87,10 +101,17 @@ void kern_vlog(kern_log_level_t level, const char *fmt, va_list args)
     vfprintf(stdout, fmt, args);
     fprintf(stdout, "\n");
 #else
-    /* 硬件环境：输出到串口 */
-    printf("[%s] ", log_level_str(level));
-    vprintf(fmt, args);
-    printf("\n");
+    /* 硬件环境：输出到串口（互斥保护，避免多任务竞争） */
+    if (g_log_mutex != NULL) {
+        xSemaphoreTake(g_log_mutex, portMAX_DELAY);
+    }
+    /* 使用 debug_printf 确保输出到硬件串口 */
+    debug_printf("[%s] ", log_level_str(level));
+    debug_vprintf(fmt, args);
+    debug_printf("\n");
+    if (g_log_mutex != NULL) {
+        xSemaphoreGive(g_log_mutex);
+    }
 #endif
 }
 

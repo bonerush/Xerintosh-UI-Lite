@@ -36,6 +36,7 @@ extern "C" {
 #include "app/serial_input/serial_input.h"
 #include "ui/ui_item.h"
 #include "ui/ui_core.h"
+#include "kernel/kern_task.h"
 }
 
 /* ═══ 外部全局变量 ═══ */
@@ -407,8 +408,9 @@ void wifi_mgr_update(void)
     switch (g_state) {
 
     case WIFI_MGR_WARMUP: {
+        /* 预热完成后不自动扫描，等待用户手动点击"扫描"按钮 */
         if (millis() - g_warmup_start_time >= WIFI_WARMUP_DELAY_MS) {
-            on_scan_pressed();
+            g_state = WIFI_MGR_CONNECTED;
         }
         break;
     }
@@ -514,6 +516,21 @@ void wifi_mgr_update(void)
 
     default:
         break;
+    }
+}
+
+/* ═══ 内核任务入口 ═══ */
+
+/**
+ * @brief WiFi 管理器内核任务入口
+ * @note  每 50ms 轮询一次状态机。
+ */
+extern "C" void wifi_mgr_task_main(void *arg)
+{
+    (void)arg;
+    for (;;) {
+        wifi_mgr_update();
+        kern_sleep_ms(50);
     }
 }
 
