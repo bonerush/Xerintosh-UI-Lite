@@ -27,49 +27,74 @@ static void about_draw(void);
 static void about_draw(void)
 {
     int16_t fh = hal_get_font_height();
+    int16_t sw = SCREEN_WIDTH;
+    int16_t sh = SCREEN_HEIGHT;
 
-    /* Logo（Xerintosh 设备轮廓，复用于开机画面） */
-    boot_screen_draw_logo(18, 4, 80);
+    /*
+     * 自适应布局：
+     * - 竖屏（80x160）：logo 在上，信息在下，充裕间距
+     * - 横屏（160x80）：logo 缩小，信息紧凑排列
+     */
+    int16_t logo_scale;
+    int16_t logo_ox, logo_oy;
+    int16_t title_y;
+    int16_t info_start_y;
+    int16_t line_dy;
+
+    if (sh >= 140) {
+        /* 竖屏：充裕布局 */
+        logo_scale  = 80;
+        logo_ox     = (sw - 44 * logo_scale / 100) / 2;
+        logo_oy     = 2;
+        title_y     = logo_oy + 60 * logo_scale / 100 + 5;
+        info_start_y = title_y + fh + 6;
+        line_dy     = fh + 5;
+    } else {
+        /* 横屏：紧凑布局 */
+        logo_scale  = 55;
+        logo_ox     = 4;
+        logo_oy     = 2;
+        title_y     = logo_oy + 60 * logo_scale / 100 + 4;
+        info_start_y = title_y + fh + 2;
+        line_dy     = fh + 1;
+    }
+
+    /* Logo */
+    boot_screen_draw_logo(logo_ox, logo_oy, logo_scale);
 
     /* 系统名称 */
     hal_set_font(NULL);
     int16_t tw = hal_get_string_width("Xerintosh");
-    hal_draw_string((SCREEN_WIDTH - tw) / 2, 54, "Xerintosh", COLOR_FG);
+    hal_draw_string((sw - tw) / 2, title_y, "Xerintosh", COLOR_FG);
 
     /* 信息区 */
     hal_set_font(hal_get_cn_font());
-    int16_t lx  = 4;
-    int16_t y   = 62;
-    int16_t dy  = fh + 4;
+    int16_t lx = 4;
+    int16_t y  = info_start_y;
     char buf[64];
 
     /* 分隔线 */
-    hal_draw_line(lx, y, SCREEN_WIDTH - 8, y, COLOR_FG);
-    y += 6;
+    hal_draw_line(lx, y, sw - 8, y, COLOR_FG);
+    y += 4;
 
-    snprintf(buf, sizeof(buf), "Version: " XEROS_VERSION_STRING);
+    snprintf(buf, sizeof(buf), "v" XEROS_VERSION_STRING "  " XEROS_CODENAME);
     hal_draw_string(lx, y + fh, buf, COLOR_FG);
-    y += dy;
+    y += line_dy;
 
-    snprintf(buf, sizeof(buf), "Codename: " XEROS_CODENAME);
+    snprintf(buf, sizeof(buf), XEROS_PLATFORM);
     hal_draw_string(lx, y + fh, buf, COLOR_FG);
-    y += dy;
+    y += line_dy;
 
-    snprintf(buf, sizeof(buf), "Platform: " XEROS_PLATFORM);
+    snprintf(buf, sizeof(buf), "by " XEROS_DEVELOPER);
     hal_draw_string(lx, y + fh, buf, COLOR_FG);
-    y += dy;
+    y += line_dy;
 
-    snprintf(buf, sizeof(buf), "Developer: " XEROS_DEVELOPER);
-    hal_draw_string(lx, y + fh, buf, COLOR_FG);
-    y += dy;
-
-    snprintf(buf, sizeof(buf), "Built: " __DATE__ " " __TIME__);
+    snprintf(buf, sizeof(buf), __DATE__);
     hal_draw_string(lx, y + fh, buf, COLOR_FG);
 
     /* 底部提示 */
     hal_set_font(hal_get_cn_font());
-    hal_draw_string(4, SCREEN_HEIGHT - fh - 4 + fh,
-                    "Hold BtnB to return", COLOR_FG);
+    hal_draw_string(lx, sh - 2, "Hold BtnB to return", COLOR_FG);
 }
 
 /* ═══ 生命周期 ═══ */
