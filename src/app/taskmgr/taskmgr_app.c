@@ -102,12 +102,19 @@ void taskmgr_init(void)
 
 /* ═══ UI 状态访问器 ═══ */
 
-#define TASKMGR_LINE_HEIGHT  14
-#define TASKMGR_LIST_Y       18
+/* 布局常量（与 taskmgr_ui.c 保持一致） */
+#define HEADER_Y         2
+#define FOOTER_MARGIN    4
 
 int taskmgr_visible_lines(void)
 {
-    int visible = (SCREEN_HEIGHT - TASKMGR_LIST_Y) / TASKMGR_LINE_HEIGHT;
+    int16_t fh = hal_get_font_height();
+    /* 列表可用高度 = 屏幕高度 - 标题栏 - 底部信息栏 */
+    int16_t header_h = HEADER_Y + fh + 6;        /* 标题行占用 */
+    int16_t footer_h = fh + FOOTER_MARGIN + 4;   /* 信息栏 + 分隔线 */
+    int16_t avail = SCREEN_HEIGHT - header_h - footer_h;
+    int16_t row_h = fh + 4;                      /* 行高 = 字体 + 间距 */
+    int visible = avail / row_h;
     if (visible > TASKMGR_VISIBLE_MAX) visible = TASKMGR_VISIBLE_MAX;
     if (visible < 1) visible = 1;
     return visible;

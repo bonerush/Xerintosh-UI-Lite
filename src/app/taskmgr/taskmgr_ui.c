@@ -60,29 +60,29 @@ static void format_line(kern_task_t *task, char *buf, size_t size)
 
 /**
  * @brief 绘制标题栏
- * @note  使用 hal_get_font_height() 计算行高，避免硬编码值导致重叠
  */
 static void draw_header(void)
 {
     int16_t fh = hal_get_font_height();
     hal_set_font(hal_get_cn_font());
 
-    hal_draw_string(LEFT_MARGIN, HEADER_Y + fh, "Task Manager", COLOR_ACCENT);
+    hal_draw_string(LEFT_MARGIN, HEADER_Y + fh, "Task Manager", COLOR_FG);
 
     /* 分隔线 */
     int16_t sep_y = HEADER_Y + fh + 3;
-    hal_draw_line(0, sep_y, SCREEN_WIDTH, sep_y, COLOR_ACCENT);
+    hal_draw_line(0, sep_y, SCREEN_WIDTH, sep_y, COLOR_FG);
 }
 
 /**
  * @brief 绘制任务列表
+ * @note  纯黑白配色：白底黑字（选中），黑底白字（未选中）。
+ *         受保护任务以 "*" 前缀标识，不使用绿色强调。
  */
 static void draw_list(void)
 {
     int16_t fh = hal_get_font_height();
     hal_set_font(hal_get_cn_font());
 
-    /* 列表区域顶部：标题栏下方 */
     int16_t list_top = HEADER_Y + fh + 6;
 
     int count = taskmgr_get_count();
@@ -95,25 +95,20 @@ static void draw_list(void)
         kern_task_t *t = taskmgr_get_task(idx);
         if (t == NULL) continue;
 
-        /* 行顶部 Y */
         int16_t row_y = list_top + (int16_t)(i * (fh + 4));
-        /* 文字基线 Y（hal_draw_string 使用 baseline_left 基准） */
         int16_t text_y = row_y + fh;
-
         bool is_sel = (idx == selected);
-        bool is_prot = taskmgr_is_task_protected(idx);
 
-        /* 选中行：白底黑字反色 */
+        char line[48];
+        format_line(t, line, sizeof(line));
+
         if (is_sel) {
+            /* 选中行：白底黑字反色 */
             hal_draw_fill_rect(0, row_y, SCREEN_WIDTH, (int16_t)(fh + 4), COLOR_FG);
-            char line[48];
-            format_line(t, line, sizeof(line));
             hal_draw_string(LEFT_MARGIN + 1, text_y, line, COLOR_BG);
         } else {
-            uint16_t text_color = is_prot ? COLOR_ACCENT : COLOR_FG;
-            char line[48];
-            format_line(t, line, sizeof(line));
-            hal_draw_string(LEFT_MARGIN + 1, text_y, line, text_color);
+            /* 未选中行：黑底白字 */
+            hal_draw_string(LEFT_MARGIN + 1, text_y, line, COLOR_FG);
         }
     }
 }
@@ -137,11 +132,11 @@ static void draw_confirm_overlay(void)
     int16_t bh = (int16_t)(fh * 2 + 10);
 
     hal_draw_fill_rect((int16_t)(cx - bw / 2), cy, bw, bh, COLOR_BG);
-    hal_draw_rect((int16_t)(cx - bw / 2), cy, bw, bh, COLOR_ACCENT);
+    hal_draw_rect((int16_t)(cx - bw / 2), cy, bw, bh, COLOR_FG);
 
     char msg[40];
     snprintf(msg, sizeof(msg), "Kill '%s'?", t->name);
-    hal_draw_string((int16_t)(cx - 60), cy + fh, msg, COLOR_ACCENT);
+    hal_draw_string((int16_t)(cx - 60), cy + fh, msg, COLOR_FG);
 
     hal_draw_string((int16_t)(cx - 60), cy + fh * 2 + 2,
                     "A=Yes  B=No", COLOR_FG);
@@ -162,7 +157,7 @@ static void draw_footer(void)
     int16_t footer_y = SCREEN_HEIGHT - fh - FOOTER_MARGIN;
 
     /* 分隔线 */
-    hal_draw_line(0, footer_y - 2, SCREEN_WIDTH, footer_y - 2, COLOR_ACCENT);
+    hal_draw_line(0, footer_y - 2, SCREEN_WIDTH, footer_y - 2, COLOR_FG);
 
     bool is_prot = taskmgr_is_task_protected(selected);
     char info[64];
@@ -176,7 +171,7 @@ static void draw_footer(void)
                  kern_task_stack_usage(t), t->stack_size,
                  is_prot ? "PROTECTED" : "killable");
     }
-    hal_draw_string(LEFT_MARGIN, footer_y + fh, info, COLOR_ACCENT);
+    hal_draw_string(LEFT_MARGIN, footer_y + fh, info, COLOR_FG);
 }
 
 /* ═══ 入口 ═══ */
