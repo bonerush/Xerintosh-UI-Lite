@@ -24,7 +24,7 @@ extern "C" {
 
 /* ═══ 开发者与项目信息 ═══ */
 
-#define XEROS_DEVELOPER      "YukiSala"
+#define XEROS_DEVELOPER      "Bonerush"
 #define XEROS_CODENAME       "M5Stick-P1"
 
 #ifdef NATIVE_TEST
