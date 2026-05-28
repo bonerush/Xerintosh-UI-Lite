@@ -29,7 +29,8 @@ Project Root
 │   ├── [绘制驱动适配](ui/draw-driver.md)  ← oled_* 宏映射到 HAL API
 │   ├── [项目系统](ui/item.md)          ← 列表项、开关、滑条、按钮、用户页
 │   ├── [核心引擎](ui/core.md)          ← 动画插值、相机、选择器、主循环
-│   └── [绘制管线](ui/drawer.md)        ← 列表外观、选择器高亮、弹窗、信息栏
+│   ├── [绘制管线](ui/drawer.md)        ← 列表外观、选择器高亮、弹窗、信息栏
+│   └── [行列表动画工具](ui/ui-anim-row.md) ← 可复用行列表动画（入场滑入+高亮过渡）
 ├── App 层（每个 App 独立子目录）
 │   ├── app_init.c/h        ← 菜单构建、管理器初始化、输入处理
 │   ├── boot/               ← 开机画面
@@ -41,6 +42,7 @@ Project Root
 │   ├── serial_monitor/     ← 串口监视器 App（缓冲区/状态机/界面）
 │   └── taskmgr/             ← 任务管理器 App（进程列表/终止/保护）
 ├── [编码风格规范](coding-style.md)     ← C OOP 命名、封装、继承规范
+├── [内核优化分析](kernel-optimization-analysis.md) ← 7 模块诊断+方案+收益
 ├── 教程
 │   └── [从零开始创建 App](tutorials/your-first-app.md) ← 面向初学者的 App 开发教程
 └── 入口
@@ -106,13 +108,15 @@ FreeRTOS 继续在底层为 WiFi/BT 协议栈服务；Xeros 内核运行在 Ardu
 - **[可移植层](kernel/kern-port.md)** — 调度原语抽象（FreeRTOS/原生双后端）
 - **[IPC 进程间通信](kernel/kern-ipc.md)** — 匿名 pipe + 命名消息队列
 - **[系统调用接口](kernel/kern-syscall.md)** — 统一分发器与用户态封装
-- **[内核 Shell](kernel/kern-shell.md)** — 串口交互式命令行（ls/cd/ps/cat/echo...）
+- **[内核 Shell](kernel/kern-shell.md)** — 串口交互式命令行（30+ 命令，含 scope/top/param 等）
 - **[物理设备驱动](kernel/kern-devices.md)** — /dev/fb0 / /dev/input0 / /dev/ttyS0
+- **[内核优化分析](kernel-optimization-analysis.md)** — 7 模块诊断+方案+代码+收益
 
 ### App 层
 - **[应用初始化](app/app-init.md)** — 菜单树构建、管理器初始化、按键映射
 - **[设置管理](app/settings.md)** — 亮度/动画/方向/波特率配置与存储
-- **[任务管理器](app/taskmgr.md)** — 进程列表查看与安全终止
+- **[任务管理器](app/taskmgr.md)** — 进程列表查看与安全终止（动画行列表 + 横屏 3 行）
+- **[串口监视器](app/serial-monitor.md)** — 串口数据监视（入场滑入动画 + 按钮平滑过渡）
 
 ### 入门教程
 - **[从零开始创建 App](tutorials/your-first-app.md)** — 面向初学者的完整教程，手把手教你创建第一个 `user_item` App
@@ -127,6 +131,7 @@ FreeRTOS 继续在底层为 WiFi/BT 协议栈服务；Xeros 内核运行在 Ardu
 - **[项目系统](ui/item.md)** — 列表项类型层次、构造与挂载、选择器与相机
 - **[核心引擎](ui/core.md)** — 动画系统、相机滚动、主循环调度
 - **[绘制管线](ui/drawer.md)** — 列表外观绘制、选择器渲染、弹窗与信息栏
+- **[行列表动画工具](ui/ui-anim-row.md)** — 可复用行列表动画（入场滑入 + 高亮平滑过渡）
 
 ## 快速链接
 

@@ -18,31 +18,31 @@ FreeRTOS 继续在底层为 WiFi/BT 协议栈服务，Xeros 运行在 Arduino `l
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│ 用户态任务                                                    │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐       │
-│  │ ui_task  │ │wifi_task │ │ bt_task  │ │shell_task│       │
-│  └────┬─────┘ └────┬─────┘ └────┬─────┘ └────┬─────┘       │
+│ 用户态任务                                                  │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐        │
+│  │ ui_task  │ │wifi_task │ │ bt_task  │ │shell_task│        │
+│  └────┬─────┘ └────┬─────┘ └────┬─────┘ └────┬─────┘        │
 │       └────────────┴────────────┴────────────┘              │
-│              sys_open / sys_read / sys_write / sys_yield     │
+│              sys_open / sys_read / sys_write / sys_yield    │
 ├─────────────────────────────────────────────────────────────┤
-│ Xeros 内核                                                    │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐       │
-│  │Scheduler │ │   VFS    │ │  devfs   │ │  procfs  │       │
-│  │ (coop)   │ │(inode)   │ │(/dev/*)  │ │(/proc/*) │       │
-│  └──────────┘ └──────────┘ └──────────┘ └──────────┘       │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐       │
-│  │  sysfs   │ │   IPC    │ │  Shell   │ │ Syscall  │       │
-│  │(/sys/*)  │ │(pipe/mq) │ │(ttyS0)   │ │dispatch  │       │
-│  └──────────┘ └──────────┘ └──────────┘ └──────────┘       │
-│  ┌──────────┐                                               │
-│  │  gpiofs  │                                               │
-│  │(/sys/gpio)│                                              │
-│  └──────────┘                                               │
+│ Xeros 内核                                                  │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐        │
+│  │Scheduler │ │   VFS    │ │  devfs   │ │  procfs  │        │
+│  │ (coop)   │ │(inode)   │ │(/dev/*)  │ │(/proc/*) │        │
+│  └──────────┘ └──────────┘ └──────────┘ └──────────┘        │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐        │
+│  │  sysfs   │ │   IPC    │ │  Shell   │ │ Syscall  │        │
+│  │(/sys/*)  │ │(pipe/mq) │ │(30+ cmd) │ │dispatch  │        │
+│  └──────────┘ └──────────┘ └──────────┘ └──────────┘        │
+│  ┌───────────┐ ┌───────────┐                                  │
+│  │  gpiofs   │ │  Scope    │                                  │
+│  │ /sys/gpio │ │(监测引擎) │                                  │
+│  └───────────┘ └───────────┘                                  │
 ├─────────────────────────────────────────────────────────────┤
-│ HAL / FreeRTOS（底层，不动）                                   │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐       │
-│  │M5Unified │ │M5GFX     │ │WiFi Stack│ │BT Stack  │       │
-│  └──────────┘ └──────────┘ └──────────┘ └──────────┘       │
+│ HAL / FreeRTOS（底层，不动）                                │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐        │
+│  │M5Unified │ │M5GFX     │ │WiFi Stack│ │BT Stack  │        │
+│  └──────────┘ └──────────┘ └──────────┘ └──────────┘        │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -58,7 +58,8 @@ FreeRTOS 继续在底层为 WiFi/BT 协议栈服务，Xeros 运行在 Arduino `l
 | /proc 与 /sys | [kern-procfs-sysfs.md](kern-procfs-sysfs.md) | `kern_procfs.c/h`, `kern_sysfs.c/h` | 内核状态信息、系统配置文件系统 |
 | IPC | [kern-ipc.md](kern-ipc.md) | `kern_ipc.c/h` | 匿名 pipe（环形缓冲区）+ 命名消息队列 |
 | 系统调用 | [kern-syscall.md](kern-syscall.md) | `kern_syscall.c/h` | 统一 syscall 分发器 + 用户态封装 |
-| Shell | [kern-shell.md](kern-shell.md) | `kern_shell.c/h` | 串口交互式命令行（ls/cd/pwd/ps/cat/echo...） |
+| Shell | [kern-shell.md](kern-shell.md) | `kern_shell.c/h`, `kern_shell_cmds.c/h` | 串口交互式命令行（30+ 命令，含 scope/top/param 等） |
+| Scope | [kern-shell.md](kern-shell.md#scope--实时数据监测引擎phase-3-新增) | `kern_shell_cmds.c`, `kern_shell_cmds_internal.h` | 实时数据监测引擎（周期 CSV 输出） |
 | GPIO 桥接 | [kern-gpiofs.md](kern-gpiofs.md) | `kern_gpiofs.c/h` | /sys/gpio 引脚状态映射与读写 |
 | 版本信息 | [kern-version.md](kern-version.md) | `kern_version.h` | 版本号与开发者信息集中管理 |
 | 物理设备 | [kern-devices.md](kern-devices.md) | `devices/kern_devices.c` | `/dev/fb0` 帧缓冲、`/dev/input0` 按键、`/dev/ttyS0` 串口 |
@@ -122,6 +123,8 @@ main.cpp setup():
 │   ├── rotation          ← 屏幕方向（0-3，可读写）
 │   ├── anim_speed        ← 动画速度（0-100，可读写）
 │   ├── anim_enabled      ← 动画开关（0/1，可读写）
+│   ├── mode              ← 运行模式（0=manual/1=auto/2=calibrate/3=estop，可读写）
+│   ├── ctrl              ← 控制算法（0=stop/1=start/2=reset，可读写）
 │   ├── kernel/
 │   │   └── log_level     ← 日志级别（0-3，可读写）
 │   └── gpio/
@@ -138,4 +141,4 @@ main.cpp setup():
 
 ---
 
-> **See Also:** [类型系统](kern-types.md) | [调度器](kern-task.md) | [VFS 核心](kern-vfs.md) | [架构计划](../../.claude/plans/microkernel.plan.md)
+> **See Also:** [类型系统](kern-types.md) | [调度器](kern-task.md) | [VFS 核心](kern-vfs.md) | [架构计划](../../.claude/plans/microkernel.plan.md) | [Shell 扩充计划](../../.claude/plans/ui-anim-shell-kernel-v2.plan.md) | [内核优化分析](../kernel-optimization-analysis.md)
