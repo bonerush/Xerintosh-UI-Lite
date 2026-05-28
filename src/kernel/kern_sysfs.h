@@ -27,7 +27,9 @@ typedef enum {
     KERN_SYSFS_ANIM_SPEED   = 2,
     KERN_SYSFS_ANIM_ENABLED = 3,
     KERN_SYSFS_LOG_LEVEL    = 4,
-    KERN_SYSFS_ATTR_COUNT   = 5
+    KERN_SYSFS_MODE         = 5,  /* Phase 3: 运行模式 (0=manual 1=auto 2=calibrate 3=estop) */
+    KERN_SYSFS_CTRL         = 6,  /* Phase 3: 控制算法 (0=stop 1=start 2=reset) */
+    KERN_SYSFS_ATTR_COUNT   = 7
 } kern_sysfs_attr_t;
 
 /* ═══ 变更回调 ═══ */
@@ -89,6 +91,12 @@ extern void    kern_sysfs_set_anim_enabled(int32_t val);
 
 extern int32_t kern_sysfs_get_log_level(void);
 extern void    kern_sysfs_set_log_level(int32_t val);
+
+extern int32_t kern_sysfs_get_mode(void);
+extern void    kern_sysfs_set_mode(int32_t val);
+
+extern int32_t kern_sysfs_get_ctrl(void);
+extern void    kern_sysfs_set_ctrl(int32_t val);
 
 #ifdef __cplusplus
 }

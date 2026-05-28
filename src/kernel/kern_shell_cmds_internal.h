@@ -1,10 +1,7 @@
 /**
  * @file   kern_shell_cmds_internal.h
  * @brief  Shell 命令模块内部共享声明
- * @details 提供 sh_print/sh_println 等输出辅助函数声明，
- *          供 kern_shell_cmds.c 和 kern_shell_cmds_file.c 内部使用。
- *
- * @note   预留：当前文件命令尚未拆分。此头文件供未来拆分时使用。
+ * @details Phase 3: 新增 scope 数据结构。
  *
  * @copyright Copyright (c) 2026
  */
@@ -19,10 +16,22 @@
 extern "C" {
 #endif
 
-/* ═══ 输出辅助（内部共享）═══ */
+/* ═══ Scope 数据结构（Phase 3：实时数据监测）═══ */
 
-void sh_print(kern_fd_t tty, const char *msg);
-void sh_println(kern_fd_t tty, const char *msg);
+#define SCOPE_MAX_VARS 8
+
+typedef struct {
+    char   path[KERN_PATH_MAX];
+    bool   active;
+} scope_var_t;
+
+extern bool     g_scope_running;
+extern int      g_scope_period_ms;
+extern uint64_t g_scope_last_tick;
+extern scope_var_t g_scope_vars[SCOPE_MAX_VARS];
+extern int      g_scope_count;
+
+void scope_tick(kern_fd_t tty);
 
 #ifdef __cplusplus
 }

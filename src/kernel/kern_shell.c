@@ -15,6 +15,7 @@
 #include "kern_types.h"
 #include "kern_shell_parser.h"
 #include "kern_shell_cmds.h"
+#include "kern_shell_cmds_internal.h"
 
 #include <string.h>
 #include <stdio.h>
@@ -84,6 +85,9 @@ static void shell_task_main(void *arg)
     sh_print_prompt(tty, cwd);
 
     for (;;) {
+        /* Phase 3: scope tick — 非阻塞周期数据输出 */
+        scope_tick(tty);
+
         char ch;
         ssize_t n = kern_read(tty, &ch, 1);
         if (n <= 0) { kern_yield(); continue; }

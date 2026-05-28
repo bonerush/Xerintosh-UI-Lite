@@ -48,6 +48,8 @@ static int32_t g_sys_rotation     = 0;
 static int32_t g_sys_anim_speed   = 92;
 static int32_t g_sys_anim_enabled = 1;
 static int32_t g_sys_log_level    = 1;
+static int32_t g_sys_mode         = 0;  /* Phase 3: 0=manual 1=auto 2=calibrate 3=estop */
+static int32_t g_sys_ctrl         = 0;  /* Phase 3: 0=stop 1=start 2=reset */
 
 /* ═══ 属性表 ═══ */
 
@@ -57,6 +59,8 @@ static kern_sysfs_attr_def_t g_sysfs_attrs[KERN_SYSFS_ATTR_COUNT] = {
     { KERN_SYSFS_ANIM_SPEED,   "anim_speed",   &g_sys_anim_speed,    0,   100 },
     { KERN_SYSFS_ANIM_ENABLED, "anim_enabled", &g_sys_anim_enabled,  0,   1   },
     { KERN_SYSFS_LOG_LEVEL,    "log_level",    &g_sys_log_level,     0,   3   },
+    { KERN_SYSFS_MODE,         "mode",         &g_sys_mode,          0,   3   },
+    { KERN_SYSFS_CTRL,         "ctrl",         &g_sys_ctrl,          0,   2   },
 };
 
 /* ═══ inode 数组 ═══ */
@@ -259,4 +263,16 @@ int32_t kern_sysfs_get_log_level(void)   { return g_sys_log_level; }
 void    kern_sysfs_set_log_level(int32_t val)
 {
     if (val >= 0 && val <= 3) g_sys_log_level = val;
+}
+
+int32_t kern_sysfs_get_mode(void)         { return g_sys_mode; }
+void    kern_sysfs_set_mode(int32_t val)
+{
+    if (val >= 0 && val <= 3) g_sys_mode = val;
+}
+
+int32_t kern_sysfs_get_ctrl(void)         { return g_sys_ctrl; }
+void    kern_sysfs_set_ctrl(int32_t val)
+{
+    if (val >= 0 && val <= 2) g_sys_ctrl = val;
 }

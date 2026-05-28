@@ -44,7 +44,7 @@ typedef struct {
 
 /* ═══ 命令表接口 ═══ */
 
-#define SHELL_MAX_BUILTIN_CMDS  32   /* 最大内置命令数 */
+#define SHELL_MAX_BUILTIN_CMDS  48   /* 最大内置命令数（Phase 3 扩充） */
 #define SHELL_MAX_DYNAMIC_CMDS   8   /* 最大动态注册命令数 */
 
 /**

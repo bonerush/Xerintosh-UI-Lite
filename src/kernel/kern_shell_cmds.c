@@ -19,7 +19,13 @@
 
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <inttypes.h>
+
+#ifndef NATIVE_TEST
+#include <esp_ota_ops.h>
+#include <nvs_flash.h>
+#endif
 
 #include "kern_shell_cmds_internal.h"
 
@@ -602,6 +608,293 @@ static void cmd_hexdump(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t
     kern_close(fd);
 }
 
+/* ═══ top — 实时任务监控（Phase 3 新增）═══ */
+
+static void cmd_top(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_size)
+{
+    (void)argc; (void)argv;
+    sh_println(tty, "TOP — press any key to exit");
+    bool running = true;
+    while (running) {
+        cmd_ps(tty, 0, NULL, cwd, cwd_size);
+        sh_println(tty, "---");
+        char c;
+        if (kern_read(tty, &c, 1) > 0) running = false;
+        if (running) {
+#ifndef NATIVE_TEST
+            vTaskDelay(pdMS_TO_TICKS(2000));
+#else
+            { volatile uint32_t s = 0; while (s < 1000000) s++; }
+#endif
+        }
+    }
+}
+
+/* ═══ log — 日志级别查看/设置（Phase 3 新增）═══ */
+
+static void cmd_log(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_size)
+{
+    (void)cwd; (void)cwd_size;
+    if (argc > 1) {
+        /* 设置日志级别：echo <n> > /sys/kernel/log_level */
+        kern_fd_t fd = kern_open("/sys/kernel/log_level", KERN_O_WRONLY);
+        if (fd < 0) { sh_println(tty, "log: cannot write log_level"); return; }
+        kern_write(fd, argv[1], strlen(argv[1]));
+        kern_close(fd);
+        sh_println(tty, "OK");
+    } else {
+        /* 查看日志级别：cat /sys/kernel/log_level */
+        cmd_cat(tty, 2, (char *[]){ "cat", "/sys/kernel/log_level", NULL }, cwd, cwd_size);
+    }
+}
+
+/* ═══ debug — 模块调试开关（Phase 3 新增）═══ */
+
+static void cmd_debug(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_size)
+{
+    (void)cwd; (void)cwd_size;
+    if (argc < 2) {
+        sh_println(tty, "Usage: debug <on|off> [module]");
+        return;
+    }
+    if (strcmp(argv[1], "on") == 0) {
+        sh_println(tty, "debug: all modules ON (module filter NYI)");
+    } else if (strcmp(argv[1], "off") == 0) {
+        sh_println(tty, "debug: all modules OFF (module filter NYI)");
+    } else {
+        sh_println(tty, "debug: expected 'on' or 'off'");
+    }
+}
+
+/* ═══ param — 参数配置（Phase 3 新增）═══ */
+
+static void cmd_param(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_size)
+{
+    (void)cwd; (void)cwd_size;
+    if (argc < 2) { sh_println(tty, "Usage: param <list|get|set|save|load> [args]"); return; }
+
+    if (strcmp(argv[1], "list") == 0) {
+        /* 遍历已知 sysfs 属性 */
+        const char *known[] = {
+            "/sys/kernel/brightness", "/sys/kernel/rotation",
+            "/sys/kernel/anim_speed", "/sys/kernel/anim_enabled",
+            "/sys/kernel/log_level", NULL
+        };
+        for (int i = 0; known[i] != NULL; i++) {
+            cmd_cat(tty, 2, (char *[]){ "cat", (char *)known[i], NULL }, cwd, cwd_size);
+        }
+    } else if (strcmp(argv[1], "get") == 0 && argc >= 3) {
+        char path[KERN_PATH_MAX];
+        snprintf(path, sizeof(path), "/sys/kernel/%s", argv[2]);
+        cmd_cat(tty, 2, (char *[]){ "cat", path, NULL }, cwd, cwd_size);
+    } else if (strcmp(argv[1], "set") == 0 && argc >= 4) {
+        char path[KERN_PATH_MAX];
+        snprintf(path, sizeof(path), "/sys/kernel/%s", argv[2]);
+        kern_fd_t fd = kern_open(path, KERN_O_WRONLY);
+        if (fd < 0) { sh_println(tty, "param set: cannot open parameter"); return; }
+        kern_write(fd, argv[3], strlen(argv[3]));
+        kern_close(fd);
+        sh_println(tty, "OK");
+    } else if (strcmp(argv[1], "save") == 0) {
+        sh_println(tty, "param save: settings_save_all() NYI");
+    } else if (strcmp(argv[1], "load") == 0) {
+        sh_println(tty, "param load: settings_load_all() NYI");
+    } else {
+        sh_println(tty, "param: unknown sub-command");
+    }
+}
+
+/* ═══ bootloader — 进入 OTA 模式（Phase 3 新增）═══ */
+
+static void cmd_bootloader(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_size)
+{
+    (void)argc; (void)argv; (void)cwd; (void)cwd_size;
+    sh_println(tty, "Entering bootloader mode...");
+#ifndef NATIVE_TEST
+    { volatile uint32_t s = 0; while (s < 500000) s++; }
+    esp_ota_set_boot_partition(esp_ota_get_next_update_partition(NULL));
+    esp_restart();
+#else
+    sh_println(tty, "(native: bootloader not available)");
+#endif
+}
+
+/* ═══ factory — 恢复出厂设置（Phase 3 新增）═══ */
+
+static void cmd_factory(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_size)
+{
+    (void)argc; (void)argv; (void)cwd; (void)cwd_size;
+    sh_println(tty, "WARNING: This will erase ALL settings and reboot.");
+    sh_print(tty, "Type 'yes' to confirm: ");
+    char confirm[8] = {0};
+    ssize_t n = kern_read(tty, confirm, sizeof(confirm) - 1);
+    if (n <= 0) { sh_println(tty, "\r\nAborted."); return; }
+    confirm[n] = '\0';
+    for (ssize_t i = n - 1; i >= 0 && (confirm[i] == '\r' || confirm[i] == '\n'); i--)
+        confirm[i] = '\0';
+    if (strcmp(confirm, "yes") != 0) { sh_println(tty, "Aborted."); return; }
+    sh_println(tty, "\r\nErasing NVS and rebooting...");
+#ifndef NATIVE_TEST
+    nvs_flash_erase();
+    esp_restart();
+#else
+    sh_println(tty, "(native: factory reset not available)");
+#endif
+}
+
+/* ═══ version — 固件/硬件信息（Phase 3 新增）═══ */
+
+static void cmd_version(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_size)
+{
+    (void)argc; (void)argv; (void)cwd; (void)cwd_size;
+    char line[128];
+    snprintf(line, sizeof(line), "Version: " XEROS_VERSION_STRING);
+    sh_println(tty, line);
+    snprintf(line, sizeof(line), "Platform: " XEROS_PLATFORM);
+    sh_println(tty, line);
+    snprintf(line, sizeof(line), "Build: " __DATE__ " " __TIME__);
+    sh_println(tty, line);
+}
+
+/* ═══ scope — 实时数据监测（Phase 3 新增）═══ */
+
+scope_var_t g_scope_vars[SCOPE_MAX_VARS];
+int         g_scope_count = 0;
+bool        g_scope_running = false;
+int         g_scope_period_ms = 1000;
+uint64_t    g_scope_last_tick = 0;
+
+void scope_tick(kern_fd_t tty)
+{
+    if (!g_scope_running || g_scope_count <= 0) return;
+#ifndef NATIVE_TEST
+    uint64_t now = esp_timer_get_time();
+#else
+    uint64_t now = 0;
+    return;
+#endif
+    if (now - g_scope_last_tick < (uint64_t)g_scope_period_ms * 1000ULL) return;
+    g_scope_last_tick = now;
+
+    char line[256]; int pos = 0;
+    for (int i = 0; i < g_scope_count; i++) {
+        if (!g_scope_vars[i].active) continue;
+        kern_fd_t fd = kern_open(g_scope_vars[i].path, KERN_O_RDONLY);
+        if (fd >= 0) {
+            char val[32]; ssize_t n2 = kern_read(fd, val, sizeof(val) - 1);
+            if (n2 > 0) { val[n2] = '\0';
+                pos += snprintf(line + pos, sizeof(line) - pos, "%s%s",
+                               i > 0 ? "," : "", val); }
+            kern_close(fd);
+        }
+    }
+    if (pos > 0) sh_println(tty, line);
+}
+
+static void cmd_scope(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_size)
+{
+    (void)cwd; (void)cwd_size;
+    if (argc < 2) { sh_println(tty, "Usage: scope <add|start|stop> [args]"); return; }
+
+    if (strcmp(argv[1], "add") == 0 && argc >= 3) {
+        if (g_scope_count >= SCOPE_MAX_VARS) {
+            sh_println(tty, "scope: max variables reached"); return;
+        }
+        strncpy(g_scope_vars[g_scope_count].path, argv[2], KERN_PATH_MAX - 1);
+        g_scope_vars[g_scope_count].active = true;
+        g_scope_count++;
+        sh_println(tty, "OK");
+    } else if (strcmp(argv[1], "start") == 0) {
+        if (argc >= 3) g_scope_period_ms = atoi(argv[2]);
+        g_scope_running = true;
+        g_scope_last_tick = 0;
+        sh_println(tty, "scope started");
+    } else if (strcmp(argv[1], "stop") == 0) {
+        g_scope_running = false;
+        sh_println(tty, "scope stopped");
+    } else {
+        sh_println(tty, "scope: unknown sub-command");
+    }
+}
+
+/* ═══ mode — 运行模式（Phase 3 新增）═══ */
+
+static void cmd_mode(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_size)
+{
+    (void)cwd; (void)cwd_size;
+    if (argc >= 2 && strcmp(argv[1], "set") == 0 && argc >= 3) {
+        kern_fd_t fd = kern_open("/sys/mode", KERN_O_WRONLY);
+        if (fd < 0) { sh_println(tty, "mode: /sys/mode not available"); return; }
+        kern_write(fd, argv[2], strlen(argv[2]));
+        kern_close(fd);
+        sh_println(tty, "OK");
+    } else {
+        cmd_cat(tty, 2, (char *[]){ "cat", "/sys/mode", NULL }, cwd, cwd_size);
+    }
+}
+
+/* ═══ ctrl — 控制算法启停（Phase 3 新增）═══ */
+
+static void cmd_ctrl(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_size)
+{
+    (void)cwd; (void)cwd_size;
+    if (argc >= 2) {
+        kern_fd_t fd = kern_open("/sys/ctrl", KERN_O_WRONLY);
+        if (fd < 0) { sh_println(tty, "ctrl: /sys/ctrl not available"); return; }
+        kern_write(fd, argv[1], strlen(argv[1]));
+        kern_close(fd);
+        sh_println(tty, "OK");
+    } else {
+        cmd_cat(tty, 2, (char *[]){ "cat", "/sys/ctrl", NULL }, cwd, cwd_size);
+    }
+}
+
+/* ═══ info — 设备汇总信息（Phase 3 新增）═══ */
+
+static void cmd_info(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_size)
+{
+    (void)argc; (void)argv; (void)cwd; (void)cwd_size;
+    sh_println(tty, "=== Device Info ===");
+    cmd_uname(tty, 0, NULL, cwd, cwd_size);
+    cmd_free(tty, 0, NULL, cwd, cwd_size);
+    cmd_df(tty, 0, NULL, cwd, cwd_size);
+    cmd_date(tty, 0, NULL, cwd, cwd_size);
+}
+
+/* ═══ ping — 网络连通性测试（Phase 3 新增）═══ */
+
+static void cmd_ping(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_size)
+{
+    (void)argc; (void)cwd; (void)cwd_size;
+    if (argc < 2) { sh_println(tty, "Usage: ping <host>"); return; }
+    char msg[64];
+    snprintf(msg, sizeof(msg), "ping: %s — not connected", argv[1]);
+    sh_println(tty, msg);
+}
+
+/* ═══ io — GPIO 调试（Phase 3 新增）═══ */
+
+static void cmd_io(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_size)
+{
+    (void)cwd; (void)cwd_size;
+    if (argc < 2) { sh_println(tty, "Usage: io <get|set> <pin> [value]"); return; }
+    if (strcmp(argv[1], "get") == 0 && argc >= 3) {
+        char path[KERN_PATH_MAX];
+        snprintf(path, sizeof(path), "/sys/gpio/%s", argv[2]);
+        cmd_cat(tty, 2, (char *[]){ "cat", path, NULL }, cwd, cwd_size);
+    } else if (strcmp(argv[1], "set") == 0 && argc >= 4) {
+        char path[KERN_PATH_MAX];
+        snprintf(path, sizeof(path), "/sys/gpio/%s", argv[2]);
+        kern_fd_t fd = kern_open(path, KERN_O_WRONLY);
+        if (fd < 0) { sh_println(tty, "io: pin not available"); return; }
+        kern_write(fd, argv[3], strlen(argv[3]));
+        kern_close(fd);
+        sh_println(tty, "OK");
+    } else {
+        sh_println(tty, "io: unknown sub-command");
+    }
+}
+
 /* ═══ 内置命令表 ═══ */
 
 static const shell_cmd_t g_builtin_cmds[] = {
@@ -630,6 +923,23 @@ static const shell_cmd_t g_builtin_cmds[] = {
     { "history", cmd_history,  "show command history" },
     { "date",    cmd_date,     "show uptime" },
     { "hexdump", cmd_hexdump,  "hex dump <path>" },
+
+    /* ── Phase 3 新增命令 ── */
+    { "top",       cmd_top,       "real-time task monitor" },
+    { "mem",       cmd_free,      "show heap memory (alias: free)" },
+    { "log",       cmd_log,       "view/set log level" },
+    { "debug",     cmd_debug,     "module debug switch" },
+    { "param",     cmd_param,     "config parameters (list/get/set/save/load)" },
+    { "bootloader",cmd_bootloader,"enter OTA bootloader mode" },
+    { "update",    cmd_ping,      "OTA update (NYI — placeholder)" },
+    { "factory",   cmd_factory,   "factory reset (DANGER!)" },
+    { "version",   cmd_version,   "firmware & hardware info" },
+    { "scope",     cmd_scope,     "real-time data scope (add/start/stop)" },
+    { "mode",      cmd_mode,      "view/set run mode" },
+    { "ctrl",      cmd_ctrl,      "control algorithm start/stop/reset" },
+    { "info",      cmd_info,      "device summary info" },
+    { "ping",      cmd_ping,      "network connectivity test (placeholder)" },
+    { "io",        cmd_io,        "GPIO debug (get/set <pin> [value])" },
 };
 
 #define BUILTIN_COUNT (sizeof(g_builtin_cmds) / sizeof(g_builtin_cmds[0]))
