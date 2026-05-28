@@ -555,7 +555,9 @@ bool kern_task_is_protected(kern_task_t *task)
 
     /* 虚任务自身不是系统关键任务，但 taskmgr 自身受保护 */
     static const char *protected_names[] = {
-        "idle", "shell", "ui", "taskmgr", NULL
+        "idle", "shell", "ui",
+        "taskmgr", "任务管理器",  /* 中英文双名保护 */
+        NULL
     };
 
     for (int i = 0; protected_names[i] != NULL; i++) {
