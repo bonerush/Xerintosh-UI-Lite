@@ -56,8 +56,7 @@ static void task_wrapper(void *arg)
 
     /* 获得了令牌：现在是我们运行的时间片 */
     task->state = KERN_TASK_RUNNING;
-    extern kern_task_t *kern_port_get_current(void);
-    /* g_current_task 由 kern_task.c 维护，此处仅运行入口 */
+    /* g_current_task 由 kern_task.c 维护 */
 
     /* 执行任务入口 */
     if (task->entry != NULL) {
@@ -98,7 +97,10 @@ kern_port_thread_t kern_port_thread_spawn(
     size_t stack_size,
     kern_task_t *task)
 {
-    if (entry == NULL) return KERN_PORT_THREAD_NULL;
+    (void)entry;  /* FreeRTOS 后端始终使用内部 task_wrapper，实际入口从 task->entry 读取 */
+    (void)arg;    /* 同上，参数通过 TCB 传递 */
+
+    if (task == NULL) return KERN_PORT_THREAD_NULL;
 
     if (stack_size < KERN_PORT_STACK_MIN) {
         stack_size = KERN_PORT_STACK_MIN;
