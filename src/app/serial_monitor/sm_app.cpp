@@ -1,7 +1,8 @@
 /**
- * @file   sm_app.c
+ * @file   sm_app.cpp
  * @brief  串口监视器 App 生命周期与后台读取
  * @details 实现串口监视器的初始化、主循环、退出及后台数据读取。
+ *          Phase 2: 添加入场滑入动画和按钮平滑过渡。
  *
  * @copyright Copyright (c) 2026
  */
@@ -25,6 +26,11 @@ uint32_t    sm_blink_tick = 0;
 bool        sm_blink_on = false;
 sm_buffer_t sm_buffer;
 
+/* Phase 2: 动画状态 */
+float       sm_entry_offset = 0.0f;
+float       sm_btn_alpha_0 = 1.0f;
+float       sm_btn_alpha_1 = 0.0f;
+
 #ifndef NATIVE_TEST
 #include <Arduino.h>
 #include <M5Unified.h>
@@ -35,11 +41,11 @@ static bool        s_prev_landscape = true; /* 保存进入前的屏幕方向 */
 
 /* ═══ 常量 ═══ */
 
-#define SM_BLINK_PERIOD 500  /* 反色闪烁周期（毫秒） */
+#define SM_BLINK_PERIOD 500  /* 反色闪烁周期（毫秒，保留向后兼容） */
 
 /**
  * @brief 初始化串口监视器 App
- * @note  重置所有状态、清空缓冲区、停止监视
+ * @note  重置所有状态、清空缓冲区、初始化动画变量
  */
 void serial_monitor_init(void)
 {
@@ -49,6 +55,11 @@ void serial_monitor_init(void)
     sm_blink_tick = hal_get_ticks();
     sm_blink_on = false;
     sm_buffer_init(&sm_buffer);
+
+    /* Phase 2: 初始化动画状态 */
+    sm_entry_offset = (float)SCREEN_HEIGHT;
+    sm_btn_alpha_0 = 1.0f;
+    sm_btn_alpha_1 = 0.0f;
 
 #ifndef NATIVE_TEST
     sm_rx_len = 0;
@@ -69,7 +80,7 @@ void serial_monitor_init(void)
 
 /**
  * @brief 串口监视器主循环（每帧调用）
- * @note  处理输入事件、更新反色闪烁、绘制信息栏和终端
+ * @note  处理输入事件、更新动画、绘制信息栏和终端
  */
 void serial_monitor_loop(void)
 {
@@ -113,7 +124,18 @@ void serial_monitor_loop(void)
         }
     }
 
-    /* 第六步：更新反色闪烁相位 */
+    /* ── Phase 2: 动画更新 ── */
+
+    /* 入场滑入动画 */
+    xerintosh_animation(&sm_entry_offset, 0.0f, ANIM_SPEED_EXIT);
+
+    /* 按钮选中平滑过渡（替代闪烁） */
+    float trg0 = (sm_selected == 0) ? 1.0f : 0.0f;
+    float trg1 = (sm_selected == 1) ? 1.0f : 0.0f;
+    xerintosh_animation(&sm_btn_alpha_0, trg0, ANIM_SPEED_SELECTOR_H);
+    xerintosh_animation(&sm_btn_alpha_1, trg1, ANIM_SPEED_SELECTOR_H);
+
+    /* 保留闪烁相位更新（向后兼容，供 draw_button 的阈值判断使用） */
     uint32_t now = hal_get_ticks();
     if (now - sm_blink_tick >= SM_BLINK_PERIOD) {
         sm_blink_tick = now;

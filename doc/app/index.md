@@ -12,12 +12,13 @@ App 层是用户应用代码所在。每个 App 在独立子目录中，通过 `
 |------|------|------|------|
 | 应用初始化 | [app-init.md](app-init.md) | `src/app/app_init.c/h` | 菜单树构建、管理器初始化、按键映射 |
 | 设置管理 | [settings.md](settings.md) | `src/app/settings/settings.c/h` | 亮度/动画/方向配置与存储 |
+| 任务管理器 | [taskmgr.md](taskmgr.md) | `src/app/taskmgr/` | 任务查看与终止（动画行列表 + 横屏3行布局） |
+| 串口监视器 | [serial-monitor.md](serial-monitor.md) | `src/app/serial_monitor/` | 串口监视器 App（入场滑入动画 + 按钮平滑过渡） |
 | 开机画面 | — | `src/app/boot/` | Macintosh 128K 风格开机动画 |
 | 存储 | — | `src/app/storage.cpp/h` | NVS 持久化存储封装 |
 | WiFi 管理 | — | `src/app/wifi/wifi_manager.cpp/h` | WiFi 状态机（扫描/连接/密码输入） |
 | 蓝牙管理 | — | `src/app/bluetooth/bt_manager.cpp/h` | 蓝牙管理器（NimBLE 扫描/配对） |
 | 串口输入 | — | `src/app/serial_input/serial_input.cpp/h` | 串口 CLI 输入（WiFi/蓝牙密码） |
-| 串口监视器 | — | `src/app/serial_monitor/` | 串口监视器 App（缓冲区/状态机/界面） |
 
 ---
 

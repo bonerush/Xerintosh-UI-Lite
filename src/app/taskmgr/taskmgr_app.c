@@ -8,6 +8,7 @@
  *          终止前显示框架 pop_up 确认提示。
  *
  *          架构参考 serial_monitor：init/loop/draw 三层分离。
+ *          Phase 1: 集成 ui_anim_row 行列表动画引擎。
  *
  * @copyright Copyright (c) 2026
  */
@@ -21,8 +22,10 @@
 #include "hal/hal_system.h"
 #include "ui/ui_core.h"
 #include "ui/ui_item.h"
+#include "ui/ui_anim_row.h"
 
 #include <stdio.h>
+#include <math.h>
 
 /* ═══ 常量 ═══ */
 
@@ -38,6 +41,9 @@ typedef struct {
     kern_task_t *tasks[KERN_MAX_TASKS];  /* 本帧任务指针快照 */
     bool         confirming;     /* 是否处于确认态 */
     uint32_t     confirm_tick;   /* 确认开始时间 */
+    xerintosh_anim_row_list_t anim_list;  /* 行列表动画上下文 */
+    int          prev_selected;  /* 上一帧 selected（用于检测变化） */
+    int          prev_scroll;    /* 上一帧 scroll（用于检测变化） */
 } taskmgr_state_t;
 
 static taskmgr_state_t g_tm;
@@ -92,26 +98,34 @@ void taskmgr_init(void)
     g_tm.selected = 0;
     g_tm.scroll   = 0;
     g_tm.confirming = false;
+    g_tm.prev_selected = -1;
+    g_tm.prev_scroll = -1;
 
 #ifndef NATIVE_TEST
     hal_input_reset_events();
 #endif
 
     taskmgr_refresh_list();
+
+    /* 初始化行列表动画 */
+    int visible = taskmgr_visible_lines();
+    int16_t fh = hal_get_font_height();
+    int16_t list_top = TASKMGR_HEADER_Y + fh + 3;
+    xerintosh_anim_row_list_init(&g_tm.anim_list, visible, (int16_t)(fh + 4), list_top);
 }
 
 /* ═══ UI 状态访问器 ═══ */
 
-/* 布局常量（与 taskmgr_ui.c 保持一致） */
-#define HEADER_Y         2
-#define FOOTER_MARGIN    4
+/* 布局常量（与 taskmgr_ui.c 保持一致，定义在 taskmgr.h） */
+/* TASKMGR_HEADER_Y=2, TASKMGR_LEFT_MARGIN=4 */
 
 int taskmgr_visible_lines(void)
 {
     int16_t fh = hal_get_font_height();
     /* 列表可用高度 = 屏幕高度 - 标题栏 - 底部信息栏 */
-    int16_t header_h = HEADER_Y + fh + 6;        /* 标题行占用 */
-    int16_t footer_h = fh + FOOTER_MARGIN + 4;   /* 信息栏 + 分隔线 */
+    /* Phase 1: 缩减间距，header/footer 各减 4px，横屏可显示 3 行 */
+    int16_t header_h = TASKMGR_HEADER_Y + fh + 2;  /* 标题行占用（原 +6 → +2） */
+    int16_t footer_h = fh + 2;                   /* 信息栏占用（原 +6 → +2） */
     int16_t avail = SCREEN_HEIGHT - header_h - footer_h;
     int16_t row_h = fh + 4;                      /* 行高 = 字体 + 间距 */
     int visible = avail / row_h;
@@ -137,6 +151,11 @@ bool taskmgr_is_task_protected(int index)
     kern_task_t *t = taskmgr_get_task(index);
     if (t == NULL) return true;
     return kern_task_is_protected(t);
+}
+
+const xerintosh_anim_row_list_t *taskmgr_get_anim_list(void)
+{
+    return &g_tm.anim_list;
 }
 
 /* ═══ 生命周期 ═══ */
@@ -207,6 +226,19 @@ void taskmgr_loop(void)
         }
     }
 
+    /* ── 动画更新 ── */
+
+    /* 当 selected/scroll 变化时刷新目标位置 */
+    if (g_tm.prev_selected != g_tm.selected || g_tm.prev_scroll != g_tm.scroll) {
+        xerintosh_anim_row_list_refresh(&g_tm.anim_list,
+            g_tm.selected, g_tm.scroll, SCREEN_WIDTH, g_tm.count);
+        g_tm.prev_selected = g_tm.selected;
+        g_tm.prev_scroll = g_tm.scroll;
+    }
+
+    /* 每帧更新动画 */
+    xerintosh_anim_row_list_update(&g_tm.anim_list, (float)ANIM_SPEED_SELECTOR);
+
     /* 第二步：绘制界面（clear/flush 由框架 ui_task 处理） */
     taskmgr_draw();
 }
@@ -214,6 +246,8 @@ void taskmgr_loop(void)
 void taskmgr_exit(void)
 {
     g_tm.confirming = false;
+    g_tm.prev_selected = -1;
+    g_tm.prev_scroll = -1;
 #ifndef NATIVE_TEST
     hal_input_reset_events();
 #endif

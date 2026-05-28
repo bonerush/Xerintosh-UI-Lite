@@ -16,85 +16,67 @@
 #include "ui/ui_item.h"
 
 #include <stdio.h>
-#include <stddef.h>
 
-/* ═══ 前向声明 ═══ */
+/* ═══ 布局常量 ═══ */
 
-static void about_draw(void);
+#define ABOUT_LOGO_SCALE   80
+#define ABOUT_LEFT_MARGIN  4
+#define ABOUT_SEP_GAP      10
+#define ABOUT_INFO_GAP     17
+#define ABOUT_TITLE_GAP    4
 
 /* ═══ 渲染 ═══ */
 
 static void about_draw(void)
 {
     int16_t fh = hal_get_font_height();
-    int16_t sw = SCREEN_WIDTH;
     int16_t sh = SCREEN_HEIGHT;
 
-    /*
-     * 自适应布局：
-     * - 竖屏（80x160）：logo 在上，信息在下，充裕间距
-     * - 横屏（160x80）：logo 缩小，信息紧凑排列
-     */
-    int16_t logo_scale;
-    int16_t logo_ox, logo_oy;
-    int16_t title_y;
-    int16_t info_start_y;
-    int16_t line_dy;
+    /* Logo 像素尺寸（必须与 boot_screen_draw_logo 内部公式一致） */
+    int16_t logo_w = 44 * ABOUT_LOGO_SCALE / 100;
+    int16_t logo_h = 60 * ABOUT_LOGO_SCALE / 100;
 
-    if (sh >= 140) {
-        /* 竖屏：充裕布局 */
-        logo_scale  = 80;
-        logo_ox     = (sw - 44 * logo_scale / 100) / 2;
-        logo_oy     = 2;
-        title_y     = logo_oy + 60 * logo_scale / 100 + 5;
-        info_start_y = title_y + fh + 6;
-        line_dy     = fh + 5;
+    /* 标题宽度 */
+    hal_set_font(NULL);
+    int16_t title_w = hal_get_string_width("Xerintosh");
+
+    /*
+     * 左右对齐：较宽者左对齐到 ABOUT_LEFT_MARGIN，
+     * 较窄者居中于较宽者下方。
+     */
+    int16_t content_w = (logo_w > title_w) ? logo_w : title_w;
+    int16_t logo_x, title_x;
+    if (logo_w > title_w) {
+        logo_x  = ABOUT_LEFT_MARGIN;
+        title_x = ABOUT_LEFT_MARGIN + (logo_w - title_w) / 2;
     } else {
-        /* 横屏：紧凑布局 */
-        logo_scale  = 55;
-        logo_ox     = 4;
-        logo_oy     = 2;
-        title_y     = logo_oy + 60 * logo_scale / 100 + 4;
-        info_start_y = title_y + fh + 2;
-        line_dy     = fh + 1;
+        title_x = ABOUT_LEFT_MARGIN;
+        logo_x  = ABOUT_LEFT_MARGIN + (title_w - logo_w) / 2;
     }
 
-    /* Logo */
-    boot_screen_draw_logo(logo_ox, logo_oy, logo_scale);
+    /* 垂直居中：logo + 标题作为一个整体 */
+    int16_t y0 = (sh - (logo_h + fh + ABOUT_TITLE_GAP)) / 2;
+    int16_t group_h = logo_h + fh + ABOUT_TITLE_GAP;
 
-    /* 系统名称 */
-    hal_set_font(NULL);
-    int16_t tw = hal_get_string_width("Xerintosh");
-    hal_draw_string((sw - tw) / 2, title_y, "Xerintosh", COLOR_FG);
+    boot_screen_draw_logo(logo_x, y0, ABOUT_LOGO_SCALE);
+    hal_draw_string(title_x, y0 + group_h, "Xerintosh", COLOR_FG);
+
+    /* 分隔线（纵贯屏幕） */
+    hal_draw_v_line(ABOUT_LEFT_MARGIN + content_w + ABOUT_SEP_GAP,
+                    y0, sh - 2 * y0, COLOR_FG);
 
     /* 信息区 */
     hal_set_font(hal_get_cn_font());
-    int16_t lx = 4;
-    int16_t y  = info_start_y;
-    char buf[64];
+    int16_t info_x = ABOUT_LEFT_MARGIN + content_w + ABOUT_INFO_GAP;
+    char buf[32];
 
-    /* 分隔线 */
-    hal_draw_line(lx, y, sw - 8, y, COLOR_FG);
-    y += 4;
+    snprintf(buf, sizeof(buf), "Version:%s", XEROS_VERSION_STRING);
+    hal_draw_string(info_x, y0 + fh,              buf,              COLOR_FG);
+    hal_draw_string(info_x, y0 + fh + fh,         XEROS_CODENAME,   COLOR_FG);
+    hal_draw_string(info_x, y0 + fh + 2 * fh,     XEROS_PLATFORM,   COLOR_FG);
 
-    snprintf(buf, sizeof(buf), "v" XEROS_VERSION_STRING "  " XEROS_CODENAME);
-    hal_draw_string(lx, y + fh, buf, COLOR_FG);
-    y += line_dy;
-
-    snprintf(buf, sizeof(buf), XEROS_PLATFORM);
-    hal_draw_string(lx, y + fh, buf, COLOR_FG);
-    y += line_dy;
-
-    snprintf(buf, sizeof(buf), "by " XEROS_DEVELOPER);
-    hal_draw_string(lx, y + fh, buf, COLOR_FG);
-    y += line_dy;
-
-    snprintf(buf, sizeof(buf), __DATE__);
-    hal_draw_string(lx, y + fh, buf, COLOR_FG);
-
-    /* 底部提示 */
-    hal_set_font(hal_get_cn_font());
-    hal_draw_string(lx, sh - 2, "Hold BtnB to return", COLOR_FG);
+    snprintf(buf, sizeof(buf), "By:%s", XEROS_DEVELOPER);
+    hal_draw_string(info_x, y0 + fh + 4 * fh,     buf,              COLOR_FG);
 }
 
 /* ═══ 生命周期 ═══ */

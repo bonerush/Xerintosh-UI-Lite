@@ -2,6 +2,7 @@
  * @file   sm_ui.c
  * @brief  串口监视器绘制实现
  * @details 实现信息栏（控制按钮 + 波特率）和终端区域的绘制。
+ *          Phase 2: 添加入场滑入动画偏移 + 按钮平滑过渡。
  *
  * @copyright Copyright (c) 2026
  */
@@ -11,6 +12,7 @@
 #include "app/settings/settings.h"
 #include "hal/hal_display.h"
 #include "hal/hal_system.h"
+#include "ui/ui_core.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -21,23 +23,23 @@
  * @param  w       宽度
  * @param  h       高度
  * @param  label   按钮文字
- * @param  selected 是否被选中
- * @note   未选中：白底黑字；选中时以 500ms 周期反色闪烁
+ * @param  id      按钮 ID（0 或 1，对应 sm_btn_alpha_0/1）
+ * @note   Phase 2: 使用 sm_btn_alpha 平滑过渡，阈值 0.5 判断反色
  */
 static void draw_button(int16_t x, int16_t y, int16_t w, int16_t h,
-                        const char *label, bool selected)
+                        const char *label, int id)
 {
+    float alpha = (id == 0) ? sm_btn_alpha_0 : sm_btn_alpha_1;
+    bool is_selected = (alpha > 0.5f);
+
     uint16_t bg_color, text_color;
 
-    if (selected && sm_blink_on) {
+    if (is_selected) {
         bg_color = COLOR_FG;
         text_color = COLOR_BG;
-    } else if (selected && !sm_blink_on) {
+    } else {
         bg_color = COLOR_BG;
         text_color = COLOR_FG;
-    } else {
-        bg_color = COLOR_FG;
-        text_color = COLOR_BG;
     }
 
     hal_draw_fill_rect(x, y, w, h, bg_color);
@@ -52,12 +54,14 @@ static void draw_button(int16_t x, int16_t y, int16_t w, int16_t h,
 /**
  * @brief  绘制信息栏（顶部控制区）
  * @note   包含 START/STOP 按钮、波特率显示、NORM/DEBUG 按钮
+ *         Phase 2: Y 坐标叠加 sm_entry_offset 入场动画
  */
 static void draw_info_bar(void)
 {
     int16_t font_h = hal_get_font_height();
     int16_t bar_h = font_h + 1;
-    int16_t bar_y = 1;
+    int16_t entry = (sm_entry_offset < 1.0f) ? 0 : (int16_t)sm_entry_offset;
+    int16_t bar_y = 1 + entry;
 
     const char *start_label = sm_running ? "STOP" : "RUN";
     const char *mode_label = sm_debug ? "DBG" : "NORM";
@@ -77,12 +81,11 @@ static void draw_info_bar(void)
     int16_t rate_x  = start_x + start_w + spacing;
     int16_t mode_x  = rate_x + rate_w + spacing;
 
-    int16_t btn_y_text = bar_y + (bar_h + font_h) / 2 - 3;
     int16_t rate_y_text = bar_y + (bar_h + font_h) / 2 - 3;
 
-    draw_button(start_x, bar_y, start_w, bar_h, start_label, sm_selected == 0);
+    draw_button(start_x, bar_y, start_w, bar_h, start_label, 0);
     hal_draw_string(rate_x, rate_y_text, rate_str, COLOR_FG);
-    draw_button(mode_x, bar_y, mode_w, bar_h, mode_label, sm_selected == 1);
+    draw_button(mode_x, bar_y, mode_w, bar_h, mode_label, 1);
 }
 
 /**
@@ -162,18 +165,21 @@ static int16_t draw_text_segment(int16_t term_y, int16_t text_x,
  * @brief  绘制终端区域
  * @note   基于字体高度和屏幕尺寸动态计算可见行数和终端区域位置。
  *         支持：soft-wrap 折行、换行符强制换行。
+ *         Phase 2: term_y 叠加 sm_entry_offset 入场动画。
  */
 static void draw_terminal(void)
 {
     int16_t font_h = hal_get_font_height();
     int16_t bar_h = font_h + 1;
 
-    int16_t term_y = bar_h + 5;
+    /* Phase 2: 终端区域叠加入场偏移 */
+    int16_t entry = (sm_entry_offset < 1.0f) ? 0 : (int16_t)sm_entry_offset;
+    int16_t term_y = bar_h + 5 + entry;
     int16_t term_h = SCREEN_HEIGHT - term_y - 1;
 
     if (term_h < font_h) term_h = font_h;
 
-    int16_t max_screen_lines = term_h / font_h;
+    int16_t max_screen_lines = (term_h - 2) / font_h;  /* 底部留 2px 边距 */
     if (max_screen_lines < 1) max_screen_lines = 1;
     if (max_screen_lines > SM_TERM_LINES) max_screen_lines = SM_TERM_LINES;
 
