@@ -43,8 +43,6 @@ extern bool bt_on;  /* 定义在 main.cpp */
 
 static bool g_bt_enabled = false;           /* 蓝牙是否已启用 */
 static bt_mgr_state_t g_state = BT_MGR_IDLE; /* 状态机当前状态 */
-static bool g_bt_task_exit = false;          /* 任务退出标志 */
-static kern_pid_t g_bt_mgr_pid = KERN_PID_INVALID; /* 任务 PID */
 
 /* BLE 扫描结果 */
 struct BleDeviceResult {
@@ -269,18 +267,6 @@ void bt_mgr_init(void) {
  * @brief 启用蓝牙：初始化 NimBLE，配置扫描参数，开始预热
  */
 void bt_mgr_enable(void) {
-    /* 若任务已退出或被杀死，重新创建 */
-    if (g_bt_mgr_pid != KERN_PID_INVALID) {
-        kern_task_t *t = kern_task_get(g_bt_mgr_pid);
-        if (t == NULL || t->state == KERN_TASK_ZOMBIE) {
-            g_bt_mgr_pid = KERN_PID_INVALID;
-        }
-    }
-    if (g_bt_mgr_pid == KERN_PID_INVALID) {
-        g_bt_task_exit = false;
-        g_bt_mgr_pid = kern_spawn("bt-mgr", bt_mgr_task_main, NULL, 4096);
-    }
-
     g_bt_enabled = true;
     NimBLEDevice::init("");
     NimBLEScan *scan = NimBLEDevice::getScan();
@@ -299,7 +285,6 @@ void bt_mgr_enable(void) {
 void bt_mgr_disable(void) {
     NimBLEDevice::deinit(true);
     g_bt_enabled = false;
-    g_bt_task_exit = true;  /* 通知任务退出 */
 
     if (g_devices_list) {
         xerintosh_list_item_t *check = g_xerintosh_selector.selected_item;
@@ -400,9 +385,6 @@ extern "C" void bt_mgr_task_main(void *arg)
 {
     (void)arg;
     for (;;) {
-        if (g_bt_task_exit) {
-            return;  /* 退出入口→task_wrapper 处理 ZOMBIE + give(done) + vTaskDelete */
-        }
         bt_mgr_update();
         kern_sleep_ms(50);
     }
