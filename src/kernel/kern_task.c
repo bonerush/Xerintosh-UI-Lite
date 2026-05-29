@@ -942,6 +942,38 @@ static void task_entry_trampoline(void)
     g_current_task = g_idle_task;
     setcontext(&g_sched_ctx);
 }
+#endif /* NATIVE_TEST */
+
+/* ─── 栈初始化 ─── */
+
+#if defined(NATIVE_TEST) || defined(XEROS_NATIVE_SCHED)
+
+static void task_stack_init(kern_task_t *task, size_t stack_size)
+{
+    if (stack_size > KERN_STACK_MAX) stack_size = KERN_STACK_MAX;
+    if (stack_size < KERN_STACK_MIN) stack_size = KERN_STACK_MIN;
+
+    task->stack_size = stack_size;
+    task->stack_base = (uint8_t *)malloc(stack_size);
+    if (task->stack_base == NULL) {
+        kern_log(KERN_LOG_WARN, "stack alloc failed for task %s, size=%zu",
+                 task->name, stack_size);
+        return;
+    }
+
+    memset(task->stack_base, 0xAA, stack_size);
+}
+
+static void task_write_canary(kern_task_t *task)
+{
+    if (task == NULL || task->stack_base == NULL) return;
+    if (task->stack_size >= sizeof(uint32_t)) {
+        uint32_t canary = KERN_STACK_CANARY;
+        memcpy(task->stack_base, &canary, sizeof(uint32_t));
+    }
+}
+
+/* ─── Round-Robin 就绪任务选择 ─── */
 
 static kern_task_t *pick_next_ready(void)
 {
@@ -977,37 +1009,26 @@ static kern_task_t *pick_next_ready(void)
     return NULL;
 }
 
-static void task_stack_init(kern_task_t *task, size_t stack_size)
-{
-    if (stack_size > KERN_STACK_MAX) stack_size = KERN_STACK_MAX;
-    if (stack_size < KERN_STACK_MIN) stack_size = KERN_STACK_MIN;
-
-    task->stack_size = stack_size;
-    task->stack_base = (uint8_t *)malloc(stack_size);
-    if (task->stack_base == NULL) {
-        kern_log(KERN_LOG_WARN, "stack alloc failed for task %s, size=%zu",
-                 task->name, stack_size);
-        return;
-    }
-
-    memset(task->stack_base, 0xAA, stack_size);
-}
-
-static void task_write_canary(kern_task_t *task)
-{
-    if (task == NULL || task->stack_base == NULL) return;
-    if (task->stack_size >= sizeof(uint32_t)) {
-        uint32_t canary = KERN_STACK_CANARY;
-        memcpy(task->stack_base, &canary, sizeof(uint32_t));
-    }
-}
-
 #else /* ═══════════════ ESP32 (FreeRTOS 任务容器) ═══════════════ */
 
 /*
  * task_wrapper 已移至 kern_port.c（可移植层）。
  * 以下为 ESP32 专用的辅助函数。
  */
+
+/* ─── 栈初始化（空实现：FreeRTOS 管理栈）─── */
+static void task_stack_init(kern_task_t *task, size_t stack_size)
+{
+    (void)task;
+    (void)stack_size;
+    /* FreeRTOS 分配和管理任务栈 */
+}
+
+static void task_write_canary(kern_task_t *task)
+{
+    (void)task;
+    /* FreeRTOS 有自己的栈溢出检测 */
+}
 
 /* ─── Round-Robin 就绪任务选择 ─── */
 
@@ -1047,20 +1068,6 @@ static kern_task_t *pick_next_ready(void)
 
     /* 所有任务都不可运行 */
     return NULL;
-}
-
-/* ─── 栈初始化（空实现：FreeRTOS 管理栈）─── */
-static void task_stack_init(kern_task_t *task, size_t stack_size)
-{
-    (void)task;
-    (void)stack_size;
-    /* FreeRTOS 分配和管理任务栈 */
-}
-
-static void task_write_canary(kern_task_t *task)
-{
-    (void)task;
-    /* FreeRTOS 有自己的栈溢出检测 */
 }
 
 #endif

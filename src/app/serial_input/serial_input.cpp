@@ -25,6 +25,7 @@ serial_state_t serial_poll(void) { return SERIAL_STATE_IDLE; }
 const char* serial_get_input(void) { return NULL; }
 const char* serial_get_target_name(void) { return NULL; }
 const char* serial_get_target_addr(void) { return NULL; }
+bool serial_input_is_waiting(void) { return false; }
 
 #else
 
@@ -256,6 +257,12 @@ const char *serial_get_target_name(void)
 const char *serial_get_target_addr(void)
 {
     return g_target_addr[0] ? g_target_addr : NULL;
+}
+
+bool serial_input_is_waiting(void)
+{
+    return (g_serial_state == SERIAL_STATE_WAITING_PASSWORD ||
+            g_serial_state == SERIAL_STATE_WAITING_PAIR_CODE);
 }
 
 #endif /* NATIVE_TEST */

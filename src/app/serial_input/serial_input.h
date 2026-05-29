@@ -82,6 +82,15 @@ const char*    serial_get_target_name(void);
  */
 const char*    serial_get_target_addr(void);
 
+/**
+ * @brief  查询是否正在等待用户输入（密码/配对码）
+ * @return true  正在等待输入
+ * @return false 空闲状态
+ * @note   用于 dev_ttyS0_poll() 判断是否将串口字符留给 serial_input
+ *         而非写入 /dev/ttyS0 ring buffer 供 shell 消费。
+ */
+bool           serial_input_is_waiting(void);
+
 #ifdef __cplusplus
 }
 #endif

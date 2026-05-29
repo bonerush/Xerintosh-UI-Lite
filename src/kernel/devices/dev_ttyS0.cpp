@@ -11,6 +11,8 @@
  */
 
 #include "kernel/devices/dev_ttyS0.h"
+#include "app/serial_input/serial_input.h"
+#include "app/serial_monitor/serial_monitor.h"
 
 #ifdef NATIVE_TEST
 #define TTY_BUF_SIZE  512
@@ -29,13 +31,11 @@ static char  g_rx_buf[TTY_RX_BUF_SIZE];
 static volatile int g_rx_head = 0;
 static volatile int g_rx_tail = 0;
 static volatile int g_rx_count = 0;
-static portMUX_TYPE g_rx_spinlock = portMUX_INITIALIZER_UNLOCKED;
 
 static char  g_tx_buf[TTY_TX_BUF_SIZE];
 static volatile int g_tx_head = 0;
 static volatile int g_tx_tail = 0;
 static volatile int g_tx_count = 0;
-static portMUX_TYPE g_tx_spinlock = portMUX_INITIALIZER_UNLOCKED;
 #endif
 
 /* ═══ read ═══ */
@@ -58,9 +58,7 @@ static ssize_t dev_ttyS0_read(kern_file_t *f, char *buf, size_t len)
     while (total < len && g_rx_count > 0) {
         buf[total++] = g_rx_buf[g_rx_tail];
         g_rx_tail = (g_rx_tail + 1) % TTY_RX_BUF_SIZE;
-        portENTER_CRITICAL(&g_rx_spinlock);
-        g_rx_count--;
-        portEXIT_CRITICAL(&g_rx_spinlock);
+        __atomic_fetch_sub(&g_rx_count, 1, __ATOMIC_RELAXED);
     }
     return (ssize_t)total;
 #endif
@@ -86,9 +84,7 @@ static ssize_t dev_ttyS0_write(kern_file_t *f, const char *buf, size_t len)
     while (total < len && g_tx_count < TTY_TX_BUF_SIZE) {
         g_tx_buf[g_tx_head] = buf[total];
         g_tx_head = (g_tx_head + 1) % TTY_TX_BUF_SIZE;
-        portENTER_CRITICAL(&g_tx_spinlock);
-        g_tx_count++;
-        portEXIT_CRITICAL(&g_tx_spinlock);
+        __atomic_fetch_add(&g_tx_count, 1, __ATOMIC_RELAXED);
         total++;
     }
     return (ssize_t)total;
@@ -124,16 +120,21 @@ void dev_ttyS0_poll(void)
 {
     /*
      * RX: 从硬件串口读取数据，写入环形缓冲区供任务消费。
-     * 每次轮询最多读取 32 字节，避免阻塞主循环太久。
+     *
+     * 在以下两种情况下跳过 RX，将字符留在硬件 Serial 缓冲区:
+     * 1. serial_input 正在等待密码/配对码（由 serial_poll() 直接消费）
+     * 2. 串口监视器正在运行（由 serial_monitor_update() 直接消费）
+     * 否则 Serial 字节会被此处消耗并进入 ring buffer，
+     * Shell 和 serial_input/serial_monitor 会竞争同一份数据。
      */
     int rx_limit = 32;
-    while (rx_limit > 0 && Serial.available() > 0 && g_rx_count < TTY_RX_BUF_SIZE) {
-        g_rx_buf[g_rx_head] = (char)Serial.read();
-        g_rx_head = (g_rx_head + 1) % TTY_RX_BUF_SIZE;
-        portENTER_CRITICAL(&g_rx_spinlock);
-        g_rx_count++;
-        portEXIT_CRITICAL(&g_rx_spinlock);
-        rx_limit--;
+    if (!serial_input_is_waiting() && !serial_monitor_is_active()) {
+        while (rx_limit > 0 && Serial.available() > 0 && g_rx_count < TTY_RX_BUF_SIZE) {
+            g_rx_buf[g_rx_head] = (char)Serial.read();
+            g_rx_head = (g_rx_head + 1) % TTY_RX_BUF_SIZE;
+            __atomic_fetch_add(&g_rx_count, 1, __ATOMIC_RELAXED);
+            rx_limit--;
+        }
     }
 
     /*
@@ -144,9 +145,7 @@ void dev_ttyS0_poll(void)
     while (tx_limit > 0 && g_tx_count > 0) {
         Serial.write((uint8_t)g_tx_buf[g_tx_tail]);
         g_tx_tail = (g_tx_tail + 1) % TTY_TX_BUF_SIZE;
-        portENTER_CRITICAL(&g_tx_spinlock);
-        g_tx_count--;
-        portEXIT_CRITICAL(&g_tx_spinlock);
+        __atomic_fetch_sub(&g_tx_count, 1, __ATOMIC_RELAXED);
         tx_limit--;
     }
 }

@@ -42,6 +42,12 @@ void serial_monitor_exit(void);
  */
 void serial_monitor_update(void);
 
+/**
+ * @brief  查询串口监视器是否活跃（运行中或 DEBUG 模式）
+ * @return true  监视器正在消费串口，dev_ttyS0_poll 应暂停 RX
+ */
+bool serial_monitor_is_active(void);
+
 #ifdef __cplusplus
 }
 #endif

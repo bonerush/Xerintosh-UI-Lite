@@ -33,15 +33,32 @@
 
 void kern_port_init(void) {}
 
+kern_port_thread_t kern_port_thread_spawn(
+    void (*entry)(void *arg), void *arg, const char *name,
+    size_t stack_size, kern_task_t *task)
+{ (void)entry; (void)arg; (void)name; (void)stack_size; (void)task;
+  return KERN_PORT_THREAD_NULL; }
+
+void kern_port_thread_exit(void) { while (1) {} }
+
+void kern_port_thread_kill(kern_port_thread_t thread) { (void)thread; }
+
+size_t kern_port_thread_stack_usage(kern_port_thread_t thread)
+{ (void)thread; return 0; }
+
+void kern_port_switch_to(kern_task_t *task) { (void)task; }
+
+void kern_port_task_yield(void) {}
+
+void kern_port_task_exit(void) { while (1) {} }
+
 void kern_port_idle(void)
 {
-    /* 无就绪任务时短暂让出 CPU */
+    /* 无就绪任务时短暂忙等待让出 CPU */
     for (volatile int i = 0; i < 10000; i++) {
         __asm__ volatile("nop");
     }
 }
-
-void kern_port_thread_kill(kern_port_thread_t thread) { (void)thread; }
 
 #else /* FreeRTOS 后端（默认）*/
 

@@ -180,9 +180,11 @@ void serial_monitor_update(void)
 {
     if (!sm_running && !sm_debug) return;
 
-    serial_state_t st = serial_poll();
-    if (st == SERIAL_STATE_WAITING_PASSWORD ||
-        st == SERIAL_STATE_WAITING_PAIR_CODE) {
+    /*
+     * 当 serial_input 正在等待密码/配对码时，不消费串口字符。
+     * 将字符留在硬件 Serial 缓冲区中，由 serial_poll() 直接消费。
+     */
+    if (serial_input_is_waiting()) {
         return;
     }
 
@@ -202,4 +204,9 @@ void serial_monitor_update(void)
         }
     }
 #endif
+}
+
+extern "C" bool serial_monitor_is_active(void)
+{
+    return sm_running || sm_debug;
 }

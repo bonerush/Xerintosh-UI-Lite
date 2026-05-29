@@ -613,11 +613,7 @@ static void cmd_top(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd
         char c;
         if (kern_read(tty, &c, 1) > 0) running = false;
         if (running) {
-#ifndef NATIVE_TEST
-            vTaskDelay(pdMS_TO_TICKS(2000));
-#else
-            { volatile uint32_t s = 0; while (s < 1000000) s++; }
-#endif
+            kern_sleep_ms(2000);  /* 使用内核 sleep API，兼容 FreeRTOS 和原生调度器 */
         }
     }
 }
