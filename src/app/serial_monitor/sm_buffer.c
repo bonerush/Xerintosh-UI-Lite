@@ -9,6 +9,17 @@
 #include "sm_buffer.h"
 #include <string.h>
 
+/* ═══ 内部辅助 ═══ */
+
+/**
+ * @brief  计算指定偏移对应的环形缓冲区索引
+ * @note   offset=0 指向最新行，offset=1 指向上一行...
+ */
+static inline int16_t sm_buf_idx(const sm_buffer_t *buf, int16_t offset)
+{
+    return (buf->head - 1 - offset + SM_TERM_LINES) % SM_TERM_LINES;
+}
+
 void sm_buffer_init(sm_buffer_t *buf)
 {
     memset(buf, 0, sizeof(*buf));
@@ -38,7 +49,7 @@ void sm_buffer_get_line(const sm_buffer_t *buf, int16_t offset,
     out[0] = '\0';
     if (offset < 0 || offset >= buf->count) return;
 
-    int16_t idx = (buf->head - 1 - offset + SM_TERM_LINES) % SM_TERM_LINES;
+    int16_t idx = sm_buf_idx(buf, offset);
     const sm_line_t *line = &buf->lines[idx];
     strncpy(out, line->text, out_len - 1);
     out[out_len - 1] = '\0';
@@ -49,7 +60,7 @@ bool sm_buffer_get_line_source(const sm_buffer_t *buf, int16_t offset)
     if (!buf) return false;
     if (offset < 0 || offset >= buf->count) return false;
 
-    int16_t idx = (buf->head - 1 - offset + SM_TERM_LINES) % SM_TERM_LINES;
+    int16_t idx = sm_buf_idx(buf, offset);
     return buf->lines[idx].from_host;
 }
 

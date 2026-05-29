@@ -42,6 +42,20 @@ typedef struct {
     const char           *help;      /* 帮助文本（单行） */
 } shell_cmd_t;
 
+/* ═══ 输出辅助 ═══ */
+
+/**
+ * @brief 向 shell 终端输出一行文本
+ * @param tty 终端文件描述符
+ * @param msg 文本（不含换行）
+ */
+extern void sh_print(kern_fd_t tty, const char *msg);
+
+/**
+ * @brief 向 shell 终端输出一行文本 + 换行
+ */
+extern void sh_println(kern_fd_t tty, const char *msg);
+
 /* ═══ 命令表接口 ═══ */
 
 #define SHELL_MAX_BUILTIN_CMDS  48   /* 最大内置命令数（Phase 3 扩充） */

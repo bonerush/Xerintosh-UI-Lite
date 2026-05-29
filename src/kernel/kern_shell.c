@@ -31,18 +31,11 @@ extern int shell_history_count(void);
 
 /* ═══ 输出辅助 ═══ */
 
-static void sh_print(kern_fd_t tty, const char *msg)
-{
-    if (tty >= 0 && msg != NULL) {
-        kern_write(tty, msg, strlen(msg));
-    }
-}
-
 static void sh_print_prompt(kern_fd_t tty, const char *cwd)
 {
     char prompt[KERN_PATH_MAX + 8];
     snprintf(prompt, sizeof(prompt), "[%s]$ ", cwd);
-    sh_print(tty, prompt);
+    sh_print(tty, prompt);  /* sh_print 由 kern_shell_cmds.c 提供 */
 }
 
 /* ═══ VT100 转义序列解析 ═══ */
