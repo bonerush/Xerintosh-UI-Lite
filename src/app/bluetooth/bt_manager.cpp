@@ -37,7 +37,7 @@ extern "C" {
 #include "kernel/kern_task.h"
 }
 
-extern bool bt_on;  /* 定义在 main.cpp */
+extern bool g_bt_on;  /* 定义在 main.cpp */
 
 /* ═══ 内部状态 ═══ */
 
@@ -366,7 +366,7 @@ void bt_mgr_update(void) {
  */
 void bt_mgr_on_switch_toggle(void *ud) {
     (void)ud;
-    if (bt_on) {
+    if (g_bt_on) {
         bt_mgr_enable();
     } else {
         bt_mgr_disable();

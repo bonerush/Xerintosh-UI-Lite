@@ -27,8 +27,8 @@
 #include "hal/hal_display.h"
 
 /* 由 main.cpp / native_main.cpp 提供的外部变量 */
-extern bool wifi_on;
-extern bool bt_on;
+extern bool g_wifi_on;
+extern bool g_bt_on;
 
 /* ─── 设置变更回调（由 main.cpp 提供）─── */
 extern void on_brightness_change_cb(void *ud);
@@ -77,9 +77,9 @@ void app_init_ui(void)
         "关于", about_init, about_loop, about_exit, user_icon);
 
     xerintosh_list_item_t* sw1 = xerintosh_new_switch_item(
-        "WiFi", &wifi_on, NULL, wifi_mgr_on_switch_toggle, default_icon);
+        "WiFi", &g_wifi_on, NULL, wifi_mgr_on_switch_toggle, default_icon);
     xerintosh_list_item_t* sw2 = xerintosh_new_switch_item(
-        "蓝牙", &bt_on, NULL, bt_mgr_on_switch_toggle, default_icon);
+        "蓝牙", &g_bt_on, NULL, bt_mgr_on_switch_toggle, default_icon);
     xerintosh_list_item_t* sl1 = xerintosh_new_slider_item(
         "亮度", &g_brightness_level, 1, 1, 10,
         NULL, on_brightness_change_cb, default_icon);
@@ -141,8 +141,8 @@ void app_init_managers(void)
     wifi_mgr_init();
     bt_mgr_init();
 
-    if (wifi_on) wifi_mgr_enable();
-    if (bt_on)   bt_mgr_enable();
+    if (g_wifi_on) wifi_mgr_enable();
+    if (g_bt_on)   bt_mgr_enable();
 
     /* WiFi/BT 内核任务由 setup() 在 xerintosh_init_core() 之后启动，
        确保 g_xerintosh_selector 已初始化，避免 LoadStoreError */

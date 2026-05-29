@@ -41,7 +41,7 @@ extern "C" {
 
 /* ═══ 外部全局变量 ═══ */
 
-extern bool wifi_on;   /* 定义在 main.cpp */
+extern bool g_wifi_on;   /* 定义在 main.cpp */
 
 /* ═══ 模块状态 ═══ */
 
@@ -114,7 +114,7 @@ void wifi_mgr_init(void)
         g_settings_list = root->child_list_item[0];  /* "设置" */
     }
 
-    /* 注意：自动连接已移除。WiFi 默认关闭（wifi_on = false）。
+    /* 注意：自动连接已移除。WiFi 默认关闭（g_wifi_on = false）。
        在此处调用 WiFi.begin() 会导致后续扫描失败，因为
        WiFi.disconnect() 会使驱动处于不稳定状态。
        连接逻辑改为用户选择网络时触发。 */
@@ -188,7 +188,7 @@ void wifi_mgr_disable(void)
 void wifi_mgr_on_switch_toggle(void *ud)
 {
     (void)ud;
-    if (wifi_on) {
+    if (g_wifi_on) {
         wifi_mgr_enable();
     } else {
         wifi_mgr_disable();

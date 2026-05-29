@@ -2,7 +2,7 @@
  * @file   kern_shell.c
  * @brief  Xeros 内核 Shell 实现
  * @details 通过 /dev/ttyS0 提供交互式命令行界面。
- *          使用命令表化分派（shell_cmd_t + 精确匹配），
+ *          使用命令表化分派（kern_shell_cmd_t + 精确匹配），
  *          支持 tokenize 解析（引号/转义）、命令历史（↑↓ 浏览）、
  *          内置命令 + 动态扩展。
  *
@@ -31,11 +31,11 @@ extern int shell_history_count(void);
 
 /* ═══ 输出辅助 ═══ */
 
-static void sh_print_prompt(kern_fd_t tty, const char *cwd)
+static void kern_shell_print_prompt(kern_fd_t tty, const char *cwd)
 {
     char prompt[KERN_PATH_MAX + 8];
     snprintf(prompt, sizeof(prompt), "[%s]$ ", cwd);
-    sh_print(tty, prompt);  /* sh_print 由 kern_shell_cmds.c 提供 */
+    kern_shell_print(tty, prompt);  /* kern_shell_print 由 kern_shell_cmds.c 提供 */
 }
 
 /* ═══ VT100 转义序列解析 ═══ */
@@ -64,7 +64,7 @@ static void shell_task_main(void *arg)
     kern_fd_t tty = kern_open("/dev/ttyS0", KERN_O_RDWR);
     if (tty < 0) return;
 
-    sh_print(tty, "\r\nXeros Shell ready. Type 'help' for commands.\r\n");
+    kern_shell_print(tty, "\r\nXeros Shell ready. Type 'help' for commands.\r\n");
 
     static char line[SHELL_BUF_SIZE];
     static size_t pos = 0;
@@ -73,11 +73,11 @@ static void shell_task_main(void *arg)
     /* 历史浏览状态 */
     static int hist_browse = -1;  /* -1 = 不在浏览模式，0..15 = 浏览索引 */
 
-    sh_print_prompt(tty, cwd);
+    kern_shell_print_prompt(tty, cwd);
 
     for (;;) {
         /* Phase 3: scope tick — 非阻塞周期数据输出 */
-        scope_tick(tty);
+        kern_shell_scope_tick(tty);
 
         char ch;
         ssize_t n = kern_read(tty, &ch, 1);
@@ -113,12 +113,12 @@ static void shell_task_main(void *arg)
 
                 /* 清屏当前行 */
                 for (size_t i = 0; i < pos; i++) {
-                    sh_print(tty, "\b \b");
+                    kern_shell_print(tty, "\b \b");
                 }
                 /* 写入历史命令 */
                 strncpy(line, entry, SHELL_BUF_SIZE - 1);
                 line[SHELL_BUF_SIZE - 1] = '\0';
-                sh_print(tty, line);
+                kern_shell_print(tty, line);
                 pos = strlen(line);
             } else if (arrow == 'B') {
                 /* ↓ — 下一条历史 */
@@ -126,15 +126,15 @@ static void shell_task_main(void *arg)
                     hist_browse--;
                     const char *entry = shell_history_get(hist_browse);
                     if (entry != NULL) {
-                        for (size_t i = 0; i < pos; i++) sh_print(tty, "\b \b");
+                        for (size_t i = 0; i < pos; i++) kern_shell_print(tty, "\b \b");
                         strncpy(line, entry, SHELL_BUF_SIZE - 1);
                         line[SHELL_BUF_SIZE - 1] = '\0';
-                        sh_print(tty, line);
+                        kern_shell_print(tty, line);
                         pos = strlen(line);
                     }
                 } else {
                     /* 回到最新：清空行 */
-                    for (size_t i = 0; i < pos; i++) sh_print(tty, "\b \b");
+                    for (size_t i = 0; i < pos; i++) kern_shell_print(tty, "\b \b");
                     line[0] = '\0';
                     pos = 0;
                     hist_browse = -1;
@@ -150,21 +150,21 @@ static void shell_task_main(void *arg)
 
         if (ch == '\r' || ch == '\n') {
             line[pos] = '\0';
-            sh_print(tty, "\r\n");
+            kern_shell_print(tty, "\r\n");
 
             /* 添加到命令历史 */
             shell_history_add(line);
 
             /* tokenize + 执行 */
             char *tokens[SHELL_MAX_TOKENS];
-            int token_count = shell_tokenize(line, tokens, SHELL_MAX_TOKENS);
+            int token_count = kern_shell_tokenize(line, tokens, SHELL_MAX_TOKENS);
             if (token_count < 0) {
-                sh_print(tty, "shell: unclosed quote\r\n");
+                kern_shell_print(tty, "shell: unclosed quote\r\n");
             } else if (token_count > 0) {
-                shell_exec_cmd(tty, token_count, tokens, cwd, sizeof(cwd));
+                kern_shell_exec_cmd(tty, token_count, tokens, cwd, sizeof(cwd));
             }
 
-            sh_print_prompt(tty, cwd);
+            kern_shell_print_prompt(tty, cwd);
             pos = 0;
             hist_browse = -1;
         } else if (ch == '\b' || ch == 0x7F) {

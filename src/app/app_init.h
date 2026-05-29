@@ -18,8 +18,8 @@ extern "C" {
 
 /* ═══ 外部状态标志（由 main.cpp / native_main.cpp 定义）═══ */
 
-extern bool wifi_on;  /* WiFi 开关状态 */
-extern bool bt_on;    /* 蓝牙开关状态 */
+extern bool g_wifi_on;  /* WiFi 开关状态 */
+extern bool g_bt_on;    /* 蓝牙开关状态 */
 
 /* ═══ 生命周期 ═══ */
 

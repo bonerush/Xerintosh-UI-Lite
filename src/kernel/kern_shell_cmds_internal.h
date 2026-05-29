@@ -31,7 +31,7 @@ extern uint64_t g_scope_last_tick;
 extern scope_var_t g_scope_vars[SCOPE_MAX_VARS];
 extern int      g_scope_count;
 
-void scope_tick(kern_fd_t tty);
+void kern_shell_scope_tick(kern_fd_t tty);
 
 #ifdef __cplusplus
 }

@@ -22,8 +22,8 @@ void bt_mgr_task_main(void *arg);
 #ifndef NATIVE_TEST
 
 extern "C" {
-bool wifi_on = true;  /* WiFi 默认开关状态 */
-bool bt_on = true;    /* 蓝牙默认开关状态 */
+bool g_wifi_on = true;  /* WiFi 默认开关状态 */
+bool g_bt_on = true;    /* 蓝牙默认开关状态 */
 }
 
 #include <M5Unified.h>

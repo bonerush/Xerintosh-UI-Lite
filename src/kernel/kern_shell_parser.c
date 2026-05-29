@@ -55,7 +55,7 @@ static int shell_parse_escape(const char *src, char *dst)
 
 /* ═══ Tokenize ═══ */
 
-int shell_tokenize(char *line, char *tokens_out[], int max_tokens)
+int kern_shell_tokenize(char *line, char *tokens_out[], int max_tokens)
 {
     if (line == NULL || tokens_out == NULL || max_tokens <= 0) {
         return 0;

@@ -21,7 +21,7 @@ extern "C" {
 /**
  * @brief 启动 Shell 任务
  * @note  作为内核任务运行，从 /dev/ttyS0 读取命令并执行。
- *        使用命令表化分派（shell_cmd_t + 精确匹配），
+ *        使用命令表化分派（kern_shell_cmd_t + 精确匹配），
  *        支持 VT100 方向键浏览历史。
  */
 extern void kern_shell_init(void);

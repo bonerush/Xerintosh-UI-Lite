@@ -79,7 +79,7 @@ void wifi_mgr_update(void);
 
 /**
  * @brief WiFi 开关切换回调（由 switch_item 的 exit_function 调用）
- * @note  根据 wifi_on 全局变量决定启用或禁用
+ * @note  根据 g_wifi_on 全局变量决定启用或禁用
  */
 void wifi_mgr_on_switch_toggle(void *ud);
 

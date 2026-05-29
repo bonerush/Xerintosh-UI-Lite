@@ -1,7 +1,7 @@
 /**
  * @file   kern_shell_parser.h
  * @brief  Xeros Shell 命令行解析器头文件
- * @details 提供 shell_tokenize() 函数，将输入行按空格分割为 token 数组。
+ * @details 提供 kern_shell_tokenize() 函数，将输入行按空格分割为 token 数组。
  *          支持双引号保护、转义字符。
  *
  * @copyright Copyright (c) 2026
@@ -37,7 +37,7 @@ extern "C" {
  *           - "双引号" 保护含空格的 token
  *           - 转义字符：\n, \t, \\, \", \xNN（两位十六进制）
  */
-extern int shell_tokenize(char *line, char *tokens_out[], int max_tokens);
+extern int kern_shell_tokenize(char *line, char *tokens_out[], int max_tokens);
 
 #ifdef __cplusplus
 }

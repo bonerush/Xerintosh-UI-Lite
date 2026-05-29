@@ -26,8 +26,8 @@ void on_screen_rotation_change_cb(void *ud) { (void)ud; }
 void on_serial_baud_change_cb(void *ud) { (void)ud; }
 
 /* 外部状态标志桩 */
-bool wifi_on = true;
-bool bt_on = true;
+bool g_wifi_on = true;
+bool g_bt_on = true;
 }
 
 /* ═══ 动画测试 ═══ */

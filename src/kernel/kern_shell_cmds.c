@@ -4,7 +4,7 @@
  * @details 包含全部 Shell 命令处理函数和命令表。
  *          文件命令依赖 kern_shell_cmds_internal.h 声明。
  *
- *          命令表化设计：每条命令通过 shell_cmd_t 注册，命令名精确匹配。
+ *          命令表化设计：每条命令通过 kern_shell_cmd_t 注册，命令名精确匹配。
  *          支持 kern_shell_register_cmd() 动态注册扩展命令。
  *
  * @copyright Copyright (c) 2026
@@ -38,17 +38,17 @@
 
 /* ═══ 输出辅助 ═══ */
 
-void sh_print(kern_fd_t tty, const char *msg)
+void kern_shell_print(kern_fd_t tty, const char *msg)
 {
     if (tty >= 0 && msg != NULL) {
         kern_write(tty, msg, strlen(msg));
     }
 }
 
-void sh_println(kern_fd_t tty, const char *msg)
+void kern_shell_println(kern_fd_t tty, const char *msg)
 {
-    sh_print(tty, msg);
-    sh_print(tty, "\r\n");
+    kern_shell_print(tty, msg);
+    kern_shell_print(tty, "\r\n");
 }
 
 /* ═══ 路径解析 ═══ */
@@ -123,7 +123,7 @@ static void cmd_ps(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_
     kern_task_t *task = kern_task_list_head();
     char line[100];
 
-    sh_println(tty, "PID  STATE     NAME          STACK");
+    kern_shell_println(tty, "PID  STATE     NAME          STACK");
 
     while (task != NULL) {
         const char *state_str;
@@ -139,7 +139,7 @@ static void cmd_ps(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_
         snprintf(line, sizeof(line), "%-4d %s %-12s %zu/%zu",
                  (int)task->pid, state_str, task->name,
                  kern_task_stack_usage(task), task->stack_size);
-        sh_println(tty, line);
+        kern_shell_println(tty, line);
         task = task->next;
     }
 }
@@ -153,24 +153,24 @@ static void cmd_ls(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_
 
     char abs_path[KERN_PATH_MAX];
     const char *target = resolve_path(cwd, path_arg, abs_path, sizeof(abs_path));
-    if (target == NULL) { sh_println(tty, "ls: path too long"); return; }
+    if (target == NULL) { kern_shell_println(tty, "ls: path too long"); return; }
 
     kern_dentry_t *dir = kern_path_resolve(target);
     if (dir == NULL) {
         char err[64];
         snprintf(err, sizeof(err), "ls: cannot access '%s': no such entry", target);
-        sh_println(tty, err);
+        kern_shell_println(tty, err);
         return;
     }
 
     if (dir->inode != NULL && dir->inode->type != KERN_FILE_DIR) {
-        sh_println(tty, target);
+        kern_shell_println(tty, target);
         return;
     }
 
     char header[80];
     snprintf(header, sizeof(header), "%s (%u entries):", target, dir->child_count);
-    sh_println(tty, header);
+    kern_shell_println(tty, header);
 
     for (uint8_t i = 0; i < dir->child_count; i++) {
         kern_dentry_t *child = dir->children[i];
@@ -191,7 +191,7 @@ static void cmd_ls(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_
 
         char line[80];
         snprintf(line, sizeof(line), "  %s %s", type_str, child->name);
-        sh_println(tty, line);
+        kern_shell_println(tty, line);
     }
 }
 
@@ -219,19 +219,19 @@ static void cmd_cd(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_
 
     char abs_path[KERN_PATH_MAX];
     const char *target = resolve_path(cwd, path, abs_path, sizeof(abs_path));
-    if (target == NULL) { sh_println(tty, "cd: path too long"); return; }
+    if (target == NULL) { kern_shell_println(tty, "cd: path too long"); return; }
 
     kern_dentry_t *dir = kern_path_resolve(target);
     if (dir == NULL) {
         char err[64];
         snprintf(err, sizeof(err), "cd: '%s': no such directory", target);
-        sh_println(tty, err);
+        kern_shell_println(tty, err);
         return;
     }
     if (dir->inode != NULL && dir->inode->type != KERN_FILE_DIR) {
         char err[64];
         snprintf(err, sizeof(err), "cd: '%s': not a directory", target);
-        sh_println(tty, err);
+        kern_shell_println(tty, err);
         return;
     }
 
@@ -244,7 +244,7 @@ static void cmd_cd(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_
 static void cmd_pwd(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_size)
 {
     (void)argc; (void)argv; (void)cwd_size;
-    sh_println(tty, cwd);
+    kern_shell_println(tty, cwd);
 }
 
 /* ═══ cat — 读取文件 ═══ */
@@ -252,13 +252,13 @@ static void cmd_pwd(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd
 static void cmd_cat(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_size)
 {
     (void)cwd; (void)cwd_size;
-    if (argc < 2) { sh_println(tty, "Usage: cat <path>"); return; }
+    if (argc < 2) { kern_shell_println(tty, "Usage: cat <path>"); return; }
 
     kern_fd_t fd = kern_open(argv[1], KERN_O_RDONLY);
     if (fd < 0) {
         char err[64];
         snprintf(err, sizeof(err), "cat: cannot open '%s'", argv[1]);
-        sh_println(tty, err);
+        kern_shell_println(tty, err);
         return;
     }
 
@@ -275,13 +275,13 @@ static void cmd_cat(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd
 static void cmd_cp(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_size)
 {
     (void)cwd; (void)cwd_size;
-    if (argc < 3) { sh_println(tty, "Usage: cp <src> <dst>"); return; }
+    if (argc < 3) { kern_shell_println(tty, "Usage: cp <src> <dst>"); return; }
 
     kern_fd_t src = kern_open(argv[1], KERN_O_RDONLY);
-    if (src < 0) { sh_println(tty, "cp: cannot open source"); return; }
+    if (src < 0) { kern_shell_println(tty, "cp: cannot open source"); return; }
 
     kern_fd_t dst = kern_open(argv[2], KERN_O_WRONLY);
-    if (dst < 0) { kern_close(src); sh_println(tty, "cp: cannot open destination"); return; }
+    if (dst < 0) { kern_close(src); kern_shell_println(tty, "cp: cannot open destination"); return; }
 
     char buf[128];
     ssize_t n;
@@ -297,15 +297,15 @@ static void cmd_cp(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_
 static void cmd_rm(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_size)
 {
     (void)cwd; (void)cwd_size;
-    if (argc < 2) { sh_println(tty, "Usage: rm <path>"); return; }
+    if (argc < 2) { kern_shell_println(tty, "Usage: rm <path>"); return; }
 
     int ret = kern_vfs_unlink(argv[1]);
     if (ret == KERN_ENOENT) {
-        sh_println(tty, "rm: no such file or directory");
+        kern_shell_println(tty, "rm: no such file or directory");
     } else if (ret == KERN_ENOTEMPTY) {
-        sh_println(tty, "rm: directory not empty");
+        kern_shell_println(tty, "rm: directory not empty");
     } else if (ret != KERN_OK) {
-        sh_println(tty, "rm: failed");
+        kern_shell_println(tty, "rm: failed");
     }
 }
 
@@ -314,13 +314,13 @@ static void cmd_rm(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_
 static void cmd_mkdir(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_size)
 {
     (void)cwd; (void)cwd_size;
-    if (argc < 2) { sh_println(tty, "Usage: mkdir <path>"); return; }
+    if (argc < 2) { kern_shell_println(tty, "Usage: mkdir <path>"); return; }
 
     int ret = kern_vfs_mkdir(argv[1]);
     if (ret == KERN_EEXIST) {
-        sh_println(tty, "mkdir: directory already exists");
+        kern_shell_println(tty, "mkdir: directory already exists");
     } else if (ret != KERN_OK) {
-        sh_println(tty, "mkdir: failed");
+        kern_shell_println(tty, "mkdir: failed");
     }
 }
 
@@ -329,13 +329,13 @@ static void cmd_mkdir(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t c
 static void cmd_touch(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_size)
 {
     (void)cwd; (void)cwd_size;
-    if (argc < 2) { sh_println(tty, "Usage: touch <path>"); return; }
+    if (argc < 2) { kern_shell_println(tty, "Usage: touch <path>"); return; }
 
     int ret = kern_vfs_touch(argv[1]);
     if (ret == KERN_EEXIST) {
         /* 已存在，静默成功 */
     } else if (ret != KERN_OK) {
-        sh_println(tty, "touch: failed");
+        kern_shell_println(tty, "touch: failed");
     }
 }
 
@@ -358,7 +358,7 @@ static void cmd_echo(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cw
         /* 重定向写入 */
         kern_fd_t fd = kern_open(argv[redirect_pos + 1], KERN_O_WRONLY);
         if (fd < 0) {
-            sh_println(tty, "echo: cannot write to file");
+            kern_shell_println(tty, "echo: cannot write to file");
             return;
         }
         for (int i = 1; i < redirect_pos; i++) {
@@ -369,10 +369,10 @@ static void cmd_echo(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cw
     } else {
         /* 回显到终端 */
         for (int i = 1; i < argc; i++) {
-            if (i > 1) sh_print(tty, " ");
-            sh_print(tty, argv[i]);
+            if (i > 1) kern_shell_print(tty, " ");
+            kern_shell_print(tty, argv[i]);
         }
-        sh_print(tty, "\r\n");
+        kern_shell_print(tty, "\r\n");
     }
 }
 
@@ -381,12 +381,12 @@ static void cmd_echo(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cw
 static void cmd_reboot(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_size)
 {
     (void)argc; (void)argv; (void)cwd; (void)cwd_size;
-    sh_println(tty, "Rebooting...");
+    kern_shell_println(tty, "Rebooting...");
     { volatile uint32_t s = 0; while (s < 500000) s++; }
 #ifndef NATIVE_TEST
     esp_restart();
 #else
-    sh_println(tty, "(native: reboot not available)");
+    kern_shell_println(tty, "(native: reboot not available)");
 #endif
 }
 
@@ -395,14 +395,14 @@ static void cmd_reboot(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t 
 static void cmd_help(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_size)
 {
     (void)argc; (void)argv; (void)cwd; (void)cwd_size;
-    sh_println(tty, "Xeros Shell — available commands:");
+    kern_shell_println(tty, "Xeros Shell — available commands:");
 
-    const shell_cmd_t *cmds = shell_get_builtin_cmds();
-    int count = shell_get_builtin_count();
+    const kern_shell_cmd_t *cmds = kern_shell_get_builtin_cmds();
+    int count = kern_shell_get_builtin_count();
     char line[96];
     for (int i = 0; i < count; i++) {
         snprintf(line, sizeof(line), "  %-12s - %s", cmds[i].name, cmds[i].help);
-        sh_println(tty, line);
+        kern_shell_println(tty, line);
     }
 }
 
@@ -420,7 +420,7 @@ static void cmd_free(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cw
 #else
     snprintf(line, sizeof(line), "free_heap=N/A (native mode)");
 #endif
-    sh_println(tty, line);
+    kern_shell_println(tty, line);
 }
 
 /* ═══ kill — 终止任务（新增）═══ */
@@ -428,28 +428,28 @@ static void cmd_free(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cw
 static void cmd_kill(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_size)
 {
     (void)cwd; (void)cwd_size;
-    if (argc < 2) { sh_println(tty, "Usage: kill <pid>"); return; }
+    if (argc < 2) { kern_shell_println(tty, "Usage: kill <pid>"); return; }
 
     /* 解析 PID */
     long pid_l = 0;
     for (char *p = argv[1]; *p; p++) {
-        if (*p < '0' || *p > '9') { sh_println(tty, "kill: invalid PID"); return; }
+        if (*p < '0' || *p > '9') { kern_shell_println(tty, "kill: invalid PID"); return; }
         pid_l = pid_l * 10 + (*p - '0');
     }
 
     kern_task_t *task = kern_task_get((kern_pid_t)pid_l);
     if (task == NULL) {
-        sh_println(tty, "kill: no such task");
+        kern_shell_println(tty, "kill: no such task");
         return;
     }
     if (task->state == KERN_TASK_ZOMBIE) {
-        sh_println(tty, "kill: task already zombie");
+        kern_shell_println(tty, "kill: task already zombie");
         return;
     }
     if (kern_task_is_protected(task)) {
         char msg[64];
         snprintf(msg, sizeof(msg), "kill: cannot kill system task '%s'", task->name);
-        sh_println(tty, msg);
+        kern_shell_println(tty, msg);
         return;
     }
 
@@ -461,7 +461,7 @@ static void cmd_kill(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cw
     } else {
         snprintf(msg, sizeof(msg), "kill: failed (err=%d)", ret);
     }
-    sh_println(tty, msg);
+    kern_shell_println(tty, msg);
 }
 
 /* ═══ uname — 系统信息（新增）═══ */
@@ -472,7 +472,7 @@ static void cmd_uname(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t c
     char line[128];
     snprintf(line, sizeof(line), "Xeros " XEROS_VERSION_STRING " " XEROS_PLATFORM
              " compiled " __DATE__ " " __TIME__);
-    sh_println(tty, line);
+    kern_shell_println(tty, line);
 }
 
 /* ═══ df — VFS 使用统计（新增）═══ */
@@ -502,7 +502,7 @@ static void cmd_df(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_
     char line[128];
     snprintf(line, sizeof(line), "VFS: %d dentries, %d inodes, %d fd slots",
              dentries, inodes, KERN_MAX_FD_PER_TASK);
-    sh_println(tty, line);
+    kern_shell_println(tty, line);
 }
 
 /* ═══ clear — 清屏（新增）═══ */
@@ -510,7 +510,7 @@ static void cmd_df(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_
 static void cmd_clear(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_size)
 {
     (void)argc; (void)argv; (void)cwd; (void)cwd_size;
-    sh_print(tty, "\x1b[2J\x1b[H");  /* ANSI 清屏 + 光标归位 */
+    kern_shell_print(tty, "\x1b[2J\x1b[H");  /* ANSI 清屏 + 光标归位 */
 }
 
 /* ═══ history — 命令历史（新增）═══ */
@@ -523,7 +523,7 @@ static void cmd_history(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t
         const char *entry = shell_history_get(i);
         if (entry == NULL) break;
         snprintf(line, sizeof(line), "%4d  %s", i + 1, entry);
-        sh_println(tty, line);
+        kern_shell_println(tty, line);
     }
 }
 
@@ -547,9 +547,9 @@ static void cmd_date(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cw
     char line[64];
     snprintf(line, sizeof(line), "Uptime: %" PRIu32 "d %02" PRIu32 ":%02" PRIu32 ":%02" PRIu32 ".%03" PRIu32,
              d, h, m, s, ms % 1000);
-    sh_println(tty, line);
+    kern_shell_println(tty, line);
 #else
-    sh_println(tty, "Uptime: N/A (native mode)");
+    kern_shell_println(tty, "Uptime: N/A (native mode)");
 #endif
 }
 
@@ -558,11 +558,11 @@ static void cmd_date(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cw
 static void cmd_hexdump(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_size)
 {
     (void)cwd; (void)cwd_size;
-    if (argc < 2) { sh_println(tty, "Usage: hexdump <path>"); return; }
+    if (argc < 2) { kern_shell_println(tty, "Usage: hexdump <path>"); return; }
 
     kern_fd_t fd = kern_open(argv[1], KERN_O_RDONLY);
     if (fd < 0) {
-        sh_println(tty, "hexdump: cannot open file");
+        kern_shell_println(tty, "hexdump: cannot open file");
         return;
     }
 
@@ -594,7 +594,7 @@ static void cmd_hexdump(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t
         }
         line[pos] = '\0';
 
-        sh_println(tty, line);
+        kern_shell_println(tty, line);
         offset += (uint32_t)n;
     }
     kern_close(fd);
@@ -605,11 +605,11 @@ static void cmd_hexdump(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t
 static void cmd_top(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_size)
 {
     (void)argc; (void)argv;
-    sh_println(tty, "TOP — press any key to exit");
+    kern_shell_println(tty, "TOP — press any key to exit");
     bool running = true;
     while (running) {
         cmd_ps(tty, 0, NULL, cwd, cwd_size);
-        sh_println(tty, "---");
+        kern_shell_println(tty, "---");
         char c;
         if (kern_read(tty, &c, 1) > 0) running = false;
         if (running) {
@@ -626,10 +626,10 @@ static void cmd_log(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd
     if (argc > 1) {
         /* 设置日志级别：echo <n> > /sys/kernel/log_level */
         kern_fd_t fd = kern_open("/sys/kernel/log_level", KERN_O_WRONLY);
-        if (fd < 0) { sh_println(tty, "log: cannot write log_level"); return; }
+        if (fd < 0) { kern_shell_println(tty, "log: cannot write log_level"); return; }
         kern_write(fd, argv[1], strlen(argv[1]));
         kern_close(fd);
-        sh_println(tty, "OK");
+        kern_shell_println(tty, "OK");
     } else {
         /* 查看日志级别：cat /sys/kernel/log_level */
         cmd_cat(tty, 2, (char *[]){ "cat", "/sys/kernel/log_level", NULL }, cwd, cwd_size);
@@ -642,15 +642,15 @@ static void cmd_debug(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t c
 {
     (void)cwd; (void)cwd_size;
     if (argc < 2) {
-        sh_println(tty, "Usage: debug <on|off> [module]");
+        kern_shell_println(tty, "Usage: debug <on|off> [module]");
         return;
     }
     if (strcmp(argv[1], "on") == 0) {
-        sh_println(tty, "debug: all modules ON (module filter NYI)");
+        kern_shell_println(tty, "debug: all modules ON (module filter NYI)");
     } else if (strcmp(argv[1], "off") == 0) {
-        sh_println(tty, "debug: all modules OFF (module filter NYI)");
+        kern_shell_println(tty, "debug: all modules OFF (module filter NYI)");
     } else {
-        sh_println(tty, "debug: expected 'on' or 'off'");
+        kern_shell_println(tty, "debug: expected 'on' or 'off'");
     }
 }
 
@@ -659,7 +659,7 @@ static void cmd_debug(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t c
 static void cmd_param(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_size)
 {
     (void)cwd; (void)cwd_size;
-    if (argc < 2) { sh_println(tty, "Usage: param <list|get|set|save|load> [args]"); return; }
+    if (argc < 2) { kern_shell_println(tty, "Usage: param <list|get|set|save|load> [args]"); return; }
 
     if (strcmp(argv[1], "list") == 0) {
         /* 遍历已知 sysfs 属性 */
@@ -679,16 +679,16 @@ static void cmd_param(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t c
         char path[KERN_PATH_MAX];
         snprintf(path, sizeof(path), "/sys/kernel/%s", argv[2]);
         kern_fd_t fd = kern_open(path, KERN_O_WRONLY);
-        if (fd < 0) { sh_println(tty, "param set: cannot open parameter"); return; }
+        if (fd < 0) { kern_shell_println(tty, "param set: cannot open parameter"); return; }
         kern_write(fd, argv[3], strlen(argv[3]));
         kern_close(fd);
-        sh_println(tty, "OK");
+        kern_shell_println(tty, "OK");
     } else if (strcmp(argv[1], "save") == 0) {
-        sh_println(tty, "param save: settings_save_all() NYI");
+        kern_shell_println(tty, "param save: settings_save_all() NYI");
     } else if (strcmp(argv[1], "load") == 0) {
-        sh_println(tty, "param load: settings_load_all() NYI");
+        kern_shell_println(tty, "param load: settings_load_all() NYI");
     } else {
-        sh_println(tty, "param: unknown sub-command");
+        kern_shell_println(tty, "param: unknown sub-command");
     }
 }
 
@@ -697,13 +697,13 @@ static void cmd_param(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t c
 static void cmd_bootloader(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_size)
 {
     (void)argc; (void)argv; (void)cwd; (void)cwd_size;
-    sh_println(tty, "Entering bootloader mode...");
+    kern_shell_println(tty, "Entering bootloader mode...");
 #ifndef NATIVE_TEST
     { volatile uint32_t s = 0; while (s < 500000) s++; }
     esp_ota_set_boot_partition(esp_ota_get_next_update_partition(NULL));
     esp_restart();
 #else
-    sh_println(tty, "(native: bootloader not available)");
+    kern_shell_println(tty, "(native: bootloader not available)");
 #endif
 }
 
@@ -712,21 +712,21 @@ static void cmd_bootloader(kern_fd_t tty, int argc, char *argv[], char *cwd, siz
 static void cmd_factory(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_size)
 {
     (void)argc; (void)argv; (void)cwd; (void)cwd_size;
-    sh_println(tty, "WARNING: This will erase ALL settings and reboot.");
-    sh_print(tty, "Type 'yes' to confirm: ");
+    kern_shell_println(tty, "WARNING: This will erase ALL settings and reboot.");
+    kern_shell_print(tty, "Type 'yes' to confirm: ");
     char confirm[8] = {0};
     ssize_t n = kern_read(tty, confirm, sizeof(confirm) - 1);
-    if (n <= 0) { sh_println(tty, "\r\nAborted."); return; }
+    if (n <= 0) { kern_shell_println(tty, "\r\nAborted."); return; }
     confirm[n] = '\0';
     for (ssize_t i = n - 1; i >= 0 && (confirm[i] == '\r' || confirm[i] == '\n'); i--)
         confirm[i] = '\0';
-    if (strcmp(confirm, "yes") != 0) { sh_println(tty, "Aborted."); return; }
-    sh_println(tty, "\r\nErasing NVS and rebooting...");
+    if (strcmp(confirm, "yes") != 0) { kern_shell_println(tty, "Aborted."); return; }
+    kern_shell_println(tty, "\r\nErasing NVS and rebooting...");
 #ifndef NATIVE_TEST
     nvs_flash_erase();
     esp_restart();
 #else
-    sh_println(tty, "(native: factory reset not available)");
+    kern_shell_println(tty, "(native: factory reset not available)");
 #endif
 }
 
@@ -737,11 +737,11 @@ static void cmd_version(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t
     (void)argc; (void)argv; (void)cwd; (void)cwd_size;
     char line[128];
     snprintf(line, sizeof(line), "Version: " XEROS_VERSION_STRING);
-    sh_println(tty, line);
+    kern_shell_println(tty, line);
     snprintf(line, sizeof(line), "Platform: " XEROS_PLATFORM);
-    sh_println(tty, line);
+    kern_shell_println(tty, line);
     snprintf(line, sizeof(line), "Build: " __DATE__ " " __TIME__);
-    sh_println(tty, line);
+    kern_shell_println(tty, line);
 }
 
 /* ═══ scope — 实时数据监测（Phase 3 新增）═══ */
@@ -752,7 +752,7 @@ bool        g_scope_running = false;
 int         g_scope_period_ms = 1000;
 uint64_t    g_scope_last_tick = 0;
 
-void scope_tick(kern_fd_t tty)
+void kern_shell_scope_tick(kern_fd_t tty)
 {
     if (!g_scope_running || g_scope_count <= 0) return;
 #ifndef NATIVE_TEST
@@ -776,32 +776,32 @@ void scope_tick(kern_fd_t tty)
             kern_close(fd);
         }
     }
-    if (pos > 0) sh_println(tty, line);
+    if (pos > 0) kern_shell_println(tty, line);
 }
 
 static void cmd_scope(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_size)
 {
     (void)cwd; (void)cwd_size;
-    if (argc < 2) { sh_println(tty, "Usage: scope <add|start|stop> [args]"); return; }
+    if (argc < 2) { kern_shell_println(tty, "Usage: scope <add|start|stop> [args]"); return; }
 
     if (strcmp(argv[1], "add") == 0 && argc >= 3) {
         if (g_scope_count >= SCOPE_MAX_VARS) {
-            sh_println(tty, "scope: max variables reached"); return;
+            kern_shell_println(tty, "scope: max variables reached"); return;
         }
         strncpy(g_scope_vars[g_scope_count].path, argv[2], KERN_PATH_MAX - 1);
         g_scope_vars[g_scope_count].active = true;
         g_scope_count++;
-        sh_println(tty, "OK");
+        kern_shell_println(tty, "OK");
     } else if (strcmp(argv[1], "start") == 0) {
         if (argc >= 3) g_scope_period_ms = atoi(argv[2]);
         g_scope_running = true;
         g_scope_last_tick = 0;
-        sh_println(tty, "scope started");
+        kern_shell_println(tty, "scope started");
     } else if (strcmp(argv[1], "stop") == 0) {
         g_scope_running = false;
-        sh_println(tty, "scope stopped");
+        kern_shell_println(tty, "scope stopped");
     } else {
-        sh_println(tty, "scope: unknown sub-command");
+        kern_shell_println(tty, "scope: unknown sub-command");
     }
 }
 
@@ -812,10 +812,10 @@ static void cmd_mode(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cw
     (void)cwd; (void)cwd_size;
     if (argc >= 2 && strcmp(argv[1], "set") == 0 && argc >= 3) {
         kern_fd_t fd = kern_open("/sys/mode", KERN_O_WRONLY);
-        if (fd < 0) { sh_println(tty, "mode: /sys/mode not available"); return; }
+        if (fd < 0) { kern_shell_println(tty, "mode: /sys/mode not available"); return; }
         kern_write(fd, argv[2], strlen(argv[2]));
         kern_close(fd);
-        sh_println(tty, "OK");
+        kern_shell_println(tty, "OK");
     } else {
         cmd_cat(tty, 2, (char *[]){ "cat", "/sys/mode", NULL }, cwd, cwd_size);
     }
@@ -828,10 +828,10 @@ static void cmd_ctrl(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cw
     (void)cwd; (void)cwd_size;
     if (argc >= 2) {
         kern_fd_t fd = kern_open("/sys/ctrl", KERN_O_WRONLY);
-        if (fd < 0) { sh_println(tty, "ctrl: /sys/ctrl not available"); return; }
+        if (fd < 0) { kern_shell_println(tty, "ctrl: /sys/ctrl not available"); return; }
         kern_write(fd, argv[1], strlen(argv[1]));
         kern_close(fd);
-        sh_println(tty, "OK");
+        kern_shell_println(tty, "OK");
     } else {
         cmd_cat(tty, 2, (char *[]){ "cat", "/sys/ctrl", NULL }, cwd, cwd_size);
     }
@@ -842,7 +842,7 @@ static void cmd_ctrl(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cw
 static void cmd_info(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_size)
 {
     (void)argc; (void)argv; (void)cwd; (void)cwd_size;
-    sh_println(tty, "=== Device Info ===");
+    kern_shell_println(tty, "=== Device Info ===");
     cmd_uname(tty, 0, NULL, cwd, cwd_size);
     cmd_free(tty, 0, NULL, cwd, cwd_size);
     cmd_df(tty, 0, NULL, cwd, cwd_size);
@@ -854,10 +854,10 @@ static void cmd_info(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cw
 static void cmd_ping(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_size)
 {
     (void)argc; (void)cwd; (void)cwd_size;
-    if (argc < 2) { sh_println(tty, "Usage: ping <host>"); return; }
+    if (argc < 2) { kern_shell_println(tty, "Usage: ping <host>"); return; }
     char msg[64];
     snprintf(msg, sizeof(msg), "ping: %s — not connected", argv[1]);
-    sh_println(tty, msg);
+    kern_shell_println(tty, msg);
 }
 
 /* ═══ io — GPIO 调试（Phase 3 新增）═══ */
@@ -865,7 +865,7 @@ static void cmd_ping(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cw
 static void cmd_io(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_size)
 {
     (void)cwd; (void)cwd_size;
-    if (argc < 2) { sh_println(tty, "Usage: io <get|set> <pin> [value]"); return; }
+    if (argc < 2) { kern_shell_println(tty, "Usage: io <get|set> <pin> [value]"); return; }
     if (strcmp(argv[1], "get") == 0 && argc >= 3) {
         char path[KERN_PATH_MAX];
         snprintf(path, sizeof(path), "/sys/gpio/%s", argv[2]);
@@ -874,18 +874,18 @@ static void cmd_io(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_
         char path[KERN_PATH_MAX];
         snprintf(path, sizeof(path), "/sys/gpio/%s", argv[2]);
         kern_fd_t fd = kern_open(path, KERN_O_WRONLY);
-        if (fd < 0) { sh_println(tty, "io: pin not available"); return; }
+        if (fd < 0) { kern_shell_println(tty, "io: pin not available"); return; }
         kern_write(fd, argv[3], strlen(argv[3]));
         kern_close(fd);
-        sh_println(tty, "OK");
+        kern_shell_println(tty, "OK");
     } else {
-        sh_println(tty, "io: unknown sub-command");
+        kern_shell_println(tty, "io: unknown sub-command");
     }
 }
 
 /* ═══ 内置命令表 ═══ */
 
-static const shell_cmd_t g_builtin_cmds[] = {
+static const kern_shell_cmd_t g_builtin_cmds[] = {
     /* ── 文件系统命令 ── */
     { "ls",      cmd_ls,       "list directory" },
     { "cd",      cmd_cd,       "change directory" },
@@ -934,10 +934,10 @@ static const shell_cmd_t g_builtin_cmds[] = {
 
 /* ═══ 动态命令注册 ═══ */
 
-static shell_cmd_t g_dynamic_cmds[SHELL_MAX_DYNAMIC_CMDS];
+static kern_shell_cmd_t g_dynamic_cmds[SHELL_MAX_DYNAMIC_CMDS];
 static int g_dynamic_count = 0;
 
-int kern_shell_register_cmd(const shell_cmd_t *cmd)
+int kern_shell_register_cmd(const kern_shell_cmd_t *cmd)
 {
     if (cmd == NULL || cmd->name == NULL || cmd->handler == NULL) {
         return KERN_EINVAL;
@@ -951,17 +951,17 @@ int kern_shell_register_cmd(const shell_cmd_t *cmd)
 
 /* ═══ 命令查找 ═══ */
 
-const shell_cmd_t *shell_get_builtin_cmds(void)
+const kern_shell_cmd_t *kern_shell_get_builtin_cmds(void)
 {
     return g_builtin_cmds;
 }
 
-int shell_get_builtin_count(void)
+int kern_shell_get_builtin_count(void)
 {
     return (int)BUILTIN_COUNT;
 }
 
-const shell_cmd_t *shell_lookup_cmd(const char *name)
+const kern_shell_cmd_t *kern_shell_lookup_cmd(const char *name)
 {
     if (name == NULL || name[0] == '\0') return NULL;
 
@@ -982,16 +982,16 @@ const shell_cmd_t *shell_lookup_cmd(const char *name)
     return NULL;
 }
 
-void shell_exec_cmd(kern_fd_t tty, int argc, char *argv[],
+void kern_shell_exec_cmd(kern_fd_t tty, int argc, char *argv[],
                    char *cwd, size_t cwd_size)
 {
     if (argc <= 0 || argv == NULL || argv[0] == NULL) return;
 
-    const shell_cmd_t *cmd = shell_lookup_cmd(argv[0]);
+    const kern_shell_cmd_t *cmd = kern_shell_lookup_cmd(argv[0]);
     if (cmd == NULL) {
         char err[64];
         snprintf(err, sizeof(err), "command not found: %s", argv[0]);
-        sh_println(tty, err);
+        kern_shell_println(tty, err);
         return;
     }
 

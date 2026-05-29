@@ -1,7 +1,7 @@
 /**
  * @file   kern_shell_cmds.h
  * @brief  Xeros Shell 命令注册表头文件
- * @details 定义 shell_cmd_t 结构体和命令注册接口。
+ * @details 定义 kern_shell_cmd_t 结构体和命令注册接口。
  *          内置命令表 + 动态注册 API。
  *
  * @copyright Copyright (c) 2026
@@ -30,7 +30,7 @@ typedef int16_t kern_fd_t;
  * @param cwd  当前工作目录（可修改）
  * @param cwd_size cwd 缓冲区大小
  */
-typedef void (*shell_cmd_handler_t)(kern_fd_t tty, int argc, char *argv[],
+typedef void (*kern_shell_cmd_handler_t)(kern_fd_t tty, int argc, char *argv[],
                                     char *cwd, size_t cwd_size);
 
 /**
@@ -38,9 +38,9 @@ typedef void (*shell_cmd_handler_t)(kern_fd_t tty, int argc, char *argv[],
  */
 typedef struct {
     const char           *name;      /* 命令名（精确匹配） */
-    shell_cmd_handler_t   handler;   /* 处理函数 */
+    kern_shell_cmd_handler_t   handler;   /* 处理函数 */
     const char           *help;      /* 帮助文本（单行） */
-} shell_cmd_t;
+} kern_shell_cmd_t;
 
 /* ═══ 输出辅助 ═══ */
 
@@ -49,12 +49,12 @@ typedef struct {
  * @param tty 终端文件描述符
  * @param msg 文本（不含换行）
  */
-extern void sh_print(kern_fd_t tty, const char *msg);
+extern void kern_shell_print(kern_fd_t tty, const char *msg);
 
 /**
  * @brief 向 shell 终端输出一行文本 + 换行
  */
-extern void sh_println(kern_fd_t tty, const char *msg);
+extern void kern_shell_println(kern_fd_t tty, const char *msg);
 
 /* ═══ 命令表接口 ═══ */
 
@@ -65,26 +65,26 @@ extern void sh_println(kern_fd_t tty, const char *msg);
  * @brief  获取内置命令表
  * @return 内置命令表数组指针
  */
-extern const shell_cmd_t *shell_get_builtin_cmds(void);
+extern const kern_shell_cmd_t *kern_shell_get_builtin_cmds(void);
 
 /**
  * @brief  获取内置命令数量
  */
-extern int shell_get_builtin_count(void);
+extern int kern_shell_get_builtin_count(void);
 
 /**
  * @brief  注册一条动态命令
  * @param  cmd 命令条目（生命周期由调用者管理）
  * @return KERN_OK 成功，< 0 为错误码
  */
-extern int kern_shell_register_cmd(const shell_cmd_t *cmd);
+extern int kern_shell_register_cmd(const kern_shell_cmd_t *cmd);
 
 /**
  * @brief  在命令表中查找命令（先动态后内置）
  * @param  name 命令名
  * @return 匹配的 cmd 条目；未找到返回 NULL
  */
-extern const shell_cmd_t *shell_lookup_cmd(const char *name);
+extern const kern_shell_cmd_t *kern_shell_lookup_cmd(const char *name);
 
 /**
  * @brief  执行命令（查找 + 调用 handler）
@@ -94,7 +94,7 @@ extern const shell_cmd_t *shell_lookup_cmd(const char *name);
  * @param  cwd      当前工作目录
  * @param  cwd_size cwd 缓冲区大小
  */
-extern void shell_exec_cmd(kern_fd_t tty, int argc, char *argv[],
+extern void kern_shell_exec_cmd(kern_fd_t tty, int argc, char *argv[],
                           char *cwd, size_t cwd_size);
 
 #ifdef __cplusplus
