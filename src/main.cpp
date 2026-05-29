@@ -254,11 +254,11 @@ static void deferred_kernel_init(void)
     kern_pid_t ui_pid = kern_spawn("ui", ui_task_main, NULL, 4096);
     Serial.printf("[  OK  ] UI task spawned (pid=%d)\n", ui_pid);
 
-    /* WiFi/BT 管理器作为独立内核任务运行，与 UI 任务解耦 */
-    kern_spawn("wifi-mgr", wifi_mgr_task_main, NULL, 4096);
-    Serial.println("[  OK  ] WiFi manager spawned as kernel task");
-    kern_spawn("bt-mgr",   bt_mgr_task_main, NULL, 4096);
-    Serial.println("[  OK  ] BT manager spawned as kernel task");
+    /* WiFi/BT 管理器作为独立内核任务运行，与 UI 任务解耦
+     * 注意：任务在 wifi_mgr_enable() / bt_mgr_enable() 中按需 spawn，
+     *       不在此处无条件创建。*/
+    Serial.println("[  OK  ] WiFi manager ready (lazy-spawn)");
+    Serial.println("[  OK  ] BT manager ready (lazy-spawn)");
 
     /* 让出 CPU 给 FreeRTOS，使刚创建的任务有机会启动并阻塞在调度信号量上 */
     delay(10);

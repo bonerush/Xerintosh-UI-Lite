@@ -401,7 +401,7 @@ extern "C" void bt_mgr_task_main(void *arg)
     (void)arg;
     for (;;) {
         if (g_bt_task_exit) {
-            kern_exit();  /* 退出任务，销毁 FreeRTOS 线程 */
+            return;  /* 退出入口→task_wrapper 处理 ZOMBIE + give(done) + vTaskDelete */
         }
         bt_mgr_update();
         kern_sleep_ms(50);

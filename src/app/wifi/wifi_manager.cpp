@@ -546,7 +546,7 @@ extern "C" void wifi_mgr_task_main(void *arg)
     (void)arg;
     for (;;) {
         if (g_wifi_task_exit) {
-            kern_exit();  /* 退出任务，销毁 FreeRTOS 线程 */
+            return;  /* 退出入口→task_wrapper 处理 ZOMBIE + give(done) + vTaskDelete */
         }
         wifi_mgr_update();
         kern_sleep_ms(50);
