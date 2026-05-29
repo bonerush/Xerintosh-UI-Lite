@@ -9,12 +9,13 @@
  */
 
 #ifndef XEROS_NATIVE_SCHED
+
+/*
+ * ⚠️  实验性：默认不编译。
+ * 需同时定义 NATIVE_TEST=0 和 XEROS_NATIVE_SCHED 才激活。
+ * 在 platformio.ini 中添加 -DXEROS_NATIVE_SCHED 编译选项。
  *
- *          ⚠️  实验性：默认不编译。
- *          需同时定义 NATIVE_TEST=0 和 XEROS_NATIVE_SCHED 才激活。
- *          在 platformio.ini 中添加 -DXEROS_NATIVE_SCHED 编译选项。
- *
- *          使用时将此文件替换 kern_port.c（FreeRTOS 后端）。
+ * 使用时将此文件替换 kern_port.c（FreeRTOS 后端）。
  *
  * @copyright Copyright (c) 2026
  */

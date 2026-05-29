@@ -69,6 +69,7 @@ static kern_ctx_t     g_sched_ctx;
 
 static void idle_entry(void *arg);
 static kern_task_t *pick_next_ready(void);
+static void reap_zombies(void);
 static void task_stack_init(kern_task_t *task, size_t stack_size);
 static void task_write_canary(kern_task_t *task);
 
@@ -218,6 +219,8 @@ void kern_sched_tick(void)
 
     g_sched_ticks++;
 
+    reap_zombies();  /* 回收 ZOMBIE 任务 TCB */
+
     /* 栈使用率监控：超过 75% 时警告 */
     if (g_current_task != NULL && g_current_task != g_idle_task
         && (g_sched_ticks % 500) == 0) {  /* 每 500 tick 检查一次 */
@@ -248,6 +251,8 @@ void kern_sched_tick(void)
 
     g_sched_ticks++;
 
+    reap_zombies();  /* 回收 ZOMBIE 任务 TCB */
+
     kern_task_t *next = pick_next_ready();
 
     if (next == NULL) {
@@ -277,6 +282,8 @@ void kern_sched_tick(void)
     if (!g_sched_initialized) return;
 
     g_sched_ticks++;
+
+    reap_zombies();  /* 回收 ZOMBIE 任务 TCB */
 
     kern_task_t *next = pick_next_ready();
     
@@ -761,11 +768,20 @@ int kern_task_kill(kern_pid_t pid)
         return 0;
     }
 
-    /* 非虚任务：标记 ZOMBIE 并销毁底层 FreeRTOS 线程 */
+    /* 非虚任务：标记 ZOMBIE */
     task->state = KERN_TASK_ZOMBIE;
     kern_log(KERN_LOG_DEBUG, "task %d (%s) killed", task->pid, task->name);
 
-#if !defined(NATIVE_TEST) && !defined(XEROS_NATIVE_SCHED)
+#if defined(NATIVE_TEST)
+    /* Native: TCB 在下次 sched_tick 时由 reap_zombies 回收 */
+#elif defined(XEROS_NATIVE_SCHED)
+    /* 原生调度器：释放手动分配的栈 */
+    if (task->stack_base != NULL) {
+        free(task->stack_base);
+        task->stack_base = NULL;
+    }
+#else
+    /* FreeRTOS: 销毁底层线程 */
     if (task->port_thread != KERN_PORT_THREAD_NULL) {
         kern_port_thread_kill(task->port_thread);
         task->port_thread = KERN_PORT_THREAD_NULL;
@@ -883,6 +899,29 @@ static void idle_entry(void *arg)
     (void)arg;
     while (1) {
         kern_yield();
+    }
+}
+
+/* ======= ZOMBIE ======= */
+
+static void reap_zombies(void)
+{
+    kern_task_t *prev = NULL;
+    kern_task_t *t = g_task_list;
+    while (t != NULL) {
+        if (t->state == KERN_TASK_ZOMBIE && !(t->flags & KERN_TASK_FLAG_VIRTUAL)) {
+            kern_task_t *zombie = t;
+            t = t->next;
+            if (prev) prev->next = t;
+            else g_task_list = t;
+            if (g_last_picked == zombie) g_last_picked = NULL;
+            g_task_count--;
+            kern_log(KERN_LOG_DEBUG, "reaped zombie %d (%s)", zombie->pid, zombie->name);
+            free(zombie);
+        } else {
+            prev = t;
+            t = t->next;
+        }
     }
 }
 
