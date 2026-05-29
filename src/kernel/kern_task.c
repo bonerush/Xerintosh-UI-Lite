@@ -58,6 +58,11 @@ static ucontext_t     g_sched_ctx;
  * 64 位指针通过此全局变量传递。
  */
 static kern_task_t   *g_switch_to_task = NULL;
+#elif defined(XEROS_NATIVE_SCHED)
+/*
+ * 调度器上下文 (setjmp/longjmp)
+ */
+static kern_ctx_t     g_sched_ctx;
 #endif
 
 /* ═══ 前向声明 ═══ */
@@ -117,6 +122,41 @@ void kern_sched_init(void)
     g_last_picked = g_idle_task;  /* 首轮从 idle 之后开始扫描 */
 
     kern_log(KERN_LOG_DEBUG, "scheduler initialized (native)");
+}
+
+#elif defined(XEROS_NATIVE_SCHED)
+
+void kern_sched_init(void)
+{
+    if (g_sched_initialized) return;
+    g_sched_initialized = true;
+
+    /* 创建 idle 任务（使用手动栈 + setjmp/longjmp） */
+    g_idle_task = (kern_task_t *)calloc(1, sizeof(kern_task_t));
+    if (g_idle_task == NULL) {
+        kern_panic("failed to allocate idle task");
+        return;
+    }
+
+    g_idle_task->pid = g_next_pid++;
+    g_idle_task->state = KERN_TASK_READY;
+    g_idle_task->priority = 0;
+    strncpy(g_idle_task->name, "idle", KERN_TASK_NAME_LEN);
+    g_idle_task->entry = idle_entry;
+    g_idle_task->arg = NULL;
+    task_stack_init(g_idle_task, IDLE_STACK_MIN);
+
+    uint8_t *stack_top = g_idle_task->stack_base + g_idle_task->stack_size;
+    kern_ctx_init(&g_idle_task->ctx, g_idle_task->stack_base, stack_top,
+                  idle_entry, NULL);
+    task_write_canary(g_idle_task);
+
+    g_task_list = g_idle_task;
+    g_task_count = 1;
+    g_current_task = g_idle_task;
+    g_last_picked = g_idle_task;
+
+    kern_log(KERN_LOG_DEBUG, "scheduler initialized (esp32-native-sched)");
 }
 
 #else /* ═══════════════ ESP32 (FreeRTOS 任务容器 + 协作锁) ═══════════════ */
@@ -198,6 +238,36 @@ void kern_sched_tick(void)
     g_current_task = next;
     g_switch_to_task = next;
     swapcontext(&g_sched_ctx, &next->ctx);
+}
+
+#elif defined(XEROS_NATIVE_SCHED)
+
+void kern_sched_tick(void)
+{
+    if (!g_sched_initialized) return;
+
+    g_sched_ticks++;
+
+    kern_task_t *next = pick_next_ready();
+
+    if (next == NULL) {
+        if (g_sched_ticks % 1000 == 0) {
+            kern_log(KERN_LOG_WARN, "sched tick=%u: no ready tasks", g_sched_ticks);
+        }
+        kern_port_idle();
+        return;
+    }
+
+    g_current_task = next;
+    if (next->state != KERN_TASK_SLEEPING) {
+        next->state = KERN_TASK_RUNNING;
+    }
+
+    /* setjmp 保存调度器上下文，longjmp 切换到目标任务 */
+    if (setjmp(g_sched_ctx.jmp) == 0) {
+        longjmp(next->ctx.jmp, 1);  /* 跳转到任务的上次 setjmp 点 */
+    }
+    /* 任务 yield/exit 后回到此处 */
 }
 
 #else /* ESP32: 协作式 tick，通过可移植层释放令牌给下一个任务 */
@@ -292,6 +362,57 @@ kern_pid_t kern_spawn(const char *name, void (*entry)(void *arg),
     return task->pid;
 }
 
+#elif defined(XEROS_NATIVE_SCHED)
+
+kern_pid_t kern_spawn(const char *name, void (*entry)(void *arg),
+                       void *arg, size_t stack_min)
+{
+    if (entry == NULL) return KERN_EINVAL;
+    if (g_task_count >= MAX_TASKS) return KERN_ENOSPC;
+
+    if (!g_sched_initialized) {
+        kern_sched_init();
+    }
+
+    kern_task_t *task = (kern_task_t *)calloc(1, sizeof(kern_task_t));
+    if (task == NULL) return KERN_ENOMEM;
+
+    task->pid = g_next_pid++;
+    task->state = KERN_TASK_READY;
+    task->priority = 128;
+    task->entry = entry;
+    task->arg = arg;
+
+    if (name != NULL) {
+        strncpy(task->name, name, KERN_TASK_NAME_LEN);
+        task->name[KERN_TASK_NAME_LEN] = '\0';
+    } else {
+        snprintf(task->name, KERN_TASK_NAME_LEN, "task_%d", task->pid);
+    }
+
+    /* 手动分配栈 + setjmp/longjmp 上下文 */
+    task_stack_init(task, (stack_min > 0) ? stack_min : KERN_STACK_MIN);
+
+    uint8_t *stack_top = task->stack_base + task->stack_size;
+    kern_ctx_init(&task->ctx, task->stack_base, stack_top, entry, arg);
+    task_write_canary(task);
+
+    /* 插入任务链表（头部插入，保证 idle 保持在最前面） */
+    if (g_task_list == NULL) {
+        g_task_list = task;
+    } else {
+        kern_task_t *t = g_task_list;
+        /* 跳过 idle（pid 0），其余从 idle 之后插入 */
+        while (t->next != NULL && t->next->pid == 0) t = t->next;
+        task->next = t->next;
+        t->next = task;
+    }
+    g_task_count++;
+
+    kern_log(KERN_LOG_DEBUG, "spawned task %d: %s", task->pid, task->name);
+    return task->pid;
+}
+
 #else /* ═══════════════ ESP32 (FreeRTOS 任务容器) ═══════════════ */
 
 kern_pid_t kern_spawn(const char *name, void (*entry)(void *arg),
@@ -371,6 +492,23 @@ void kern_yield(void)
     swapcontext(&cur->ctx, &g_sched_ctx);
 }
 
+#elif defined(XEROS_NATIVE_SCHED)
+
+void kern_yield(void)
+{
+    kern_task_t *cur = g_current_task;
+    if (cur == NULL) return;
+
+    cur->state = KERN_TASK_READY;
+    g_current_task = g_idle_task;
+
+    /* setjmp 保存当前任务上下文，longjmp 回到调度器 */
+    if (setjmp(cur->ctx.jmp) == 0) {
+        longjmp(g_sched_ctx.jmp, 1);
+    }
+    /* setjmp 返回 1：调度器重新给了我们 CPU */
+}
+
 #else /* ESP32: yield = 通过可移植层释放 CPU */
 
 void kern_yield(void)
@@ -402,6 +540,22 @@ void kern_exit(void)
 
     g_current_task = g_idle_task;
     setcontext(&g_sched_ctx);
+}
+
+#elif defined(XEROS_NATIVE_SCHED)
+
+void kern_exit(void)
+{
+    kern_task_t *cur = g_current_task;
+    if (cur == NULL) return;
+
+    cur->state = KERN_TASK_ZOMBIE;
+    kern_log(KERN_LOG_DEBUG, "task %d (%s) exited", cur->pid, cur->name);
+
+    g_current_task = g_idle_task;
+
+    /* 不保存上下文，直接跳转回调度器（任务已死亡） */
+    longjmp(g_sched_ctx.jmp, 1);
 }
 
 #else /* ESP32: exit = 标记 ZOMBIE，通过可移植层销毁自身 */
@@ -436,6 +590,23 @@ void kern_sleep_ms(uint32_t ms)
     g_current_task = g_idle_task;
 
     swapcontext(&cur->ctx, &g_sched_ctx);
+}
+
+#elif defined(XEROS_NATIVE_SCHED)
+
+void kern_sleep_ms(uint32_t ms)
+{
+    kern_task_t *cur = g_current_task;
+    if (cur == NULL) return;
+
+    cur->state = KERN_TASK_SLEEPING;
+    cur->wake_time = g_sched_ticks + ms;
+    g_current_task = g_idle_task;
+
+    /* 与 kern_yield 相同：保存上下文，跳回调度器 */
+    if (setjmp(cur->ctx.jmp) == 0) {
+        longjmp(g_sched_ctx.jmp, 1);
+    }
 }
 
 #else /* ESP32: sleep = yield + 记录唤醒时间 */
@@ -594,7 +765,7 @@ int kern_task_kill(kern_pid_t pid)
     task->state = KERN_TASK_ZOMBIE;
     kern_log(KERN_LOG_DEBUG, "task %d (%s) killed", task->pid, task->name);
 
-#ifndef NATIVE_TEST
+#if !defined(NATIVE_TEST) && !defined(XEROS_NATIVE_SCHED)
     if (task->port_thread != KERN_PORT_THREAD_NULL) {
         kern_port_thread_kill(task->port_thread);
         task->port_thread = KERN_PORT_THREAD_NULL;
@@ -605,6 +776,47 @@ int kern_task_kill(kern_pid_t pid)
 }
 
 #ifdef NATIVE_TEST
+
+size_t kern_task_stack_usage(kern_task_t *task)
+{
+    if (task == NULL || task->stack_base == NULL) return 0;
+
+    #define CANARY_SKIP 8
+    size_t scan_start = (task->stack_size > CANARY_SKIP) ?
+                        (size_t)CANARY_SKIP : task->stack_size;
+    size_t used = 0;
+    for (size_t i = scan_start; i < task->stack_size; i++) {
+        if (task->stack_base[i] != 0xAA) {
+            used = task->stack_size - i;
+            break;
+        }
+    }
+
+    if (task->stack_size >= sizeof(uint32_t)) {
+        uint32_t canary;
+        memcpy(&canary, task->stack_base, sizeof(uint32_t));
+        if (canary != KERN_STACK_CANARY) {
+            kern_log(KERN_LOG_WARN, "stack canary corrupted for task %s (pid=%d)",
+                     task->name, task->pid);
+        }
+    }
+
+    return (used > 0) ? used : 1;
+}
+
+uint32_t kern_task_stack_canary(kern_task_t *task)
+{
+    if (task == NULL || task->stack_base == NULL) return 0;
+    if (task->stack_size < sizeof(uint32_t)) return 0;
+
+    uint32_t canary;
+    memcpy(&canary, task->stack_base, sizeof(uint32_t));
+    return canary;
+}
+
+#elif defined(XEROS_NATIVE_SCHED)
+
+/* XEROS_NATIVE_SCHED: 手动栈 + 0xAA canary，与 NATIVE_TEST 相同 */
 
 size_t kern_task_stack_usage(kern_task_t *task)
 {

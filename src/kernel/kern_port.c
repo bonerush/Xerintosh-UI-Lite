@@ -27,6 +27,24 @@
 
 #ifndef NATIVE_TEST
 
+#if defined(XEROS_NATIVE_SCHED)
+
+/* ═══ XEROS_NATIVE_SCHED 桩：调度逻辑在 kern_task.c 中实现 ═══ */
+
+void kern_port_init(void) {}
+
+void kern_port_idle(void)
+{
+    /* 无就绪任务时短暂让出 CPU */
+    for (volatile int i = 0; i < 10000; i++) {
+        __asm__ volatile("nop");
+    }
+}
+
+void kern_port_thread_kill(kern_port_thread_t thread) { (void)thread; }
+
+#else /* FreeRTOS 后端（默认）*/
+
 /* FreeRTOS 头文件（仅此文件直接依赖） */
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
@@ -209,6 +227,8 @@ void kern_port_idle(void)
     /* 无就绪任务时短暂让出 CPU，让 FreeRTOS 处理 WiFi/BT 事务 */
     vTaskDelay(1);
 }
+
+#endif /* defined(XEROS_NATIVE_SCHED) */
 
 #else /* NATIVE_TEST — 空桩：原生模式不使用此文件 */
 

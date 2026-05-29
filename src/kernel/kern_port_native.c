@@ -4,6 +4,12 @@
  * @details 基于 setjmp/longjmp + 手动栈管理实现协作式调度，
  *          完全不依赖 FreeRTOS 任务 API。
  *
+ * @note   当 XEROS_NATIVE_SCHED 启用时，调度逻辑直接在 kern_task.c 中实现，
+ *         此文件不参与编译。
+ */
+
+#ifndef XEROS_NATIVE_SCHED
+ *
  *          ⚠️  实验性：默认不编译。
  *          需同时定义 NATIVE_TEST=0 和 XEROS_NATIVE_SCHED 才激活。
  *          在 platformio.ini 中添加 -DXEROS_NATIVE_SCHED 编译选项。
@@ -187,3 +193,5 @@ void kern_port_idle(void)
 }
 
 #endif /* !NATIVE_TEST && XEROS_NATIVE_SCHED */
+
+#endif /* !XEROS_NATIVE_SCHED — 文件在 XEROS_NATIVE_SCHED 下不参与编译 */

@@ -71,8 +71,9 @@ static inline void kern_ctx_init(kern_ctx_t *ctx,
         "mov  a1, %[new_sp]  \n\t"  /* 切换到任务栈 */
         "mov  a3, %[entry]   \n\t"  /* entry → A3 (暂存) */
         "mov  a4, %[arg]     \n\t"  /* arg   → A4 (暂存) */
-        "mov  a5, %[jmp]     \n\t"  /* jmp_buf → A5 */
-        "callx8 setjmp       \n\t"  /* setjmp(jmp_buf)，结果在 A2 */
+        "mov  a5, %[jmp]     \n\t"  /* jmp_buf 地址 → A5 */
+        "mov  a6, %[sj]      \n\t"  /* setjmp 函数地址 → A6 */
+        "callx8 a6           \n\t"  /* call setjmp(jmp_buf) */
         "bnez a2, 1f         \n\t"  /* 如果 setjmp 返回非 0（longjmp 回到此处）*/
         /* setjmp 返回 0：保存成功，恢复调用者 SP */
         "mov  a1, %[old_sp]  \n\t"
@@ -90,8 +91,9 @@ static inline void kern_ctx_init(kern_ctx_t *ctx,
           [old_sp] "r"(caller_sp),
           [entry]  "r"(entry),
           [arg]    "r"(arg),
-          [jmp]    "r"(&ctx->jmp)
-        : "a2", "a3", "a4", "a5", "memory"
+          [jmp]    "r"(&ctx->jmp),
+          [sj]     "r"(setjmp)
+        : "a2", "a3", "a4", "a5", "a6", "memory"
     );
 
     ctx->sp = NULL; /* ESP32 模式下 SP 已由 setjmp 管理 */

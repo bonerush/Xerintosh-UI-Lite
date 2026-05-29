@@ -1,0 +1,392 @@
+[
+    {
+        "command": "/usr/bin/g++ -o .pio/build/native/libab3/googletest/googlemock/src/gmock-cardinalities.o -c -std=c++17 -Wno-deprecated-declarations -DPLATFORMIO=60119 -D_XOPEN_SOURCE -DNATIVE_TEST -DSCREEN_WIDTH=80 -DSCREEN_HEIGHT=160 -I.pio/libdeps/native/googletest -I/Users/yukisala/.platformio/platforms/native/builder/lib/XerintoshUI/src -Isrc -I.pio/libdeps/native/googletest/googlemock -I.pio/libdeps/native/googletest/googlemock/include -I.pio/libdeps/native/googletest/googletest -I.pio/libdeps/native/googletest/googletest/include .pio/libdeps/native/googletest/googlemock/src/gmock-cardinalities.cc",
+        "directory": "/Users/yukisala/Documents/PlatformIO/Projects/M5Stick-P1",
+        "file": ".pio/libdeps/native/googletest/googlemock/src/gmock-cardinalities.cc",
+        "output": ".pio/build/native/libab3/googletest/googlemock/src/gmock-cardinalities.o"
+    },
+    {
+        "command": "/usr/bin/g++ -o .pio/build/native/libab3/googletest/googlemock/src/gmock-internal-utils.o -c -std=c++17 -Wno-deprecated-declarations -DPLATFORMIO=60119 -D_XOPEN_SOURCE -DNATIVE_TEST -DSCREEN_WIDTH=80 -DSCREEN_HEIGHT=160 -I.pio/libdeps/native/googletest -I/Users/yukisala/.platformio/platforms/native/builder/lib/XerintoshUI/src -Isrc -I.pio/libdeps/native/googletest/googlemock -I.pio/libdeps/native/googletest/googlemock/include -I.pio/libdeps/native/googletest/googletest -I.pio/libdeps/native/googletest/googletest/include .pio/libdeps/native/googletest/googlemock/src/gmock-internal-utils.cc",
+        "directory": "/Users/yukisala/Documents/PlatformIO/Projects/M5Stick-P1",
+        "file": ".pio/libdeps/native/googletest/googlemock/src/gmock-internal-utils.cc",
+        "output": ".pio/build/native/libab3/googletest/googlemock/src/gmock-internal-utils.o"
+    },
+    {
+        "command": "/usr/bin/g++ -o .pio/build/native/libab3/googletest/googlemock/src/gmock-matchers.o -c -std=c++17 -Wno-deprecated-declarations -DPLATFORMIO=60119 -D_XOPEN_SOURCE -DNATIVE_TEST -DSCREEN_WIDTH=80 -DSCREEN_HEIGHT=160 -I.pio/libdeps/native/googletest -I/Users/yukisala/.platformio/platforms/native/builder/lib/XerintoshUI/src -Isrc -I.pio/libdeps/native/googletest/googlemock -I.pio/libdeps/native/googletest/googlemock/include -I.pio/libdeps/native/googletest/googletest -I.pio/libdeps/native/googletest/googletest/include .pio/libdeps/native/googletest/googlemock/src/gmock-matchers.cc",
+        "directory": "/Users/yukisala/Documents/PlatformIO/Projects/M5Stick-P1",
+        "file": ".pio/libdeps/native/googletest/googlemock/src/gmock-matchers.cc",
+        "output": ".pio/build/native/libab3/googletest/googlemock/src/gmock-matchers.o"
+    },
+    {
+        "command": "/usr/bin/g++ -o .pio/build/native/libab3/googletest/googlemock/src/gmock-spec-builders.o -c -std=c++17 -Wno-deprecated-declarations -DPLATFORMIO=60119 -D_XOPEN_SOURCE -DNATIVE_TEST -DSCREEN_WIDTH=80 -DSCREEN_HEIGHT=160 -I.pio/libdeps/native/googletest -I/Users/yukisala/.platformio/platforms/native/builder/lib/XerintoshUI/src -Isrc -I.pio/libdeps/native/googletest/googlemock -I.pio/libdeps/native/googletest/googlemock/include -I.pio/libdeps/native/googletest/googletest -I.pio/libdeps/native/googletest/googletest/include .pio/libdeps/native/googletest/googlemock/src/gmock-spec-builders.cc",
+        "directory": "/Users/yukisala/Documents/PlatformIO/Projects/M5Stick-P1",
+        "file": ".pio/libdeps/native/googletest/googlemock/src/gmock-spec-builders.cc",
+        "output": ".pio/build/native/libab3/googletest/googlemock/src/gmock-spec-builders.o"
+    },
+    {
+        "command": "/usr/bin/g++ -o .pio/build/native/libab3/googletest/googlemock/src/gmock.o -c -std=c++17 -Wno-deprecated-declarations -DPLATFORMIO=60119 -D_XOPEN_SOURCE -DNATIVE_TEST -DSCREEN_WIDTH=80 -DSCREEN_HEIGHT=160 -I.pio/libdeps/native/googletest -I/Users/yukisala/.platformio/platforms/native/builder/lib/XerintoshUI/src -Isrc -I.pio/libdeps/native/googletest/googlemock -I.pio/libdeps/native/googletest/googlemock/include -I.pio/libdeps/native/googletest/googletest -I.pio/libdeps/native/googletest/googletest/include .pio/libdeps/native/googletest/googlemock/src/gmock.cc",
+        "directory": "/Users/yukisala/Documents/PlatformIO/Projects/M5Stick-P1",
+        "file": ".pio/libdeps/native/googletest/googlemock/src/gmock.cc",
+        "output": ".pio/build/native/libab3/googletest/googlemock/src/gmock.o"
+    },
+    {
+        "command": "/usr/bin/g++ -o .pio/build/native/libab3/googletest/googletest/src/gtest-assertion-result.o -c -std=c++17 -Wno-deprecated-declarations -DPLATFORMIO=60119 -D_XOPEN_SOURCE -DNATIVE_TEST -DSCREEN_WIDTH=80 -DSCREEN_HEIGHT=160 -I.pio/libdeps/native/googletest -I/Users/yukisala/.platformio/platforms/native/builder/lib/XerintoshUI/src -Isrc -I.pio/libdeps/native/googletest/googlemock -I.pio/libdeps/native/googletest/googlemock/include -I.pio/libdeps/native/googletest/googletest -I.pio/libdeps/native/googletest/googletest/include .pio/libdeps/native/googletest/googletest/src/gtest-assertion-result.cc",
+        "directory": "/Users/yukisala/Documents/PlatformIO/Projects/M5Stick-P1",
+        "file": ".pio/libdeps/native/googletest/googletest/src/gtest-assertion-result.cc",
+        "output": ".pio/build/native/libab3/googletest/googletest/src/gtest-assertion-result.o"
+    },
+    {
+        "command": "/usr/bin/g++ -o .pio/build/native/libab3/googletest/googletest/src/gtest-death-test.o -c -std=c++17 -Wno-deprecated-declarations -DPLATFORMIO=60119 -D_XOPEN_SOURCE -DNATIVE_TEST -DSCREEN_WIDTH=80 -DSCREEN_HEIGHT=160 -I.pio/libdeps/native/googletest -I/Users/yukisala/.platformio/platforms/native/builder/lib/XerintoshUI/src -Isrc -I.pio/libdeps/native/googletest/googlemock -I.pio/libdeps/native/googletest/googlemock/include -I.pio/libdeps/native/googletest/googletest -I.pio/libdeps/native/googletest/googletest/include .pio/libdeps/native/googletest/googletest/src/gtest-death-test.cc",
+        "directory": "/Users/yukisala/Documents/PlatformIO/Projects/M5Stick-P1",
+        "file": ".pio/libdeps/native/googletest/googletest/src/gtest-death-test.cc",
+        "output": ".pio/build/native/libab3/googletest/googletest/src/gtest-death-test.o"
+    },
+    {
+        "command": "/usr/bin/g++ -o .pio/build/native/libab3/googletest/googletest/src/gtest-filepath.o -c -std=c++17 -Wno-deprecated-declarations -DPLATFORMIO=60119 -D_XOPEN_SOURCE -DNATIVE_TEST -DSCREEN_WIDTH=80 -DSCREEN_HEIGHT=160 -I.pio/libdeps/native/googletest -I/Users/yukisala/.platformio/platforms/native/builder/lib/XerintoshUI/src -Isrc -I.pio/libdeps/native/googletest/googlemock -I.pio/libdeps/native/googletest/googlemock/include -I.pio/libdeps/native/googletest/googletest -I.pio/libdeps/native/googletest/googletest/include .pio/libdeps/native/googletest/googletest/src/gtest-filepath.cc",
+        "directory": "/Users/yukisala/Documents/PlatformIO/Projects/M5Stick-P1",
+        "file": ".pio/libdeps/native/googletest/googletest/src/gtest-filepath.cc",
+        "output": ".pio/build/native/libab3/googletest/googletest/src/gtest-filepath.o"
+    },
+    {
+        "command": "/usr/bin/g++ -o .pio/build/native/libab3/googletest/googletest/src/gtest-matchers.o -c -std=c++17 -Wno-deprecated-declarations -DPLATFORMIO=60119 -D_XOPEN_SOURCE -DNATIVE_TEST -DSCREEN_WIDTH=80 -DSCREEN_HEIGHT=160 -I.pio/libdeps/native/googletest -I/Users/yukisala/.platformio/platforms/native/builder/lib/XerintoshUI/src -Isrc -I.pio/libdeps/native/googletest/googlemock -I.pio/libdeps/native/googletest/googlemock/include -I.pio/libdeps/native/googletest/googletest -I.pio/libdeps/native/googletest/googletest/include .pio/libdeps/native/googletest/googletest/src/gtest-matchers.cc",
+        "directory": "/Users/yukisala/Documents/PlatformIO/Projects/M5Stick-P1",
+        "file": ".pio/libdeps/native/googletest/googletest/src/gtest-matchers.cc",
+        "output": ".pio/build/native/libab3/googletest/googletest/src/gtest-matchers.o"
+    },
+    {
+        "command": "/usr/bin/g++ -o .pio/build/native/libab3/googletest/googletest/src/gtest-port.o -c -std=c++17 -Wno-deprecated-declarations -DPLATFORMIO=60119 -D_XOPEN_SOURCE -DNATIVE_TEST -DSCREEN_WIDTH=80 -DSCREEN_HEIGHT=160 -I.pio/libdeps/native/googletest -I/Users/yukisala/.platformio/platforms/native/builder/lib/XerintoshUI/src -Isrc -I.pio/libdeps/native/googletest/googlemock -I.pio/libdeps/native/googletest/googlemock/include -I.pio/libdeps/native/googletest/googletest -I.pio/libdeps/native/googletest/googletest/include .pio/libdeps/native/googletest/googletest/src/gtest-port.cc",
+        "directory": "/Users/yukisala/Documents/PlatformIO/Projects/M5Stick-P1",
+        "file": ".pio/libdeps/native/googletest/googletest/src/gtest-port.cc",
+        "output": ".pio/build/native/libab3/googletest/googletest/src/gtest-port.o"
+    },
+    {
+        "command": "/usr/bin/g++ -o .pio/build/native/libab3/googletest/googletest/src/gtest-printers.o -c -std=c++17 -Wno-deprecated-declarations -DPLATFORMIO=60119 -D_XOPEN_SOURCE -DNATIVE_TEST -DSCREEN_WIDTH=80 -DSCREEN_HEIGHT=160 -I.pio/libdeps/native/googletest -I/Users/yukisala/.platformio/platforms/native/builder/lib/XerintoshUI/src -Isrc -I.pio/libdeps/native/googletest/googlemock -I.pio/libdeps/native/googletest/googlemock/include -I.pio/libdeps/native/googletest/googletest -I.pio/libdeps/native/googletest/googletest/include .pio/libdeps/native/googletest/googletest/src/gtest-printers.cc",
+        "directory": "/Users/yukisala/Documents/PlatformIO/Projects/M5Stick-P1",
+        "file": ".pio/libdeps/native/googletest/googletest/src/gtest-printers.cc",
+        "output": ".pio/build/native/libab3/googletest/googletest/src/gtest-printers.o"
+    },
+    {
+        "command": "/usr/bin/g++ -o .pio/build/native/libab3/googletest/googletest/src/gtest-test-part.o -c -std=c++17 -Wno-deprecated-declarations -DPLATFORMIO=60119 -D_XOPEN_SOURCE -DNATIVE_TEST -DSCREEN_WIDTH=80 -DSCREEN_HEIGHT=160 -I.pio/libdeps/native/googletest -I/Users/yukisala/.platformio/platforms/native/builder/lib/XerintoshUI/src -Isrc -I.pio/libdeps/native/googletest/googlemock -I.pio/libdeps/native/googletest/googlemock/include -I.pio/libdeps/native/googletest/googletest -I.pio/libdeps/native/googletest/googletest/include .pio/libdeps/native/googletest/googletest/src/gtest-test-part.cc",
+        "directory": "/Users/yukisala/Documents/PlatformIO/Projects/M5Stick-P1",
+        "file": ".pio/libdeps/native/googletest/googletest/src/gtest-test-part.cc",
+        "output": ".pio/build/native/libab3/googletest/googletest/src/gtest-test-part.o"
+    },
+    {
+        "command": "/usr/bin/g++ -o .pio/build/native/libab3/googletest/googletest/src/gtest-typed-test.o -c -std=c++17 -Wno-deprecated-declarations -DPLATFORMIO=60119 -D_XOPEN_SOURCE -DNATIVE_TEST -DSCREEN_WIDTH=80 -DSCREEN_HEIGHT=160 -I.pio/libdeps/native/googletest -I/Users/yukisala/.platformio/platforms/native/builder/lib/XerintoshUI/src -Isrc -I.pio/libdeps/native/googletest/googlemock -I.pio/libdeps/native/googletest/googlemock/include -I.pio/libdeps/native/googletest/googletest -I.pio/libdeps/native/googletest/googletest/include .pio/libdeps/native/googletest/googletest/src/gtest-typed-test.cc",
+        "directory": "/Users/yukisala/Documents/PlatformIO/Projects/M5Stick-P1",
+        "file": ".pio/libdeps/native/googletest/googletest/src/gtest-typed-test.cc",
+        "output": ".pio/build/native/libab3/googletest/googletest/src/gtest-typed-test.o"
+    },
+    {
+        "command": "/usr/bin/g++ -o .pio/build/native/libab3/googletest/googletest/src/gtest.o -c -std=c++17 -Wno-deprecated-declarations -DPLATFORMIO=60119 -D_XOPEN_SOURCE -DNATIVE_TEST -DSCREEN_WIDTH=80 -DSCREEN_HEIGHT=160 -I.pio/libdeps/native/googletest -I/Users/yukisala/.platformio/platforms/native/builder/lib/XerintoshUI/src -Isrc -I.pio/libdeps/native/googletest/googlemock -I.pio/libdeps/native/googletest/googlemock/include -I.pio/libdeps/native/googletest/googletest -I.pio/libdeps/native/googletest/googletest/include .pio/libdeps/native/googletest/googletest/src/gtest.cc",
+        "directory": "/Users/yukisala/Documents/PlatformIO/Projects/M5Stick-P1",
+        "file": ".pio/libdeps/native/googletest/googletest/src/gtest.cc",
+        "output": ".pio/build/native/libab3/googletest/googletest/src/gtest.o"
+    },
+    {
+        "command": "/usr/bin/gcc -o .pio/build/native/src/app/about/about.o -c -Wno-deprecated-declarations -DPLATFORMIO=60119 -D_XOPEN_SOURCE -DNATIVE_TEST -DSCREEN_WIDTH=80 -DSCREEN_HEIGHT=160 -Iinclude -I.pio/libdeps/native/googletest -I.pio/libdeps/native/googletest/googlemock -I.pio/libdeps/native/googletest/googlemock/include -I.pio/libdeps/native/googletest/googletest -I.pio/libdeps/native/googletest/googletest/include -I/Users/yukisala/.platformio/platforms/native/builder/lib/XerintoshUI/src -Isrc src/app/about/about.c",
+        "directory": "/Users/yukisala/Documents/PlatformIO/Projects/M5Stick-P1",
+        "file": "src/app/about/about.c",
+        "output": ".pio/build/native/src/app/about/about.o"
+    },
+    {
+        "command": "/usr/bin/gcc -o .pio/build/native/src/app/app_init.o -c -Wno-deprecated-declarations -DPLATFORMIO=60119 -D_XOPEN_SOURCE -DNATIVE_TEST -DSCREEN_WIDTH=80 -DSCREEN_HEIGHT=160 -Iinclude -I.pio/libdeps/native/googletest -I.pio/libdeps/native/googletest/googlemock -I.pio/libdeps/native/googletest/googlemock/include -I.pio/libdeps/native/googletest/googletest -I.pio/libdeps/native/googletest/googletest/include -I/Users/yukisala/.platformio/platforms/native/builder/lib/XerintoshUI/src -Isrc src/app/app_init.c",
+        "directory": "/Users/yukisala/Documents/PlatformIO/Projects/M5Stick-P1",
+        "file": "src/app/app_init.c",
+        "output": ".pio/build/native/src/app/app_init.o"
+    },
+    {
+        "command": "/usr/bin/g++ -o .pio/build/native/src/app/bluetooth/bt_manager.o -c -std=c++17 -Wno-deprecated-declarations -DPLATFORMIO=60119 -D_XOPEN_SOURCE -DNATIVE_TEST -DSCREEN_WIDTH=80 -DSCREEN_HEIGHT=160 -Iinclude -I.pio/libdeps/native/googletest -I.pio/libdeps/native/googletest/googlemock -I.pio/libdeps/native/googletest/googlemock/include -I.pio/libdeps/native/googletest/googletest -I.pio/libdeps/native/googletest/googletest/include -I/Users/yukisala/.platformio/platforms/native/builder/lib/XerintoshUI/src -Isrc src/app/bluetooth/bt_manager.cpp",
+        "directory": "/Users/yukisala/Documents/PlatformIO/Projects/M5Stick-P1",
+        "file": "src/app/bluetooth/bt_manager.cpp",
+        "output": ".pio/build/native/src/app/bluetooth/bt_manager.o"
+    },
+    {
+        "command": "/usr/bin/gcc -o .pio/build/native/src/app/boot/boot_screen.o -c -Wno-deprecated-declarations -DPLATFORMIO=60119 -D_XOPEN_SOURCE -DNATIVE_TEST -DSCREEN_WIDTH=80 -DSCREEN_HEIGHT=160 -Iinclude -I.pio/libdeps/native/googletest -I.pio/libdeps/native/googletest/googlemock -I.pio/libdeps/native/googletest/googlemock/include -I.pio/libdeps/native/googletest/googletest -I.pio/libdeps/native/googletest/googletest/include -I/Users/yukisala/.platformio/platforms/native/builder/lib/XerintoshUI/src -Isrc src/app/boot/boot_screen.c",
+        "directory": "/Users/yukisala/Documents/PlatformIO/Projects/M5Stick-P1",
+        "file": "src/app/boot/boot_screen.c",
+        "output": ".pio/build/native/src/app/boot/boot_screen.o"
+    },
+    {
+        "command": "/usr/bin/g++ -o .pio/build/native/src/app/serial_input/serial_input.o -c -std=c++17 -Wno-deprecated-declarations -DPLATFORMIO=60119 -D_XOPEN_SOURCE -DNATIVE_TEST -DSCREEN_WIDTH=80 -DSCREEN_HEIGHT=160 -Iinclude -I.pio/libdeps/native/googletest -I.pio/libdeps/native/googletest/googlemock -I.pio/libdeps/native/googletest/googlemock/include -I.pio/libdeps/native/googletest/googletest -I.pio/libdeps/native/googletest/googletest/include -I/Users/yukisala/.platformio/platforms/native/builder/lib/XerintoshUI/src -Isrc src/app/serial_input/serial_input.cpp",
+        "directory": "/Users/yukisala/Documents/PlatformIO/Projects/M5Stick-P1",
+        "file": "src/app/serial_input/serial_input.cpp",
+        "output": ".pio/build/native/src/app/serial_input/serial_input.o"
+    },
+    {
+        "command": "/usr/bin/g++ -o .pio/build/native/src/app/serial_monitor/sm_app.o -c -std=c++17 -Wno-deprecated-declarations -DPLATFORMIO=60119 -D_XOPEN_SOURCE -DNATIVE_TEST -DSCREEN_WIDTH=80 -DSCREEN_HEIGHT=160 -Iinclude -I.pio/libdeps/native/googletest -I.pio/libdeps/native/googletest/googlemock -I.pio/libdeps/native/googletest/googlemock/include -I.pio/libdeps/native/googletest/googletest -I.pio/libdeps/native/googletest/googletest/include -I/Users/yukisala/.platformio/platforms/native/builder/lib/XerintoshUI/src -Isrc src/app/serial_monitor/sm_app.cpp",
+        "directory": "/Users/yukisala/Documents/PlatformIO/Projects/M5Stick-P1",
+        "file": "src/app/serial_monitor/sm_app.cpp",
+        "output": ".pio/build/native/src/app/serial_monitor/sm_app.o"
+    },
+    {
+        "command": "/usr/bin/gcc -o .pio/build/native/src/app/serial_monitor/sm_buffer.o -c -Wno-deprecated-declarations -DPLATFORMIO=60119 -D_XOPEN_SOURCE -DNATIVE_TEST -DSCREEN_WIDTH=80 -DSCREEN_HEIGHT=160 -Iinclude -I.pio/libdeps/native/googletest -I.pio/libdeps/native/googletest/googlemock -I.pio/libdeps/native/googletest/googlemock/include -I.pio/libdeps/native/googletest/googletest -I.pio/libdeps/native/googletest/googletest/include -I/Users/yukisala/.platformio/platforms/native/builder/lib/XerintoshUI/src -Isrc src/app/serial_monitor/sm_buffer.c",
+        "directory": "/Users/yukisala/Documents/PlatformIO/Projects/M5Stick-P1",
+        "file": "src/app/serial_monitor/sm_buffer.c",
+        "output": ".pio/build/native/src/app/serial_monitor/sm_buffer.o"
+    },
+    {
+        "command": "/usr/bin/gcc -o .pio/build/native/src/app/serial_monitor/sm_ui.o -c -Wno-deprecated-declarations -DPLATFORMIO=60119 -D_XOPEN_SOURCE -DNATIVE_TEST -DSCREEN_WIDTH=80 -DSCREEN_HEIGHT=160 -Iinclude -I.pio/libdeps/native/googletest -I.pio/libdeps/native/googletest/googlemock -I.pio/libdeps/native/googletest/googlemock/include -I.pio/libdeps/native/googletest/googletest -I.pio/libdeps/native/googletest/googletest/include -I/Users/yukisala/.platformio/platforms/native/builder/lib/XerintoshUI/src -Isrc src/app/serial_monitor/sm_ui.c",
+        "directory": "/Users/yukisala/Documents/PlatformIO/Projects/M5Stick-P1",
+        "file": "src/app/serial_monitor/sm_ui.c",
+        "output": ".pio/build/native/src/app/serial_monitor/sm_ui.o"
+    },
+    {
+        "command": "/usr/bin/gcc -o .pio/build/native/src/app/settings/rotation_helper.o -c -Wno-deprecated-declarations -DPLATFORMIO=60119 -D_XOPEN_SOURCE -DNATIVE_TEST -DSCREEN_WIDTH=80 -DSCREEN_HEIGHT=160 -Iinclude -I.pio/libdeps/native/googletest -I.pio/libdeps/native/googletest/googlemock -I.pio/libdeps/native/googletest/googlemock/include -I.pio/libdeps/native/googletest/googletest -I.pio/libdeps/native/googletest/googletest/include -I/Users/yukisala/.platformio/platforms/native/builder/lib/XerintoshUI/src -Isrc src/app/settings/rotation_helper.c",
+        "directory": "/Users/yukisala/Documents/PlatformIO/Projects/M5Stick-P1",
+        "file": "src/app/settings/rotation_helper.c",
+        "output": ".pio/build/native/src/app/settings/rotation_helper.o"
+    },
+    {
+        "command": "/usr/bin/gcc -o .pio/build/native/src/app/settings/settings.o -c -Wno-deprecated-declarations -DPLATFORMIO=60119 -D_XOPEN_SOURCE -DNATIVE_TEST -DSCREEN_WIDTH=80 -DSCREEN_HEIGHT=160 -Iinclude -I.pio/libdeps/native/googletest -I.pio/libdeps/native/googletest/googlemock -I.pio/libdeps/native/googletest/googlemock/include -I.pio/libdeps/native/googletest/googletest -I.pio/libdeps/native/googletest/googletest/include -I/Users/yukisala/.platformio/platforms/native/builder/lib/XerintoshUI/src -Isrc src/app/settings/settings.c",
+        "directory": "/Users/yukisala/Documents/PlatformIO/Projects/M5Stick-P1",
+        "file": "src/app/settings/settings.c",
+        "output": ".pio/build/native/src/app/settings/settings.o"
+    },
+    {
+        "command": "/usr/bin/g++ -o .pio/build/native/src/app/storage/storage.o -c -std=c++17 -Wno-deprecated-declarations -DPLATFORMIO=60119 -D_XOPEN_SOURCE -DNATIVE_TEST -DSCREEN_WIDTH=80 -DSCREEN_HEIGHT=160 -Iinclude -I.pio/libdeps/native/googletest -I.pio/libdeps/native/googletest/googlemock -I.pio/libdeps/native/googletest/googlemock/include -I.pio/libdeps/native/googletest/googletest -I.pio/libdeps/native/googletest/googletest/include -I/Users/yukisala/.platformio/platforms/native/builder/lib/XerintoshUI/src -Isrc src/app/storage/storage.cpp",
+        "directory": "/Users/yukisala/Documents/PlatformIO/Projects/M5Stick-P1",
+        "file": "src/app/storage/storage.cpp",
+        "output": ".pio/build/native/src/app/storage/storage.o"
+    },
+    {
+        "command": "/usr/bin/gcc -o .pio/build/native/src/app/taskmgr/taskmgr_app.o -c -Wno-deprecated-declarations -DPLATFORMIO=60119 -D_XOPEN_SOURCE -DNATIVE_TEST -DSCREEN_WIDTH=80 -DSCREEN_HEIGHT=160 -Iinclude -I.pio/libdeps/native/googletest -I.pio/libdeps/native/googletest/googlemock -I.pio/libdeps/native/googletest/googlemock/include -I.pio/libdeps/native/googletest/googletest -I.pio/libdeps/native/googletest/googletest/include -I/Users/yukisala/.platformio/platforms/native/builder/lib/XerintoshUI/src -Isrc src/app/taskmgr/taskmgr_app.c",
+        "directory": "/Users/yukisala/Documents/PlatformIO/Projects/M5Stick-P1",
+        "file": "src/app/taskmgr/taskmgr_app.c",
+        "output": ".pio/build/native/src/app/taskmgr/taskmgr_app.o"
+    },
+    {
+        "command": "/usr/bin/gcc -o .pio/build/native/src/app/taskmgr/taskmgr_ui.o -c -Wno-deprecated-declarations -DPLATFORMIO=60119 -D_XOPEN_SOURCE -DNATIVE_TEST -DSCREEN_WIDTH=80 -DSCREEN_HEIGHT=160 -Iinclude -I.pio/libdeps/native/googletest -I.pio/libdeps/native/googletest/googlemock -I.pio/libdeps/native/googletest/googlemock/include -I.pio/libdeps/native/googletest/googletest -I.pio/libdeps/native/googletest/googletest/include -I/Users/yukisala/.platformio/platforms/native/builder/lib/XerintoshUI/src -Isrc src/app/taskmgr/taskmgr_ui.c",
+        "directory": "/Users/yukisala/Documents/PlatformIO/Projects/M5Stick-P1",
+        "file": "src/app/taskmgr/taskmgr_ui.c",
+        "output": ".pio/build/native/src/app/taskmgr/taskmgr_ui.o"
+    },
+    {
+        "command": "/usr/bin/gcc -o .pio/build/native/src/app/ui_task.o -c -Wno-deprecated-declarations -DPLATFORMIO=60119 -D_XOPEN_SOURCE -DNATIVE_TEST -DSCREEN_WIDTH=80 -DSCREEN_HEIGHT=160 -Iinclude -I.pio/libdeps/native/googletest -I.pio/libdeps/native/googletest/googlemock -I.pio/libdeps/native/googletest/googlemock/include -I.pio/libdeps/native/googletest/googletest -I.pio/libdeps/native/googletest/googletest/include -I/Users/yukisala/.platformio/platforms/native/builder/lib/XerintoshUI/src -Isrc src/app/ui_task.c",
+        "directory": "/Users/yukisala/Documents/PlatformIO/Projects/M5Stick-P1",
+        "file": "src/app/ui_task.c",
+        "output": ".pio/build/native/src/app/ui_task.o"
+    },
+    {
+        "command": "/usr/bin/g++ -o .pio/build/native/src/app/wifi/wifi_manager.o -c -std=c++17 -Wno-deprecated-declarations -DPLATFORMIO=60119 -D_XOPEN_SOURCE -DNATIVE_TEST -DSCREEN_WIDTH=80 -DSCREEN_HEIGHT=160 -Iinclude -I.pio/libdeps/native/googletest -I.pio/libdeps/native/googletest/googlemock -I.pio/libdeps/native/googletest/googlemock/include -I.pio/libdeps/native/googletest/googletest -I.pio/libdeps/native/googletest/googletest/include -I/Users/yukisala/.platformio/platforms/native/builder/lib/XerintoshUI/src -Isrc src/app/wifi/wifi_manager.cpp",
+        "directory": "/Users/yukisala/Documents/PlatformIO/Projects/M5Stick-P1",
+        "file": "src/app/wifi/wifi_manager.cpp",
+        "output": ".pio/build/native/src/app/wifi/wifi_manager.o"
+    },
+    {
+        "command": "/usr/bin/g++ -o .pio/build/native/src/hal/hal_display.o -c -std=c++17 -Wno-deprecated-declarations -DPLATFORMIO=60119 -D_XOPEN_SOURCE -DNATIVE_TEST -DSCREEN_WIDTH=80 -DSCREEN_HEIGHT=160 -Iinclude -I.pio/libdeps/native/googletest -I.pio/libdeps/native/googletest/googlemock -I.pio/libdeps/native/googletest/googlemock/include -I.pio/libdeps/native/googletest/googletest -I.pio/libdeps/native/googletest/googletest/include -I/Users/yukisala/.platformio/platforms/native/builder/lib/XerintoshUI/src -Isrc src/hal/hal_display.cpp",
+        "directory": "/Users/yukisala/Documents/PlatformIO/Projects/M5Stick-P1",
+        "file": "src/hal/hal_display.cpp",
+        "output": ".pio/build/native/src/hal/hal_display.o"
+    },
+    {
+        "command": "/usr/bin/g++ -o .pio/build/native/src/hal/hal_input.o -c -std=c++17 -Wno-deprecated-declarations -DPLATFORMIO=60119 -D_XOPEN_SOURCE -DNATIVE_TEST -DSCREEN_WIDTH=80 -DSCREEN_HEIGHT=160 -Iinclude -I.pio/libdeps/native/googletest -I.pio/libdeps/native/googletest/googlemock -I.pio/libdeps/native/googletest/googlemock/include -I.pio/libdeps/native/googletest/googletest -I.pio/libdeps/native/googletest/googletest/include -I/Users/yukisala/.platformio/platforms/native/builder/lib/XerintoshUI/src -Isrc src/hal/hal_input.cpp",
+        "directory": "/Users/yukisala/Documents/PlatformIO/Projects/M5Stick-P1",
+        "file": "src/hal/hal_input.cpp",
+        "output": ".pio/build/native/src/hal/hal_input.o"
+    },
+    {
+        "command": "/usr/bin/gcc -o .pio/build/native/src/hal/hal_input_double_click.o -c -Wno-deprecated-declarations -DPLATFORMIO=60119 -D_XOPEN_SOURCE -DNATIVE_TEST -DSCREEN_WIDTH=80 -DSCREEN_HEIGHT=160 -Iinclude -I.pio/libdeps/native/googletest -I.pio/libdeps/native/googletest/googlemock -I.pio/libdeps/native/googletest/googlemock/include -I.pio/libdeps/native/googletest/googletest -I.pio/libdeps/native/googletest/googletest/include -I/Users/yukisala/.platformio/platforms/native/builder/lib/XerintoshUI/src -Isrc src/hal/hal_input_double_click.c",
+        "directory": "/Users/yukisala/Documents/PlatformIO/Projects/M5Stick-P1",
+        "file": "src/hal/hal_input_double_click.c",
+        "output": ".pio/build/native/src/hal/hal_input_double_click.o"
+    },
+    {
+        "command": "/usr/bin/g++ -o .pio/build/native/src/hal/hal_system.o -c -std=c++17 -Wno-deprecated-declarations -DPLATFORMIO=60119 -D_XOPEN_SOURCE -DNATIVE_TEST -DSCREEN_WIDTH=80 -DSCREEN_HEIGHT=160 -Iinclude -I.pio/libdeps/native/googletest -I.pio/libdeps/native/googletest/googlemock -I.pio/libdeps/native/googletest/googlemock/include -I.pio/libdeps/native/googletest/googletest -I.pio/libdeps/native/googletest/googletest/include -I/Users/yukisala/.platformio/platforms/native/builder/lib/XerintoshUI/src -Isrc src/hal/hal_system.cpp",
+        "directory": "/Users/yukisala/Documents/PlatformIO/Projects/M5Stick-P1",
+        "file": "src/hal/hal_system.cpp",
+        "output": ".pio/build/native/src/hal/hal_system.o"
+    },
+    {
+        "command": "/usr/bin/g++ -o .pio/build/native/src/kernel/debug_serial.o -c -std=c++17 -Wno-deprecated-declarations -DPLATFORMIO=60119 -D_XOPEN_SOURCE -DNATIVE_TEST -DSCREEN_WIDTH=80 -DSCREEN_HEIGHT=160 -Iinclude -I.pio/libdeps/native/googletest -I.pio/libdeps/native/googletest/googlemock -I.pio/libdeps/native/googletest/googlemock/include -I.pio/libdeps/native/googletest/googletest -I.pio/libdeps/native/googletest/googletest/include -I/Users/yukisala/.platformio/platforms/native/builder/lib/XerintoshUI/src -Isrc src/kernel/debug_serial.cpp",
+        "directory": "/Users/yukisala/Documents/PlatformIO/Projects/M5Stick-P1",
+        "file": "src/kernel/debug_serial.cpp",
+        "output": ".pio/build/native/src/kernel/debug_serial.o"
+    },
+    {
+        "command": "/usr/bin/gcc -o .pio/build/native/src/kernel/devices/dev_fb0.o -c -Wno-deprecated-declarations -DPLATFORMIO=60119 -D_XOPEN_SOURCE -DNATIVE_TEST -DSCREEN_WIDTH=80 -DSCREEN_HEIGHT=160 -Iinclude -I.pio/libdeps/native/googletest -I.pio/libdeps/native/googletest/googlemock -I.pio/libdeps/native/googletest/googlemock/include -I.pio/libdeps/native/googletest/googletest -I.pio/libdeps/native/googletest/googletest/include -I/Users/yukisala/.platformio/platforms/native/builder/lib/XerintoshUI/src -Isrc src/kernel/devices/dev_fb0.c",
+        "directory": "/Users/yukisala/Documents/PlatformIO/Projects/M5Stick-P1",
+        "file": "src/kernel/devices/dev_fb0.c",
+        "output": ".pio/build/native/src/kernel/devices/dev_fb0.o"
+    },
+    {
+        "command": "/usr/bin/gcc -o .pio/build/native/src/kernel/devices/dev_input0.o -c -Wno-deprecated-declarations -DPLATFORMIO=60119 -D_XOPEN_SOURCE -DNATIVE_TEST -DSCREEN_WIDTH=80 -DSCREEN_HEIGHT=160 -Iinclude -I.pio/libdeps/native/googletest -I.pio/libdeps/native/googletest/googlemock -I.pio/libdeps/native/googletest/googlemock/include -I.pio/libdeps/native/googletest/googletest -I.pio/libdeps/native/googletest/googletest/include -I/Users/yukisala/.platformio/platforms/native/builder/lib/XerintoshUI/src -Isrc src/kernel/devices/dev_input0.c",
+        "directory": "/Users/yukisala/Documents/PlatformIO/Projects/M5Stick-P1",
+        "file": "src/kernel/devices/dev_input0.c",
+        "output": ".pio/build/native/src/kernel/devices/dev_input0.o"
+    },
+    {
+        "command": "/usr/bin/g++ -o .pio/build/native/src/kernel/devices/dev_ttyS0.o -c -std=c++17 -Wno-deprecated-declarations -DPLATFORMIO=60119 -D_XOPEN_SOURCE -DNATIVE_TEST -DSCREEN_WIDTH=80 -DSCREEN_HEIGHT=160 -Iinclude -I.pio/libdeps/native/googletest -I.pio/libdeps/native/googletest/googlemock -I.pio/libdeps/native/googletest/googlemock/include -I.pio/libdeps/native/googletest/googletest -I.pio/libdeps/native/googletest/googletest/include -I/Users/yukisala/.platformio/platforms/native/builder/lib/XerintoshUI/src -Isrc src/kernel/devices/dev_ttyS0.cpp",
+        "directory": "/Users/yukisala/Documents/PlatformIO/Projects/M5Stick-P1",
+        "file": "src/kernel/devices/dev_ttyS0.cpp",
+        "output": ".pio/build/native/src/kernel/devices/dev_ttyS0.o"
+    },
+    {
+        "command": "/usr/bin/gcc -o .pio/build/native/src/kernel/devices/kern_devices.o -c -Wno-deprecated-declarations -DPLATFORMIO=60119 -D_XOPEN_SOURCE -DNATIVE_TEST -DSCREEN_WIDTH=80 -DSCREEN_HEIGHT=160 -Iinclude -I.pio/libdeps/native/googletest -I.pio/libdeps/native/googletest/googlemock -I.pio/libdeps/native/googletest/googlemock/include -I.pio/libdeps/native/googletest/googletest -I.pio/libdeps/native/googletest/googletest/include -I/Users/yukisala/.platformio/platforms/native/builder/lib/XerintoshUI/src -Isrc src/kernel/devices/kern_devices.c",
+        "directory": "/Users/yukisala/Documents/PlatformIO/Projects/M5Stick-P1",
+        "file": "src/kernel/devices/kern_devices.c",
+        "output": ".pio/build/native/src/kernel/devices/kern_devices.o"
+    },
+    {
+        "command": "/usr/bin/gcc -o .pio/build/native/src/kernel/kern_devfs.o -c -Wno-deprecated-declarations -DPLATFORMIO=60119 -D_XOPEN_SOURCE -DNATIVE_TEST -DSCREEN_WIDTH=80 -DSCREEN_HEIGHT=160 -Iinclude -I.pio/libdeps/native/googletest -I.pio/libdeps/native/googletest/googlemock -I.pio/libdeps/native/googletest/googlemock/include -I.pio/libdeps/native/googletest/googletest -I.pio/libdeps/native/googletest/googletest/include -I/Users/yukisala/.platformio/platforms/native/builder/lib/XerintoshUI/src -Isrc src/kernel/kern_devfs.c",
+        "directory": "/Users/yukisala/Documents/PlatformIO/Projects/M5Stick-P1",
+        "file": "src/kernel/kern_devfs.c",
+        "output": ".pio/build/native/src/kernel/kern_devfs.o"
+    },
+    {
+        "command": "/usr/bin/gcc -o .pio/build/native/src/kernel/kern_gpiofs.o -c -Wno-deprecated-declarations -DPLATFORMIO=60119 -D_XOPEN_SOURCE -DNATIVE_TEST -DSCREEN_WIDTH=80 -DSCREEN_HEIGHT=160 -Iinclude -I.pio/libdeps/native/googletest -I.pio/libdeps/native/googletest/googlemock -I.pio/libdeps/native/googletest/googlemock/include -I.pio/libdeps/native/googletest/googletest -I.pio/libdeps/native/googletest/googletest/include -I/Users/yukisala/.platformio/platforms/native/builder/lib/XerintoshUI/src -Isrc src/kernel/kern_gpiofs.c",
+        "directory": "/Users/yukisala/Documents/PlatformIO/Projects/M5Stick-P1",
+        "file": "src/kernel/kern_gpiofs.c",
+        "output": ".pio/build/native/src/kernel/kern_gpiofs.o"
+    },
+    {
+        "command": "/usr/bin/gcc -o .pio/build/native/src/kernel/kern_init.o -c -Wno-deprecated-declarations -DPLATFORMIO=60119 -D_XOPEN_SOURCE -DNATIVE_TEST -DSCREEN_WIDTH=80 -DSCREEN_HEIGHT=160 -Iinclude -I.pio/libdeps/native/googletest -I.pio/libdeps/native/googletest/googlemock -I.pio/libdeps/native/googletest/googlemock/include -I.pio/libdeps/native/googletest/googletest -I.pio/libdeps/native/googletest/googletest/include -I/Users/yukisala/.platformio/platforms/native/builder/lib/XerintoshUI/src -Isrc src/kernel/kern_init.c",
+        "directory": "/Users/yukisala/Documents/PlatformIO/Projects/M5Stick-P1",
+        "file": "src/kernel/kern_init.c",
+        "output": ".pio/build/native/src/kernel/kern_init.o"
+    },
+    {
+        "command": "/usr/bin/gcc -o .pio/build/native/src/kernel/kern_ipc.o -c -Wno-deprecated-declarations -DPLATFORMIO=60119 -D_XOPEN_SOURCE -DNATIVE_TEST -DSCREEN_WIDTH=80 -DSCREEN_HEIGHT=160 -Iinclude -I.pio/libdeps/native/googletest -I.pio/libdeps/native/googletest/googlemock -I.pio/libdeps/native/googletest/googlemock/include -I.pio/libdeps/native/googletest/googletest -I.pio/libdeps/native/googletest/googletest/include -I/Users/yukisala/.platformio/platforms/native/builder/lib/XerintoshUI/src -Isrc src/kernel/kern_ipc.c",
+        "directory": "/Users/yukisala/Documents/PlatformIO/Projects/M5Stick-P1",
+        "file": "src/kernel/kern_ipc.c",
+        "output": ".pio/build/native/src/kernel/kern_ipc.o"
+    },
+    {
+        "command": "/usr/bin/gcc -o .pio/build/native/src/kernel/kern_port.o -c -Wno-deprecated-declarations -DPLATFORMIO=60119 -D_XOPEN_SOURCE -DNATIVE_TEST -DSCREEN_WIDTH=80 -DSCREEN_HEIGHT=160 -Iinclude -I.pio/libdeps/native/googletest -I.pio/libdeps/native/googletest/googlemock -I.pio/libdeps/native/googletest/googlemock/include -I.pio/libdeps/native/googletest/googletest -I.pio/libdeps/native/googletest/googletest/include -I/Users/yukisala/.platformio/platforms/native/builder/lib/XerintoshUI/src -Isrc src/kernel/kern_port.c",
+        "directory": "/Users/yukisala/Documents/PlatformIO/Projects/M5Stick-P1",
+        "file": "src/kernel/kern_port.c",
+        "output": ".pio/build/native/src/kernel/kern_port.o"
+    },
+    {
+        "command": "/usr/bin/gcc -o .pio/build/native/src/kernel/kern_port_native.o -c -Wno-deprecated-declarations -DPLATFORMIO=60119 -D_XOPEN_SOURCE -DNATIVE_TEST -DSCREEN_WIDTH=80 -DSCREEN_HEIGHT=160 -Iinclude -I.pio/libdeps/native/googletest -I.pio/libdeps/native/googletest/googlemock -I.pio/libdeps/native/googletest/googlemock/include -I.pio/libdeps/native/googletest/googletest -I.pio/libdeps/native/googletest/googletest/include -I/Users/yukisala/.platformio/platforms/native/builder/lib/XerintoshUI/src -Isrc src/kernel/kern_port_native.c",
+        "directory": "/Users/yukisala/Documents/PlatformIO/Projects/M5Stick-P1",
+        "file": "src/kernel/kern_port_native.c",
+        "output": ".pio/build/native/src/kernel/kern_port_native.o"
+    },
+    {
+        "command": "/usr/bin/gcc -o .pio/build/native/src/kernel/kern_procfs.o -c -Wno-deprecated-declarations -DPLATFORMIO=60119 -D_XOPEN_SOURCE -DNATIVE_TEST -DSCREEN_WIDTH=80 -DSCREEN_HEIGHT=160 -Iinclude -I.pio/libdeps/native/googletest -I.pio/libdeps/native/googletest/googlemock -I.pio/libdeps/native/googletest/googlemock/include -I.pio/libdeps/native/googletest/googletest -I.pio/libdeps/native/googletest/googletest/include -I/Users/yukisala/.platformio/platforms/native/builder/lib/XerintoshUI/src -Isrc src/kernel/kern_procfs.c",
+        "directory": "/Users/yukisala/Documents/PlatformIO/Projects/M5Stick-P1",
+        "file": "src/kernel/kern_procfs.c",
+        "output": ".pio/build/native/src/kernel/kern_procfs.o"
+    },
+    {
+        "command": "/usr/bin/gcc -o .pio/build/native/src/kernel/kern_shell.o -c -Wno-deprecated-declarations -DPLATFORMIO=60119 -D_XOPEN_SOURCE -DNATIVE_TEST -DSCREEN_WIDTH=80 -DSCREEN_HEIGHT=160 -Iinclude -I.pio/libdeps/native/googletest -I.pio/libdeps/native/googletest/googlemock -I.pio/libdeps/native/googletest/googlemock/include -I.pio/libdeps/native/googletest/googletest -I.pio/libdeps/native/googletest/googletest/include -I/Users/yukisala/.platformio/platforms/native/builder/lib/XerintoshUI/src -Isrc src/kernel/kern_shell.c",
+        "directory": "/Users/yukisala/Documents/PlatformIO/Projects/M5Stick-P1",
+        "file": "src/kernel/kern_shell.c",
+        "output": ".pio/build/native/src/kernel/kern_shell.o"
+    },
+    {
+        "command": "/usr/bin/gcc -o .pio/build/native/src/kernel/kern_shell_cmds.o -c -Wno-deprecated-declarations -DPLATFORMIO=60119 -D_XOPEN_SOURCE -DNATIVE_TEST -DSCREEN_WIDTH=80 -DSCREEN_HEIGHT=160 -Iinclude -I.pio/libdeps/native/googletest -I.pio/libdeps/native/googletest/googlemock -I.pio/libdeps/native/googletest/googlemock/include -I.pio/libdeps/native/googletest/googletest -I.pio/libdeps/native/googletest/googletest/include -I/Users/yukisala/.platformio/platforms/native/builder/lib/XerintoshUI/src -Isrc src/kernel/kern_shell_cmds.c",
+        "directory": "/Users/yukisala/Documents/PlatformIO/Projects/M5Stick-P1",
+        "file": "src/kernel/kern_shell_cmds.c",
+        "output": ".pio/build/native/src/kernel/kern_shell_cmds.o"
+    },
+    {
+        "command": "/usr/bin/gcc -o .pio/build/native/src/kernel/kern_shell_parser.o -c -Wno-deprecated-declarations -DPLATFORMIO=60119 -D_XOPEN_SOURCE -DNATIVE_TEST -DSCREEN_WIDTH=80 -DSCREEN_HEIGHT=160 -Iinclude -I.pio/libdeps/native/googletest -I.pio/libdeps/native/googletest/googlemock -I.pio/libdeps/native/googletest/googlemock/include -I.pio/libdeps/native/googletest/googletest -I.pio/libdeps/native/googletest/googletest/include -I/Users/yukisala/.platformio/platforms/native/builder/lib/XerintoshUI/src -Isrc src/kernel/kern_shell_parser.c",
+        "directory": "/Users/yukisala/Documents/PlatformIO/Projects/M5Stick-P1",
+        "file": "src/kernel/kern_shell_parser.c",
+        "output": ".pio/build/native/src/kernel/kern_shell_parser.o"
+    },
+    {
+        "command": "/usr/bin/gcc -o .pio/build/native/src/kernel/kern_syscall.o -c -Wno-deprecated-declarations -DPLATFORMIO=60119 -D_XOPEN_SOURCE -DNATIVE_TEST -DSCREEN_WIDTH=80 -DSCREEN_HEIGHT=160 -Iinclude -I.pio/libdeps/native/googletest -I.pio/libdeps/native/googletest/googlemock -I.pio/libdeps/native/googletest/googlemock/include -I.pio/libdeps/native/googletest/googletest -I.pio/libdeps/native/googletest/googletest/include -I/Users/yukisala/.platformio/platforms/native/builder/lib/XerintoshUI/src -Isrc src/kernel/kern_syscall.c",
+        "directory": "/Users/yukisala/Documents/PlatformIO/Projects/M5Stick-P1",
+        "file": "src/kernel/kern_syscall.c",
+        "output": ".pio/build/native/src/kernel/kern_syscall.o"
+    },
+    {
+        "command": "/usr/bin/gcc -o .pio/build/native/src/kernel/kern_sysfs.o -c -Wno-deprecated-declarations -DPLATFORMIO=60119 -D_XOPEN_SOURCE -DNATIVE_TEST -DSCREEN_WIDTH=80 -DSCREEN_HEIGHT=160 -Iinclude -I.pio/libdeps/native/googletest -I.pio/libdeps/native/googletest/googlemock -I.pio/libdeps/native/googletest/googlemock/include -I.pio/libdeps/native/googletest/googletest -I.pio/libdeps/native/googletest/googletest/include -I/Users/yukisala/.platformio/platforms/native/builder/lib/XerintoshUI/src -Isrc src/kernel/kern_sysfs.c",
+        "directory": "/Users/yukisala/Documents/PlatformIO/Projects/M5Stick-P1",
+        "file": "src/kernel/kern_sysfs.c",
+        "output": ".pio/build/native/src/kernel/kern_sysfs.o"
+    },
+    {
+        "command": "/usr/bin/gcc -o .pio/build/native/src/kernel/kern_task.o -c -Wno-deprecated-declarations -DPLATFORMIO=60119 -D_XOPEN_SOURCE -DNATIVE_TEST -DSCREEN_WIDTH=80 -DSCREEN_HEIGHT=160 -Iinclude -I.pio/libdeps/native/googletest -I.pio/libdeps/native/googletest/googlemock -I.pio/libdeps/native/googletest/googlemock/include -I.pio/libdeps/native/googletest/googletest -I.pio/libdeps/native/googletest/googletest/include -I/Users/yukisala/.platformio/platforms/native/builder/lib/XerintoshUI/src -Isrc src/kernel/kern_task.c",
+        "directory": "/Users/yukisala/Documents/PlatformIO/Projects/M5Stick-P1",
+        "file": "src/kernel/kern_task.c",
+        "output": ".pio/build/native/src/kernel/kern_task.o"
+    },
+    {
+        "command": "/usr/bin/gcc -o .pio/build/native/src/kernel/kern_vfs.o -c -Wno-deprecated-declarations -DPLATFORMIO=60119 -D_XOPEN_SOURCE -DNATIVE_TEST -DSCREEN_WIDTH=80 -DSCREEN_HEIGHT=160 -Iinclude -I.pio/libdeps/native/googletest -I.pio/libdeps/native/googletest/googlemock -I.pio/libdeps/native/googletest/googlemock/include -I.pio/libdeps/native/googletest/googletest -I.pio/libdeps/native/googletest/googletest/include -I/Users/yukisala/.platformio/platforms/native/builder/lib/XerintoshUI/src -Isrc src/kernel/kern_vfs.c",
+        "directory": "/Users/yukisala/Documents/PlatformIO/Projects/M5Stick-P1",
+        "file": "src/kernel/kern_vfs.c",
+        "output": ".pio/build/native/src/kernel/kern_vfs.o"
+    },
+    {
+        "command": "/usr/bin/g++ -o .pio/build/native/src/main.o -c -std=c++17 -Wno-deprecated-declarations -DPLATFORMIO=60119 -D_XOPEN_SOURCE -DNATIVE_TEST -DSCREEN_WIDTH=80 -DSCREEN_HEIGHT=160 -Iinclude -I.pio/libdeps/native/googletest -I.pio/libdeps/native/googletest/googlemock -I.pio/libdeps/native/googletest/googlemock/include -I.pio/libdeps/native/googletest/googletest -I.pio/libdeps/native/googletest/googletest/include -I/Users/yukisala/.platformio/platforms/native/builder/lib/XerintoshUI/src -Isrc src/main.cpp",
+        "directory": "/Users/yukisala/Documents/PlatformIO/Projects/M5Stick-P1",
+        "file": "src/main.cpp",
+        "output": ".pio/build/native/src/main.o"
+    },
+    {
+        "command": "/usr/bin/g++ -o .pio/build/native/src/native_main.o -c -std=c++17 -Wno-deprecated-declarations -DPLATFORMIO=60119 -D_XOPEN_SOURCE -DNATIVE_TEST -DSCREEN_WIDTH=80 -DSCREEN_HEIGHT=160 -Iinclude -I.pio/libdeps/native/googletest -I.pio/libdeps/native/googletest/googlemock -I.pio/libdeps/native/googletest/googlemock/include -I.pio/libdeps/native/googletest/googletest -I.pio/libdeps/native/googletest/googletest/include -I/Users/yukisala/.platformio/platforms/native/builder/lib/XerintoshUI/src -Isrc src/native_main.cpp",
+        "directory": "/Users/yukisala/Documents/PlatformIO/Projects/M5Stick-P1",
+        "file": "src/native_main.cpp",
+        "output": ".pio/build/native/src/native_main.o"
+    },
+    {
+        "command": "/usr/bin/gcc -o .pio/build/native/src/ui/ui_core.o -c -Wno-deprecated-declarations -DPLATFORMIO=60119 -D_XOPEN_SOURCE -DNATIVE_TEST -DSCREEN_WIDTH=80 -DSCREEN_HEIGHT=160 -Iinclude -I.pio/libdeps/native/googletest -I.pio/libdeps/native/googletest/googlemock -I.pio/libdeps/native/googletest/googlemock/include -I.pio/libdeps/native/googletest/googletest -I.pio/libdeps/native/googletest/googletest/include -I/Users/yukisala/.platformio/platforms/native/builder/lib/XerintoshUI/src -Isrc src/ui/ui_core.c",
+        "directory": "/Users/yukisala/Documents/PlatformIO/Projects/M5Stick-P1",
+        "file": "src/ui/ui_core.c",
+        "output": ".pio/build/native/src/ui/ui_core.o"
+    },
+    {
+        "command": "/usr/bin/gcc -o .pio/build/native/src/ui/ui_draw_anim.o -c -Wno-deprecated-declarations -DPLATFORMIO=60119 -D_XOPEN_SOURCE -DNATIVE_TEST -DSCREEN_WIDTH=80 -DSCREEN_HEIGHT=160 -Iinclude -I.pio/libdeps/native/googletest -I.pio/libdeps/native/googletest/googlemock -I.pio/libdeps/native/googletest/googlemock/include -I.pio/libdeps/native/googletest/googletest -I.pio/libdeps/native/googletest/googletest/include -I/Users/yukisala/.platformio/platforms/native/builder/lib/XerintoshUI/src -Isrc src/ui/ui_draw_anim.c",
+        "directory": "/Users/yukisala/Documents/PlatformIO/Projects/M5Stick-P1",
+        "file": "src/ui/ui_draw_anim.c",
+        "output": ".pio/build/native/src/ui/ui_draw_anim.o"
+    },
+    {
+        "command": "/usr/bin/gcc -o .pio/build/native/src/ui/ui_draw_driver.o -c -Wno-deprecated-declarations -DPLATFORMIO=60119 -D_XOPEN_SOURCE -DNATIVE_TEST -DSCREEN_WIDTH=80 -DSCREEN_HEIGHT=160 -Iinclude -I.pio/libdeps/native/googletest -I.pio/libdeps/native/googletest/googlemock -I.pio/libdeps/native/googletest/googlemock/include -I.pio/libdeps/native/googletest/googletest -I.pio/libdeps/native/googletest/googletest/include -I/Users/yukisala/.platformio/platforms/native/builder/lib/XerintoshUI/src -Isrc src/ui/ui_draw_driver.c",
+        "directory": "/Users/yukisala/Documents/PlatformIO/Projects/M5Stick-P1",
+        "file": "src/ui/ui_draw_driver.c",
+        "output": ".pio/build/native/src/ui/ui_draw_driver.o"
+    },
+    {
+        "command": "/usr/bin/gcc -o .pio/build/native/src/ui/ui_draw_icons.o -c -Wno-deprecated-declarations -DPLATFORMIO=60119 -D_XOPEN_SOURCE -DNATIVE_TEST -DSCREEN_WIDTH=80 -DSCREEN_HEIGHT=160 -Iinclude -I.pio/libdeps/native/googletest -I.pio/libdeps/native/googletest/googlemock -I.pio/libdeps/native/googletest/googlemock/include -I.pio/libdeps/native/googletest/googletest -I.pio/libdeps/native/googletest/googletest/include -I/Users/yukisala/.platformio/platforms/native/builder/lib/XerintoshUI/src -Isrc src/ui/ui_draw_icons.c",
+        "directory": "/Users/yukisala/Documents/PlatformIO/Projects/M5Stick-P1",
+        "file": "src/ui/ui_draw_icons.c",
+        "output": ".pio/build/native/src/ui/ui_draw_icons.o"
+    },
+    {
+        "command": "/usr/bin/gcc -o .pio/build/native/src/ui/ui_draw_list.o -c -Wno-deprecated-declarations -DPLATFORMIO=60119 -D_XOPEN_SOURCE -DNATIVE_TEST -DSCREEN_WIDTH=80 -DSCREEN_HEIGHT=160 -Iinclude -I.pio/libdeps/native/googletest -I.pio/libdeps/native/googletest/googlemock -I.pio/libdeps/native/googletest/googlemock/include -I.pio/libdeps/native/googletest/googletest -I.pio/libdeps/native/googletest/googletest/include -I/Users/yukisala/.platformio/platforms/native/builder/lib/XerintoshUI/src -Isrc src/ui/ui_draw_list.c",
+        "directory": "/Users/yukisala/Documents/PlatformIO/Projects/M5Stick-P1",
+        "file": "src/ui/ui_draw_list.c",
+        "output": ".pio/build/native/src/ui/ui_draw_list.o"
+    },
+    {
+        "command": "/usr/bin/gcc -o .pio/build/native/src/ui/ui_draw_widgets.o -c -Wno-deprecated-declarations -DPLATFORMIO=60119 -D_XOPEN_SOURCE -DNATIVE_TEST -DSCREEN_WIDTH=80 -DSCREEN_HEIGHT=160 -Iinclude -I.pio/libdeps/native/googletest -I.pio/libdeps/native/googletest/googlemock -I.pio/libdeps/native/googletest/googlemock/include -I.pio/libdeps/native/googletest/googletest -I.pio/libdeps/native/googletest/googletest/include -I/Users/yukisala/.platformio/platforms/native/builder/lib/XerintoshUI/src -Isrc src/ui/ui_draw_widgets.c",
+        "directory": "/Users/yukisala/Documents/PlatformIO/Projects/M5Stick-P1",
+        "file": "src/ui/ui_draw_widgets.c",
+        "output": ".pio/build/native/src/ui/ui_draw_widgets.o"
+    },
+    {
+        "command": "/usr/bin/gcc -o .pio/build/native/src/ui/ui_item_base.o -c -Wno-deprecated-declarations -DPLATFORMIO=60119 -D_XOPEN_SOURCE -DNATIVE_TEST -DSCREEN_WIDTH=80 -DSCREEN_HEIGHT=160 -Iinclude -I.pio/libdeps/native/googletest -I.pio/libdeps/native/googletest/googlemock -I.pio/libdeps/native/googletest/googlemock/include -I.pio/libdeps/native/googletest/googletest -I.pio/libdeps/native/googletest/googletest/include -I/Users/yukisala/.platformio/platforms/native/builder/lib/XerintoshUI/src -Isrc src/ui/ui_item_base.c",
+        "directory": "/Users/yukisala/Documents/PlatformIO/Projects/M5Stick-P1",
+        "file": "src/ui/ui_item_base.c",
+        "output": ".pio/build/native/src/ui/ui_item_base.o"
+    },
+    {
+        "command": "/usr/bin/gcc -o .pio/build/native/src/ui/ui_item_camera.o -c -Wno-deprecated-declarations -DPLATFORMIO=60119 -D_XOPEN_SOURCE -DNATIVE_TEST -DSCREEN_WIDTH=80 -DSCREEN_HEIGHT=160 -Iinclude -I.pio/libdeps/native/googletest -I.pio/libdeps/native/googletest/googlemock -I.pio/libdeps/native/googletest/googlemock/include -I.pio/libdeps/native/googletest/googletest -I.pio/libdeps/native/googletest/googletest/include -I/Users/yukisala/.platformio/platforms/native/builder/lib/XerintoshUI/src -Isrc src/ui/ui_item_camera.c",
+        "directory": "/Users/yukisala/Documents/PlatformIO/Projects/M5Stick-P1",
+        "file": "src/ui/ui_item_camera.c",
+        "output": ".pio/build/native/src/ui/ui_item_camera.o"
+    },
+    {
+        "command": "/usr/bin/gcc -o .pio/build/native/src/ui/ui_item_list.o -c -Wno-deprecated-declarations -DPLATFORMIO=60119 -D_XOPEN_SOURCE -DNATIVE_TEST -DSCREEN_WIDTH=80 -DSCREEN_HEIGHT=160 -Iinclude -I.pio/libdeps/native/googletest -I.pio/libdeps/native/googletest/googlemock -I.pio/libdeps/native/googletest/googlemock/include -I.pio/libdeps/native/googletest/googletest -I.pio/libdeps/native/googletest/googletest/include -I/Users/yukisala/.platformio/platforms/native/builder/lib/XerintoshUI/src -Isrc src/ui/ui_item_list.c",
+        "directory": "/Users/yukisala/Documents/PlatformIO/Projects/M5Stick-P1",
+        "file": "src/ui/ui_item_list.c",
+        "output": ".pio/build/native/src/ui/ui_item_list.o"
+    },
+    {
+        "command": "/usr/bin/gcc -o .pio/build/native/src/ui/ui_item_popup.o -c -Wno-deprecated-declarations -DPLATFORMIO=60119 -D_XOPEN_SOURCE -DNATIVE_TEST -DSCREEN_WIDTH=80 -DSCREEN_HEIGHT=160 -Iinclude -I.pio/libdeps/native/googletest -I.pio/libdeps/native/googletest/googlemock -I.pio/libdeps/native/googletest/googlemock/include -I.pio/libdeps/native/googletest/googletest -I.pio/libdeps/native/googletest/googletest/include -I/Users/yukisala/.platformio/platforms/native/builder/lib/XerintoshUI/src -Isrc src/ui/ui_item_popup.c",
+        "directory": "/Users/yukisala/Documents/PlatformIO/Projects/M5Stick-P1",
+        "file": "src/ui/ui_item_popup.c",
+        "output": ".pio/build/native/src/ui/ui_item_popup.o"
+    },
+    {
+        "command": "/usr/bin/gcc -o .pio/build/native/src/ui/ui_item_selector.o -c -Wno-deprecated-declarations -DPLATFORMIO=60119 -D_XOPEN_SOURCE -DNATIVE_TEST -DSCREEN_WIDTH=80 -DSCREEN_HEIGHT=160 -Iinclude -I.pio/libdeps/native/googletest -I.pio/libdeps/native/googletest/googlemock -I.pio/libdeps/native/googletest/googlemock/include -I.pio/libdeps/native/googletest/googletest -I.pio/libdeps/native/googletest/googletest/include -I/Users/yukisala/.platformio/platforms/native/builder/lib/XerintoshUI/src -Isrc src/ui/ui_item_selector.c",
+        "directory": "/Users/yukisala/Documents/PlatformIO/Projects/M5Stick-P1",
+        "file": "src/ui/ui_item_selector.c",
+        "output": ".pio/build/native/src/ui/ui_item_selector.o"
+    }
+]
