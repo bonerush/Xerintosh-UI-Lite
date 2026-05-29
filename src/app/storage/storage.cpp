@@ -100,334 +100,190 @@ void storage_init(void) {
     prefs.end();
 }
 
-/* ═══ WiFi 凭据 ═══ */
+/* ─── 通用凭据存储辅助 ─── */
 
-int storage_wifi_get_count(void) {
+/**
+ * @brief 凭据类型描述符（消除 wifi/bt 之间的代码重复）
+ */
+typedef struct {
+    const char *count_key;       /* NVS 计数 key（如 "wifi_count"） */
+    const char *field1_fmt;      /* 字段1 key 格式（如 "wifi_ssid_%%d"） */
+    const char *field2_fmt;      /* 字段2 key 格式（如 "wifi_pass_%%d"） */
+    uint8_t     max_items;       /* 最大条目数 */
+    size_t      field1_max;      /* 字段1 缓冲区最大长度 */
+    size_t      field2_max;      /* 字段2 缓冲区最大长度 */
+} credential_kind_t;
+
+static const credential_kind_t WIFI_KIND = {
+    "wifi_count", "wifi_ssid_%d", "wifi_pass_%d",
+    STORAGE_MAX_WIFI_NETWORKS, STORAGE_SSID_MAX_LEN, STORAGE_PASS_MAX_LEN
+};
+static const credential_kind_t BT_KIND = {
+    "bt_count", "bt_addr_%d", "bt_name_%d",
+    STORAGE_MAX_BT_DEVICES, STORAGE_BT_ADDR_MAX_LEN, STORAGE_BT_NAME_MAX_LEN
+};
+
+static int cred_get_count(const credential_kind_t *k) {
     Preferences prefs;
     prefs.begin(NVS_NAMESPACE, true);
     uint8_t count = 0;
-    read_count(&prefs, "wifi_count", &count);
+    read_count(&prefs, k->count_key, &count);
     prefs.end();
     return (int)count;
 }
 
-bool storage_wifi_get(int index, char *ssid, char *pass) {
-    if (index < 0 || index >= STORAGE_MAX_WIFI_NETWORKS) {
-        return false;
-    }
+static bool cred_get(const credential_kind_t *k, int index,
+                     char *f1, char *f2) {
+    if (index < 0 || index >= k->max_items) return false;
 
     Preferences prefs;
     prefs.begin(NVS_NAMESPACE, true);
 
     uint8_t count = 0;
-    read_count(&prefs, "wifi_count", &count);
-    if (index >= (int)count) {
-        prefs.end();
-        return false;
-    }
+    read_count(&prefs, k->count_key, &count);
+    if (index >= (int)count) { prefs.end(); return false; }
 
-    char key_ssid[20];
-    char key_pass[20];
-    snprintf(key_ssid, sizeof(key_ssid), "wifi_ssid_%d", index);
-    snprintf(key_pass, sizeof(key_pass), "wifi_pass_%d", index);
+    char key1[20], key2[20];
+    snprintf(key1, sizeof(key1), k->field1_fmt, index);
+    snprintf(key2, sizeof(key2), k->field2_fmt, index);
 
-    size_t ssid_len = prefs.getString(key_ssid, ssid, STORAGE_SSID_MAX_LEN);
-    size_t pass_len = prefs.getString(key_pass, pass, STORAGE_PASS_MAX_LEN);
-
+    size_t len1 = prefs.getString(key1, f1, k->field1_max);
+    prefs.getString(key2, f2, k->field2_max);
     prefs.end();
-    return (ssid_len > 0);
+    return (len1 > 0);
 }
 
-int storage_wifi_find(const char *ssid) {
-    if (!ssid) {
-        return -1;
-    }
+static int cred_find(const credential_kind_t *k, const char *target) {
+    if (!target) return -1;
 
     Preferences prefs;
     prefs.begin(NVS_NAMESPACE, true);
 
     uint8_t count = 0;
-    read_count(&prefs, "wifi_count", &count);
+    read_count(&prefs, k->count_key, &count);
 
-    char buf[STORAGE_SSID_MAX_LEN];
+    char buf[STORAGE_PASS_MAX_LEN];  /* 足够容纳 wifi_pass 或 bt_name */
     for (int i = 0; i < (int)count; i++) {
         char key[20];
-        snprintf(key, sizeof(key), "wifi_ssid_%d", i);
+        snprintf(key, sizeof(key), k->field1_fmt, i);
         prefs.getString(key, buf, sizeof(buf));
-        if (strcmp(buf, ssid) == 0) {
-            prefs.end();
-            return i;
-        }
+        if (strcmp(buf, target) == 0) { prefs.end(); return i; }
     }
-
     prefs.end();
     return -1;
 }
 
-bool storage_wifi_add(const char *ssid, const char *pass) {
-    if (!ssid || !pass) {
-        return false;
-    }
-    if (strlen(ssid) == 0) {
-        return false;
-    }
+static bool cred_add(const credential_kind_t *k, const char *f1, const char *f2) {
+    if (!f1 || !f2) return false;
+    if (strlen(f1) == 0) return false;
 
     Preferences prefs;
     prefs.begin(NVS_NAMESPACE, false);
 
-    /* 若 SSID 已存在则原地更新密码 */
     uint8_t count = 0;
-    read_count(&prefs, "wifi_count", &count);
+    read_count(&prefs, k->count_key, &count);
 
-    char buf[STORAGE_SSID_MAX_LEN];
+    /* 已存在则原地更新字段2 */
+    char buf[STORAGE_PASS_MAX_LEN];
     for (int i = 0; i < (int)count; i++) {
         char key[20];
-        snprintf(key, sizeof(key), "wifi_ssid_%d", i);
+        snprintf(key, sizeof(key), k->field1_fmt, i);
         prefs.getString(key, buf, sizeof(buf));
-        if (strcmp(buf, ssid) == 0) {
-            char key_pass[20];
-            snprintf(key_pass, sizeof(key_pass), "wifi_pass_%d", i);
-            prefs.putString(key_pass, pass);
+        if (strcmp(buf, f1) == 0) {
+            char key2[20];
+            snprintf(key2, sizeof(key2), k->field2_fmt, i);
+            prefs.putString(key2, f2);
             prefs.end();
             return true;
         }
     }
 
-    /* 追加到下一个空槽位 */
-    if (count >= STORAGE_MAX_WIFI_NETWORKS) {
-        prefs.end();
-        return false;
-    }
+    if (count >= k->max_items) { prefs.end(); return false; }
 
-    char key_ssid[20];
-    char key_pass[20];
-    snprintf(key_ssid, sizeof(key_ssid), "wifi_ssid_%d", (int)count);
-    snprintf(key_pass, sizeof(key_pass), "wifi_pass_%d", (int)count);
-
-    prefs.putString(key_ssid, ssid);
-    prefs.putString(key_pass, pass);
-
-    uint8_t new_count = count + 1;
-    write_count(&prefs, "wifi_count", new_count);
-
+    char key1[20], key2[20];
+    snprintf(key1, sizeof(key1), k->field1_fmt, (int)count);
+    snprintf(key2, sizeof(key2), k->field2_fmt, (int)count);
+    prefs.putString(key1, f1);
+    prefs.putString(key2, f2);
+    write_count(&prefs, k->count_key, count + 1);
     prefs.end();
     return true;
 }
 
-bool storage_wifi_remove(int index) {
-    if (index < 0 || index >= STORAGE_MAX_WIFI_NETWORKS) {
-        return false;
-    }
+static bool cred_remove(const credential_kind_t *k, int index) {
+    if (index < 0 || index >= k->max_items) return false;
 
     Preferences prefs;
     prefs.begin(NVS_NAMESPACE, false);
 
     uint8_t count = 0;
-    read_count(&prefs, "wifi_count", &count);
-    if (index >= (int)count) {
-        prefs.end();
-        return false;
-    }
+    read_count(&prefs, k->count_key, &count);
+    if (index >= (int)count) { prefs.end(); return false; }
 
-    /* 将后续条目前移填补空缺 */
+    /* 前移后续条目 */
+    char buf[STORAGE_PASS_MAX_LEN];
     for (int i = index; i < (int)count - 1; i++) {
-        char key_src_ssid[20];
-        char key_dst_ssid[20];
-        char key_src_pass[20];
-        char key_dst_pass[20];
+        char key_src1[20], key_dst1[20], key_src2[20], key_dst2[20];
+        snprintf(key_src1, sizeof(key_src1), k->field1_fmt, i + 1);
+        snprintf(key_dst1, sizeof(key_dst1), k->field1_fmt, i);
+        snprintf(key_src2, sizeof(key_src2), k->field2_fmt, i + 1);
+        snprintf(key_dst2, sizeof(key_dst2), k->field2_fmt, i);
 
-        snprintf(key_src_ssid, sizeof(key_src_ssid), "wifi_ssid_%d", i + 1);
-        snprintf(key_dst_ssid, sizeof(key_dst_ssid), "wifi_ssid_%d", i);
-        snprintf(key_src_pass, sizeof(key_src_pass), "wifi_pass_%d", i + 1);
-        snprintf(key_dst_pass, sizeof(key_dst_pass), "wifi_pass_%d", i);
-
-        char buf[STORAGE_PASS_MAX_LEN];
-
-        prefs.getString(key_src_ssid, buf, sizeof(buf));
-        prefs.putString(key_dst_ssid, buf);
-
-        prefs.getString(key_src_pass, buf, sizeof(buf));
-        prefs.putString(key_dst_pass, buf);
+        prefs.getString(key_src1, buf, sizeof(buf));
+        prefs.putString(key_dst1, buf);
+        prefs.getString(key_src2, buf, sizeof(buf));
+        prefs.putString(key_dst2, buf);
     }
 
     /* 清空最后一个槽位 */
-    char key_last_ssid[20];
-    char key_last_pass[20];
-    snprintf(key_last_ssid, sizeof(key_last_ssid), "wifi_ssid_%d", (int)count - 1);
-    snprintf(key_last_pass, sizeof(key_last_pass), "wifi_pass_%d", (int)count - 1);
-    prefs.remove(key_last_ssid);
-    prefs.remove(key_last_pass);
-
-    uint8_t new_count = count - 1;
-    write_count(&prefs, "wifi_count", new_count);
-
+    char key_last1[20], key_last2[20];
+    snprintf(key_last1, sizeof(key_last1), k->field1_fmt, (int)count - 1);
+    snprintf(key_last2, sizeof(key_last2), k->field2_fmt, (int)count - 1);
+    prefs.remove(key_last1);
+    prefs.remove(key_last2);
+    write_count(&prefs, k->count_key, count - 1);
     prefs.end();
     return true;
+}
+
+/* ═══ WiFi 凭据 ═══ */
+
+int storage_wifi_get_count(void) { return cred_get_count(&WIFI_KIND); }
+
+bool storage_wifi_get(int index, char *ssid, char *pass) {
+    return cred_get(&WIFI_KIND, index, ssid, pass);
+}
+
+int storage_wifi_find(const char *ssid) {
+    return cred_find(&WIFI_KIND, ssid);
+}
+
+bool storage_wifi_add(const char *ssid, const char *pass) {
+    return cred_add(&WIFI_KIND, ssid, pass);
+}
+
+bool storage_wifi_remove(int index) {
+    return cred_remove(&WIFI_KIND, index);
 }
 
 /* ═══ 蓝牙凭据 ═══ */
 
-int storage_bt_get_count(void) {
-    Preferences prefs;
-    prefs.begin(NVS_NAMESPACE, true);
-    uint8_t count = 0;
-    read_count(&prefs, "bt_count", &count);
-    prefs.end();
-    return (int)count;
-}
+int storage_bt_get_count(void) { return cred_get_count(&BT_KIND); }
 
 bool storage_bt_get(int index, char *addr, char *name) {
-    if (index < 0 || index >= STORAGE_MAX_BT_DEVICES) {
-        return false;
-    }
-
-    Preferences prefs;
-    prefs.begin(NVS_NAMESPACE, true);
-
-    uint8_t count = 0;
-    read_count(&prefs, "bt_count", &count);
-    if (index >= (int)count) {
-        prefs.end();
-        return false;
-    }
-
-    char key_addr[20];
-    char key_name[20];
-    snprintf(key_addr, sizeof(key_addr), "bt_addr_%d", index);
-    snprintf(key_name, sizeof(key_name), "bt_name_%d", index);
-
-    size_t addr_len = prefs.getString(key_addr, addr, STORAGE_BT_ADDR_MAX_LEN);
-    size_t name_len = prefs.getString(key_name, name, STORAGE_BT_NAME_MAX_LEN);
-
-    prefs.end();
-    return (addr_len > 0);
+    return cred_get(&BT_KIND, index, addr, name);
 }
 
 int storage_bt_find(const char *addr) {
-    if (!addr) {
-        return -1;
-    }
-
-    Preferences prefs;
-    prefs.begin(NVS_NAMESPACE, true);
-
-    uint8_t count = 0;
-    read_count(&prefs, "bt_count", &count);
-
-    char buf[STORAGE_BT_ADDR_MAX_LEN];
-    for (int i = 0; i < (int)count; i++) {
-        char key[20];
-        snprintf(key, sizeof(key), "bt_addr_%d", i);
-        prefs.getString(key, buf, sizeof(buf));
-        if (strcmp(buf, addr) == 0) {
-            prefs.end();
-            return i;
-        }
-    }
-
-    prefs.end();
-    return -1;
+    return cred_find(&BT_KIND, addr);
 }
 
 bool storage_bt_add(const char *addr, const char *name) {
-    if (!addr || !name) {
-        return false;
-    }
-    if (strlen(addr) == 0) {
-        return false;
-    }
-
-    Preferences prefs;
-    prefs.begin(NVS_NAMESPACE, false);
-
-    /* 若地址已存在则原地更新名称 */
-    uint8_t count = 0;
-    read_count(&prefs, "bt_count", &count);
-
-    char buf[STORAGE_BT_ADDR_MAX_LEN];
-    for (int i = 0; i < (int)count; i++) {
-        char key[20];
-        snprintf(key, sizeof(key), "bt_addr_%d", i);
-        prefs.getString(key, buf, sizeof(buf));
-        if (strcmp(buf, addr) == 0) {
-            char key_name[20];
-            snprintf(key_name, sizeof(key_name), "bt_name_%d", i);
-            prefs.putString(key_name, name);
-            prefs.end();
-            return true;
-        }
-    }
-
-    /* 追加到下一个空槽位 */
-    if (count >= STORAGE_MAX_BT_DEVICES) {
-        prefs.end();
-        return false;
-    }
-
-    char key_addr[20];
-    char key_name[20];
-    snprintf(key_addr, sizeof(key_addr), "bt_addr_%d", (int)count);
-    snprintf(key_name, sizeof(key_name), "bt_name_%d", (int)count);
-
-    prefs.putString(key_addr, addr);
-    prefs.putString(key_name, name);
-
-    uint8_t new_count = count + 1;
-    write_count(&prefs, "bt_count", new_count);
-
-    prefs.end();
-    return true;
+    return cred_add(&BT_KIND, addr, name);
 }
 
 bool storage_bt_remove(int index) {
-    if (index < 0 || index >= STORAGE_MAX_BT_DEVICES) {
-        return false;
-    }
-
-    Preferences prefs;
-    prefs.begin(NVS_NAMESPACE, false);
-
-    uint8_t count = 0;
-    read_count(&prefs, "bt_count", &count);
-    if (index >= (int)count) {
-        prefs.end();
-        return false;
-    }
-
-    /* 将后续条目前移填补空缺 */
-    for (int i = index; i < (int)count - 1; i++) {
-        char key_src_addr[20];
-        char key_dst_addr[20];
-        char key_src_name[20];
-        char key_dst_name[20];
-
-        snprintf(key_src_addr, sizeof(key_src_addr), "bt_addr_%d", i + 1);
-        snprintf(key_dst_addr, sizeof(key_dst_addr), "bt_addr_%d", i);
-        snprintf(key_src_name, sizeof(key_src_name), "bt_name_%d", i + 1);
-        snprintf(key_dst_name, sizeof(key_dst_name), "bt_name_%d", i);
-
-        char buf[STORAGE_BT_NAME_MAX_LEN];
-
-        prefs.getString(key_src_addr, buf, sizeof(buf));
-        prefs.putString(key_dst_addr, buf);
-
-        prefs.getString(key_src_name, buf, sizeof(buf));
-        prefs.putString(key_dst_name, buf);
-    }
-
-    /* 清空最后一个槽位 */
-    char key_last_addr[20];
-    char key_last_name[20];
-    snprintf(key_last_addr, sizeof(key_last_addr), "bt_addr_%d", (int)count - 1);
-    snprintf(key_last_name, sizeof(key_last_name), "bt_name_%d", (int)count - 1);
-    prefs.remove(key_last_addr);
-    prefs.remove(key_last_name);
-
-    uint8_t new_count = count - 1;
-    write_count(&prefs, "bt_count", new_count);
-
-    prefs.end();
-    return true;
+    return cred_remove(&BT_KIND, index);
 }
 
 /* ═══ 亮度 ═══ */
