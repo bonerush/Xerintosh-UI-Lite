@@ -19,6 +19,8 @@ App 层是用户应用代码所在。每个 App 在独立子目录中，通过 `
 | WiFi 管理 | — | `src/app/wifi/wifi_manager.cpp/h` | WiFi 状态机（扫描/连接/密码输入） |
 | 蓝牙管理 | — | `src/app/bluetooth/bt_manager.cpp/h` | 蓝牙管理器（NimBLE 扫描/配对） |
 | 串口输入 | — | `src/app/serial_input/serial_input.cpp/h` | 串口 CLI 输入（WiFi/蓝牙密码） |
+| UI 任务 | [ui-task.md](ui-task.md) | `src/app/ui_task.c` | Xerintosh UI 内核任务包装（输入→渲染→yield） |
+| 服务助手 | [svc-mgr-helper.md](svc-mgr-helper.md) | `src/app/svc_mgr_helper.c/h` | WiFi/BT 共享开关切换抽象 |
 
 ---
 

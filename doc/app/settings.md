@@ -35,7 +35,8 @@ int16_t anim_speed = 40 + g_anim_speed_level * 5;          /* 实际速度 45-95
 extern int16_t g_brightness_level;
 extern int16_t g_anim_speed_level;
 extern bool    g_anim_enabled;
-extern int16_t g_screen_rotation_level;
+extern bool    g_is_landscape;
+extern int16_t g_serial_baud_rate;
 ```
 
 ### 中文伪代码拆解
@@ -45,14 +46,16 @@ extern int16_t g_screen_rotation_level;
     亮度档位       /* 1-10，对应 10%-100% */
     动画速度档位   /* 1-10，对应 45-95 */
     动画开关       /* true/false */
-    屏幕方向档位   /* 1=竖屏, 2=横屏 */
+    横屏/竖屏开关   /* false=竖屏, true=横屏 */
+    波特率档位     /* 1-6，对应 9600-230400 */
 }
 
 /* 全局变量声明（定义在 settings.c 中） */
 亮度档位 = 5      /* 默认值 50% */
 动画速度档位 = 5  /* 默认值 70 */
 动画开关 = true
-屏幕方向档位 = 2  /* 默认横屏 */
+横屏开关 = false  /* 默认竖屏 */
+波特率档位 = 5    /* 默认值 115200 */
 ```
 
 ---
@@ -78,8 +81,9 @@ void settings_load_from_storage(void);
 *📄 Source: [settings.c](../../src/app/settings/settings.c#L57-L65)*
 
 ```c
-int16_t settings_brightness_hw_value(void);   /* 档位 → 0-255 硬件值 */
-int16_t settings_anim_speed_value(void);      /* 档位 → 45-95 实际速度 */
+int16_t settings_brightness_hw_value(void);      /* 亮度档位 → 0-255 硬件值 */
+int16_t settings_anim_speed_value(void);         /* 速度档位 → 45-95 实际速度 */
+int32_t settings_serial_baud_hw_value(int16_t);  /* 波特率档位 → 实际波特率数值 */
 ```
 
 ---
@@ -108,10 +112,11 @@ main.cpp setup():
 | 亮度 | `on_brightness_change_cb()` | `M5.Display.setBrightness(hw)` |
 | 动画速度 | `on_anim_speed_change_cb()` | 更新 `g_anim_speed` |
 | 动画开关 | `on_anim_enabled_change_cb()` | 更新 `g_anim_enabled` |
-| 屏幕方向 | `on_screen_rotation_change_cb()` | `M5.Display.setRotation()` |
+| 横屏/竖屏 | `on_screen_rotation_change_cb()` | `M5.Display.setRotation()` |
+| 波特率 | `on_serial_baud_change_cb()` | `Serial.end(); Serial.begin(baud)` |
 
 > **为什么回调在 main.cpp 中**：这些回调需要调用 `M5.Display` 等 C++ Arduino API，而 main.cpp 是唯一的 C++ 入口文件。
 
 ---
 
-> **See Also:** [App 初始化](app-init.md) | [存储模块](storage.md) | [屏幕旋转映射](../developer-guide.md)
+> **See Also:** [App 初始化](app-init.md) | [屏幕旋转映射](../developer-guide.md)

@@ -12,7 +12,7 @@
 
 ### 列表外观（滚动条 + 装饰线）
 
-*📄 Source: [ui_drawer.c](../../src/ui/ui_drawer.c#L244-L300)*
+*📄 Source: [ui_draw_list.c](../../src/ui/ui_draw_list.c#L130-L186)*
 
 ```c
 void xerintosh_draw_list_appearance()
@@ -83,7 +83,7 @@ void xerintosh_draw_list_appearance()
 
 ### 列表项绘制
 
-*📄 Source: [ui_drawer.c](../../src/ui/ui_drawer.c#L432-L524)*
+*📄 Source: [ui_draw_list.c](../../src/ui/ui_draw_list.c#L193-L278)*
 
 ```c
 void xerintosh_draw_list_item()
@@ -171,7 +171,7 @@ void xerintosh_draw_list_item()
 
 ### 选择器高亮（XOR 反色）
 
-*📄 Source: [ui_drawer.c](../../src/ui/ui_drawer.c#L599-L621)*
+*📄 Source: [ui_draw_list.c](../../src/ui/ui_draw_list.c#L287-L309)*
 
 ```c
 void xerintosh_draw_selector()
@@ -221,7 +221,7 @@ void xerintosh_draw_selector()
 
 ### 弹窗（Pop-up）
 
-*📄 Source: [ui_drawer.c](../../src/ui/ui_drawer.c#L191-L236)*
+*📄 Source: [ui_draw_widgets.c](../../src/ui/ui_draw_widgets.c#L74-L126)*
 
 ```c
 void xerintosh_draw_pop_up()
@@ -294,7 +294,7 @@ void xerintosh_draw_pop_up()
 
 信息栏与弹窗结构几乎一致，区别仅在于尺寸更小（`INFO_BAR_HEIGHT = 15` vs `POP_UP_HEIGHT = 20`）和默认位置不同。
 
-*📄 Source: [ui_drawer.c](../../src/ui/ui_drawer.c#L137-L183)*
+*📄 Source: [ui_draw_widgets.c](../../src/ui/ui_draw_widgets.c#L20-L72)*
 
 ---
 

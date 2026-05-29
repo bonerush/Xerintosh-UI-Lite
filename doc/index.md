@@ -27,9 +27,9 @@ Project Root
 │   └── [系统时钟](hal/system.md)       ← tick 与延时
 ├── UI 核心层（纯 C）
 │   ├── [绘制驱动适配](ui/draw-driver.md)  ← oled_* 宏映射到 HAL API
-│   ├── [项目系统](ui/item.md)          ← 列表项、开关、滑条、按钮、用户页
+│   ├── [项目系统](ui/item.md)          ← 列表项、开关、滑条、按钮、用户页（基类/树/选择器）
 │   ├── [核心引擎](ui/core.md)          ← 动画插值、相机、选择器、主循环
-│   ├── [绘制管线](ui/drawer.md)        ← 列表外观、选择器高亮、弹窗、信息栏
+│   ├── [绘制管线](ui/drawer.md)        ← 列表外观、选择器高亮、弹窗、信息栏、退场动画、图标
 │   └── [行列表动画工具](ui/ui-anim-row.md) ← 可复用行列表动画（入场滑入+高亮过渡）
 ├── App 层（每个 App 独立子目录）
 │   ├── app_init.c/h        ← 菜单构建、管理器初始化、输入处理
@@ -40,7 +40,10 @@ Project Root
 │   ├── bluetooth/          ← 蓝牙管理器（NimBLE 扫描/配对）
 │   ├── serial_input/       ← 串口 CLI 输入（WiFi 密码/蓝牙配对码）
 │   ├── serial_monitor/     ← 串口监视器 App（缓冲区/状态机/界面）
-│   └── taskmgr/             ← 任务管理器 App（进程列表/终止/保护）
+│   ├── taskmgr/             ← 任务管理器 App（进程列表/终止/保护）
+│   ├── about/              ← 关于页面（版本/Logo/开发者信息）
+│   ├── ui_task.c           ← UI 内核任务包装（输入→渲染→yield）
+│   └── svc_mgr_helper.c/h  ← WiFi/BT 共享开关切换抽象
 ├── [编码风格规范](coding-style.md)     ← C OOP 命名、封装、继承规范
 ├── [内核优化分析](kernel-optimization-analysis.md) ← 7 模块诊断+方案+收益
 ├── 教程
@@ -110,6 +113,8 @@ FreeRTOS 继续在底层为 WiFi/BT 协议栈服务；Xeros 内核运行在 Ardu
 - **[系统调用接口](kernel/kern-syscall.md)** — 统一分发器与用户态封装
 - **[内核 Shell](kernel/kern-shell.md)** — 串口交互式命令行（30+ 命令，含 scope/top/param 等）
 - **[物理设备驱动](kernel/kern-devices.md)** — /dev/fb0 / /dev/input0 / /dev/ttyS0
+- **[Shell 命令实现](kernel/kern-shell-cmds.md)** — 30+ 内置命令与动态注册
+- **[Shell 解析器](kernel/kern-shell-parser.md)** — 输入行解析（引号支持、参数分割）
 - **[内核优化分析](kernel-optimization-analysis.md)** — 7 模块诊断+方案+代码+收益
 
 ### App 层
@@ -117,6 +122,8 @@ FreeRTOS 继续在底层为 WiFi/BT 协议栈服务；Xeros 内核运行在 Ardu
 - **[设置管理](app/settings.md)** — 亮度/动画/方向/波特率配置与存储
 - **[任务管理器](app/taskmgr.md)** — 进程列表查看与安全终止（动画行列表 + 横屏 3 行）
 - **[串口监视器](app/serial-monitor.md)** — 串口数据监视（入场滑入动画 + 按钮平滑过渡）
+- **[UI 任务](app/ui-task.md)** — 内核任务包装的 UI 主循环
+- **[服务管理助手](app/svc-mgr-helper.md)** — WiFi/BT 共享开关切换抽象
 
 ### 入门教程
 - **[从零开始创建 App](tutorials/your-first-app.md)** — 面向初学者的完整教程，手把手教你创建第一个 `user_item` App
@@ -130,7 +137,7 @@ FreeRTOS 继续在底层为 WiFi/BT 协议栈服务；Xeros 内核运行在 Ardu
 - **[绘制驱动适配](ui/draw-driver.md)** — 从 `oled_*` 到 `hal_*` 的宏桥接层
 - **[项目系统](ui/item.md)** — 列表项类型层次、构造与挂载、选择器与相机
 - **[核心引擎](ui/core.md)** — 动画系统、相机滚动、主循环调度
-- **[绘制管线](ui/drawer.md)** — 列表外观绘制、选择器渲染、弹窗与信息栏
+- **[绘制管线](ui/drawer.md)** — 列表外观绘制、选择器渲染、弹窗与信息栏、退场动画、图标
 - **[行列表动画工具](ui/ui-anim-row.md)** — 可复用行列表动画（入场滑入 + 高亮平滑过渡）
 
 ## 快速链接

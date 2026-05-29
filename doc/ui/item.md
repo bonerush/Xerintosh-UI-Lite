@@ -124,13 +124,12 @@ typedef struct xerintosh_user_item_t {
 
 ### 类型转换函数
 
-*📄 Source: [ui_item.c](../../src/ui/ui_item.c#L125-L130)*
+*📄 Source: [ui_item_base.c](../../src/ui/ui_item_base.c#L31-L49)*
 
 ```c
-xerintosh_switch_item_t *xerintosh_to_switch_item(xerintosh_list_item_t *_item) {
-    if (_item != NULL && _item->type == switch_item)
-        return (xerintosh_switch_item_t*)_item;
-    return (xerintosh_switch_item_t*)xerintosh_get_root_list();
+xerintosh_switch_item_t *xerintosh_to_switch_item(xerintosh_list_item_t *_xerintosh_list_item)
+{
+  return (xerintosh_switch_item_t*)xerintosh_safe_cast(_xerintosh_list_item, switch_item);
 }
 ```
 
@@ -138,7 +137,7 @@ xerintosh_switch_item_t *xerintosh_to_switch_item(xerintosh_list_item_t *_item) 
 
 ### 构造与挂载
 
-*📄 Source: [ui_item.c](../../src/ui/ui_item.c#L209-L230)*
+*📄 Source: [ui_item_base.c](../../src/ui/ui_item_base.c#L97-L103)*
 
 ```c
 xerintosh_list_item_t *xerintosh_new_list_item(char *_content, xerintosh_list_item_icon_t icon) {
@@ -173,7 +172,7 @@ xerintosh_list_item_t *xerintosh_new_list_item(char *_content, xerintosh_list_it
 
 ### 挂载到树（Push）
 
-*📄 Source: [ui_item.c](../../src/ui/ui_item.c#L592-L617)*
+*📄 Source: [ui_item_list.c](../../src/ui/ui_item_list.c#L25-L60)*
 
 ```c
 bool xerintosh_push_item_to_list(xerintosh_list_item_t *_parent, xerintosh_list_item_t *_child) {
@@ -253,7 +252,7 @@ typedef struct xerintosh_selector_t {
 
 ### 导航函数
 
-*📄 Source: [ui_item.c](../../src/ui/ui_item.c#L373-L400)*
+*📄 Source: [ui_item_selector.c](../../src/ui/ui_item_selector.c#L71-L104)*
 
 ```c
 void xerintosh_selector_go_next_item() {
@@ -300,7 +299,7 @@ void xerintosh_selector_go_next_item() {
 
 ### 确认与回退
 
-*📄 Source: [ui_item.c](../../src/ui/ui_item.c#L494-L537)*
+*📄 Source: [ui_item_selector.c](../../src/ui/ui_item_selector.c#L200-L253)*
 
 ```c
 void xerintosh_selector_jump_to_selected_item() {

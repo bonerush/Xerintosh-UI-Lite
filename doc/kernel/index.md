@@ -62,7 +62,9 @@ FreeRTOS 继续在底层为 WiFi/BT 协议栈服务，Xeros 运行在 Arduino `l
 | Scope | [kern-shell.md](kern-shell.md#scope--实时数据监测引擎phase-3-新增) | `kern_shell_cmds.c`, `kern_shell_cmds_internal.h` | 实时数据监测引擎（周期 CSV 输出） |
 | GPIO 桥接 | [kern-gpiofs.md](kern-gpiofs.md) | `kern_gpiofs.c/h` | /sys/gpio 引脚状态映射与读写 |
 | 版本信息 | [kern-version.md](kern-version.md) | `kern_version.h` | 版本号与开发者信息集中管理 |
-| 物理设备 | [kern-devices.md](kern-devices.md) | `devices/kern_devices.c` | `/dev/fb0` 帧缓冲、`/dev/input0` 按键、`/dev/ttyS0` 串口 |
+| 物理设备 | [kern-devices.md](kern-devices.md) | `devices/kern_devices.c`, `dev_fb0.c`, `dev_input0.c`, `dev_ttyS0.cpp` | `/dev/fb0` 帧缓冲、`/dev/input0` 按键、`/dev/ttyS0` 串口 |
+| Shell 命令 | [kern-shell-cmds.md](kern-shell-cmds.md) | `kern_shell_cmds.c/h`, `kern_shell_cmds_internal.h` | 30+ 内置命令实现与动态注册 |
+| Shell 解析器 | [kern-shell-parser.md](kern-shell-parser.md) | `kern_shell_parser.c/h` | 输入行解析（引号支持、参数分割） |
 
 ## 关键设计决策
 

@@ -28,18 +28,48 @@ void app_init_ui(void)
     xerintosh_list_item_t* root = xerintosh_get_root_list();
 
     xerintosh_list_item_t* item1 = xerintosh_new_list_item("设置", list_icon);
-    xerintosh_list_item_t* item2 = xerintosh_new_list_item("关于", user_icon);
+    xerintosh_list_item_t* item2 = xerintosh_new_user_item(
+        "任务管理器", taskmgr_init, taskmgr_loop, taskmgr_exit, user_icon);
+    xerintosh_list_item_t* item3 = xerintosh_new_user_item(
+        "串口监视器", serial_monitor_init, serial_monitor_loop, serial_monitor_exit, default_icon);
+    xerintosh_list_item_t* item4 = xerintosh_new_user_item(
+        "关于", about_init, about_loop, about_exit, user_icon);
 
     xerintosh_list_item_t* sw1 = xerintosh_new_switch_item(
-        "WiFi", &wifi_on, NULL, wifi_mgr_on_switch_toggle, default_icon);
+        "WiFi", &g_wifi_on, NULL, wifi_mgr_on_switch_toggle, default_icon);
     xerintosh_list_item_t* sw2 = xerintosh_new_switch_item(
-        "蓝牙", &bt_on, NULL, bt_mgr_on_switch_toggle, default_icon);
-    /* ... 更多控件 ... */
+        "蓝牙", &g_bt_on, NULL, bt_mgr_on_switch_toggle, default_icon);
+    xerintosh_list_item_t* sl1 = xerintosh_new_slider_item(
+        "亮度", &g_brightness_level, 1, 1, 10, NULL, on_brightness_change_cb, default_icon);
+    xerintosh_list_item_t* sw_anim = xerintosh_new_switch_item(
+        "动画效果", &g_anim_enabled, NULL, on_anim_enabled_change_cb, default_icon);
+    xerintosh_list_item_t* sl_anim = xerintosh_new_slider_item(
+        "动画速度", &g_anim_speed_level, 1, 1, 10, NULL, on_anim_speed_change_cb, default_icon);
+    xerintosh_list_item_t* sw_rot = xerintosh_new_switch_item(
+        "横屏/竖屏", &g_is_landscape, NULL, on_screen_rotation_change_cb, default_icon);
+
+    /* 波特率子菜单 */
+    xerintosh_list_item_t* baud_menu = xerintosh_new_list_item("波特率", list_icon);
+    const char *baud_labels[] = {"9600", "19200", "38400", "57600", "115200", "230400"};
+    int16_t baud_levels[] = {1, 2, 3, 4, 5, 6};
+    for (int i = 0; i < 6; i++) {
+        xerintosh_list_item_t* btn = xerintosh_new_button_item(
+            baud_labels[i], on_baud_selected_cb, default_icon);
+        btn->user_data = (void*)(intptr_t)baud_levels[i];
+        xerintosh_push_item_to_list(baud_menu, btn);
+    }
 
     xerintosh_push_item_to_list(root, item1);
     xerintosh_push_item_to_list(root, item2);
+    xerintosh_push_item_to_list(root, item3);
+    xerintosh_push_item_to_list(root, item4);
     xerintosh_push_item_to_list(item1, sw1);
-    /* ... */
+    xerintosh_push_item_to_list(item1, sw2);
+    xerintosh_push_item_to_list(item1, sl1);
+    xerintosh_push_item_to_list(item1, sw_anim);
+    xerintosh_push_item_to_list(item1, sl_anim);
+    xerintosh_push_item_to_list(item1, sw_rot);
+    xerintosh_push_item_to_list(item1, baud_menu);
 }
 ```
 
@@ -60,9 +90,16 @@ void app_init_ui(void)
     方向滑条 = 新建滑条项("屏幕方向", 方向档位指针, 范围1-2, 回调)
 
     挂载(根节点, 设置项)
+    挂载(根节点, 任务管理器)
+    挂载(根节点, 串口监视器)
     挂载(根节点, 关于项)
     挂载(设置项, WiFi开关)
-    /* ... */
+    挂载(设置项, 蓝牙开关)
+    挂载(设置项, 亮度滑条)
+    挂载(设置项, 动画开关)
+    挂载(设置项, 速度滑条)
+    挂载(设置项, 方向开关)
+    挂载(设置项, 波特率菜单)
 }
 ```
 
@@ -126,12 +163,13 @@ void app_input_process(void)
 
 | 变量 | 提供者 | 说明 |
 |------|--------|------|
-| `wifi_on` | `main.cpp` / `native_main.cpp` | WiFi 开关状态 |
-| `bt_on` | `main.cpp` / `native_main.cpp` | 蓝牙开关状态 |
+| `g_wifi_on` | `main.cpp` / `native_main.cpp` | WiFi 开关状态 |
+| `g_bt_on` | `main.cpp` / `native_main.cpp` | 蓝牙开关状态 |
 | `g_brightness_level` | `settings.c` | 亮度档位 |
 | `g_anim_speed_level` | `settings.c` | 动画速度档位 |
-| `g_anim_enabled` | `ui_core.c` | 动画开关 |
-| `g_screen_rotation_level` | `settings.c` | 屏幕方向档位 |
+| `g_anim_enabled` | `settings.c` | 动画开关 |
+| `g_is_landscape` | `settings.c` | 横屏/竖屏开关 |
+| `g_serial_baud_rate` | `settings.c` | 串口波特率档位 |
 
 ---
 

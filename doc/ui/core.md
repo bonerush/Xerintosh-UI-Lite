@@ -17,7 +17,7 @@
 
 ### 动画插值公式
 
-*📄 Source: [ui_core.c](../../src/ui/ui_core.c#L53-L65)*
+*📄 Source: [ui_core.c](../../src/ui/ui_core.c#L45-L60)*
 
 ```c
 void xerintosh_animation(float *_pos, float _pos_trg, float _speed)
@@ -63,7 +63,7 @@ void xerintosh_animation(float *_pos, float _pos_trg, float _speed)
 
 ### 相机（视口）滚动
 
-*📄 Source: [ui_core.c](../../src/ui/ui_core.c#L91-L102)*
+*📄 Source: [ui_core.c](../../src/ui/ui_core.c#L83-L97)*
 
 ```c
 void xerintosh_refresh_camera_position()
@@ -105,7 +105,7 @@ void xerintosh_refresh_camera_position()
 
 ### 选择器位置刷新
 
-*📄 Source: [ui_core.c](../../src/ui/ui_core.c#L157-L168)*
+*📄 Source: [ui_core.c](../../src/ui/ui_core.c#L139-L150)*
 
 ```c
 void xerintosh_refresh_selector_position()
@@ -149,7 +149,7 @@ void xerintosh_refresh_selector_position()
 
 ### 主循环调度
 
-*📄 Source: [ui_core.c](../../src/ui/ui_core.c#L193-L240)*
+*📄 Source: [ui_core.c](../../src/ui/ui_core.c#L169-L216)*
 
 ```c
 void xerintosh_ui_main_core()
