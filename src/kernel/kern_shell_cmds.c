@@ -446,8 +446,6 @@ static void cmd_kill(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cw
         sh_println(tty, "kill: task already zombie");
         return;
     }
-
-    /* 保护系统关键任务 */
     if (kern_task_is_protected(task)) {
         char msg[64];
         snprintf(msg, sizeof(msg), "kill: cannot kill system task '%s'", task->name);
@@ -455,20 +453,14 @@ static void cmd_kill(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cw
         return;
     }
 
-    /* 虚任务：注销而非标记 ZOMBIE（避免 TCB 泄漏） */
-    if (task->flags & KERN_TASK_FLAG_VIRTUAL) {
-        char msg[64];
-        snprintf(msg, sizeof(msg), "task %ld (%s) killed", pid_l, task->name);
-        sh_println(tty, msg);
-        /* 通知 UI 任务退出当前 user_item */
-        extern bool g_xerintosh_exit_requested;
-        g_xerintosh_exit_requested = true;
-        return;
-    }
-
-    task->state = KERN_TASK_ZOMBIE;
+    /* 使用统一 kill API（处理虚任务注销 + FreeRTOS 线程销毁） */
+    int ret = kern_task_kill((kern_pid_t)pid_l);
     char msg[64];
-    snprintf(msg, sizeof(msg), "task %ld (%s) killed", pid_l, task->name);
+    if (ret == 0) {
+        snprintf(msg, sizeof(msg), "task %ld (%s) killed", pid_l, task->name);
+    } else {
+        snprintf(msg, sizeof(msg), "kill: failed (err=%d)", ret);
+    }
     sh_println(tty, msg);
 }
 

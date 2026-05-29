@@ -24,8 +24,14 @@
 #include "ui/ui_item.h"
 #include "ui/ui_anim_row.h"
 
+#ifndef NATIVE_TEST
+#include "app/wifi/wifi_manager.h"
+#include "app/bluetooth/bt_manager.h"
+#endif
+
 #include <stdio.h>
 #include <math.h>
+#include <string.h>
 
 /* ═══ 常量 ═══ */
 
@@ -172,11 +178,15 @@ void taskmgr_loop(void)
             if (g_tm.selected >= 0 && g_tm.selected < g_tm.count) {
                 kern_task_t *t = g_tm.tasks[g_tm.selected];
                 if (t != NULL && !kern_task_is_protected(t)) {
-                    if (t->flags & KERN_TASK_FLAG_VIRTUAL) {
-                        kern_task_unregister_virtual(t->pid);
-                    } else {
-                        t->state = KERN_TASK_ZOMBIE;
+#ifndef NATIVE_TEST
+                    /* 特殊任务：先清理硬件再杀任务 */
+                    if (strcmp(t->name, "wifi-mgr") == 0) {
+                        wifi_mgr_disable();
+                    } else if (strcmp(t->name, "bt-mgr") == 0) {
+                        bt_mgr_disable();
                     }
+#endif
+                    kern_task_kill(t->pid);
                     xerintosh_push_pop_up("Killed", 1000);
                 }
             }

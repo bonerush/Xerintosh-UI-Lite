@@ -47,6 +47,8 @@ extern bool wifi_on;   /* 定义在 main.cpp */
 
 static wifi_mgr_state_t g_state           = WIFI_MGR_IDLE;    /* 状态机当前状态 */
 static bool             g_wifi_enabled    = false;            /* WiFi 是否已启用 */
+static bool             g_wifi_task_exit  = false;            /* 任务退出标志 */
+static kern_pid_t       g_wifi_mgr_pid    = KERN_PID_INVALID; /* 任务 PID */
 
 /* UI 菜单指针（用于动态构建/清理网络菜单） */
 static xerintosh_list_item_t *g_settings_list      = NULL;  /* "设置" 列表项 */
@@ -80,6 +82,7 @@ static void on_scan_pressed(void);
 static void rebuild_network_list(int scan_count);
 static void suppress_wifi_logs(void);
 static void restore_wifi_logs(void);
+extern "C" void wifi_mgr_task_main(void *arg);
 
 /* ═══ 公共查询接口 ═══ */
 
@@ -126,6 +129,18 @@ void wifi_mgr_init(void)
  */
 void wifi_mgr_enable(void)
 {
+    /* 若任务已退出或被杀死，重新创建 */
+    if (g_wifi_mgr_pid != KERN_PID_INVALID) {
+        kern_task_t *t = kern_task_get(g_wifi_mgr_pid);
+        if (t == NULL || t->state == KERN_TASK_ZOMBIE) {
+            g_wifi_mgr_pid = KERN_PID_INVALID;
+        }
+    }
+    if (g_wifi_mgr_pid == KERN_PID_INVALID) {
+        g_wifi_task_exit = false;
+        g_wifi_mgr_pid = kern_spawn("wifi-mgr", wifi_mgr_task_main, NULL, 4096);
+    }
+
     g_wifi_enabled = true;
     WiFi.mode(WIFI_STA);
     g_warmup_start_time = millis();
@@ -162,6 +177,7 @@ void wifi_mgr_disable(void)
     WiFi.disconnect();
     WiFi.mode(WIFI_OFF);
     g_wifi_enabled = false;
+    g_wifi_task_exit = true;  /* 通知任务退出 */
 
     if (g_networks_list) {
         /* 若选择器当前位于网络子树内，将其移回设置项 */
@@ -529,6 +545,9 @@ extern "C" void wifi_mgr_task_main(void *arg)
 {
     (void)arg;
     for (;;) {
+        if (g_wifi_task_exit) {
+            kern_exit();  /* 退出任务，销毁 FreeRTOS 线程 */
+        }
         wifi_mgr_update();
         kern_sleep_ms(50);
     }
