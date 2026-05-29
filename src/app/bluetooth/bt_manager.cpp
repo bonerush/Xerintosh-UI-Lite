@@ -384,10 +384,7 @@ void bt_mgr_on_switch_toggle(void) {
 extern "C" void bt_mgr_task_main(void *arg)
 {
     (void)arg;
-    for (;;) {
-        bt_mgr_update();
-        kern_sleep_ms(50);
-    }
+    kern_poll_loop(bt_mgr_update, 50);
 }
 
 #endif /* NATIVE_TEST */

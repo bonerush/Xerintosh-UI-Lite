@@ -529,10 +529,7 @@ void wifi_mgr_update(void)
 extern "C" void wifi_mgr_task_main(void *arg)
 {
     (void)arg;
-    for (;;) {
-        wifi_mgr_update();
-        kern_sleep_ms(50);
-    }
+    kern_poll_loop(wifi_mgr_update, 50);
 }
 
 #endif /* NATIVE_TEST */

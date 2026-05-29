@@ -135,6 +135,22 @@ extern int kern_task_kill(kern_pid_t pid);
  */
 extern void kern_sleep_ms(uint32_t ms);
 
+/* ═══ 工具函数 ═══ */
+
+/**
+ * @brief  通用轮询任务循环（永不返回）
+ * @param  update_fn   每轮调用的更新函数
+ * @param  interval_ms 轮询间隔（毫秒）
+ * @note   替代手写的 for(;;) { update(); kern_sleep_ms(n); } 模式
+ */
+static inline void kern_poll_loop(void (*update_fn)(void), uint32_t interval_ms)
+{
+    for (;;) {
+        update_fn();
+        kern_sleep_ms(interval_ms);
+    }
+}
+
 /* ═══ 查询接口 ═══ */
 
 extern kern_task_t *kern_task_current(void);
