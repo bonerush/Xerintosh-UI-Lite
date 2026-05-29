@@ -170,7 +170,6 @@ typedef struct xerintosh_list_item_t
   void *user_data;                   /* 用户自定义数据 */
 
   /* 文字滚动状态 */
-  float content_scroll_offset;       /* 当前滚动偏移 */
   uint32_t scroll_start_time;        /* 滚动开始时间戳 */
   bool is_scrolling;                 /* 是否正在滚动 */
 
@@ -368,12 +367,6 @@ typedef struct xerintosh_selector_t
 } xerintosh_selector_t;
 
 extern xerintosh_selector_t g_xerintosh_selector;  /* 全局选择器实例 */
-
-/**
- * @brief  获取选择器指针
- * @return 选择器指针
- */
-extern xerintosh_selector_t* xerintosh_get_selector(void);
 
 /**
  * @brief  将指定项绑定到选择器

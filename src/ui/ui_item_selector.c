@@ -17,15 +17,6 @@
 xerintosh_selector_t g_xerintosh_selector = {};
 
 /**
- * @brief  获取选择器指针
- * @return 选择器指针
- */
-xerintosh_selector_t *xerintosh_get_selector()
-{
-  return &g_xerintosh_selector;
-}
-
-/**
  * @brief  在父项的子项列表中查找目标项的索引
  * @param  _parent 父项指针
  * @param  _target 目标子项指针

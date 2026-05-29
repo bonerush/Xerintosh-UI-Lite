@@ -18,10 +18,6 @@
 extern "C" {
 #endif
 
-/* ═══ 全局状态 ═══ */
-
-extern uint8_t g_xerintosh_exit_animation_status;  /* 退场动画阶段状态机 */
-
 /* ═══ 绘制函数 ═══ */
 
 /**
@@ -70,11 +66,6 @@ extern void xerintosh_draw_item_bitmap(xerintosh_list_item_t *_item, uint16_t x,
  * @brief 绘制选择器高亮框（XOR 反色矩形 + 右侧虚线装饰）
  */
 extern void xerintosh_draw_selector(void);
-
-/**
- * @brief 绘制所有控件（信息栏 + 弹窗）
- */
-extern void xerintosh_draw_widget(void);
 
 /**
  * @brief  绘制长按进度提示条

@@ -63,19 +63,9 @@ extern void xerintosh_refresh_list_item_position(void);
 extern void xerintosh_refresh_selector_position(void);
 
 /**
- * @brief 刷新主核心位置（调用列表刷新）
- */
-extern void xerintosh_refresh_main_core_position(void);
-
-/**
  * @brief 刷新相机位置，确保选择器始终处于可视区域
  */
 extern void xerintosh_refresh_camera_position(void);
-
-/**
- * @brief 刷新控件核心位置（信息栏 + 弹窗）
- */
-extern void xerintosh_refresh_widget_core_position(void);
 
 /**
  * @brief 刷新信息栏位置与宽度

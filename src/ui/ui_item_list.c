@@ -12,7 +12,6 @@
 #include <string.h>
 
 #include "ui_core.h"
-#include "hal/hal_system.h"
 
 /**
  * @brief  将子项挂载到父项下

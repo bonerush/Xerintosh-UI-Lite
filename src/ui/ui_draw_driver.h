@@ -19,15 +19,6 @@
 extern "C" {
 #endif
 
-/* ═══ 全局绘制颜色 ═══ */
-
-extern uint16_t g_xerintosh_draw_color;  /* 当前前景色（COLOR_FG / COLOR_BG） */
-
-/* ═══ 系统兼容宏（保留供外部代码使用） ═══ */
-
-#define get_ticks() hal_get_ticks()
-#define delay(ms)   hal_delay_ms(ms)
-
 /* ═══ 生命周期 ═══ */
 
 /**

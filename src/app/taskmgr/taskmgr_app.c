@@ -30,7 +30,6 @@
 #endif
 
 #include <stdio.h>
-#include <math.h>
 #include <string.h>
 
 /* ═══ 常量 ═══ */

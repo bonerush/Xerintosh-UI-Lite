@@ -51,7 +51,7 @@ void xerintosh_animation(float *_pos, float _pos_trg, float _speed)
       return;
     }
     if (_speed >= 99.0f) _speed = 99.0f;
-    if (fabs(*_pos - _pos_trg) <= 1.0f) *_pos = _pos_trg;
+    if (fabsf(*_pos - _pos_trg) <= 1.0f) *_pos = _pos_trg;
     else *_pos += (_pos_trg - *_pos) / (100.0f - _speed) / 1.0f;
   }
 }
@@ -94,16 +94,6 @@ void xerintosh_refresh_camera_position()
 }
 
 /**
- * @brief 刷新控件核心位置（信息栏 + 弹窗）
- */
-void xerintosh_refresh_widget_core_position()
-{
-  /* 需要调用所有的 widget refresh 函数 */
-  xerintosh_refresh_info_bar();
-  xerintosh_refresh_pop_up();
-}
-
-/**
  * @brief 初始化列表动画起始位置
  * @note  将所有根节点子项的 y 坐标归零，用于入场动画
  */
@@ -129,7 +119,7 @@ void xerintosh_init_core()
     xerintosh_bind_item_to_selector(root->child_list_item[0]);
   else
     xerintosh_bind_item_to_selector(root);
-  xerintosh_bind_selector_to_camera(xerintosh_get_selector());
+  xerintosh_bind_selector_to_camera(&g_xerintosh_selector);
 }
 
 /**
@@ -159,14 +149,6 @@ void xerintosh_refresh_selector_position()
   xerintosh_animation(&g_xerintosh_selector.h_selector, g_xerintosh_selector.h_selector_trg, ANIM_SPEED_SELECTOR_H);
 }
 
-/**
- * @brief 刷新主核心位置（调用列表刷新）
- */
-void xerintosh_refresh_main_core_position()
-{
-  xerintosh_refresh_list_item_position();
-}
-
 /* ═══ 主循环 ═══ */
 
 /**
@@ -174,8 +156,10 @@ void xerintosh_refresh_main_core_position()
  */
 void xerintosh_ui_widget_core()
 {
-  xerintosh_refresh_widget_core_position();
-  xerintosh_draw_widget();
+  xerintosh_refresh_info_bar();
+  xerintosh_refresh_pop_up();
+  xerintosh_draw_info_bar();
+  xerintosh_draw_pop_up();
 }
 
 /**
@@ -234,7 +218,7 @@ void xerintosh_ui_main_core()
   } else
   {
     xerintosh_refresh_camera_position();
-    xerintosh_refresh_main_core_position();
+    xerintosh_refresh_list_item_position();
     xerintosh_refresh_selector_position();
     xerintosh_draw_list();
   }

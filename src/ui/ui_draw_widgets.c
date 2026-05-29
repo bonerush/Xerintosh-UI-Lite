@@ -118,13 +118,8 @@ void xerintosh_draw_pop_up()
                  g_xerintosh_pop_up.content, g_xerintosh_draw_color);
 }
 
-/* ═══ 控件聚合 ═══ */
+/* ═══ 控件聚合 ═══
 
-/**
- * @brief 绘制所有控件（信息栏 + 弹窗）
+ * @note  xerintosh_draw_widget() 已内联到 xerintosh_ui_widget_core() 中，
+ *        直接调用 xerintosh_draw_info_bar() 和 xerintosh_draw_pop_up()。
  */
-void xerintosh_draw_widget()
-{
-  xerintosh_draw_info_bar();
-  xerintosh_draw_pop_up();
-}

@@ -8,7 +8,6 @@
 
 #include "ui_drawer.h"
 #include "ui_core.h"
-#include "hal/hal_system.h"
 
 /* ═══ 全局状态定义 ═══ */
 

@@ -29,9 +29,9 @@ static bool is_item_visible(int16_t _y_item)
 /* ═══ 各类列表项绘制 ═══ */
 
 /**
- * @brief 绘制普通列表项（仅图标）
+ * @brief 绘制仅图标列表项（list/button/user 公用）
  */
-static void draw_list_item_list(xerintosh_list_item_t *_item, int16_t _x, int16_t _y)
+static void draw_list_item_icon_only(xerintosh_list_item_t *_item, int16_t _x, int16_t _y)
 {
   if (is_item_visible(_y))
     xerintosh_draw_list_icon(_item->icon, _x, _y);
@@ -63,15 +63,6 @@ static void draw_list_item_switch(xerintosh_switch_item_t *_switch, int16_t _x, 
     hal_draw_fill_rect(SCREEN_WIDTH - LIST_ITEM_RIGHT_MARGIN - 5, _y, 3, 3, g_xerintosh_draw_color);
     hal_draw_pixel(SCREEN_WIDTH - LIST_ITEM_RIGHT_MARGIN, _y + 1, g_xerintosh_draw_color);
   }
-}
-
-/**
- * @brief 绘制按钮项（仅图标）
- */
-static void draw_list_item_button(xerintosh_button_item_t *_button, int16_t _x, int16_t _y)
-{
-  if (is_item_visible(_y))
-    xerintosh_draw_list_icon(_button->base_item.icon, _x, _y);
 }
 
 /**
@@ -128,15 +119,6 @@ static void xerintosh_draw_slider_overlays(void)
     g_xerintosh_draw_color = COLOR_FG;
     hal_draw_string(_x_value + 2, _y + hal_get_font_height() / 2, _value_str, g_xerintosh_draw_color);
   }
-}
-
-/**
- * @brief 绘制用户自定义项（仅图标）
- */
-static void draw_list_item_user(xerintosh_list_item_t *_item, int16_t _x, int16_t _y)
-{
-  if (is_item_visible(_y))
-    xerintosh_draw_list_icon(_item->icon, _x, _y);
 }
 
 /* ═══ 列表外观 ═══ */
@@ -221,23 +203,18 @@ void xerintosh_draw_list_item()
     switch (_item->type)
     {
       case list_item:
-        draw_list_item_list(_item, _x_list_item, _y_list_item);
+      case button_item:
+      case user_item:
+        draw_list_item_icon_only(_item, _x_list_item, _y_list_item);
         break;
       case switch_item:
         draw_list_item_switch(xerintosh_to_switch_item(_item), _x_list_item, _y_list_item);
         break;
-      case button_item:
-        draw_list_item_button(xerintosh_to_button_item(_item), _x_list_item, _y_list_item);
-        break;
       case slider_item:
         draw_list_item_slider(xerintosh_to_slider_item(_item), _x_list_item, _y_list_item);
         break;
-      case user_item:
-        draw_list_item_user(_item, _x_list_item, _y_list_item);
-        break;
       default:
-        if (is_item_visible(_y_list_item))
-          xerintosh_draw_list_icon(_item->icon, _x_list_item, _y_list_item);
+        draw_list_item_icon_only(_item, _x_list_item, _y_list_item);
         break;
     }
 

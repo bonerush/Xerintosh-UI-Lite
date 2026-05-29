@@ -23,8 +23,6 @@
 /* ═══ 常量 ═══ */
 
 #define SHELL_BUF_SIZE    128      /* 输入行缓冲区 */
-#define HISTORY_SIZE      16       /* 历史条数（与 kern_shell_cmds.c 一致） */
-
 /* ═══ 外部声明 ═══ */
 
 extern void shell_history_add(const char *cmd);
