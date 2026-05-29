@@ -11,12 +11,15 @@
 
 #include "kernel/kern_task.h"
 #include "ui/ui_anim_row.h"
+#include "hal/hal_layout.h"
 #include <stdbool.h>
 
 /* ═══ 布局常量（taskmgr_app.c / taskmgr_ui.c 共享）═══ */
 
-#define TASKMGR_HEADER_Y    0
-#define TASKMGR_LEFT_MARGIN 4
+#define TASKMGR_LEFT_MARGIN  HAL_LEFT_X()         /* 标准左缩进 = HAL_MARGIN_MD(4) */
+#define TASKMGR_HEADER_H     HAL_ROW_H()           /* 标题栏高度 */
+#define TASKMGR_FOOTER_H     HAL_ROW_H()           /* 底部信息栏高度 */
+#define TASKMGR_ROW_H        HAL_ROW_H()           /* 列表行高 */
 
 #ifdef __cplusplus
 extern "C" {

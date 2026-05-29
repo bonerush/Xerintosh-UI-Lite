@@ -11,6 +11,7 @@
 #include "kernel/kern_version.h"
 #include "app/boot/boot_screen.h"
 #include "hal/hal_display.h"
+#include "hal/hal_layout.h"
 #include "hal/hal_input.h"
 #include "ui/ui_core.h"
 #include "ui/ui_item.h"
@@ -20,17 +21,16 @@
 /* ═══ 布局常量 ═══ */
 
 #define ABOUT_LOGO_SCALE   80
-#define ABOUT_LEFT_MARGIN  4
-#define ABOUT_SEP_GAP      10
-#define ABOUT_INFO_GAP     17
-#define ABOUT_TITLE_GAP    4
+#define ABOUT_LEFT_MARGIN  HAL_LEFT_X()       /* 标准左缩进 = HAL_MARGIN_MD(4) */
+#define ABOUT_SEP_GAP      10                 /* 分隔线间距 */
+#define ABOUT_INFO_GAP     17                 /* 信息区间距 */
+#define ABOUT_TITLE_GAP    4                  /* 标题与 logo 间距 */
 
 /* ═══ 渲染 ═══ */
 
 static void about_draw(void)
 {
     int16_t fh = hal_get_font_height();
-    int16_t sh = SCREEN_HEIGHT;
 
     /* Logo 像素尺寸（必须与 boot_screen_draw_logo 内部公式一致） */
     int16_t logo_w = 44 * ABOUT_LOGO_SCALE / 100;
@@ -55,15 +55,15 @@ static void about_draw(void)
     }
 
     /* 垂直居中：logo + 标题作为一个整体 */
-    int16_t y0 = (sh - (logo_h + fh + ABOUT_TITLE_GAP)) / 2;
     int16_t group_h = logo_h + fh + ABOUT_TITLE_GAP;
+    int16_t y0 = HAL_CENTER_Y(group_h);
 
     boot_screen_draw_logo(logo_x, y0, ABOUT_LOGO_SCALE);
     hal_draw_string(title_x, y0 + group_h, "Xerintosh", COLOR_FG);
 
     /* 分隔线（纵贯屏幕） */
     hal_draw_v_line(ABOUT_LEFT_MARGIN + content_w + ABOUT_SEP_GAP,
-                    y0, sh - 2 * y0, COLOR_FG);
+                    y0, SCREEN_HEIGHT - 2 * y0, COLOR_FG);
 
     /* 信息区 */
     hal_set_font(hal_get_cn_font());

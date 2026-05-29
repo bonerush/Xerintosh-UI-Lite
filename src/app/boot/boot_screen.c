@@ -9,6 +9,7 @@
 
 #include "boot_screen.h"
 #include "hal/hal_display.h"
+#include "hal/hal_layout.h"
 #include "hal/hal_system.h"
 #include <stdint.h>
 #include <stddef.h>
@@ -55,13 +56,10 @@ void boot_screen_draw_logo(int16_t ox, int16_t oy, int16_t scale)
  */
 void boot_screen_show(void)
 {
-    int16_t sw = SCREEN_WIDTH;
-    int16_t sh = SCREEN_HEIGHT;
-
     int16_t body_w = 44;
     int16_t body_h = 60;
-    int16_t body_x = (sw - body_w) / 2;
-    int16_t body_y = (sh - body_h) / 2 - 4;
+    int16_t body_x = HAL_CENTER_X(body_w);
+    int16_t body_y = HAL_CENTER_Y(body_h) - HAL_MARGIN_SM * 2;
 
     hal_display_clear();
 
@@ -71,8 +69,8 @@ void boot_screen_show(void)
     const char* label = "Xerintosh";
     hal_set_font(NULL);
     int16_t tw = hal_get_string_width(label);
-    int16_t tx = (sw - tw) / 2;
-    int16_t ty = body_y + body_h + 8;
+    int16_t tx = HAL_CENTER_X(tw);
+    int16_t ty = body_y + body_h + HAL_MARGIN_LG;
     hal_draw_string(tx, ty, label, COLOR_FG);
 
     hal_display_flush();

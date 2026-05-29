@@ -109,9 +109,8 @@ void taskmgr_init(void)
 
     /* 初始化行列表动画 */
     int visible = taskmgr_visible_lines();
-    int16_t fh = hal_get_font_height();
-    int16_t list_top = TASKMGR_HEADER_Y + fh + 3;
-    xerintosh_anim_row_list_init(&g_tm.anim_list, visible, (int16_t)(fh + 4), list_top);
+    int16_t list_top = HAL_HEADER_BOTTOM();
+    xerintosh_anim_row_list_init(&g_tm.anim_list, visible, TASKMGR_ROW_H, list_top);
 }
 
 /* ═══ UI 状态访问器 ═══ */
@@ -121,13 +120,10 @@ void taskmgr_init(void)
 
 int taskmgr_visible_lines(void)
 {
-    int16_t fh = hal_get_font_height();
-    /* 列表可用高度 = 屏幕高度 - 标题栏 - 底部信息栏 */
-    /* Phase 1: 缩减间距，header/footer 各减 4px，横屏可显示 3 行 */
-    int16_t header_h = TASKMGR_HEADER_Y + fh + 2;  /* 标题行占用（原 +6 → +2） */
-    int16_t footer_h = fh + 2;                   /* 信息栏占用（原 +6 → +2） */
+    int16_t header_h = TASKMGR_HEADER_H;  /* 标题栏高度 */
+    int16_t footer_h = TASKMGR_FOOTER_H;  /* 底部信息栏高度 */
     int16_t avail = SCREEN_HEIGHT - header_h - footer_h;
-    int16_t row_h = fh + 4;                      /* 行高 = 字体 + 间距 */
+    int16_t row_h = TASKMGR_ROW_H;        /* 行高 */
     int visible = avail / row_h;
     if (visible > TASKMGR_VISIBLE_MAX) visible = TASKMGR_VISIBLE_MAX;
     if (visible < 1) visible = 1;

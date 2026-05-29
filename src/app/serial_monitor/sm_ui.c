@@ -11,6 +11,7 @@
 #include "sm_app.h"
 #include "app/settings/settings.h"
 #include "hal/hal_display.h"
+#include "hal/hal_layout.h"
 #include "hal/hal_system.h"
 #include "ui/ui_core.h"
 #include <stdio.h>
@@ -25,14 +26,14 @@
 static void draw_info_bar(void)
 {
     int16_t font_h = hal_get_font_height();
-    int16_t bar_h = font_h + 1;
+    int16_t bar_h = HAL_ROW_H();
     int16_t entry = (sm_entry_offset < 1.0f) ? 0 : (int16_t)sm_entry_offset;
-    int16_t bar_y = 1 + entry;
+    int16_t bar_y = HAL_MARGIN_SM + entry;
 
     const char *start_label = sm_running ? "STOP" : "RUN";
     const char *mode_label = sm_debug ? "DBG" : "NORM";
-    int16_t start_w = hal_get_string_width(start_label) + 4;
-    int16_t mode_w  = hal_get_string_width(mode_label) + 4;
+    int16_t start_w = hal_get_string_width(start_label) + HAL_MARGIN_MD;
+    int16_t mode_w  = hal_get_string_width(mode_label) + HAL_MARGIN_MD;
 
     char rate_str[16];
     int32_t baud = settings_serial_baud_hw_value(g_serial_baud_rate);
@@ -40,10 +41,10 @@ static void draw_info_bar(void)
     int16_t rate_w = hal_get_string_width(rate_str);
 
     int16_t total_w = start_w + rate_w + mode_w;
-    int16_t spacing = (SCREEN_WIDTH - 4 - total_w) / 2;
-    if (spacing < 2) spacing = 2;
+    int16_t spacing = (SCREEN_WIDTH - HAL_MARGIN_MD * 2 - total_w) / 2;
+    if (spacing < HAL_MARGIN_SM) spacing = HAL_MARGIN_SM;
 
-    int16_t start_x = 2;
+    int16_t start_x = HAL_MARGIN_SM;
     int16_t rate_x  = start_x + start_w + spacing;
     int16_t mode_x  = rate_x + rate_w + spacing;
 
@@ -146,24 +147,23 @@ static int16_t draw_text_segment(int16_t term_y, int16_t text_x,
 static void draw_terminal(void)
 {
     int16_t font_h = hal_get_font_height();
-    int16_t bar_h = font_h + 1;
 
     /* Phase 2: 终端区域叠加入场偏移 */
     int16_t entry = (sm_entry_offset < 1.0f) ? 0 : (int16_t)sm_entry_offset;
-    int16_t term_y = bar_h + 5 + entry;
-    int16_t term_h = SCREEN_HEIGHT - term_y - 1;
+    int16_t term_y = HAL_HEADER_BOTTOM() + HAL_MARGIN_SM + entry;
+    int16_t term_h = SCREEN_HEIGHT - term_y - HAL_MARGIN_SM;
 
     if (term_h < font_h) term_h = font_h;
 
-    int16_t max_screen_lines = (term_h - 2) / font_h;  /* 底部留 2px 边距 */
+    int16_t max_screen_lines = (term_h - HAL_MARGIN_SM) / font_h;  /* 底部留边距 */
     if (max_screen_lines < 1) max_screen_lines = 1;
     if (max_screen_lines > SM_TERM_LINES) max_screen_lines = SM_TERM_LINES;
 
     hal_draw_rect(0, term_y, SCREEN_WIDTH, term_h, COLOR_FG);
 
-    int16_t max_line_width = SCREEN_WIDTH - 4;
+    int16_t max_line_width = SCREEN_WIDTH - HAL_MARGIN_MD * 2;
     int16_t prefix_w = hal_get_string_width("[Master]:");
-    int16_t text_x = 2 + prefix_w;
+    int16_t text_x = HAL_MARGIN_SM + prefix_w;
     int16_t available_w = max_line_width - prefix_w;
     if (available_w < 0) available_w = 0;
 
