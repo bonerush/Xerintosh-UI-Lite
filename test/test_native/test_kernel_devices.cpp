@@ -63,7 +63,7 @@ TEST_F(KernelDevicesTest, Fb0WritePixelDrawsToFramebuffer)
 
     /* 先清屏再用 hal_test_fb_read 验证像素 */
     uint8_t cmd[7];
-    cmd[0] = FB_CMD_PIXEL;
+    cmd[0] = DEV_FB_CMD_PIXEL;
     int16_t x = 10, y = 20;
     uint16_t color = 0xF800;
     memcpy(cmd + 1, &x, 2);
@@ -86,7 +86,7 @@ TEST_F(KernelDevicesTest, Fb0WriteClearFillsBlack)
 
     /* 先画一个像素 */
     uint8_t pixel_cmd[7];
-    pixel_cmd[0] = FB_CMD_PIXEL;
+    pixel_cmd[0] = DEV_FB_CMD_PIXEL;
     int16_t x = 30, y = 40;
     uint16_t color = 0xFFFF;
     memcpy(pixel_cmd + 1, &x, 2);
@@ -97,7 +97,7 @@ TEST_F(KernelDevicesTest, Fb0WriteClearFillsBlack)
 
     /* 清屏 */
     uint8_t clear_cmd[3];
-    clear_cmd[0] = FB_CMD_CLEAR;
+    clear_cmd[0] = DEV_FB_CMD_CLEAR;
     uint16_t bg = 0x0000;
     memcpy(clear_cmd + 1, &bg, 2);
     write_fb_cmd(fd, clear_cmd, sizeof(clear_cmd));
@@ -112,7 +112,7 @@ TEST_F(KernelDevicesTest, Fb0WriteFlushDoesNotCrash)
     kern_fd_t fd = kern_open("/dev/fb0", KERN_O_WRONLY);
     ASSERT_GE(fd, 0);
 
-    uint8_t flush_cmd = FB_CMD_FLUSH;
+    uint8_t flush_cmd = DEV_FB_CMD_FLUSH;
     write_fb_cmd(fd, &flush_cmd, 1);
 
     kern_close(fd);
@@ -125,7 +125,7 @@ TEST_F(KernelDevicesTest, Fb0WriteFillRect)
     ASSERT_GE(fd, 0);
 
     uint8_t cmd[11];
-    cmd[0] = FB_CMD_FILL_RECT;
+    cmd[0] = DEV_FB_CMD_FILL_RECT;
     int16_t x = 5, y = 10, w = 20, h = 15;
     uint16_t color = 0x07E0;
     memcpy(cmd + 1, &x, 2);
@@ -150,7 +150,7 @@ TEST_F(KernelDevicesTest, Fb0IoctlGetWidth)
     kern_fd_t fd = kern_open("/dev/fb0", KERN_O_WRONLY);
     ASSERT_GE(fd, 0);
 
-    int w = kern_ioctl(fd, FB_IOCTL_GET_WIDTH, 0);
+    int w = kern_ioctl(fd, DEV_FB_IOCTL_GET_WIDTH, 0);
     EXPECT_EQ(w, SCREEN_WIDTH);
 
     kern_close(fd);
@@ -162,7 +162,7 @@ TEST_F(KernelDevicesTest, Fb0IoctlGetHeight)
     kern_fd_t fd = kern_open("/dev/fb0", KERN_O_WRONLY);
     ASSERT_GE(fd, 0);
 
-    int h = kern_ioctl(fd, FB_IOCTL_GET_HEIGHT, 0);
+    int h = kern_ioctl(fd, DEV_FB_IOCTL_GET_HEIGHT, 0);
     EXPECT_EQ(h, SCREEN_HEIGHT);
 
     kern_close(fd);
@@ -187,7 +187,7 @@ TEST_F(KernelDevicesTest, Fb0TruncatedCommand)
     kern_fd_t fd = kern_open("/dev/fb0", KERN_O_WRONLY);
     ASSERT_GE(fd, 0);
 
-    uint8_t bad[4] = { FB_CMD_PIXEL, 0x01, 0x02, 0x03 };
+    uint8_t bad[4] = { DEV_FB_CMD_PIXEL, 0x01, 0x02, 0x03 };
     ssize_t written = kern_write(fd, (const char *)bad, 4);
     EXPECT_LT(written, 0);
 
@@ -212,12 +212,12 @@ TEST_F(KernelDevicesTest, Input0ReadShortPress)
 
     hal_test_inject_event(HAL_BTN_A, HAL_EVENT_SHORT_PRESS);
 
-    uint8_t buf[INPUT_EVENT_SIZE];
+    uint8_t buf[DEV_INPUT_EVENT_SIZE];
     ssize_t n = kern_read(fd, (char *)buf, sizeof(buf));
-    EXPECT_EQ(n, (ssize_t)INPUT_EVENT_SIZE);
+    EXPECT_EQ(n, (ssize_t)DEV_INPUT_EVENT_SIZE);
 
-    input_event_t ev;
-    memcpy(&ev, buf, INPUT_EVENT_SIZE);
+    dev_input_event_t ev;
+    memcpy(&ev, buf, DEV_INPUT_EVENT_SIZE);
     EXPECT_EQ(ev.button, (uint8_t)HAL_BTN_A);
     EXPECT_EQ(ev.event, (uint8_t)HAL_EVENT_SHORT_PRESS);
 
@@ -232,12 +232,12 @@ TEST_F(KernelDevicesTest, Input0ReadLongPress)
 
     hal_test_inject_event(HAL_BTN_B, HAL_EVENT_LONG_PRESS);
 
-    uint8_t buf[INPUT_EVENT_SIZE];
+    uint8_t buf[DEV_INPUT_EVENT_SIZE];
     ssize_t n = kern_read(fd, (char *)buf, sizeof(buf));
-    EXPECT_EQ(n, (ssize_t)INPUT_EVENT_SIZE);
+    EXPECT_EQ(n, (ssize_t)DEV_INPUT_EVENT_SIZE);
 
-    input_event_t ev;
-    memcpy(&ev, buf, INPUT_EVENT_SIZE);
+    dev_input_event_t ev;
+    memcpy(&ev, buf, DEV_INPUT_EVENT_SIZE);
     EXPECT_EQ(ev.button, (uint8_t)HAL_BTN_B);
     EXPECT_EQ(ev.event, (uint8_t)HAL_EVENT_LONG_PRESS);
 
@@ -252,12 +252,12 @@ TEST_F(KernelDevicesTest, Input0ReadNoEventReturnsNone)
 
     /* 不注入事件，应返回 HAL_EVENT_NONE */
 
-    uint8_t buf[INPUT_EVENT_SIZE];
+    uint8_t buf[DEV_INPUT_EVENT_SIZE];
     ssize_t n = kern_read(fd, (char *)buf, sizeof(buf));
-    EXPECT_EQ(n, (ssize_t)INPUT_EVENT_SIZE);
+    EXPECT_EQ(n, (ssize_t)DEV_INPUT_EVENT_SIZE);
 
-    input_event_t ev;
-    memcpy(&ev, buf, INPUT_EVENT_SIZE);
+    dev_input_event_t ev;
+    memcpy(&ev, buf, DEV_INPUT_EVENT_SIZE);
     EXPECT_EQ(ev.event, (uint8_t)HAL_EVENT_NONE);
 
     kern_close(fd);
@@ -282,11 +282,11 @@ TEST_F(KernelDevicesTest, Input0IoctlDoubleClick)
     kern_fd_t fd = kern_open("/dev/input0", KERN_O_RDONLY);
     ASSERT_GE(fd, 0);
 
-    int rc = kern_ioctl(fd, INPUT_IOCTL_SET_DOUBLE_CLICK, 1);
+    int rc = kern_ioctl(fd, DEV_INPUT_IOCTL_SET_DOUBLE_CLICK, 1);
     EXPECT_EQ(rc, KERN_OK);
     EXPECT_TRUE(hal_input_is_double_click_enabled());
 
-    rc = kern_ioctl(fd, INPUT_IOCTL_SET_DOUBLE_CLICK, 0);
+    rc = kern_ioctl(fd, DEV_INPUT_IOCTL_SET_DOUBLE_CLICK, 0);
     EXPECT_EQ(rc, KERN_OK);
     EXPECT_FALSE(hal_input_is_double_click_enabled());
 

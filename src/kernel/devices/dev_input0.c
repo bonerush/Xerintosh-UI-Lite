@@ -19,12 +19,12 @@ static ssize_t dev_input0_read(kern_file_t *f, char *buf, size_t len)
 {
     (void)f;
 
-    if (len < INPUT_EVENT_SIZE) {
+    if (len < DEV_INPUT_EVENT_SIZE) {
         return KERN_EINVAL;
     }
 
     /* 轮询两个按键，返回第一个检测到的事件 */
-    input_event_t ev;
+    dev_input_event_t ev;
     memset(&ev, 0, sizeof(ev));
 
     for (int btn = 0; btn < HAL_BTN_COUNT; btn++) {
@@ -37,8 +37,8 @@ static ssize_t dev_input0_read(kern_file_t *f, char *buf, size_t len)
         }
     }
 
-    memcpy(buf, &ev, INPUT_EVENT_SIZE);
-    return INPUT_EVENT_SIZE;
+    memcpy(buf, &ev, DEV_INPUT_EVENT_SIZE);
+    return DEV_INPUT_EVENT_SIZE;
 }
 
 /* ═══ ioctl ═══ */
@@ -48,7 +48,7 @@ static int dev_input0_ioctl(kern_file_t *f, unsigned int cmd, unsigned long arg)
     (void)f;
 
     switch (cmd) {
-    case INPUT_IOCTL_SET_DOUBLE_CLICK:
+    case DEV_INPUT_IOCTL_SET_DOUBLE_CLICK:
         hal_input_set_double_click_enabled(arg != 0);
         return KERN_OK;
     default:

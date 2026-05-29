@@ -19,7 +19,7 @@ extern "C" {
 
 /* ═══ 输入事件结构体 ═══ */
 
-#define INPUT_EVENT_SIZE  6  /* button(1) + event(1) + timestamp(4) */
+#define DEV_INPUT_EVENT_SIZE  6  /* button(1) + event(1) + timestamp(4) */
 
 /**
  * @brief 按键事件（read() 返回此结构体的原始字节）
@@ -28,11 +28,11 @@ typedef struct {
     uint8_t  button;     /* hal_button_t: 0=BtnA, 1=BtnB */
     uint8_t  event;      /* hal_event_t: 0=None, 1=Short, 2=Long, 3=Double */
     uint32_t timestamp;  /* hal_get_ticks() 时间戳 */
-} input_event_t;
+} dev_input_event_t;
 
 /* ═══ ioctl 命令 ═══ */
 
-#define INPUT_IOCTL_SET_DOUBLE_CLICK  0x20  /* arg = 0 (disable) / 1 (enable) */
+#define DEV_INPUT_IOCTL_SET_DOUBLE_CLICK  0x20  /* arg = 0 (disable) / 1 (enable) */
 
 /* ═══ 设备操作表 ═══ */
 

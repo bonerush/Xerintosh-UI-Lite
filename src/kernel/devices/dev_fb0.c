@@ -24,7 +24,7 @@ static ssize_t dev_fb0_write(kern_file_t *f, const char *buf, size_t len)
         pos++;
 
         switch (cmd) {
-        case FB_CMD_PIXEL: {
+        case DEV_FB_CMD_PIXEL: {
             if (pos + 6 > len) return KERN_EINVAL;
             int16_t x, y;
             uint16_t color;
@@ -34,7 +34,7 @@ static ssize_t dev_fb0_write(kern_file_t *f, const char *buf, size_t len)
             hal_draw_pixel(x, y, color);
             break;
         }
-        case FB_CMD_FILL_RECT: {
+        case DEV_FB_CMD_FILL_RECT: {
             if (pos + 10 > len) return KERN_EINVAL;
             int16_t x, y, w, h;
             uint16_t color;
@@ -46,7 +46,7 @@ static ssize_t dev_fb0_write(kern_file_t *f, const char *buf, size_t len)
             hal_draw_fill_rect(x, y, w, h, color);
             break;
         }
-        case FB_CMD_CLEAR: {
+        case DEV_FB_CMD_CLEAR: {
             if (pos + 2 > len) return KERN_EINVAL;
             uint16_t color;
             memcpy(&color, buf + pos, 2); pos += 2;
@@ -54,7 +54,7 @@ static ssize_t dev_fb0_write(kern_file_t *f, const char *buf, size_t len)
             hal_display_clear();
             break;
         }
-        case FB_CMD_FLUSH:
+        case DEV_FB_CMD_FLUSH:
             hal_display_flush();
             break;
         default:
@@ -72,11 +72,11 @@ static int dev_fb0_ioctl(kern_file_t *f, unsigned int cmd, unsigned long arg)
     (void)f;
 
     switch (cmd) {
-    case FB_IOCTL_GET_WIDTH:
+    case DEV_FB_IOCTL_GET_WIDTH:
         return (int)SCREEN_WIDTH;
-    case FB_IOCTL_GET_HEIGHT:
+    case DEV_FB_IOCTL_GET_HEIGHT:
         return (int)SCREEN_HEIGHT;
-    case FB_IOCTL_SET_ROTATION:
+    case DEV_FB_IOCTL_SET_ROTATION:
         /* 硬件环境: M5.Display.setRotation(arg) 但 HAL 层未暴露旋转 API，
          * 保留此 ioctl 供未来扩展 */
         (void)arg;
