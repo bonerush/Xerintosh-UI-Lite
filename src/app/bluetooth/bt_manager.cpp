@@ -32,6 +32,7 @@ void bt_mgr_on_switch_toggle(void *ud) { (void)ud; }
 extern "C" {
 #include "app/storage/storage.h"
 #include "app/serial_input/serial_input.h"
+#include "app/svc_mgr_helper.h"
 #include "ui/ui_item.h"
 #include "ui/ui_core.h"
 #include "kernel/kern_task.h"
@@ -184,21 +185,7 @@ static void rebuild_device_list(void) {
     if (!g_devices_list) return;
 
     /* 安全处理：若选择器位于设备子树内，先将其移到设备项本身 */
-    xerintosh_list_item_t *check = g_xerintosh_selector.selected_item;
-    while (check && check != g_devices_list) check = check->parent;
-    if (check == g_devices_list) {
-        uint8_t idx = 0;
-        if (g_settings_list) {
-            for (uint8_t i = 0; i < g_settings_list->child_num; i++) {
-                if (g_settings_list->child_list_item[i] == g_devices_list) {
-                    idx = i;
-                    break;
-                }
-            }
-        }
-        g_xerintosh_selector.selected_item = g_devices_list;
-        g_xerintosh_selector.selected_index = idx;
-    }
+    ui_selector_rebuild_anchor(g_devices_list, g_settings_list);
 
     xerintosh_clear_children_of_list(g_devices_list);
 
@@ -365,12 +352,7 @@ void bt_mgr_update(void) {
  * @brief 蓝牙开关切换回调
  */
 void bt_mgr_on_switch_toggle(void *ud) {
-    (void)ud;
-    if (g_bt_on) {
-        bt_mgr_enable();
-    } else {
-        bt_mgr_disable();
-    }
+    svc_mgr_handle_switch_toggle(&g_bt_on, bt_mgr_enable, bt_mgr_disable, ud);
 }
 
 /* ═══ 内核任务入口 ═══ */

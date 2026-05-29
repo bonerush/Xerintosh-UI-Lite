@@ -34,6 +34,7 @@ void wifi_mgr_on_switch_toggle(void *ud) { (void)ud; }
 extern "C" {
 #include "app/storage/storage.h"
 #include "app/serial_input/serial_input.h"
+#include "app/svc_mgr_helper.h"
 #include "ui/ui_item.h"
 #include "ui/ui_core.h"
 #include "kernel/kern_task.h"
@@ -187,12 +188,7 @@ void wifi_mgr_disable(void)
  */
 void wifi_mgr_on_switch_toggle(void *ud)
 {
-    (void)ud;
-    if (g_wifi_on) {
-        wifi_mgr_enable();
-    } else {
-        wifi_mgr_disable();
-    }
+    svc_mgr_handle_switch_toggle(&g_wifi_on, wifi_mgr_enable, wifi_mgr_disable, ud);
 }
 
 /* ═══ 网络菜单重建 ═══ */
@@ -216,25 +212,8 @@ static void rebuild_network_list(int scan_count)
         return;
     }
 
-    /* 安全处理：若选择器位于网络子树内，先将其移到网络项本身，
-       避免清理子项后产生悬空指针。 */
-    xerintosh_list_item_t *check = g_xerintosh_selector.selected_item;
-    while (check && check != g_networks_list) {
-        check = check->parent;
-    }
-    if (check == g_networks_list) {
-        uint8_t idx = 0;
-        if (g_settings_list) {
-            for (uint8_t i = 0; i < g_settings_list->child_num; i++) {
-                if (g_settings_list->child_list_item[i] == g_networks_list) {
-                    idx = i;
-                    break;
-                }
-            }
-        }
-        g_xerintosh_selector.selected_item = g_networks_list;
-        g_xerintosh_selector.selected_index = idx;
-    }
+    /* 安全处理：若选择器位于网络子树内，先将其移到网络项本身 */
+    ui_selector_rebuild_anchor(g_networks_list, g_settings_list);
 
     xerintosh_clear_children_of_list(g_networks_list);
 

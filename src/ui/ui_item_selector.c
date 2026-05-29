@@ -298,6 +298,41 @@ bool ui_user_item_try_exit(hal_event_t event_b)
     return true;
 }
 
+void ui_selector_rebuild_anchor(xerintosh_list_item_t *subtree_root,
+                                xerintosh_list_item_t *parent)
+{
+    if (subtree_root == NULL) return;
+
+    /* 若选择器位于即将被重建的子树内，将其提升到子树根节点 */
+    xerintosh_list_item_t *check = g_xerintosh_selector.selected_item;
+    while (check && check != subtree_root) {
+        check = check->parent;
+    }
+    if (check == subtree_root) {
+        uint8_t idx = 0;
+        if (parent != NULL) {
+            for (uint8_t i = 0; i < parent->child_num; i++) {
+                if (parent->child_list_item[i] == subtree_root) {
+                    idx = i;
+                    break;
+                }
+            }
+        }
+        g_xerintosh_selector.selected_item  = subtree_root;
+        g_xerintosh_selector.selected_index = idx;
+    }
+}
+
+void ui_selector_move_to_first_child(xerintosh_list_item_t *parent)
+{
+    if (parent == NULL) return;
+    if (g_xerintosh_selector.selected_item == parent
+        && parent->child_num > 0) {
+        g_xerintosh_selector.selected_item  = parent->child_list_item[0];
+        g_xerintosh_selector.selected_index = 0;
+    }
+}
+
 void ui_selector_safety_move_out(xerintosh_list_item_t *subtree_root,
                                  xerintosh_list_item_t *fallback_parent)
 {

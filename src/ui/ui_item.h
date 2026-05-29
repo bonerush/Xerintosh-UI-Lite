@@ -370,6 +370,20 @@ extern void xerintosh_clear_children_of_list(xerintosh_list_item_t *_parent);
 extern void ui_selector_safety_move_out(xerintosh_list_item_t *subtree_root,
                                         xerintosh_list_item_t *fallback_parent);
 
+/**
+ * @brief  rebuild 锚定：若选择器位于子树内，将其提升到子树根节点
+ * @param  subtree_root 即将被重建的子树根节点
+ * @param  parent       subtree_root 的父项（用于计算 selected_index）
+ */
+extern void ui_selector_rebuild_anchor(xerintosh_list_item_t *subtree_root,
+                                       xerintosh_list_item_t *parent);
+
+/**
+ * @brief  若选择器当前在 parent 上，移至其第一个子项
+ * @param  parent 父项指针
+ */
+extern void ui_selector_move_to_first_child(xerintosh_list_item_t *parent);
+
 /* ═══ 选择器 ═══ */
 
 /**
