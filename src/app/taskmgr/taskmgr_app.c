@@ -221,14 +221,7 @@ void taskmgr_loop(void)
             }
         }
 
-        if (event_b == HAL_EVENT_LONG_PRESS) {
-            xerintosh_user_item_t* current =
-                xerintosh_to_user_item(g_xerintosh_selector.selected_item);
-            if (current != NULL && !current->exiting_user_item) {
-                xerintosh_selector_exit_current_item();
-            }
-            return;
-        }
+        if (ui_user_item_try_exit(event_b)) return;
     }
 
     /* ── 动画更新 ── */

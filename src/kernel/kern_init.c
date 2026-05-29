@@ -2,7 +2,7 @@
  * @file   kern_init.c
  * @brief  Xeros 内核初始化、日志与 panic 系统实现
  * @details 实现内核启动入口 kern_init()、分级日志输出 kern_log()、
- *          致命错误处理 kern_panic() 及统计信息 kern_log_stats()。
+ *          致命错误处理 kern_panic()。
  *
  * @copyright Copyright (c) 2026
  */

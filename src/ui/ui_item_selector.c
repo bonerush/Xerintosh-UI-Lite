@@ -9,6 +9,7 @@
 #include "ui_item.h"
 #include "ui_core.h"
 #include "ui_drawer.h"
+#include "hal/hal_input.h"
 #include "kernel/kern_task.h"
 #include <stddef.h>
 
@@ -281,4 +282,37 @@ void xerintosh_selector_exit_current_item()
   g_xerintosh_selector.selected_index = find_item_index(
     g_xerintosh_selector.selected_item->parent->parent, g_xerintosh_selector.selected_item->parent);
   g_xerintosh_selector.selected_item = g_xerintosh_selector.selected_item->parent;
+}
+
+/* ═══ 公共 Helper ═══ */
+
+bool ui_user_item_try_exit(hal_event_t event_b)
+{
+    if (event_b != HAL_EVENT_LONG_PRESS) return false;
+
+    xerintosh_user_item_t *current =
+        xerintosh_to_user_item(g_xerintosh_selector.selected_item);
+    if (current != NULL && !current->exiting_user_item) {
+        xerintosh_selector_exit_current_item();
+    }
+    return true;
+}
+
+void ui_selector_safety_move_out(xerintosh_list_item_t *subtree_root,
+                                 xerintosh_list_item_t *fallback_parent)
+{
+    if (subtree_root == NULL) return;
+
+    /* 检查选择器是否位于即将被移除的子树内 */
+    xerintosh_list_item_t *check = g_xerintosh_selector.selected_item;
+    while (check && check != subtree_root) {
+        check = check->parent;
+    }
+    if (check == subtree_root) {
+        /* 将选择器移回 fallback_parent 的第一个子项 */
+        if (fallback_parent != NULL && fallback_parent->child_num > 0) {
+            g_xerintosh_selector.selected_item  = fallback_parent->child_list_item[0];
+            g_xerintosh_selector.selected_index = 0;
+        }
+    }
 }

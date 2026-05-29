@@ -15,11 +15,8 @@
 extern "C" {
 #endif
 
-/* ═══ 语义化版本号 ═══ */
+/* ═══ 版本信息 ═══ */
 
-#define XEROS_VERSION_MAJOR  0
-#define XEROS_VERSION_MINOR  2
-#define XEROS_VERSION_PATCH  0
 #define XEROS_VERSION_STRING "0.2.0"
 
 /* ═══ 开发者与项目信息 ═══ */

@@ -8,6 +8,7 @@
  */
 
 #include "sm_app.h"
+#include "serial_monitor.h"
 #include "sm_ui.h"
 #include "app/settings/settings.h"
 #include "app/serial_input/serial_input.h"
@@ -104,13 +105,7 @@ void serial_monitor_loop(void)
     }
 
     /* 第四步：长按返回按钮退出 App */
-    if (event_b == HAL_EVENT_LONG_PRESS) {
-        xerintosh_user_item_t* current = xerintosh_to_user_item(g_xerintosh_selector.selected_item);
-        if (current != NULL && !current->exiting_user_item) {
-            xerintosh_selector_exit_current_item();
-        }
-        return;
-    }
+    if (ui_user_item_try_exit(event_b)) return;
 
     /* 第五步：双击滚动终端 */
     if (event_a == HAL_EVENT_DOUBLE_CLICK) {

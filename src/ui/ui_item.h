@@ -11,33 +11,33 @@
 #define UI_ITEM_H
 
 #include "hal/hal_display.h"
+#include "hal/hal_input.h"
 #include <stdint.h>
 #include <stdbool.h>
 
-/* 内核 PID 类型前向声明（避免循环依赖） */
-typedef int16_t kern_pid_t;
-#define KERN_PID_INVALID (-1)
-
-/* 全局绘制颜色（定义在 ui_core.c） */
-extern uint16_t g_xerintosh_draw_color;
+/* 内核 PID 类型（来自 kern_types.h，避免重复定义） */
+#include "kernel/kern_types.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+/* 全局绘制颜色（定义在 ui_core.c） */
+extern uint16_t g_xerintosh_draw_color;
+
 /* ═══ 动画速度常量 ═══ */
 
 extern int16_t g_anim_speed;  /* 全局动画速度基准值 */
 
-#define ANIM_SPEED_LIST_ITEM    (g_anim_speed - 8)//列表项动画速度，适当慢于选择器，确保在快速切换时能及时调整位置以适应文本长度
-#define ANIM_SPEED_SELECTOR     (g_anim_speed)    //选择器动画速度，适当慢于列表项，确保在快速切换时能及时调整位置以适应文本长度
-#define ANIM_SPEED_SELECTOR_H   (g_anim_speed + 1)//选择器高度动画稍快，确保在快速切换时能及时调整尺寸以适应文本长度
-#define ANIM_SPEED_INFO_BAR     (g_anim_speed + 2)//信息栏动画速度，适当快于选择器，确保在快速切换时能及时调整尺寸以适应文本长度
-#define ANIM_SPEED_INFO_BAR_W   (g_anim_speed + 3)//信息栏宽度动画稍快，确保在快速切换时能及时调整尺寸以适应文本长度
-#define ANIM_SPEED_POP_UP_W     (g_anim_speed + 4)//弹窗宽度动画稍快，确保在快速切换时能及时调整尺寸以适应文本长度
-#define ANIM_SPEED_POP_UP_Y     (g_anim_speed + 2)//弹窗动画在 y 轴上稍慢，确保信息栏、弹窗等核心元素的动画速度一致
-#define ANIM_SPEED_CAMERA       (g_anim_speed + 4)//相机动画速度，适当快于选择器，确保在快速切换时能及时调整视图位置
-#define ANIM_SPEED_EXIT         (g_anim_speed + 2)//退出动画速度，主要用于 user_item 退场动画，确保与信息栏、弹窗等核心元素的动画速度一致
+#define ANIM_SPEED_LIST_ITEM    (g_anim_speed - 8) /* 列表项动画速度，适当慢于选择器 */
+#define ANIM_SPEED_SELECTOR     (g_anim_speed)     /* 选择器动画速度 */
+#define ANIM_SPEED_SELECTOR_H   (g_anim_speed + 1) /* 选择器高度动画稍快 */
+#define ANIM_SPEED_INFO_BAR     (g_anim_speed + 2) /* 信息栏动画速度 */
+#define ANIM_SPEED_INFO_BAR_W   (g_anim_speed + 3) /* 信息栏宽度动画稍快 */
+#define ANIM_SPEED_POP_UP_W     (g_anim_speed + 4) /* 弹窗宽度动画稍快 */
+#define ANIM_SPEED_POP_UP_Y     (g_anim_speed + 2) /* 弹窗 y 轴动画 */
+#define ANIM_SPEED_CAMERA       (g_anim_speed + 4) /* 相机动画速度 */
+#define ANIM_SPEED_EXIT         (g_anim_speed + 2) /* 退出动画速度 */
 
 /* ═══ 字体 ═══ */
 
@@ -354,6 +354,14 @@ extern bool xerintosh_remove_item_from_list(xerintosh_list_item_t *_parent, xeri
  */
 extern void xerintosh_clear_children_of_list(xerintosh_list_item_t *_parent);
 
+/**
+ * @brief  安全移出选择器：若选择器位于即将被移除的子树内，将其移回父项
+ * @param  subtree_root     即将被移除的子树根节点
+ * @param  fallback_parent  选择器移出后的目标父项
+ */
+extern void ui_selector_safety_move_out(xerintosh_list_item_t *subtree_root,
+                                        xerintosh_list_item_t *fallback_parent);
+
 /* ═══ 选择器 ═══ */
 
 /**
@@ -401,6 +409,14 @@ extern void xerintosh_selector_jump_to_selected_item(void);
  *        list_item 返回父菜单；主菜单（layer==0）不允许退出
  */
 extern void xerintosh_selector_exit_current_item(void);
+
+/**
+ * @brief  user_item 通用退出检测（供 App loop 调用）
+ * @param  event_b 按钮 B 的事件
+ * @return true 若已触发退出，false 若事件不匹配
+ * @note   长按 B 时自动退出当前 user_item，App 无需自行实现退出逻辑
+ */
+extern bool ui_user_item_try_exit(hal_event_t event_b);
 
 /* ═══ 相机 ═══ */
 

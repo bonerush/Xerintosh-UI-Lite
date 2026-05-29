@@ -166,14 +166,7 @@ void wifi_mgr_disable(void)
 
     if (g_networks_list) {
         /* 若选择器当前位于网络子树内，将其移回设置项 */
-        xerintosh_list_item_t *check = g_xerintosh_selector.selected_item;
-        while (check && check != g_networks_list) {
-            check = check->parent;
-        }
-        if (check == g_networks_list) {
-            g_xerintosh_selector.selected_item  = g_settings_list->child_list_item[0];
-            g_xerintosh_selector.selected_index = 0;
-        }
+        ui_selector_safety_move_out(g_networks_list, g_settings_list);
 
         xerintosh_clear_children_of_list(g_networks_list);
         xerintosh_remove_item_from_list(g_settings_list, g_networks_list);

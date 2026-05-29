@@ -287,14 +287,7 @@ void bt_mgr_disable(void) {
     g_bt_enabled = false;
 
     if (g_devices_list) {
-        xerintosh_list_item_t *check = g_xerintosh_selector.selected_item;
-        while (check && check != g_devices_list) check = check->parent;
-        if (check == g_devices_list) {
-            if (g_settings_list) {
-                g_xerintosh_selector.selected_item = g_settings_list->child_list_item[0];
-                g_xerintosh_selector.selected_index = 0;
-            }
-        }
+        ui_selector_safety_move_out(g_devices_list, g_settings_list);
 
         xerintosh_clear_children_of_list(g_devices_list);
         if (g_settings_list) {

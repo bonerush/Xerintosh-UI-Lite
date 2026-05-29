@@ -55,12 +55,6 @@ extern void kern_log(kern_log_level_t level, const char *fmt, ...);
  */
 extern void kern_vlog(kern_log_level_t level, const char *fmt, va_list args);
 
-/**
- * @brief  输出所有已注册的内核统计信息
- * @note   包括任务数、VFS 节点数、内存使用等
- */
-extern void kern_log_stats(void);
-
 /* ═══ Panic ═══ */
 
 /**
@@ -76,6 +70,11 @@ extern void kern_panic(const char *msg);
  * @note   用于 native 测试环境验证 panic 行为
  */
 extern const char *kern_get_last_panic(void);
+
+/**
+ * @brief  输出所有已注册的内核统计信息
+ */
+extern void kern_log_stats(void);
 
 /**
  * @brief  清除 panic 状态

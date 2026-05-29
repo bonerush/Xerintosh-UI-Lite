@@ -277,18 +277,6 @@ void loop()
 {
     deferred_kernel_init();
 
-    static uint32_t last_heartbeat = 0;
-    uint32_t now = millis();
-#if 0
-    /* 心跳日志：每 5 秒报告一次内存状态（调试用） */
-    if (now - last_heartbeat >= 5000) {
-        Serial.printf("[LOOP] heartbeat, free_heap=%u\n", ESP.getFreeHeap());
-        last_heartbeat = now;
-    }
-#else
-    (void)now;
-    (void)last_heartbeat;
-#endif
     dev_ttyS0_poll();
     serial_monitor_update();
     kern_sched_tick();
