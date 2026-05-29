@@ -17,44 +17,10 @@
 #include <string.h>
 
 /**
- * @brief  绘制单个按钮
- * @param  x       左上角 x
- * @param  y       左上角 y
- * @param  w       宽度
- * @param  h       高度
- * @param  label   按钮文字
- * @param  id      按钮 ID（0 或 1，对应 sm_btn_alpha_0/1）
- * @note   Phase 2: 使用 sm_btn_alpha 平滑过渡，阈值 0.5 判断反色
- */
-static void draw_button(int16_t x, int16_t y, int16_t w, int16_t h,
-                        const char *label, int id)
-{
-    float alpha = (id == 0) ? sm_btn_alpha_0 : sm_btn_alpha_1;
-    bool is_selected = (alpha > 0.5f);
-
-    uint16_t bg_color, text_color;
-
-    if (is_selected) {
-        bg_color = COLOR_FG;
-        text_color = COLOR_BG;
-    } else {
-        bg_color = COLOR_BG;
-        text_color = COLOR_FG;
-    }
-
-    hal_draw_fill_rect(x, y, w, h, bg_color);
-    hal_draw_rect(x, y, w, h, COLOR_FG);
-
-    int16_t tw = hal_get_string_width(label);
-    int16_t tx = x + (w - tw) / 2;
-    int16_t ty = y + (h + hal_get_font_height()) / 2 - 3;
-    hal_draw_string(tx, ty, label, text_color);
-}
-
-/**
  * @brief  绘制信息栏（顶部控制区）
- * @note   包含 START/STOP 按钮、波特率显示、NORM/DEBUG 按钮
- *         Phase 2: Y 坐标叠加 sm_entry_offset 入场动画
+ * @note   包含 START/STOP 按钮、波特率显示、NORM/DEBUG 按钮。
+ *         Phase 3: 用 XOR 反色矩形实现灵动滑块，复用菜单选择框的 hal_draw_xor_rect，
+ *         区域内文字自动反色（白字→黑字，黑底→白底），无需文字裁剪。
  */
 static void draw_info_bar(void)
 {
@@ -81,11 +47,21 @@ static void draw_info_bar(void)
     int16_t rate_x  = start_x + start_w + spacing;
     int16_t mode_x  = rate_x + rate_w + spacing;
 
-    int16_t rate_y_text = bar_y + (bar_h + font_h) / 2 - 3;
+    int16_t ty = bar_y + (bar_h + font_h) / 2 - 3;
+    int16_t start_tx = start_x + (start_w - hal_get_string_width(start_label)) / 2;
+    int16_t mode_tx  = mode_x  + (mode_w  - hal_get_string_width(mode_label)) / 2;
 
-    draw_button(start_x, bar_y, start_w, bar_h, start_label, 0);
-    hal_draw_string(rate_x, rate_y_text, rate_str, COLOR_FG);
-    draw_button(mode_x, bar_y, mode_w, bar_h, mode_label, 1);
+    /* 1. 白色文字（所有文字统一绘制，为滑块外底色） */
+    hal_draw_string(start_tx, ty, start_label, COLOR_FG);
+    hal_draw_string(rate_x, ty, rate_str, COLOR_FG);
+    hal_draw_string(mode_tx, ty, mode_label, COLOR_FG);
+
+    /* 2. XOR 反色滑块（复用菜单选择框机制，区域内白字变黑、黑底变白）
+     *    alpha 在 [0,100] 范围，确保 xerintosh_animation 逐帧平滑插值 */
+    float t = sm_btn_alpha_1 / 100.0f;
+    int16_t slider_x = (int16_t)(start_x + (mode_x - start_x) * t);
+    int16_t slider_w = (int16_t)(start_w + (mode_w - start_w) * t);
+    hal_draw_xor_rect(slider_x + 1, bar_y + 1, slider_w - 2, bar_h - 2);
 }
 
 /**

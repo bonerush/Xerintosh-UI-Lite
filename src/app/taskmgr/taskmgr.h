@@ -15,7 +15,7 @@
 
 /* ═══ 布局常量（taskmgr_app.c / taskmgr_ui.c 共享）═══ */
 
-#define TASKMGR_HEADER_Y  2
+#define TASKMGR_HEADER_Y    0
 #define TASKMGR_LEFT_MARGIN 4
 
 #ifdef __cplusplus

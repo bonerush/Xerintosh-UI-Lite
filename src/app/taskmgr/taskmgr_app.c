@@ -230,6 +230,21 @@ void taskmgr_loop(void)
 
     /* 当 selected/scroll 变化时刷新目标位置 */
     if (g_tm.prev_selected != g_tm.selected || g_tm.prev_scroll != g_tm.scroll) {
+        /* scroll 变化时注入滚动偏移动画：文字整体滑入/滑出，选择框保持不动 */
+        if (g_tm.prev_scroll != g_tm.scroll && g_tm.prev_scroll >= 0) {
+            int delta = g_tm.scroll - g_tm.prev_scroll;
+            if (delta > 1 || delta < -1) {
+                /* wrap-around（列表首尾回绕）：从屏幕底部重新入场，避免溢出列表区域 */
+                for (int i = 0; i < g_tm.anim_list.visible_count && i < ANIM_ROW_MAX; i++) {
+                    g_tm.anim_list.rows[i].y = (float)SCREEN_HEIGHT;
+                }
+            } else {
+                for (int i = 0; i < g_tm.anim_list.visible_count && i < ANIM_ROW_MAX; i++) {
+                    g_tm.anim_list.rows[i].y += (float)(delta * g_tm.anim_list.row_height);
+                }
+            }
+        }
+
         xerintosh_anim_row_list_refresh(&g_tm.anim_list,
             g_tm.selected, g_tm.scroll, SCREEN_WIDTH, g_tm.count);
         g_tm.prev_selected = g_tm.selected;

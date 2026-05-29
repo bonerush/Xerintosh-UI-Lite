@@ -67,7 +67,7 @@ static void draw_header(void)
     int16_t fh = hal_get_font_height();
     hal_set_font(hal_get_cn_font());
 
-    hal_draw_string(TASKMGR_LEFT_MARGIN, TASKMGR_HEADER_Y + fh, "Task Manager", COLOR_FG);
+    hal_draw_string(TASKMGR_LEFT_MARGIN, TASKMGR_HEADER_Y + fh - 2, "Task Manager", COLOR_FG);
 
     /* 分隔线（缩减间距：+3 替代 +6） */
     int16_t sep_y = TASKMGR_HEADER_Y + fh + 3;
@@ -91,6 +91,10 @@ static void draw_list(void)
     int selected = taskmgr_get_selected();
     int scroll = taskmgr_get_scroll();
     int visible = taskmgr_visible_lines();
+
+    /* 裁剪列表渲染区域，防止动画行溢出到 header/footer */
+    int16_t clip_h = (int16_t)(anim->visible_count * anim->row_height);
+    hal_set_clip_rect(0, anim->list_top, SCREEN_WIDTH, clip_h);
 
     for (int i = 0; i < visible && (i + scroll) < count; i++) {
         int idx = i + scroll;
@@ -116,6 +120,8 @@ static void draw_list(void)
             hal_draw_string(TASKMGR_LEFT_MARGIN + 1, text_y, line, COLOR_FG);
         }
     }
+
+    hal_clear_clip_rect();
 }
 
 /**

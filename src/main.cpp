@@ -289,7 +289,8 @@ void loop()
     (void)now;
     (void)last_heartbeat;
 #endif
-    dev_ttyS0_poll();    /* 在 FreeRTOS 上下文传输串口数据到环形缓冲区 */
+    dev_ttyS0_poll();
+    serial_monitor_update();
     kern_sched_tick();
 }
 

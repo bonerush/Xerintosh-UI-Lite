@@ -58,7 +58,7 @@ void serial_monitor_init(void)
 
     /* Phase 2: 初始化动画状态 */
     sm_entry_offset = (float)SCREEN_HEIGHT;
-    sm_btn_alpha_0 = 1.0f;
+    sm_btn_alpha_0 = 100.0f;
     sm_btn_alpha_1 = 0.0f;
 
 #ifndef NATIVE_TEST
@@ -129,11 +129,11 @@ void serial_monitor_loop(void)
     /* 入场滑入动画 */
     xerintosh_animation(&sm_entry_offset, 0.0f, ANIM_SPEED_EXIT);
 
-    /* 按钮选中平滑过渡（替代闪烁） */
-    float trg0 = (sm_selected == 0) ? 1.0f : 0.0f;
-    float trg1 = (sm_selected == 1) ? 1.0f : 0.0f;
-    xerintosh_animation(&sm_btn_alpha_0, trg0, ANIM_SPEED_SELECTOR_H);
-    xerintosh_animation(&sm_btn_alpha_1, trg1, ANIM_SPEED_SELECTOR_H);
+    /* 按钮选中平滑过渡（[0,100] 范围确保 xerintosh_animation 差值 > 1.0，触发逐帧动画） */
+    float trg0 = (sm_selected == 0) ? 100.0f : 0.0f;
+    float trg1 = (sm_selected == 1) ? 100.0f : 0.0f;
+    xerintosh_animation(&sm_btn_alpha_0, trg0, ANIM_SPEED_SELECTOR);
+    xerintosh_animation(&sm_btn_alpha_1, trg1, ANIM_SPEED_SELECTOR);
 
     /* 保留闪烁相位更新（向后兼容，供 draw_button 的阈值判断使用） */
     uint32_t now = hal_get_ticks();
