@@ -55,7 +55,7 @@ void xerintosh_push_info_bar(const char *_content, const uint16_t _span)
   }
 
   xerintosh_set_font(hal_get_cn_font());
-  g_xerintosh_info_bar.w_info_bar_trg = hal_get_utf8_width(g_xerintosh_info_bar.content) + INFO_BAR_OFFSET;
+  g_xerintosh_info_bar.w_info_bar_trg = hal_get_string_width(g_xerintosh_info_bar.content) + INFO_BAR_OFFSET;
 }
 
 /* ═══ 弹窗 ═══ */
@@ -92,7 +92,7 @@ void xerintosh_push_pop_up(const char *_content, const uint16_t _span)
   }
 
   xerintosh_set_font(hal_get_cn_font());
-  g_xerintosh_pop_up.w_pop_up_trg = hal_get_utf8_width(g_xerintosh_pop_up.content) + POP_UP_OFFSET;
+  g_xerintosh_pop_up.w_pop_up_trg = hal_get_string_width(g_xerintosh_pop_up.content) + POP_UP_OFFSET;
 }
 
 /**

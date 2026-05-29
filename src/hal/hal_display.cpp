@@ -252,19 +252,7 @@ void hal_draw_string(int16_t x, int16_t y, const char* str, uint16_t color) {
     (void)color;
 }
 
-void hal_draw_utf8(int16_t x, int16_t y, const char* str, uint16_t color) {
-    (void)x;
-    (void)y;
-    (void)str;
-    (void)color;
-}
-
 int16_t hal_get_string_width(const char* str) {
-    (void)str;
-    return 0;
-}
-
-int16_t hal_get_utf8_width(const char* str) {
     (void)str;
     return 0;
 }
@@ -453,27 +441,9 @@ void hal_draw_string(int16_t x, int16_t y, const char* str, uint16_t color) {
 }
 
 /**
- * @brief 绘制 UTF-8 字符串
- */
-void hal_draw_utf8(int16_t x, int16_t y, const char* str, uint16_t color) {
-    if (!g_canvas || !str) return;
-    g_canvas->setTextColor(color);
-    g_canvas->setTextDatum(lgfx::v1::baseline_left);
-    g_canvas->drawString(str, x, y);
-}
-
-/**
  * @brief 获取 ASCII 字符串宽度
  */
 int16_t hal_get_string_width(const char* str) {
-    if (!g_canvas || !str) return 0;
-    return g_canvas->textWidth(str);
-}
-
-/**
- * @brief 获取 UTF-8 字符串宽度
- */
-int16_t hal_get_utf8_width(const char* str) {
     if (!g_canvas || !str) return 0;
     return g_canvas->textWidth(str);
 }

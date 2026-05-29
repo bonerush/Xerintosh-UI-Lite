@@ -81,7 +81,7 @@ static void draw_list_item_slider(xerintosh_slider_item_t *_slider, int16_t _x, 
   {
     char _value_str[10] = {};
     sprintf(_value_str, "%d", *_slider->value);
-    int16_t _value_width = hal_get_utf8_width(_value_str);
+    int16_t _value_width = hal_get_string_width(_value_str);
     int16_t _x_value = SCREEN_WIDTH - LIST_ITEM_RIGHT_MARGIN - _value_width + 2;
     g_xerintosh_draw_color = COLOR_FG;
     hal_draw_string(_x_value + 2, _y + hal_get_font_height() / 2, _value_str, g_xerintosh_draw_color);
@@ -110,7 +110,7 @@ static void xerintosh_draw_slider_overlays(void)
 
     char _value_str[10] = {};
     sprintf(_value_str, "%d", *_slider->value);
-    int16_t _value_width = hal_get_utf8_width(_value_str);
+    int16_t _value_width = hal_get_string_width(_value_str);
     int16_t _x_value = SCREEN_WIDTH - LIST_ITEM_RIGHT_MARGIN - _value_width + 2;
 
     /* 反色背景框 */
@@ -228,7 +228,7 @@ void xerintosh_draw_list_item()
     if (_y_list_item + hal_get_font_height() / 2 > LIST_INFO_BAR_HEIGHT &&
         _y_list_item + hal_get_font_height() / 2 < SCREEN_HEIGHT)
     {
-      int16_t _text_width = hal_get_utf8_width(_item->content);
+      int16_t _text_width = hal_get_string_width(_item->content);
       bool _has_right_control = (_item->type == switch_item || _item->type == slider_item);
       int16_t _right_margin = _has_right_control ? LIST_ITEM_RIGHT_MARGIN : 4;
       int16_t _avail_width = SCREEN_WIDTH - LIST_ITEM_LEFT_MARGIN - 10 - _right_margin;
@@ -264,10 +264,10 @@ void xerintosh_draw_list_item()
       int16_t _draw_x = _clip_x - (int16_t)_scroll_x;
 
       /* 绘制两份相同文字，形成无缝循环跑马灯 */
-      hal_draw_utf8(_draw_x,
+      hal_draw_string(_draw_x,
                      _y_list_item + hal_get_font_height() / 2,
                      _item->content, g_xerintosh_draw_color);
-      hal_draw_utf8(_draw_x + _cycle_dist,
+      hal_draw_string(_draw_x + _cycle_dist,
                      _y_list_item + hal_get_font_height() / 2,
                      _item->content, g_xerintosh_draw_color);
 

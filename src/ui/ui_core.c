@@ -142,7 +142,7 @@ void xerintosh_refresh_selector_position()
   g_xerintosh_selector.y_selector_trg = g_xerintosh_selector.selected_item->y_list_item_trg - hal_get_font_height() + 1;
   if (g_xerintosh_selector.selected_item->type == switch_item || g_xerintosh_selector.selected_item->type == slider_item)
     g_xerintosh_selector.w_selector_trg = SCREEN_WIDTH - 18;
-  else g_xerintosh_selector.w_selector_trg = hal_get_utf8_width(g_xerintosh_selector.selected_item->content) + 12;
+  else g_xerintosh_selector.w_selector_trg = hal_get_string_width(g_xerintosh_selector.selected_item->content) + 12;
   g_xerintosh_selector.h_selector_trg = hal_get_font_height() + 4;
   xerintosh_animation(&g_xerintosh_selector.y_selector, g_xerintosh_selector.y_selector_trg, ANIM_SPEED_SELECTOR);
   xerintosh_animation(&g_xerintosh_selector.w_selector, g_xerintosh_selector.w_selector_trg, ANIM_SPEED_SELECTOR);

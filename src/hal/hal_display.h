@@ -159,12 +159,9 @@ extern void hal_draw_string(int16_t x, int16_t y, const char* str, uint16_t colo
 
 /**
  * @brief  绘制 UTF-8 字符串
- * @param x     基线左对齐 x 坐标
- * @param y     基线 y 坐标
- * @param str   UTF-8 字符串
- * @param color 颜色
+ * @note   hal_draw_utf8 是 hal_draw_string 的别名（M5GFX drawString 本身即 UTF-8 兼容）
  */
-extern void hal_draw_utf8(int16_t x, int16_t y, const char* str, uint16_t color);
+#define hal_draw_utf8(x, y, str, color) hal_draw_string(x, y, str, color)
 
 /**
  * @brief  获取 ASCII 字符串宽度（像素）
@@ -175,10 +172,9 @@ extern int16_t hal_get_string_width(const char* str);
 
 /**
  * @brief  获取 UTF-8 字符串宽度（像素）
- * @param str UTF-8 字符串
- * @return 宽度（像素）
+ * @note   hal_get_utf8_width 是 hal_get_string_width 的别名
  */
-extern int16_t hal_get_utf8_width(const char* str);
+#define hal_get_utf8_width(str) hal_get_string_width(str)
 
 /**
  * @brief  获取当前字体高度

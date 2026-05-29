@@ -60,7 +60,7 @@ void xerintosh_draw_info_bar()
   hal_draw_pixel(_x_info_bar + 1, _y_info_bar_2 - 3, g_xerintosh_draw_color);
   hal_draw_pixel(_x_info_bar - 2, _y_info_bar_2 - 3, g_xerintosh_draw_color);
 
-  hal_draw_utf8(_x_info_bar + 6,
+  hal_draw_string(_x_info_bar + 6,
                  (int16_t)(g_xerintosh_info_bar.y_info_bar + hal_get_font_height() - 2),
                  g_xerintosh_info_bar.content, g_xerintosh_draw_color);
 }
@@ -113,7 +113,7 @@ void xerintosh_draw_pop_up()
   hal_draw_pixel(_x_pop_up - 1, _y_pop_up - 3, g_xerintosh_draw_color);
   hal_draw_pixel((int16_t)(SCREEN_WIDTH/2 + g_xerintosh_pop_up.w_pop_up/2), _y_pop_up - 3, g_xerintosh_draw_color);
 
-  hal_draw_utf8(_x_pop_up + 3,
+  hal_draw_string(_x_pop_up + 3,
                  (int16_t)(g_xerintosh_pop_up.y_pop_up + hal_get_font_height() + 1),
                  g_xerintosh_pop_up.content, g_xerintosh_draw_color);
 }
