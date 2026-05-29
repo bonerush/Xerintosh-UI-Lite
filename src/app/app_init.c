@@ -31,14 +31,14 @@ extern bool wifi_on;
 extern bool bt_on;
 
 /* ─── 设置变更回调（由 main.cpp 提供）─── */
-extern void on_brightness_change_cb(void);
-extern void on_anim_speed_change_cb(void);
-extern void on_anim_enabled_change_cb(void);
-extern void on_screen_rotation_change_cb(void);
-extern void on_serial_baud_change_cb(void);
+extern void on_brightness_change_cb(void *ud);
+extern void on_anim_speed_change_cb(void *ud);
+extern void on_anim_enabled_change_cb(void *ud);
+extern void on_screen_rotation_change_cb(void *ud);
+extern void on_serial_baud_change_cb(void *ud);
 
 /* 波特率选择回调（前向声明）*/
-static void on_baud_selected_cb(void);
+static void on_baud_selected_cb(void *ud);
 
 /* ═══ 菜单构建 ═══ */
 
@@ -121,12 +121,13 @@ void app_init_ui(void)
  * @brief 波特率子菜单选项确认回调
  * @note  通过 user_data 获取目标波特率等级，设置后触发变更回调并返回父菜单
  */
-static void on_baud_selected_cb(void)
+static void on_baud_selected_cb(void *ud)
 {
+    (void)ud;
     xerintosh_list_item_t *item = g_xerintosh_selector.selected_item;
     int16_t level = (int16_t)(intptr_t)item->user_data;
     g_serial_baud_rate = level;
-    on_serial_baud_change_cb();
+    on_serial_baud_change_cb(NULL);
     xerintosh_selector_exit_current_item();
 }
 

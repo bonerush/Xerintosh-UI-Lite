@@ -65,8 +65,9 @@ static int16_t brightness = 50;  /* 当前硬件亮度缓存 */
  * @brief 亮度变更回调
  * @note  将亮度等级转换为硬件 PWM 值并应用到屏幕
  */
-extern "C" void on_brightness_change_cb(void)
+extern "C" void on_brightness_change_cb(void *ud)
 {
+    (void)ud;
     brightness = g_brightness_level * 10;
     uint8_t hw = (uint8_t)settings_brightness_hw_value();
     M5.Display.setBrightness(hw);
@@ -76,8 +77,9 @@ extern "C" void on_brightness_change_cb(void)
 /**
  * @brief 动画速度变更回调
  */
-extern "C" void on_anim_speed_change_cb(void)
+extern "C" void on_anim_speed_change_cb(void *ud)
 {
+    (void)ud;
     g_anim_speed = settings_anim_speed_value();
     storage_set_anim_speed((uint8_t)g_anim_speed);
 }
@@ -85,8 +87,9 @@ extern "C" void on_anim_speed_change_cb(void)
 /**
  * @brief 动画开关变更回调
  */
-extern "C" void on_anim_enabled_change_cb(void)
+extern "C" void on_anim_enabled_change_cb(void *ud)
 {
+    (void)ud;
     storage_set_anim_enabled(g_anim_enabled);
 }
 
@@ -94,8 +97,9 @@ extern "C" void on_anim_enabled_change_cb(void)
  * @brief 波特率变更回调
  * @note  保存新波特率等级到 NVS，并重新初始化 Serial
  */
-extern "C" void on_serial_baud_change_cb(void)
+extern "C" void on_serial_baud_change_cb(void *ud)
 {
+    (void)ud;
     storage_set_serial_baud_rate(g_serial_baud_rate);
     Serial.end();
     Serial.begin(settings_serial_baud_hw_value(g_serial_baud_rate));
@@ -109,8 +113,9 @@ extern "C" void on_serial_baud_change_cb(void)
  *        setRotation(2) → 反向竖屏
  *        setRotation(3) → 反向横屏
  */
-extern "C" void on_screen_rotation_change_cb(void)
+extern "C" void on_screen_rotation_change_cb(void *ud)
 {
+    (void)ud;
     /* 同步 bool 开关到等级值 */
     g_screen_rotation_level = g_is_landscape ? ORIENTATION_LANDSCAPE : ORIENTATION_PORTRAIT;
 

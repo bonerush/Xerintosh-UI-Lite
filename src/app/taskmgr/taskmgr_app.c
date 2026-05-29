@@ -98,8 +98,9 @@ static void taskmgr_scroll_to_selected(void)
 
 /* ═══ 生命周期 ═══ */
 
-void taskmgr_init(void)
+void taskmgr_init(void *ud)
 {
+    (void)ud;
     g_tm.selected = 0;
     g_tm.scroll   = 0;
     g_tm.confirming = false;
@@ -161,8 +162,9 @@ const xerintosh_anim_row_list_t *taskmgr_get_anim_list(void)
 
 /* ═══ 生命周期 ═══ */
 
-void taskmgr_loop(void)
+void taskmgr_loop(void *ud)
 {
+    (void)ud;
     /* 第一步：读取按键事件（hal_input_update 由框架 app_input_process 处理） */
     hal_event_t event_a = hal_input_get_event(HAL_BTN_A);
     hal_event_t event_b = hal_input_get_event(HAL_BTN_B);
@@ -256,8 +258,9 @@ void taskmgr_loop(void)
     taskmgr_draw();
 }
 
-void taskmgr_exit(void)
+void taskmgr_exit(void *ud)
 {
+    (void)ud;
     g_tm.confirming = false;
     g_tm.prev_selected = -1;
     g_tm.prev_scroll = -1;

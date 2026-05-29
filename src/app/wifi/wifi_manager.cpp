@@ -20,7 +20,7 @@ bool wifi_mgr_is_enabled(void) { return false; }
 wifi_mgr_state_t wifi_mgr_get_state(void) { return WIFI_MGR_IDLE; }
 bool wifi_mgr_is_waiting_input(void) { return false; }
 void wifi_mgr_update(void) {}
-void wifi_mgr_on_switch_toggle(void) {}
+void wifi_mgr_on_switch_toggle(void *ud) { (void)ud; }
 
 #else
 
@@ -73,10 +73,10 @@ static int g_scan_retry_count = 0;                 /* 扫描重试计数 */
 
 /* ═══ 前向声明（回调函数）═══ */
 
-static void on_network_button_pressed(void);
-static void on_saved_connect_pressed(void);
-static void on_saved_delete_pressed(void);
-static void on_scan_pressed(void);
+static void on_network_button_pressed(void *ud);
+static void on_saved_connect_pressed(void *ud);
+static void on_saved_delete_pressed(void *ud);
+static void on_scan_pressed(void *ud);
 static void rebuild_network_list(int scan_count);
 static void suppress_wifi_logs(void);
 static void restore_wifi_logs(void);
@@ -185,8 +185,9 @@ void wifi_mgr_disable(void)
 /**
  * @brief WiFi 开关切换回调（由 switch_item 的 exit_function 调用）
  */
-void wifi_mgr_on_switch_toggle(void)
+void wifi_mgr_on_switch_toggle(void *ud)
 {
+    (void)ud;
     if (wifi_on) {
         wifi_mgr_enable();
     } else {
@@ -294,8 +295,9 @@ static void rebuild_network_list(int scan_count)
 /**
  * @brief 可用网络按钮按下回调：请求串口输入密码并进入连接状态
  */
-static void on_network_button_pressed(void)
+static void on_network_button_pressed(void *ud)
 {
+    (void)ud;
     const char *content = g_xerintosh_selector.selected_item->content;
     if (!content) {
         return;
@@ -309,8 +311,9 @@ static void on_network_button_pressed(void)
 /**
  * @brief 已保存网络"连接"按钮按下回调：读取密码并直接连接
  */
-static void on_saved_connect_pressed(void)
+static void on_saved_connect_pressed(void *ud)
 {
+    (void)ud;
     const char *content = g_xerintosh_selector.selected_item->parent->content;
     if (!content) {
         return;
@@ -340,8 +343,9 @@ static void on_saved_connect_pressed(void)
 /**
  * @brief 已保存网络"删除"按钮按下回调
  */
-static void on_saved_delete_pressed(void)
+static void on_saved_delete_pressed(void *ud)
 {
+    (void)ud;
     const char *content = g_xerintosh_selector.selected_item->parent->content;
     if (!content) {
         return;
@@ -360,8 +364,9 @@ static void on_saved_delete_pressed(void)
 /**
  * @brief 扫描按钮按下回调：启动异步网络扫描
  */
-static void on_scan_pressed(void)
+static void on_scan_pressed(void *ud)
 {
+    (void)ud;
     if (g_connecting) {
         WiFi.disconnect();
         restore_wifi_logs();

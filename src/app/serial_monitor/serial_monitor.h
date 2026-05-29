@@ -19,19 +19,19 @@ extern "C" {
  * @brief 初始化串口监视器 App
  * @note  重置状态、清空缓冲区
  */
-void serial_monitor_init(void);
+void serial_monitor_init(void *ud);
 
 /**
  * @brief 串口监视器主循环（每帧调用）
  * @note  处理输入事件、更新闪烁、绘制界面
  */
-void serial_monitor_loop(void);
+void serial_monitor_loop(void *ud);
 
 /**
  * @brief 退出串口监视器 App
  * @note  若处于 NORM 模式则清空缓冲区；DEBUG 模式保留历史
  */
-void serial_monitor_exit(void);
+void serial_monitor_exit(void *ud);
 
 /* ═══ 后台更新 ═══ */
 

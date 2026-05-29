@@ -81,15 +81,17 @@ static void about_draw(void)
 
 /* ═══ 生命周期 ═══ */
 
-void about_init(void)
+void about_init(void *ud)
 {
+    (void)ud;
 #ifndef NATIVE_TEST
     hal_input_reset_events();
 #endif
 }
 
-void about_loop(void)
+void about_loop(void *ud)
 {
+    (void)ud;
     hal_event_t event_b = hal_input_get_event(HAL_BTN_B);
 
     if (ui_user_item_try_exit(event_b)) return;
@@ -97,8 +99,9 @@ void about_loop(void)
     about_draw();
 }
 
-void about_exit(void)
+void about_exit(void *ud)
 {
+    (void)ud;
 #ifndef NATIVE_TEST
     hal_input_reset_events();
 #endif

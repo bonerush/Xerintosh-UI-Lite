@@ -112,7 +112,7 @@ xerintosh_list_item_t *xerintosh_new_list_item(const char *_content, xerintosh_l
  * @return 新创建的列表项指针；内存分配失败时返回 NULL
  */
 xerintosh_list_item_t *xerintosh_new_switch_item(const char *_content, bool *_value,
-                                          void (*_init_function)(), void (*_exit_function)(),
+                                          xerintosh_cb_t _init_function, xerintosh_cb_t _exit_function,
                                           xerintosh_list_item_icon_t icon)
 {
   xerintosh_switch_item_t *_item = (xerintosh_switch_item_t*)malloc(sizeof(xerintosh_switch_item_t));
@@ -131,7 +131,7 @@ xerintosh_list_item_t *xerintosh_new_switch_item(const char *_content, bool *_va
  * @param  icon           图标类型
  * @return 新创建的列表项指针；内存分配失败时返回 NULL
  */
-xerintosh_list_item_t *xerintosh_new_button_item(const char *_content, void (*_exit_function)(),
+xerintosh_list_item_t *xerintosh_new_button_item(const char *_content, xerintosh_cb_t _exit_function,
                                           xerintosh_list_item_icon_t icon)
 {
   xerintosh_button_item_t *_item = (xerintosh_button_item_t*)malloc(sizeof(xerintosh_button_item_t));
@@ -155,7 +155,7 @@ xerintosh_list_item_t *xerintosh_new_button_item(const char *_content, void (*_e
  */
 xerintosh_list_item_t *xerintosh_new_slider_item(const char *_content, int16_t *_value, uint8_t _step,
                                           int16_t _min, int16_t _max,
-                                          void (*_init_function)(), void (*_exit_function)(),
+                                          xerintosh_cb_t _init_function, xerintosh_cb_t _exit_function,
                                           xerintosh_list_item_icon_t icon)
 {
   xerintosh_slider_item_t *_item = (xerintosh_slider_item_t*)malloc(sizeof(xerintosh_slider_item_t));
@@ -181,8 +181,8 @@ xerintosh_list_item_t *xerintosh_new_slider_item(const char *_content, int16_t *
  * @param  icon           图标类型
  * @return 新创建的列表项指针；内存分配失败时返回 NULL
  */
-xerintosh_list_item_t *xerintosh_new_user_item(const char *_content, void (*_init_function)(),
-                                        void (*_loop_function)(), void (*_exit_function)(),
+xerintosh_list_item_t *xerintosh_new_user_item(const char *_content, xerintosh_cb_t _init_function,
+                                        xerintosh_cb_t _loop_function, xerintosh_cb_t _exit_function,
                                         xerintosh_list_item_icon_t icon)
 {
   xerintosh_user_item_t *_item = (xerintosh_user_item_t*)malloc(sizeof(xerintosh_user_item_t));

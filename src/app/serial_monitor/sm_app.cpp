@@ -48,8 +48,9 @@ static bool        s_prev_landscape = true; /* 保存进入前的屏幕方向 */
  * @brief 初始化串口监视器 App
  * @note  重置所有状态、清空缓冲区、初始化动画变量
  */
-void serial_monitor_init(void)
+void serial_monitor_init(void *ud)
 {
+    (void)ud;
     sm_running = false;
     sm_debug = false;
     sm_selected = 0;
@@ -83,8 +84,9 @@ void serial_monitor_init(void)
  * @brief 串口监视器主循环（每帧调用）
  * @note  处理输入事件、更新动画、绘制信息栏和终端
  */
-void serial_monitor_loop(void)
+void serial_monitor_loop(void *ud)
 {
+    (void)ud;
     /* 第一步：读取按键事件 */
     hal_event_t event_a = hal_input_get_event(HAL_BTN_A);
     hal_event_t event_b = hal_input_get_event(HAL_BTN_B);
@@ -145,8 +147,9 @@ void serial_monitor_loop(void)
  * @brief 退出串口监视器 App
  * @note  NORM 模式下清空缓冲区；DEBUG 模式下保留历史缓存
  */
-void serial_monitor_exit(void)
+void serial_monitor_exit(void *ud)
 {
+    (void)ud;
     if (!sm_debug) {
         sm_buffer_clear(&sm_buffer);
     }

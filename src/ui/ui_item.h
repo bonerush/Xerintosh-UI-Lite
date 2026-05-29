@@ -112,6 +112,14 @@ extern void xerintosh_push_pop_up(const char *_content, const uint16_t _span);
  */
 extern void xerintosh_hide_pop_up(void);
 
+/* ═══ 回调类型 ═══ */
+
+/**
+ * @brief 统一回调函数类型
+ * @param user_data 用户上下文指针（来自 xerintosh_list_item_t.user_data）
+ */
+typedef void (*xerintosh_cb_t)(void *user_data);
+
 /* ═══ 列表项类型 ═══ */
 
 #define MAX_LIST_CHILD_NUM 10   /* 每个父节点最多子项数 */
@@ -188,8 +196,8 @@ typedef struct xerintosh_switch_item_t
 {
   xerintosh_list_item_t base_item;   /* 基类 */
   bool *value;                       /* 绑定的布尔值指针 */
-  void (*init_function)();           /* 进入该项时调用的初始化函数 */
-  void (*exit_function)();           /* 值改变后调用的退出函数 */
+  xerintosh_cb_t init_function;      /* 进入该项时调用的初始化函数 */
+  xerintosh_cb_t exit_function;      /* 值改变后调用的退出函数 */
 } xerintosh_switch_item_t;
 
 /**
@@ -198,7 +206,7 @@ typedef struct xerintosh_switch_item_t
 typedef struct xerintosh_button_item_t
 {
   xerintosh_list_item_t base_item;   /* 基类 */
-  void (*exit_function)();           /* 按下时触发的回调函数 */
+  xerintosh_cb_t exit_function;      /* 按下时触发的回调函数 */
 } xerintosh_button_item_t;
 
 /**
@@ -213,8 +221,8 @@ typedef struct xerintosh_slider_item_t
   uint8_t value_step;                /* 步进值 */
   int16_t value_max;                 /* 最大值 */
   int16_t value_min;                 /* 最小值 */
-  void (*init_function)();           /* 进入该项时调用的初始化函数 */
-  void (*exit_function)();           /* 值改变后调用的退出函数 */
+  xerintosh_cb_t init_function;      /* 进入该项时调用的初始化函数 */
+  xerintosh_cb_t exit_function;      /* 值改变后调用的退出函数 */
 } xerintosh_slider_item_t;
 
 /**
@@ -226,9 +234,9 @@ typedef struct xerintosh_user_item_t
   bool in_user_item;                 /* 是否已处于 user_item 运行态 */
   bool entering_user_item;           /* 是否正在进入 */
   bool exiting_user_item;            /* 是否正在退出 */
-  void (*init_function)();           /* 进入时调用一次 */
-  void (*loop_function)();           /* 每帧调用 */
-  void (*exit_function)();           /* 退出时调用一次 */
+  xerintosh_cb_t init_function;      /* 进入时调用一次 */
+  xerintosh_cb_t loop_function;      /* 每帧调用 */
+  xerintosh_cb_t exit_function;      /* 退出时调用一次 */
   kern_pid_t kernel_pid;             /* 内核虚任务 PID（-1=未注册） */
 } xerintosh_user_item_t;
 
@@ -286,7 +294,7 @@ extern xerintosh_list_item_t *xerintosh_new_list_item(const char *_content, xeri
  * @return 新创建的列表项指针；内存分配失败时返回 NULL
  */
 extern xerintosh_list_item_t *xerintosh_new_switch_item(const char *_content, bool *_value,
-                                                 void (*_init_function)(), void (*_exit_function)(),
+                                                 xerintosh_cb_t _init_function, xerintosh_cb_t _exit_function,
                                                  xerintosh_list_item_icon_t icon);
 
 /**
@@ -296,7 +304,7 @@ extern xerintosh_list_item_t *xerintosh_new_switch_item(const char *_content, bo
  * @param  icon           图标类型
  * @return 新创建的列表项指针；内存分配失败时返回 NULL
  */
-extern xerintosh_list_item_t *xerintosh_new_button_item(const char *_content, void (*_exit_function)(),
+extern xerintosh_list_item_t *xerintosh_new_button_item(const char *_content, xerintosh_cb_t _exit_function,
                                                  xerintosh_list_item_icon_t icon);
 
 /**
@@ -313,7 +321,7 @@ extern xerintosh_list_item_t *xerintosh_new_button_item(const char *_content, vo
  */
 extern xerintosh_list_item_t *xerintosh_new_slider_item(const char *_content, int16_t *_value, uint8_t _step,
                                                  int16_t _min, int16_t _max,
-                                                 void (*_init_function)(), void (*_exit_function)(),
+                                                 xerintosh_cb_t _init_function, xerintosh_cb_t _exit_function,
                                                  xerintosh_list_item_icon_t icon);
 
 /**
@@ -325,8 +333,8 @@ extern xerintosh_list_item_t *xerintosh_new_slider_item(const char *_content, in
  * @param  icon           图标类型
  * @return 新创建的列表项指针；内存分配失败时返回 NULL
  */
-extern xerintosh_list_item_t *xerintosh_new_user_item(const char *_content, void (*_init_function)(),
-                                               void (*_loop_function)(), void (*_exit_function)(),
+extern xerintosh_list_item_t *xerintosh_new_user_item(const char *_content, xerintosh_cb_t _init_function,
+                                               xerintosh_cb_t _loop_function, xerintosh_cb_t _exit_function,
                                                xerintosh_list_item_icon_t icon);
 
 /**

@@ -43,7 +43,7 @@ static void draw_list_item_icon_only(xerintosh_list_item_t *_item, int16_t _x, i
 static void draw_list_item_switch(xerintosh_switch_item_t *_switch, int16_t _x, int16_t _y)
 {
   if (_switch->init_function && g_xerintosh_refresh_list_value)
-    _switch->init_function();
+    _switch->init_function(_switch->base_item.user_data);
   if (!is_item_visible(_y)) return;
 
   xerintosh_draw_list_icon(_switch->base_item.icon, _x, _y);
@@ -71,7 +71,7 @@ static void draw_list_item_switch(xerintosh_switch_item_t *_switch, int16_t _x, 
 static void draw_list_item_slider(xerintosh_slider_item_t *_slider, int16_t _x, int16_t _y)
 {
   if (_slider->init_function && g_xerintosh_refresh_list_value)
-    _slider->init_function();
+    _slider->init_function(_slider->base_item.user_data);
   if (!is_item_visible(_y)) return;
 
   xerintosh_draw_list_icon(_slider->base_item.icon, _x, _y);

@@ -179,7 +179,7 @@ void xerintosh_ui_main_core()
     if (_selected_user_item->entering_user_item && g_xerintosh_exit_animation_status == 1)
     {
       if (_selected_user_item->init_function != NULL)
-        _selected_user_item->init_function();
+        _selected_user_item->init_function(g_xerintosh_selector.selected_item->user_data);
       _selected_user_item->in_user_item = 1;
       _selected_user_item->entering_user_item = false;  /* 进入完成，重置标志 */
     }
@@ -193,7 +193,7 @@ void xerintosh_ui_main_core()
 
     if (_selected_user_item->loop_function != NULL)
     {
-      _selected_user_item->loop_function();
+      _selected_user_item->loop_function(g_xerintosh_selector.selected_item->user_data);
     }
 
     /* 外部 kill 请求：触发 user_item 退出 */
@@ -205,7 +205,7 @@ void xerintosh_ui_main_core()
     if (_selected_user_item->exiting_user_item && g_xerintosh_exit_animation_status == 1)
     {
         if (_selected_user_item->exit_function != NULL)
-            _selected_user_item->exit_function();
+            _selected_user_item->exit_function(g_xerintosh_selector.selected_item->user_data);
         _selected_user_item->in_user_item = 0;
         _selected_user_item->exiting_user_item = false;
     }

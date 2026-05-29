@@ -184,7 +184,7 @@ static void handle_slider_confirm_toggle(xerintosh_slider_item_t *_slider)
     return;
   }
   if (_slider->exit_function)
-    _slider->exit_function();
+    _slider->exit_function(g_xerintosh_selector.selected_item->user_data);
   _slider->is_confirmed = false;
 }
 
@@ -212,7 +212,7 @@ void xerintosh_selector_jump_to_selected_item()
     xerintosh_switch_item_t* _selected_switch_item = xerintosh_to_switch_item(g_xerintosh_selector.selected_item);
     *_selected_switch_item->value = !*_selected_switch_item->value;
     if (_selected_switch_item->exit_function)
-      _selected_switch_item->exit_function();
+      _selected_switch_item->exit_function(g_xerintosh_selector.selected_item->user_data);
     return;
   }
 
@@ -220,7 +220,7 @@ void xerintosh_selector_jump_to_selected_item()
   {
     xerintosh_button_item_t* _selected_button_item = xerintosh_to_button_item(g_xerintosh_selector.selected_item);
     if (_selected_button_item->exit_function)
-      _selected_button_item->exit_function();
+      _selected_button_item->exit_function(g_xerintosh_selector.selected_item->user_data);
     return;
   }
 

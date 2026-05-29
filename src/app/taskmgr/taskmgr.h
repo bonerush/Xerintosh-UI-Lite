@@ -27,9 +27,9 @@ extern "C" {
 
 /* ═══ 生命周期（user_item 接口）═══ */
 
-void taskmgr_init(void);
-void taskmgr_loop(void);
-void taskmgr_exit(void);
+void taskmgr_init(void *ud);
+void taskmgr_loop(void *ud);
+void taskmgr_exit(void *ud);
 
 /* ═══ UI 状态访问（供 taskmgr_ui.c 使用）═══ */
 

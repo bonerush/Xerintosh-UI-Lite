@@ -12,9 +12,9 @@
 extern "C" {
 #endif
 
-void about_init(void);
-void about_loop(void);
-void about_exit(void);
+void about_init(void *ud);
+void about_loop(void *ud);
+void about_exit(void *ud);
 
 #ifdef __cplusplus
 }

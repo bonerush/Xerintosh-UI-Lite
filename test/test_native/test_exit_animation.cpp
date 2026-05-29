@@ -17,9 +17,9 @@ extern xerintosh_camera_t g_xerintosh_camera;
 }
 
 /* 简单的 stub 函数，供 user_item 使用 */
-extern "C" void stub_user_init(void) {}
-extern "C" void stub_user_loop(void) {}
-extern "C" void stub_user_exit(void) {}
+extern "C" void stub_user_init(void *ud) { (void)ud; }
+extern "C" void stub_user_loop(void *ud) { (void)ud; }
+extern "C" void stub_user_exit(void *ud) { (void)ud; }
 
 /* ═══ Phase 1: 退场动画必须能在有限帧内完成 ═══ */
 

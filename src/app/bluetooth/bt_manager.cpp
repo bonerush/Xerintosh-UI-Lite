@@ -20,7 +20,7 @@ bool bt_mgr_is_enabled(void) { return false; }
 bt_mgr_state_t bt_mgr_get_state(void) { return BT_MGR_IDLE; }
 bool bt_mgr_is_waiting_input(void) { return false; }
 void bt_mgr_update(void) {}
-void bt_mgr_on_switch_toggle(void) {}
+void bt_mgr_on_switch_toggle(void *ud) { (void)ud; }
 
 #else
 
@@ -65,10 +65,10 @@ static xerintosh_list_item_t *g_devices_list = NULL;   /* "蓝牙设备" 列表�
 /* ═══ 前向声明 ═══ */
 
 static void rebuild_device_list(void);
-static void on_device_button_pressed(void);
-static void on_bt_reconnect_pressed(void);
-static void on_bt_delete_pressed(void);
-static void on_bt_scan_pressed(void);
+static void on_device_button_pressed(void *ud);
+static void on_bt_reconnect_pressed(void *ud);
+static void on_bt_delete_pressed(void *ud);
+static void on_bt_scan_pressed(void *ud);
 extern "C" void bt_mgr_task_main(void *arg);
 
 /* ═══ BLE 扫描回调（NimBLE API）═══ */
@@ -101,7 +101,8 @@ class ScanCallbacks : public NimBLEAdvertisedDeviceCallbacks {
 /**
  * @brief 扫描到的设备按钮按下回调：请求串口输入配对码
  */
-static void on_device_button_pressed(void) {
+static void on_device_button_pressed(void *ud) {
+    (void)ud;
     xerintosh_list_item_t *item = g_xerintosh_selector.selected_item;
     if (!item || !item->content) return;
     xerintosh_push_pop_up("请在串口输入配对码", 100);
@@ -117,7 +118,8 @@ static void on_device_button_pressed(void) {
 /**
  * @brief 已保存设备"重新连接"按钮按下回调：重新扫描该设备
  */
-static void on_bt_reconnect_pressed(void) {
+static void on_bt_reconnect_pressed(void *ud) {
+    (void)ud;
     xerintosh_list_item_t *parent = g_xerintosh_selector.selected_item->parent;
     if (!parent || !parent->user_data) return;
 
@@ -136,7 +138,8 @@ static void on_bt_reconnect_pressed(void) {
 /**
  * @brief 已保存设备"删除"按钮按下回调
  */
-static void on_bt_delete_pressed(void) {
+static void on_bt_delete_pressed(void *ud) {
+    (void)ud;
     xerintosh_list_item_t *parent = g_xerintosh_selector.selected_item->parent;
     if (!parent || !parent->user_data) return;
 
@@ -154,7 +157,8 @@ static void on_bt_delete_pressed(void) {
 /**
  * @brief 扫描按钮按下回调：启动 BLE 设备扫描
  */
-static void on_bt_scan_pressed(void) {
+static void on_bt_scan_pressed(void *ud) {
+    (void)ud;
     g_scan_result_count = 0;
     NimBLEDevice::getScan()->start(SCAN_DURATION_MS / 1000, false);
     g_scan_start_time = millis();
@@ -360,7 +364,8 @@ void bt_mgr_update(void) {
 /**
  * @brief 蓝牙开关切换回调
  */
-void bt_mgr_on_switch_toggle(void) {
+void bt_mgr_on_switch_toggle(void *ud) {
+    (void)ud;
     if (bt_on) {
         bt_mgr_enable();
     } else {
