@@ -89,6 +89,14 @@ kern_port_thread_t kern_port_thread_spawn(
 void kern_port_thread_exit(void) __attribute__((noreturn));
 
 /**
+ * @brief  从外部销毁指定线程
+ * @param  thread 线程句柄
+ * @note   用于 kern_task_kill() 等外部终止场景。
+ *         被销毁的线程必须不在当前 CPU 上执行。
+ */
+void kern_port_thread_kill(kern_port_thread_t thread);
+
+/**
  * @brief  获取线程栈使用高水位
  * @param  thread 线程句柄
  * @return 已使用的栈字节数（近似值）

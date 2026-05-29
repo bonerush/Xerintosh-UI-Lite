@@ -568,6 +568,42 @@ bool kern_task_is_protected(kern_task_t *task)
     return false;
 }
 
+/* ═══ 外部任务终止 ═══ */
+
+int kern_task_kill(kern_pid_t pid)
+{
+    kern_task_t *task = kern_task_get(pid);
+    if (task == NULL) return KERN_ENOENT;
+
+    /* 不能终止受保护的系统任务 */
+    if (kern_task_is_protected(task)) return KERN_EACCES;
+
+    /* 不能终止自身（调用 kern_exit() 代替） */
+    if (task == g_current_task) return KERN_EACCES;
+
+    /* 已经是 ZOMBIE 则幂等返回成功 */
+    if (task->state == KERN_TASK_ZOMBIE) return 0;
+
+    /* 虚任务：走专门的注销路径（回收 TCB，count--） */
+    if (task->flags & KERN_TASK_FLAG_VIRTUAL) {
+        kern_task_unregister_virtual(pid);
+        return 0;
+    }
+
+    /* 非虚任务：标记 ZOMBIE 并销毁底层 FreeRTOS 线程 */
+    task->state = KERN_TASK_ZOMBIE;
+    kern_log(KERN_LOG_DEBUG, "task %d (%s) killed", task->pid, task->name);
+
+#ifndef NATIVE_TEST
+    if (task->port_thread != KERN_PORT_THREAD_NULL) {
+        kern_port_thread_kill(task->port_thread);
+        task->port_thread = KERN_PORT_THREAD_NULL;
+    }
+#endif
+
+    return 0;
+}
+
 #ifdef NATIVE_TEST
 
 size_t kern_task_stack_usage(kern_task_t *task)

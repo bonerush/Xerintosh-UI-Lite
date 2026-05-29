@@ -118,6 +118,17 @@ extern void kern_yield(void);
 extern void kern_exit(void);
 
 /**
+ * @brief  从外部终止指定任务
+ * @param  pid 要终止的任务 PID
+ * @return 0 成功，< 0 为错误码
+ * @note   受保护的系统任务不可终止（返回 KERN_EACCES）。
+ *         当前任务不可终止自身（返回 KERN_EACCES）。
+ *         虚任务：调用 kern_task_unregister_virtual() 注销。
+ *         非虚任务：标记 ZOMBIE 并销毁底层 FreeRTOS 线程。
+ */
+extern int kern_task_kill(kern_pid_t pid);
+
+/**
  * @brief  休眠指定的毫秒数
  * @param  ms 休眠时间（毫秒）
  * @note   当前任务进入 SLEEPING 状态，ms 毫秒后被唤醒

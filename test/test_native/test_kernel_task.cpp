@@ -271,3 +271,80 @@ TEST(KernelTaskTest, StackCanaryIsSet)
     uint32_t canary = kern_task_stack_canary(cur);
     EXPECT_EQ(canary, KERN_STACK_CANARY);
 }
+
+/* ═══ kern_task_kill 测试 ═══ */
+
+/* 辅助任务：设置 flag 后 exit */
+static volatile bool g_kill_flag = false;
+static void killable_task(void *arg)
+{
+    (void)arg;
+    g_kill_flag = true;
+    kern_exit();
+}
+
+TEST(KernelTaskKillTest, KillNormalTaskReturnsOK)
+{
+    kern_sched_init();
+    kern_pid_t pid = kern_spawn("killable", killable_task, NULL, 0);
+    ASSERT_GE(pid, 0);
+
+    int ret = kern_task_kill(pid);
+    EXPECT_EQ(ret, 0);
+
+    kern_task_t *task = kern_task_get(pid);
+    ASSERT_NE(task, nullptr);
+    EXPECT_EQ(task->state, KERN_TASK_ZOMBIE);
+}
+
+TEST(KernelTaskKillTest, KillProtectedTaskReturnsEACCES)
+{
+    kern_sched_init();
+    kern_task_t *idle = kern_task_get(0);
+    ASSERT_NE(idle, nullptr);
+
+    int ret = kern_task_kill(0);
+    EXPECT_EQ(ret, KERN_EACCES);
+}
+
+TEST(KernelTaskKillTest, KillNonexistentReturnsENOENT)
+{
+    kern_sched_init();
+    int ret = kern_task_kill(9999);
+    EXPECT_EQ(ret, KERN_ENOENT);
+}
+
+TEST(KernelTaskKillTest, KillVirtualTaskRemovesFromList)
+{
+    kern_sched_init();
+    kern_pid_t pid = kern_task_register_virtual("vtest");
+    ASSERT_GE(pid, 0);
+
+    int count_before = kern_task_count();
+    int ret = kern_task_kill(pid);
+    EXPECT_EQ(ret, 0);
+
+    /* 虚任务 kill 后应从链表中移除 */
+    kern_task_t *task = kern_task_get(pid);
+    EXPECT_EQ(task, nullptr);
+    EXPECT_EQ(kern_task_count(), count_before - 1);
+}
+
+TEST(KernelTaskKillTest, KillZombieIsIdempotent)
+{
+    kern_sched_init();
+    kern_pid_t pid = kern_spawn("zombie_test", killable_task, NULL, 0);
+    ASSERT_GE(pid, 0);
+
+    /* 第一次 kill */
+    int ret = kern_task_kill(pid);
+    EXPECT_EQ(ret, 0);
+
+    /* 第二次 kill 幂等 */
+    ret = kern_task_kill(pid);
+    EXPECT_EQ(ret, 0);
+
+    kern_task_t *task = kern_task_get(pid);
+    ASSERT_NE(task, nullptr);
+    EXPECT_EQ(task->state, KERN_TASK_ZOMBIE);
+}
