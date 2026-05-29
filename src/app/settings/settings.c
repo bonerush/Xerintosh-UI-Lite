@@ -78,6 +78,41 @@ void settings_load_from_storage(void)
     }
 }
 
+/* ═══ Getter/Setter ═══ */
+
+int16_t settings_get_brightness(void) { return g_brightness_level; }
+void settings_set_brightness(int16_t level) {
+    if (level < 1) level = 1;
+    if (level > 10) level = 10;
+    g_brightness_level = level;
+}
+
+int16_t settings_get_anim_speed(void) { return g_anim_speed_level; }
+void settings_set_anim_speed(int16_t level) {
+    if (level < 1) level = 1;
+    if (level > 10) level = 10;
+    g_anim_speed_level = level;
+}
+
+int16_t settings_get_rotation(void) { return g_screen_rotation_level; }
+void settings_set_rotation(int16_t level) {
+    g_screen_rotation_level = level;
+    g_is_landscape = (level == ORIENTATION_LANDSCAPE);
+}
+
+bool settings_get_landscape(void) { return g_is_landscape; }
+void settings_set_landscape(bool landscape) {
+    g_is_landscape = landscape;
+    g_screen_rotation_level = landscape ? ORIENTATION_LANDSCAPE : ORIENTATION_PORTRAIT;
+}
+
+int16_t settings_get_baud_rate(void) { return g_serial_baud_rate; }
+void settings_set_baud_rate(int16_t level) {
+    if (level < 1) level = 1;
+    if (level > 6) level = 6;
+    g_serial_baud_rate = level;
+}
+
 /* ═══ 值转换 ═══ */
 
 /**

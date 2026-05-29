@@ -35,6 +35,23 @@ extern int16_t g_screen_rotation_level;  /* 屏幕方向 1=竖屏, 2=横屏 */
 extern bool    g_is_landscape;           /* 横屏开关：true=横屏, false=竖屏 */
 extern int16_t g_serial_baud_rate;       /* 串口波特率等级 1-6 */
 
+/* ═══ Getter/Setter ═══ */
+
+extern int16_t settings_get_brightness(void);
+extern void    settings_set_brightness(int16_t level);
+
+extern int16_t settings_get_anim_speed(void);
+extern void    settings_set_anim_speed(int16_t level);
+
+extern int16_t settings_get_rotation(void);
+extern void    settings_set_rotation(int16_t level);
+
+extern bool    settings_get_landscape(void);
+extern void    settings_set_landscape(bool landscape);
+
+extern int16_t settings_get_baud_rate(void);
+extern void    settings_set_baud_rate(int16_t level);
+
 /* ═══ 生命周期 ═══ */
 
 /**
