@@ -85,12 +85,6 @@ extern uint32_t hal_input_get_press_duration(hal_button_t btn);
 extern void hal_input_set_double_click_enabled(bool enabled);
 
 /**
- * @brief  查询双击检测是否启用
- * @return true 启用，false 禁用
- */
-extern bool hal_input_is_double_click_enabled(void);
-
-/**
  * @brief  重置所有按键的事件状态机
  * @note   在 user_item 的 init/exit 中调用，清除跨模式的残留状态，
  *         防止进入/退出 App 时按键边沿丢失导致的僵死状态。

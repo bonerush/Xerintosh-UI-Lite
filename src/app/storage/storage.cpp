@@ -24,10 +24,6 @@ bool     storage_wifi_add(const char *ssid, const char *pass) {
     (void)ssid; (void)pass; return false;
 }
 bool     storage_wifi_remove(int index) { (void)index; return false; }
-int      storage_bt_get_count(void) { return 0; }
-bool     storage_bt_get(int index, char *addr, char *name) {
-    (void)index; (void)addr; (void)name; return false;
-}
 int      storage_bt_find(const char *addr) { (void)addr; return -1; }
 bool     storage_bt_add(const char *addr, const char *name) {
     (void)addr; (void)name; return false;
@@ -267,12 +263,6 @@ bool storage_wifi_remove(int index) {
 }
 
 /* ═══ 蓝牙凭据 ═══ */
-
-int storage_bt_get_count(void) { return cred_get_count(&BT_KIND); }
-
-bool storage_bt_get(int index, char *addr, char *name) {
-    return cred_get(&BT_KIND, index, addr, name);
-}
 
 int storage_bt_find(const char *addr) {
     return cred_find(&BT_KIND, addr);

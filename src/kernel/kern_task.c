@@ -639,11 +639,6 @@ kern_task_t *kern_task_current(void)
     return g_current_task;
 }
 
-uint8_t kern_task_count(void)
-{
-    return g_task_count;
-}
-
 kern_task_t *kern_task_get(kern_pid_t pid)
 {
     kern_task_t *t = g_task_list;
@@ -820,16 +815,6 @@ size_t kern_task_stack_usage(kern_task_t *task)
     return (used > 0) ? used : 1;
 }
 
-uint32_t kern_task_stack_canary(kern_task_t *task)
-{
-    if (task == NULL || task->stack_base == NULL) return 0;
-    if (task->stack_size < sizeof(uint32_t)) return 0;
-
-    uint32_t canary;
-    memcpy(&canary, task->stack_base, sizeof(uint32_t));
-    return canary;
-}
-
 #elif defined(XEROS_NATIVE_SCHED)
 
 /* XEROS_NATIVE_SCHED: 手动栈 + 0xAA canary，与 NATIVE_TEST 相同 */
@@ -861,16 +846,6 @@ size_t kern_task_stack_usage(kern_task_t *task)
     return (used > 0) ? used : 1;
 }
 
-uint32_t kern_task_stack_canary(kern_task_t *task)
-{
-    if (task == NULL || task->stack_base == NULL) return 0;
-    if (task->stack_size < sizeof(uint32_t)) return 0;
-
-    uint32_t canary;
-    memcpy(&canary, task->stack_base, sizeof(uint32_t));
-    return canary;
-}
-
 #else /* ESP32: FreeRTOS 管理栈，无法直接扫描 0xAA */
 
 size_t kern_task_stack_usage(kern_task_t *task)
@@ -880,13 +855,6 @@ size_t kern_task_stack_usage(kern_task_t *task)
     if (task->port_thread != KERN_PORT_THREAD_NULL) {
         return kern_port_thread_stack_usage(task->port_thread);
     }
-    return 0;
-}
-
-uint32_t kern_task_stack_canary(kern_task_t *task)
-{
-    /* FreeRTOS 任务不用 canary，返回 0 表示无检测 */
-    (void)task;
     return 0;
 }
 

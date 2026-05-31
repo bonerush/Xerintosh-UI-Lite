@@ -287,11 +287,9 @@ TEST_F(KernelDevicesTest, Input0IoctlDoubleClick)
 
     int rc = kern_ioctl(fd, DEV_INPUT_IOCTL_SET_DOUBLE_CLICK, 1);
     EXPECT_EQ(rc, KERN_OK);
-    EXPECT_TRUE(hal_input_is_double_click_enabled());
 
     rc = kern_ioctl(fd, DEV_INPUT_IOCTL_SET_DOUBLE_CLICK, 0);
     EXPECT_EQ(rc, KERN_OK);
-    EXPECT_FALSE(hal_input_is_double_click_enabled());
 
     kern_close(fd);
 }

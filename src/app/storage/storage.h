@@ -78,22 +78,6 @@ bool     storage_wifi_remove(int index);
 /* ═══ BT 凭据 ═══ */
 
 /**
- * @brief  获取已保存的蓝牙设备数量
- * @return 设备数量
- */
-int      storage_bt_get_count(void);
-
-/**
- * @brief  获取指定索引的蓝牙设备信息
- * @param  index 索引
- * @param  addr  输出 MAC 地址缓冲区
- * @param  name  输出名称缓冲区
- * @return true  获取成功
- * @return false 索引越界
- */
-bool     storage_bt_get(int index, char *addr, char *name);
-
-/**
  * @brief  查找指定 MAC 地址的索引
  * @param  addr MAC 地址字符串
  * @return 索引（>=0）；未找到返回 -1

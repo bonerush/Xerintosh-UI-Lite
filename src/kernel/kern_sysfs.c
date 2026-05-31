@@ -258,21 +258,3 @@ void    kern_sysfs_set_anim_enabled(int32_t val)
 {
     if (val >= 0 && val <= 1) g_sys_anim_enabled = val;
 }
-
-int32_t kern_sysfs_get_log_level(void)   { return g_sys_log_level; }
-void    kern_sysfs_set_log_level(int32_t val)
-{
-    if (val >= 0 && val <= 3) g_sys_log_level = val;
-}
-
-int32_t kern_sysfs_get_mode(void)         { return g_sys_mode; }
-void    kern_sysfs_set_mode(int32_t val)
-{
-    if (val >= 0 && val <= 3) g_sys_mode = val;
-}
-
-int32_t kern_sysfs_get_ctrl(void)         { return g_sys_ctrl; }
-void    kern_sysfs_set_ctrl(int32_t val)
-{
-    if (val >= 0 && val <= 2) g_sys_ctrl = val;
-}

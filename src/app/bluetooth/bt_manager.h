@@ -54,19 +54,6 @@ void bt_mgr_enable(void);
 void bt_mgr_disable(void);
 
 /**
- * @brief  查询蓝牙是否已启用
- * @return true  已启用
- * @return false 已禁用
- */
-bool bt_mgr_is_enabled(void);
-
-/**
- * @brief  获取当前蓝牙状态机状态
- * @return 当前状态
- */
-bt_mgr_state_t bt_mgr_get_state(void);
-
-/**
  * @brief  查询是否正在等待串口输入配对码
  * @return true  等待输入中（PAIRING 状态）
  */

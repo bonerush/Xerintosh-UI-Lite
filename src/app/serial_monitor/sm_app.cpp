@@ -23,13 +23,13 @@
 bool        sm_running = false;
 bool        sm_debug = false;
 uint8_t     sm_selected = 0;
-uint32_t    sm_blink_tick = 0;
-bool        sm_blink_on = false;
+static uint32_t    sm_blink_tick = 0;
+static bool        sm_blink_on = false;
 sm_buffer_t sm_buffer;
 
 /* Phase 2: 动画状态 */
 float       sm_entry_offset = 0.0f;
-float       sm_btn_alpha_0 = 1.0f;
+static float       sm_btn_alpha_0 = 1.0f;
 float       sm_btn_alpha_1 = 0.0f;
 
 #ifndef NATIVE_TEST

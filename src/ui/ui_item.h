@@ -133,7 +133,6 @@ typedef void (*xerintosh_cb_t)(void *user_data);
 #define MAX_LIST_CHILD_NUM 10   /* 每个父节点最多子项数 */
 #define MAX_LIST_LAYER 10       /* 菜单树最大深度 */
 #define LIST_ITEM_SPACING 18    /* 列表项纵向间距 */
-#define LIST_ITEM_OFFSET 8      /* 列表项横向偏移 */
 #define LIST_ITEM_LEFT_MARGIN 4 /* 列表项左边距 */
 #define LIST_ITEM_RIGHT_MARGIN 20  /* 列表项右边距（为右侧控件预留） */
 #define LIST_INFO_BAR_HEIGHT 3  /* 信息栏高度补偿 */

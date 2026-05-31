@@ -16,8 +16,6 @@
 void bt_mgr_init(void) {}
 void bt_mgr_enable(void) {}
 void bt_mgr_disable(void) {}
-bool bt_mgr_is_enabled(void) { return false; }
-bt_mgr_state_t bt_mgr_get_state(void) { return BT_MGR_IDLE; }
 bool bt_mgr_is_waiting_input(void) { return false; }
 void bt_mgr_update(void) {}
 void bt_mgr_on_switch_toggle(void *ud) { (void)ud; }
@@ -324,10 +322,6 @@ void bt_mgr_disable(void) {
 
     g_state = BT_MGR_IDLE;
 }
-
-bool bt_mgr_is_enabled(void) { return g_bt_enabled; }
-
-bt_mgr_state_t bt_mgr_get_state(void) { return g_state; }
 
 bool bt_mgr_is_waiting_input(void) {
     return g_state == BT_MGR_PAIRING;

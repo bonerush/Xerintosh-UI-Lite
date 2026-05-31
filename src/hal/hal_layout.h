@@ -58,11 +58,6 @@ extern "C" {
 #define HAL_CENTER_Y(h)     ((int16_t)((SCREEN_HEIGHT - (h)) / 2))
 
 /**
- * @brief 右对齐
- */
-#define HAL_RIGHT_X(w)      ((int16_t)(SCREEN_WIDTH - (w)))
-
-/**
  * @brief 左对齐（标准缩进 = HAL_MARGIN_MD）
  */
 #define HAL_LEFT_X()        ((int16_t)HAL_MARGIN_MD)

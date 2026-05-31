@@ -53,19 +53,6 @@ void wifi_mgr_enable(void);
 void wifi_mgr_disable(void);
 
 /**
- * @brief  查询 WiFi 是否已启用
- * @return true  已启用
- * @return false 已禁用
- */
-bool wifi_mgr_is_enabled(void);
-
-/**
- * @brief  获取当前 WiFi 状态机状态
- * @return 当前状态
- */
-wifi_mgr_state_t wifi_mgr_get_state(void);
-
-/**
  * @brief  查询是否正在等待串口输入密码
  * @return true  等待输入中（CONNECTING 状态）
  */

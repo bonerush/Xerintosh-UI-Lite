@@ -386,17 +386,6 @@ TEST(KernelSysfsTest, GetterSetterAnimEnabled)
     EXPECT_EQ(kern_sysfs_get_anim_enabled(), 1);
 }
 
-TEST(KernelSysfsTest, GetterSetterLogLevel)
-{
-    kern_vfs_init();
-    kern_sysfs_init();
-
-    EXPECT_EQ(kern_sysfs_get_log_level(), 1);
-
-    kern_sysfs_set_log_level(3);
-    EXPECT_EQ(kern_sysfs_get_log_level(), 3);
-}
-
 TEST(KernelSysfsTest, SetterClampsOutOfRange)
 {
     kern_vfs_init();

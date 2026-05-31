@@ -16,8 +16,6 @@
 void wifi_mgr_init(void) {}
 void wifi_mgr_enable(void) {}
 void wifi_mgr_disable(void) {}
-bool wifi_mgr_is_enabled(void) { return false; }
-wifi_mgr_state_t wifi_mgr_get_state(void) { return WIFI_MGR_IDLE; }
 bool wifi_mgr_is_waiting_input(void) { return false; }
 void wifi_mgr_update(void) {}
 void wifi_mgr_on_switch_toggle(void *ud) { (void)ud; }
@@ -84,16 +82,6 @@ static void restore_wifi_logs(void);
 extern "C" void wifi_mgr_task_main(void *arg);
 
 /* ═══ 公共查询接口 ═══ */
-
-bool wifi_mgr_is_enabled(void)
-{
-    return g_wifi_enabled;
-}
-
-wifi_mgr_state_t wifi_mgr_get_state(void)
-{
-    return g_state;
-}
 
 bool wifi_mgr_is_waiting_input(void)
 {

@@ -20,10 +20,6 @@ void hal_input_set_double_click_enabled(bool enabled) {
     g_double_click_enabled = enabled;
 }
 
-bool hal_input_is_double_click_enabled(void) {
-    return g_double_click_enabled;
-}
-
 #ifdef NATIVE_TEST
 
 /* ═══ Native 测试环境：输入桩 ═══ */

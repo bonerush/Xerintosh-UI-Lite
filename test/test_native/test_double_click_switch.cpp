@@ -8,26 +8,6 @@ extern "C" {
 /* ═══ 双击开关功能测试 ═══ */
 
 /**
- * @brief 默认状态下双击检测为禁用
- */
-TEST(DoubleClickSwitchTest, DefaultDisabled)
-{
-    EXPECT_FALSE(hal_input_is_double_click_enabled());
-}
-
-/**
- * @brief 启用/禁用切换正常
- */
-TEST(DoubleClickSwitchTest, EnableDisableToggle)
-{
-    hal_input_set_double_click_enabled(true);
-    EXPECT_TRUE(hal_input_is_double_click_enabled());
-
-    hal_input_set_double_click_enabled(false);
-    EXPECT_FALSE(hal_input_is_double_click_enabled());
-}
-
-/**
  * @brief 简单状态机：一次短按立即返回 SHORT_PRESS（无 300ms 延迟）
  */
 TEST(DoubleClickSwitchTest, SimpleModeSingleShortPress)

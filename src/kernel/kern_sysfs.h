@@ -89,15 +89,6 @@ extern void    kern_sysfs_set_anim_speed(int32_t val);
 extern int32_t kern_sysfs_get_anim_enabled(void);
 extern void    kern_sysfs_set_anim_enabled(int32_t val);
 
-extern int32_t kern_sysfs_get_log_level(void);
-extern void    kern_sysfs_set_log_level(int32_t val);
-
-extern int32_t kern_sysfs_get_mode(void);
-extern void    kern_sysfs_set_mode(int32_t val);
-
-extern int32_t kern_sysfs_get_ctrl(void);
-extern void    kern_sysfs_set_ctrl(int32_t val);
-
 #ifdef __cplusplus
 }
 #endif

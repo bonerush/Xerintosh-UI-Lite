@@ -154,11 +154,9 @@ static inline void kern_poll_loop(void (*update_fn)(void), uint32_t interval_ms)
 /* ═══ 查询接口 ═══ */
 
 extern kern_task_t *kern_task_current(void);
-extern uint8_t kern_task_count(void);
 extern kern_task_t *kern_task_get(kern_pid_t pid);
 extern kern_task_t *kern_task_list_head(void);
 extern size_t kern_task_stack_usage(kern_task_t *task);
-extern uint32_t kern_task_stack_canary(kern_task_t *task);
 
 /* ═══ 虚任务管理 ═══ */
 

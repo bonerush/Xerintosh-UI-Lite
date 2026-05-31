@@ -46,19 +46,6 @@ static uint16_t ringbuf_write(bt_uart_ringbuf_t *rb,
     return written;
 }
 
-static uint16_t ringbuf_read(bt_uart_ringbuf_t *rb,
-                              uint8_t *out, uint16_t max_len)
-{
-    uint16_t read = 0;
-    while (read < max_len && rb->count > 0) {
-        out[read] = rb->data[rb->tail];
-        rb->tail = (rb->tail + 1) % rb->size;
-        rb->count--;
-        read++;
-    }
-    return read;
-}
-
 static uint16_t ringbuf_peek(const bt_uart_ringbuf_t *rb,
                               uint8_t *out, uint16_t max_len)
 {
