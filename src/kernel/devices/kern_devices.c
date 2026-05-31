@@ -1,7 +1,7 @@
 /**
  * @file   kern_devices.c
  * @brief  物理设备初始化实现
- * @details 注册 /dev/fb0, /dev/input0, /dev/ttyS0 到 VFS。
+ * @details 注册 /dev/fb0, /dev/input0, /dev/pwrkey, /dev/ttyS0 到 VFS。
  *
  * @copyright Copyright (c) 2026
  */
@@ -12,6 +12,7 @@
 
 #include "dev_fb0.h"
 #include "dev_input0.h"
+#include "dev_pwrkey.h"
 #include "dev_ttyS0.h"
 
 int kern_devices_init(void)
@@ -36,6 +37,13 @@ int kern_devices_init(void)
                             KERN_FILE_CHRDEV, NULL);
     if (rc != KERN_OK) {
         kern_log(KERN_LOG_ERROR, "failed to register /dev/ttyS0: %d", rc);
+        return rc;
+    }
+
+    rc = kern_dev_register("pwrkey", dev_pwrkey_get_fops(),
+                            KERN_FILE_CHRDEV, NULL);
+    if (rc != KERN_OK) {
+        kern_log(KERN_LOG_ERROR, "failed to register /dev/pwrkey: %d", rc);
         return rc;
     }
 

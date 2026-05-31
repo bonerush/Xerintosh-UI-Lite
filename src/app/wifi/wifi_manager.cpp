@@ -386,9 +386,23 @@ void wifi_mgr_update(void)
     switch (g_state) {
 
     case WIFI_MGR_WARMUP: {
-        /* 预热完成后不自动扫描，等待用户手动点击"扫描"按钮 */
+        /* 预热完成后自动启动首次异步扫描（后台，不干扰 UI） */
         if (millis() - g_warmup_start_time >= WIFI_WARMUP_DELAY_MS) {
-            g_state = WIFI_MGR_CONNECTED;
+            WiFi.scanDelete();
+            int16_t scan_ret = WiFi.scanNetworks(true);  /* 异步扫描 */
+            if (scan_ret == -2) {
+                /* 扫描失败，直接进入就绪 */
+                g_state = WIFI_MGR_CONNECTED;
+            } else if (scan_ret >= 0) {
+                /* 同步完成（极少见） */
+                rebuild_network_list(scan_ret);
+                g_state = WIFI_MGR_SCAN_DONE;
+            } else {
+                /* 异步扫描已启动，等待结果 */
+                g_state = WIFI_MGR_SCANNING;
+                g_wifi_scan_start_time = millis();
+                g_scan_retry_count = 0;
+            }
         }
         break;
     }

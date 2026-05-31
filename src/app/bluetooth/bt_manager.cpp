@@ -26,6 +26,8 @@ void bt_mgr_on_switch_toggle(void *ud) { (void)ud; }
 
 #include <Arduino.h>
 #include <NimBLEDevice.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 
 #include "app/bluetooth/bt_manager.h"
 
@@ -59,6 +61,10 @@ static unsigned long g_warmup_start_time = 0; /* 预热开始时间 */
 static const unsigned long SCAN_DURATION_MS = 10000; /* 扫描持续时间 */
 #define BT_WARMUP_DELAY_MS 1500             /* 预热等待时间 */
 
+/* 异步扫描任务 */
+static volatile bool g_scan_task_running = false;  /* 扫描任务是否正在运行 */
+static TaskHandle_t g_scan_task_handle = NULL;     /* 扫描任务句柄 */
+
 /* UI 菜单指针 */
 static xerintosh_list_item_t *g_settings_list = NULL;  /* "设置" 列表项 */
 static xerintosh_list_item_t *g_devices_list = NULL;   /* "蓝牙设备" 列表项 */
@@ -72,6 +78,21 @@ static void on_bt_delete_pressed(void *ud);
 static void on_bt_scan_pressed(void *ud);
 extern "C" void bt_mgr_task_main(void *arg);
 
+/* ═══ 异步扫描 FreeRTOS 任务 ═══ */
+
+/**
+ * @brief BLE 扫描 FreeRTOS 任务入口
+ * @note  在独立任务中执行 NimBLE 阻塞式扫描，避免阻塞 UI 任务。
+ *        扫描完成后自动删除自身。
+ */
+static void bt_scan_task(void *arg) {
+    (void)arg;
+    NimBLEDevice::getScan()->start(SCAN_DURATION_MS / 1000, false);
+    g_scan_task_running = false;
+    g_scan_task_handle = NULL;
+    vTaskDelete(NULL);
+}
+
 /* ═══ BLE 扫描回调（NimBLE API）═══ */
 
 /**
@@ -83,12 +104,19 @@ class ScanCallbacks : public NimBLEAdvertisedDeviceCallbacks {
         if (g_scan_result_count >= 20) return;
 
         BleDeviceResult &r = g_scan_results[g_scan_result_count];
-        std::string addr = advertisedDevice->getAddress().toString();
+        NimBLEAddress bleAddr = advertisedDevice->getAddress();
+        std::string addr = bleAddr.toString();
         strlcpy(r.address, addr.c_str(), STORAGE_BT_ADDR_MAX_LEN);
 
+        /* 尝试获取设备名称 */
         std::string name = advertisedDevice->getName();
         if (name.empty()) {
-            name = addr;
+            /* 无名设备：用 MAC 后 3 字节生成短标识，如 "BLE_d4e5f6" */
+            const uint8_t *raw = bleAddr.getNative();
+            char short_name[16];
+            snprintf(short_name, sizeof(short_name), "BLE_%02x%02x%02x",
+                     raw[3], raw[4], raw[5]);
+            name = short_name;
         }
         strlcpy(r.name, name.c_str(), STORAGE_BT_NAME_MAX_LEN);
 
@@ -117,7 +145,7 @@ static void on_device_button_pressed(void *ud) {
 }
 
 /**
- * @brief 已保存设备"重新连接"按钮按下回调：重新扫描该设备
+ * @brief 已保存设备"重新连接"按钮按下回调：异步重新扫描该设备
  */
 static void on_bt_reconnect_pressed(void *ud) {
     (void)ud;
@@ -131,9 +159,7 @@ static void on_bt_reconnect_pressed(void *ud) {
     xerintosh_selector_exit_current_item();
 
     g_scan_result_count = 0;
-    NimBLEDevice::getScan()->start(SCAN_DURATION_MS / 1000, false);
-    g_scan_start_time = millis();
-    g_state = BT_MGR_SCANNING;
+    g_state = BT_MGR_STARTING_SCAN;
 }
 
 /**
@@ -156,14 +182,13 @@ static void on_bt_delete_pressed(void *ud) {
 }
 
 /**
- * @brief 扫描按钮按下回调：启动 BLE 设备扫描
+ * @brief 扫描按钮按下回调：启动异步 BLE 设备扫描
+ * @note  扫描在独立 FreeRTOS 任务中执行，避免阻塞 UI
  */
 static void on_bt_scan_pressed(void *ud) {
     (void)ud;
     g_scan_result_count = 0;
-    NimBLEDevice::getScan()->start(SCAN_DURATION_MS / 1000, false);
-    g_scan_start_time = millis();
-    g_state = BT_MGR_SCANNING;
+    g_state = BT_MGR_STARTING_SCAN;
     xerintosh_push_pop_up("扫描中...", SCAN_DURATION_MS);
 }
 
@@ -174,11 +199,16 @@ static void on_bt_scan_pressed(void *ud) {
  * @note  根据 g_scan_results 动态构建菜单，已保存设备标记 * 号
  */
 static void rebuild_device_list(void) {
+    Serial.printf("[BT] rebuild_device_list: g_devices_list=%p, scan_count=%d\n",
+                  g_devices_list, g_scan_result_count);
+
     /* 首次调用时创建设备列表项 */
     if (!g_devices_list) {
         g_devices_list = xerintosh_new_list_item("蓝牙设备", list_icon);
+        Serial.printf("[BT] Created g_devices_list=%p\n", g_devices_list);
         if (g_settings_list && g_devices_list) {
             xerintosh_push_item_to_list(g_settings_list, g_devices_list);
+            Serial.printf("[BT] Pushed to settings list\n");
         }
     }
 
@@ -188,6 +218,7 @@ static void rebuild_device_list(void) {
     ui_selector_rebuild_anchor(g_devices_list, g_settings_list);
 
     xerintosh_clear_children_of_list(g_devices_list);
+    Serial.printf("[BT] Cleared children, now adding %d scan results\n", g_scan_result_count);
 
     /* 最多显示 9 个扫描结果 */
     for (int i = 0; i < g_scan_result_count && i < 9; i++) {
@@ -230,10 +261,11 @@ static void rebuild_device_list(void) {
         xerintosh_new_button_item("扫描", on_bt_scan_pressed, default_icon);
     xerintosh_push_item_to_list(g_devices_list, scan_btn);
 
-    /* 重建后，若选择器位于设备项上，将其移到第一个子项 */
-    if (g_xerintosh_selector.selected_item == g_devices_list && g_devices_list->child_num > 0) {
-        g_xerintosh_selector.selected_item = g_devices_list->child_list_item[0];
-        g_xerintosh_selector.selected_index = 0;
+    Serial.printf("[BT] rebuild done: child_num=%d\n", g_devices_list->child_num);
+
+    /* 重建后，若选择器位于设备项上，移至其第一个子项 */
+    if (g_devices_list && g_devices_list->child_num > 0) {
+        ui_selector_rebuild_anchor(g_devices_list, g_settings_list);
     }
 }
 
@@ -258,6 +290,7 @@ void bt_mgr_init(void) {
  * @brief 启用蓝牙：初始化 NimBLE，配置扫描参数，开始预热
  */
 void bt_mgr_enable(void) {
+    Serial.println("[BT] bt_mgr_enable called");
     g_bt_enabled = true;
     NimBLEDevice::init("");
     NimBLEScan *scan = NimBLEDevice::getScan();
@@ -267,7 +300,9 @@ void bt_mgr_enable(void) {
     g_scan_result_count = 0;
     g_warmup_start_time = millis();
     g_state = BT_MGR_WARMUP;
+    Serial.println("[BT] Calling rebuild_device_list");
     rebuild_device_list();
+    Serial.println("[BT] bt_mgr_enable done");
 }
 
 /**
@@ -304,17 +339,49 @@ bool bt_mgr_is_waiting_input(void) {
 void bt_mgr_update(void) {
     if (!g_bt_enabled && g_state == BT_MGR_IDLE) return;
 
+    static bt_mgr_state_t last_state = BT_MGR_IDLE;
+    if (g_state != last_state) {
+        Serial.printf("[BT] State: %d -> %d\n", last_state, g_state);
+        last_state = g_state;
+    }
+
     switch (g_state) {
     case BT_MGR_WARMUP: {
-        /* 预热完成后直接进入就绪状态。
-         * 设备列表已于 bt_mgr_enable() 中创建，无需在此重建。 */
+        /* 预热完成后自动启动首次扫描（后台，不阻塞 UI） */
         if (millis() - g_warmup_start_time >= BT_WARMUP_DELAY_MS) {
-            g_state = BT_MGR_SCAN_DONE;
+            g_state = BT_MGR_STARTING_SCAN;
+        }
+        break;
+    }
+    case BT_MGR_STARTING_SCAN: {
+        /* 在独立 FreeRTOS 任务中启动 NimBLE 扫描（阻塞式），
+         * 避免阻塞 UI 任务导致看门狗重启 */
+        if (!g_scan_task_running) {
+            g_scan_task_running = true;
+            BaseType_t ret = xTaskCreate(
+                bt_scan_task, "bt_scan", 4096, NULL, 1, &g_scan_task_handle);
+            if (ret != pdPASS) {
+                g_scan_task_running = false;
+                g_state = BT_MGR_SCAN_DONE;
+                xerintosh_hide_pop_up();
+                xerintosh_push_pop_up("扫描失败", 2000);
+                break;
+            }
+            g_scan_start_time = millis();
+            g_state = BT_MGR_SCANNING;
         }
         break;
     }
     case BT_MGR_SCANNING: {
-        if (millis() - g_scan_start_time >= SCAN_DURATION_MS) {
+        /* 扫描任务完成（回调已设置 g_scan_task_running=false）或超时 */
+        bool task_done = !g_scan_task_running;
+        bool timed_out = (millis() - g_scan_start_time >= SCAN_DURATION_MS + 2000);
+        if (task_done || timed_out) {
+            if (!task_done && g_scan_task_handle) {
+                /* 超时：强制清理任务句柄（任务可能已自行退出） */
+                g_scan_task_running = false;
+                g_scan_task_handle = NULL;
+            }
             NimBLEDevice::getScan()->stop();
             xerintosh_hide_pop_up();
             rebuild_device_list();

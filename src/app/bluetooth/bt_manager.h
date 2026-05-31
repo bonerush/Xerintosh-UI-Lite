@@ -24,13 +24,14 @@ extern "C" {
  *        IDLE → WARMUP → SCANNING → SCAN_DONE → PAIRING → PAIRED/PAIR_FAILED
  */
 typedef enum {
-    BT_MGR_IDLE,        /* 空闲/关闭 */
-    BT_MGR_WARMUP,      /* 预热中 */
-    BT_MGR_SCANNING,    /* 扫描中 */
-    BT_MGR_SCAN_DONE,   /* 扫描完成 */
-    BT_MGR_PAIRING,     /* 等待串口输入配对码 */
-    BT_MGR_PAIRED,      /* 已配对 */
-    BT_MGR_PAIR_FAILED  /* 配对失败 */
+    BT_MGR_IDLE,          /* 空闲/关闭 */
+    BT_MGR_WARMUP,        /* 预热中 */
+    BT_MGR_STARTING_SCAN, /* 正在启动扫描（异步） */
+    BT_MGR_SCANNING,      /* 扫描中 */
+    BT_MGR_SCAN_DONE,     /* 扫描完成 */
+    BT_MGR_PAIRING,       /* 等待串口输入配对码 */
+    BT_MGR_PAIRED,        /* 已配对 */
+    BT_MGR_PAIR_FAILED    /* 配对失败 */
 } bt_mgr_state_t;
 
 /* ═══ 生命周期 ═══ */

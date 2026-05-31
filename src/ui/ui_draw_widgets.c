@@ -82,7 +82,7 @@ void xerintosh_draw_pop_up()
   /* 超时后向上移出 */
   if (g_xerintosh_pop_up.time - g_xerintosh_pop_up.time_start >= g_xerintosh_pop_up.span)
   {
-    g_xerintosh_pop_up.y_pop_up_trg = 0 - 2 * INFO_BAR_HEIGHT;
+    g_xerintosh_pop_up.y_pop_up_trg = 0 - 2 * POP_UP_HEIGHT;
     if (g_xerintosh_pop_up.y_pop_up == g_xerintosh_pop_up.y_pop_up_trg)
       g_xerintosh_pop_up.is_running = false;
   }
@@ -91,11 +91,6 @@ void xerintosh_draw_pop_up()
   int16_t _y_pop_up = g_xerintosh_pop_up.y_pop_up + POP_UP_HEIGHT;
 
   xerintosh_set_font(hal_get_cn_font());
-
-  /* 阴影底色 */
-  g_xerintosh_draw_color = COLOR_FG;
-  hal_draw_fill_round_rect(_x_pop_up + 1, (int16_t)g_xerintosh_pop_up.y_pop_up + 3,
-                  (int16_t)(g_xerintosh_pop_up.w_pop_up + 4), POP_UP_HEIGHT, 4, g_xerintosh_draw_color);
 
   /* 外框 */
   g_xerintosh_draw_color = COLOR_BG;
@@ -113,9 +108,24 @@ void xerintosh_draw_pop_up()
   hal_draw_pixel(_x_pop_up - 1, _y_pop_up - 3, g_xerintosh_draw_color);
   hal_draw_pixel((int16_t)(SCREEN_WIDTH/2 + g_xerintosh_pop_up.w_pop_up/2), _y_pop_up - 3, g_xerintosh_draw_color);
 
-  hal_draw_string(_x_pop_up + 3,
-                 (int16_t)(g_xerintosh_pop_up.y_pop_up + hal_get_font_height() + 1),
-                 g_xerintosh_pop_up.content, g_xerintosh_draw_color);
+  /* 多行文字渲染 */
+  {
+    int16_t fh = hal_get_font_height();
+    uint8_t n = g_xerintosh_pop_up.wrap_line_count;
+    if (n < 1) n = 1;
+    if (n > POP_UP_WRAP_LINES) n = POP_UP_WRAP_LINES;
+
+    /* 垂直居中：总文字高度 = n * fh + (n-1) * 2，起始 y = popup_top + (POP_UP_HEIGHT - total) / 2 + fh */
+    int16_t total_h = (int16_t)(n * fh + (n - 1) * 2);
+    int16_t y_text = (int16_t)(g_xerintosh_pop_up.y_pop_up + (POP_UP_HEIGHT - total_h) / 2 + fh);
+
+    for (uint8_t i = 0; i < n; i++)
+    {
+      hal_draw_string(_x_pop_up + 3, y_text,
+                      g_xerintosh_pop_up.wrap_lines[i], g_xerintosh_draw_color);
+      y_text += fh + 2;
+    }
+  }
 }
 
 /* ═══ 控件聚合 ═══

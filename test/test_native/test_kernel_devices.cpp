@@ -1,7 +1,7 @@
 /**
  * @file   test_kernel_devices.cpp
  * @brief  物理设备映射 native 测试
- * @details 测试 /dev/fb0, /dev/input0, /dev/ttyS0 的 VFS 集成。
+ * @details 测试 /dev/fb0, /dev/input0, /dev/pwrkey, /dev/ttyS0 的 VFS 集成。
  *
  * @copyright Copyright (c) 2026
  */
@@ -18,9 +18,11 @@ extern "C" {
 #include "kernel/kern_init.h"
 #include "kernel/devices/dev_fb0.h"
 #include "kernel/devices/dev_input0.h"
+#include "kernel/devices/dev_pwrkey.h"
 #include "kernel/devices/dev_ttyS0.h"
 #include "hal/hal_display.h"
 #include "hal/hal_input.h"
+#include "hal/hal_power_key.h"
 #include "hal/hal_system.h"
 }
 
@@ -34,6 +36,7 @@ protected:
         kern_log_set_level(KERN_LOG_ERROR);
         hal_display_init();
         hal_input_reset_events();
+        hal_power_key_test_reset();
     }
 };
 
@@ -367,6 +370,69 @@ TEST_F(KernelDevicesTest, TtyS0MultipleWritesAndReads)
     kern_close(fd);
 }
 
+/* ═══ /dev/pwrkey 测试 ═══ */
+
+TEST_F(KernelDevicesTest, PwrkeyOpenSucceeds)
+{
+    kern_devices_init();
+    kern_fd_t fd = kern_open("/dev/pwrkey", KERN_O_RDONLY);
+    EXPECT_GE(fd, 0);
+    kern_close(fd);
+}
+
+TEST_F(KernelDevicesTest, PwrkeyReadShortPress)
+{
+    kern_devices_init();
+    kern_fd_t fd = kern_open("/dev/pwrkey", KERN_O_RDONLY);
+    ASSERT_GE(fd, 0);
+
+    /* 注入短按：按下 100ms 后释放 */
+    hal_power_key_test_inject(true, 1000);
+    hal_power_key_test_inject(false, 1100);
+
+    uint8_t buf[DEV_PWRKEY_EVENT_SIZE];
+    ssize_t n = kern_read(fd, (char *)buf, sizeof(buf));
+    EXPECT_EQ(n, (ssize_t)DEV_PWRKEY_EVENT_SIZE);
+
+    dev_pwrkey_event_t ev;
+    memcpy(&ev, buf, DEV_PWRKEY_EVENT_SIZE);
+    EXPECT_EQ(ev.event, (uint8_t)HAL_PWR_KEY_SHORT_PRESS);
+
+    kern_close(fd);
+}
+
+TEST_F(KernelDevicesTest, PwrkeyReadNoEventReturnsZero)
+{
+    kern_devices_init();
+    kern_fd_t fd = kern_open("/dev/pwrkey", KERN_O_RDONLY);
+    ASSERT_GE(fd, 0);
+
+    /* 不注入事件，应返回 HAL_PWR_KEY_NONE */
+
+    uint8_t buf[DEV_PWRKEY_EVENT_SIZE];
+    ssize_t n = kern_read(fd, (char *)buf, sizeof(buf));
+    EXPECT_EQ(n, (ssize_t)DEV_PWRKEY_EVENT_SIZE);
+
+    dev_pwrkey_event_t ev;
+    memcpy(&ev, buf, DEV_PWRKEY_EVENT_SIZE);
+    EXPECT_EQ(ev.event, (uint8_t)HAL_PWR_KEY_NONE);
+
+    kern_close(fd);
+}
+
+TEST_F(KernelDevicesTest, PwrkeyReadBufferTooSmall)
+{
+    kern_devices_init();
+    kern_fd_t fd = kern_open("/dev/pwrkey", KERN_O_RDONLY);
+    ASSERT_GE(fd, 0);
+
+    char small_buf[4];
+    ssize_t n = kern_read(fd, small_buf, sizeof(small_buf));
+    EXPECT_LT(n, 0);
+
+    kern_close(fd);
+}
+
 /* ═══ 设备注册完整性测试 ═══ */
 
 TEST_F(KernelDevicesTest, AllDevicesRegistered)
@@ -376,6 +442,7 @@ TEST_F(KernelDevicesTest, AllDevicesRegistered)
 
     EXPECT_NE(kern_path_resolve("/dev/fb0"), (void*)nullptr);
     EXPECT_NE(kern_path_resolve("/dev/input0"), (void*)nullptr);
+    EXPECT_NE(kern_path_resolve("/dev/pwrkey"), (void*)nullptr);
     EXPECT_NE(kern_path_resolve("/dev/ttyS0"), (void*)nullptr);
 }
 

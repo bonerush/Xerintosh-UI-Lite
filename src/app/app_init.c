@@ -18,6 +18,8 @@
 #include "serial_monitor/serial_monitor.h"
 #include "taskmgr/taskmgr.h"
 #include "about/about.h"
+#include "ble_serial/ble_serial.h"
+#include "shutdown/power_key_popup.h"
 
 #include "ui/ui_item.h"
 #include "kernel/kern_task.h"
@@ -62,6 +64,7 @@ static void on_baud_selected_cb(void *ud);
  *        │       └── 230400（按钮）
  *        ├── 任务管理器（user_item）
  *        ├── 串口监视器（user_item）
+ *        ├── BLE 串口（user_item）
  *        └── 关于（user_item）
  */
 void app_init_ui(void)
@@ -75,6 +78,8 @@ void app_init_ui(void)
         "串口监视器", serial_monitor_init, serial_monitor_loop, serial_monitor_exit, default_icon);
     xerintosh_list_item_t* item4 = xerintosh_new_user_item(
         "关于", about_init, about_loop, about_exit, user_icon);
+    xerintosh_list_item_t* item5 = xerintosh_new_user_item(
+        "BLE 串口", ble_serial_init, ble_serial_loop, ble_serial_exit, default_icon);
 
     xerintosh_list_item_t* sw1 = xerintosh_new_switch_item(
         "WiFi", &g_wifi_on, NULL, wifi_mgr_on_switch_toggle, default_icon);
@@ -105,7 +110,8 @@ void app_init_ui(void)
     xerintosh_push_item_to_list(root, item1);
     xerintosh_push_item_to_list(root, item2);
     xerintosh_push_item_to_list(root, item3);
-    xerintosh_push_item_to_list(root, item4);
+    xerintosh_push_item_to_list(root, item5);  /* BLE 串口 */
+    xerintosh_push_item_to_list(root, item4);  /* 关于（永远最后） */
     xerintosh_push_item_to_list(item1, sw1);
     xerintosh_push_item_to_list(item1, sw2);
     xerintosh_push_item_to_list(item1, sl1);
@@ -140,6 +146,7 @@ void app_init_managers(void)
 {
     wifi_mgr_init();
     bt_mgr_init();
+    power_key_popup_init();
 
     if (g_wifi_on) wifi_mgr_enable();
     if (g_bt_on)   bt_mgr_enable();
@@ -165,6 +172,14 @@ void app_input_process(void)
        user_item 内部虽然不处理框架导航，但 user_item 自身
        的 loop 会调用 hal_input_get_event() 读取按键。 */
     hal_input_update();
+
+    /* 更新电源键弹窗（检测 A+B 双键关机事件） */
+    power_key_popup_update();
+
+    /* 双键按住模式下，隔离所有正常按钮事件，防止 UI 抖动 */
+    if (power_key_popup_is_dual_active()) {
+        return;
+    }
 
     /* 若处于 user_item 内部，框架输入由 App 自身接管 */
     if (xerintosh_is_in_user_item()) {

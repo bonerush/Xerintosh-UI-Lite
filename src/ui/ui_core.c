@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include "ui_drawer.h"
 #include <math.h>
+#include "app/shutdown/power_key_popup.h"
 
 /* ═══ 全局状态定义 ═══ */
 
@@ -225,6 +226,7 @@ void xerintosh_ui_main_core()
 
   /* 退场动画 */
   /* 上面都是正常应当绘制的内容；退场动画需要绘制时，只需在上面的基础上绘制遮罩即可 */
-  if (!g_xerintosh_exit_animation_finished)
+  /* 双键关机模式下跳过退出动画，避免遮罩覆盖关机弹窗 */
+  if (!g_xerintosh_exit_animation_finished && !power_key_popup_is_dual_active())
     xerintosh_draw_exit_animation();
 }

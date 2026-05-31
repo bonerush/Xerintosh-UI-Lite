@@ -82,8 +82,9 @@ extern void xerintosh_push_info_bar(const char *_content, const uint16_t _span);
 
 /* ═══ 弹窗 ═══ */
 
-#define POP_UP_HEIGHT 20
+#define POP_UP_HEIGHT 44
 #define POP_UP_OFFSET 8
+#define POP_UP_WRAP_LINES 3
 
 /**
  * @brief 中部弹窗结构体
@@ -96,6 +97,8 @@ typedef struct xerintosh_pop_up_t
   bool is_running;           /* 是否正在显示 */
   uint32_t time_start;       /* 开始显示的时间戳 */
   uint32_t time;             /* 最近一次更新的时间戳 */
+  const char *wrap_lines[POP_UP_WRAP_LINES];  /* 换行后的各行指针 */
+  uint8_t wrap_line_count;   /* 实际行数 */
 } xerintosh_pop_up_t;
 
 extern xerintosh_pop_up_t g_xerintosh_pop_up;
@@ -108,9 +111,14 @@ extern xerintosh_pop_up_t g_xerintosh_pop_up;
 extern void xerintosh_push_pop_up(const char *_content, const uint16_t _span);
 
 /**
- * @brief 立即隐藏弹窗
+ * @brief 立即隐藏弹窗（无动画，瞬间移出屏幕）
  */
 extern void xerintosh_hide_pop_up(void);
+
+/**
+ * @brief 动画退出弹窗（触发向上滑出动画，动画结束后自动停止）
+ */
+extern void xerintosh_dismiss_pop_up(void);
 
 /* ═══ 回调类型 ═══ */
 
