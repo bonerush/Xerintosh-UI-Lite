@@ -33,6 +33,7 @@ extern "C" {
 #include "app/storage/storage.h"
 #include "app/serial_input/serial_input.h"
 #include "app/svc_mgr_helper.h"
+#include "app/ui_service.h"
 #include "ui/ui_item.h"
 #include "ui/ui_core.h"
 #include "kernel/kern_task.h"
@@ -106,7 +107,7 @@ static void on_device_button_pressed(void *ud) {
     (void)ud;
     xerintosh_list_item_t *item = g_xerintosh_selector.selected_item;
     if (!item || !item->content) return;
-    xerintosh_push_pop_up("请在串口输入配对码", 100);
+    ui_svc_popup("请在串口输入配对码", 100);
     const char *addr = (const char*)item->user_data;
     if (addr && addr[0]) {
         serial_request_bt_pair_code_with_addr(item->content, addr);
@@ -127,7 +128,7 @@ static void on_bt_reconnect_pressed(void *ud) {
     char addr[STORAGE_BT_ADDR_MAX_LEN];
     strlcpy(addr, (const char*)parent->user_data, sizeof(addr));
 
-    xerintosh_push_pop_up("搜索中...", 2000);
+    ui_svc_notify_loading("搜索中...");
     xerintosh_selector_exit_current_item();
 
     g_scan_result_count = 0;
@@ -150,7 +151,7 @@ static void on_bt_delete_pressed(void *ud) {
     int idx = storage_bt_find(addr);
     if (idx >= 0) storage_bt_remove(idx);
 
-    xerintosh_push_pop_up("已删除", 1500);
+    ui_svc_notify_success("已删除");
     xerintosh_selector_exit_current_item();
     rebuild_device_list();
 }
@@ -164,7 +165,7 @@ static void on_bt_scan_pressed(void *ud) {
     NimBLEDevice::getScan()->start(SCAN_DURATION_MS / 1000, false);
     g_scan_start_time = millis();
     g_state = BT_MGR_SCANNING;
-    xerintosh_push_pop_up("扫描中...", SCAN_DURATION_MS);
+    ui_svc_popup("扫描中...", SCAN_DURATION_MS);
 }
 
 /* ═══ 设备列表重建 ═══ */
@@ -316,7 +317,7 @@ void bt_mgr_update(void) {
     case BT_MGR_SCANNING: {
         if (millis() - g_scan_start_time >= SCAN_DURATION_MS) {
             NimBLEDevice::getScan()->stop();
-            xerintosh_hide_pop_up();
+            ui_svc_popup_hide();
             rebuild_device_list();
             g_state = BT_MGR_SCAN_DONE;
         }
@@ -324,7 +325,7 @@ void bt_mgr_update(void) {
     }
     case BT_MGR_PAIRING: {
         /* 保持弹窗可见，等待串口输入 */
-        xerintosh_push_pop_up("请在串口输入配对码", 100);
+        ui_svc_popup("请在串口输入配对码", 100);
         serial_state_t ss = serial_poll();
         if (ss == SERIAL_STATE_PAIR_CODE_RECEIVED) {
             const char *code = serial_get_input();
@@ -333,13 +334,13 @@ void bt_mgr_update(void) {
             if (code && name) {
                 storage_bt_add(addr ? addr : name, name);
                 Serial.println("OK");
-                xerintosh_push_pop_up("已配对", 2000);
+                ui_svc_notify_success("已配对");
                 g_state = BT_MGR_PAIRED;
                 rebuild_device_list();
             }
         } else if (ss == SERIAL_STATE_CANCELLED) {
             g_state = BT_MGR_SCAN_DONE;
-            xerintosh_push_pop_up("已取消", 1500);
+            ui_svc_notify_info("已取消");
         }
         break;
     }
