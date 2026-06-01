@@ -82,7 +82,7 @@ extern void xerintosh_push_info_bar(const char *_content, const uint16_t _span);
 
 /* ═══ 弹窗 ═══ */
 
-#define POP_UP_HEIGHT 44
+#define POP_UP_HEIGHT 48
 #define POP_UP_OFFSET 8
 #define POP_UP_WRAP_LINES 3
 

@@ -117,30 +117,6 @@ xerintosh_pop_up_t g_xerintosh_pop_up = {0, 1, 0 - 2 * POP_UP_HEIGHT, 0 - 2 * PO
  */
 void xerintosh_push_pop_up(const char *_content, const uint16_t _span)
 {
-  /* 仅当指针不同且内容相同时才跳过重算
-     （指针相同说明调用方复用了缓冲区，内容可能已变） */
-  if (g_xerintosh_pop_up.is_running && g_xerintosh_pop_up.content != NULL
-      && _content != g_xerintosh_pop_up.content
-      && strcmp(g_xerintosh_pop_up.content, _content) == 0) {
-    g_xerintosh_pop_up.time_start = hal_get_ticks();
-    g_xerintosh_pop_up.span = _span;
-    g_xerintosh_pop_up.y_pop_up_trg = (SCREEN_HEIGHT - POP_UP_HEIGHT) / 2;
-    return;
-  }
-
-  g_xerintosh_pop_up.time = hal_get_ticks();
-  g_xerintosh_pop_up.content = _content;
-  g_xerintosh_pop_up.span = _span;
-  g_xerintosh_pop_up.is_running = false;
-
-  /* 弹出 */
-  if (!g_xerintosh_pop_up.is_running)
-  {
-    g_xerintosh_pop_up.time_start = hal_get_ticks();
-    g_xerintosh_pop_up.y_pop_up_trg = (SCREEN_HEIGHT - POP_UP_HEIGHT) / 2;
-    g_xerintosh_pop_up.is_running = true;
-  }
-
   xerintosh_set_font(hal_get_cn_font());
 
   /* ── 自动换行：当文字超出可用宽度时拆为多行 ── */
@@ -150,6 +126,13 @@ void xerintosh_push_pop_up(const char *_content, const uint16_t _span)
     int16_t text_w = hal_get_string_width(_content);
 
     if (avail < 20) avail = 20;
+
+    /* 默认单行 */
+    g_xerintosh_pop_up.wrap_line_count = 1;
+    g_xerintosh_pop_up.wrap_lines[0] = _content;
+    g_xerintosh_pop_up.w_pop_up_trg = hal_get_string_width(_content) + POP_UP_OFFSET;
+    if ((int16_t)g_xerintosh_pop_up.w_pop_up_trg > max_w)
+      g_xerintosh_pop_up.w_pop_up_trg = max_w;
 
     if (text_w > avail && POP_UP_WRAP_LINES >= 2)
     {
@@ -187,7 +170,7 @@ void xerintosh_push_pop_up(const char *_content, const uint16_t _span)
             g_xerintosh_pop_up.w_pop_up_trg = wmax + POP_UP_OFFSET;
             if ((int16_t)g_xerintosh_pop_up.w_pop_up_trg > max_w)
               g_xerintosh_pop_up.w_pop_up_trg = max_w;
-            return;
+            goto calc_height;
           }
         }
 
@@ -210,18 +193,48 @@ void xerintosh_push_pop_up(const char *_content, const uint16_t _span)
           g_xerintosh_pop_up.w_pop_up_trg = ((w0 > w1) ? w0 : w1) + POP_UP_OFFSET;
           if ((int16_t)g_xerintosh_pop_up.w_pop_up_trg > max_w)
             g_xerintosh_pop_up.w_pop_up_trg = max_w;
-          return;
+          goto calc_height;
         }
       }
     }
   }
 
-  /* 单行模式（横屏或短文本） */
-  g_xerintosh_pop_up.wrap_lines[0] = _content;
-  g_xerintosh_pop_up.wrap_line_count = 1;
-  g_xerintosh_pop_up.w_pop_up_trg = hal_get_string_width(_content) + POP_UP_OFFSET;
-  if ((int16_t)g_xerintosh_pop_up.w_pop_up_trg > SCREEN_WIDTH - 12)
-    g_xerintosh_pop_up.w_pop_up_trg = SCREEN_WIDTH - 12;
+calc_height:
+  /* 根据内容行数计算动态高度：文字高度 + 上下各 4px padding */
+  {
+    int16_t fh = hal_get_font_height();
+    uint8_t n = g_xerintosh_pop_up.wrap_line_count;
+    if (n < 1) n = 1;
+    if (n > POP_UP_WRAP_LINES) n = POP_UP_WRAP_LINES;
+    int16_t content_h = (int16_t)(n * fh + (n - 1) * 2);
+    int16_t pop_h = content_h + 8;
+    if (pop_h < 24) pop_h = 24;
+
+    /* 仅当指针不同且内容相同时才跳过重算
+       （指针相同说明调用方复用了缓冲区，内容可能已变） */
+    if (g_xerintosh_pop_up.is_running && g_xerintosh_pop_up.content != NULL
+        && _content != g_xerintosh_pop_up.content
+        && strcmp(g_xerintosh_pop_up.content, _content) == 0) {
+      g_xerintosh_pop_up.time_start = hal_get_ticks();
+      g_xerintosh_pop_up.span = _span;
+      g_xerintosh_pop_up.y_pop_up_trg = (SCREEN_HEIGHT - pop_h) / 2;
+      return;
+    }
+
+    g_xerintosh_pop_up.y_pop_up_trg = (SCREEN_HEIGHT - pop_h) / 2;
+  }
+
+  g_xerintosh_pop_up.time = hal_get_ticks();
+  g_xerintosh_pop_up.content = _content;
+  g_xerintosh_pop_up.span = _span;
+  g_xerintosh_pop_up.is_running = false;
+
+  /* 弹出 */
+  if (!g_xerintosh_pop_up.is_running)
+  {
+    g_xerintosh_pop_up.time_start = hal_get_ticks();
+    g_xerintosh_pop_up.is_running = true;
+  }
 }
 
 /**

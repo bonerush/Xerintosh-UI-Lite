@@ -87,20 +87,29 @@ void xerintosh_draw_pop_up()
       g_xerintosh_pop_up.is_running = false;
   }
 
+  /* 根据实际内容计算动态高度：文字高度 + 上下各 4px padding */
+  int16_t fh = hal_get_font_height();
+  uint8_t n = g_xerintosh_pop_up.wrap_line_count;
+  if (n < 1) n = 1;
+  if (n > POP_UP_WRAP_LINES) n = POP_UP_WRAP_LINES;
+  int16_t content_h = (int16_t)(n * fh + (n - 1) * 2);
+  int16_t pop_h = content_h + 8;
+  if (pop_h < 24) pop_h = 24;
+
   int16_t _x_pop_up = SCREEN_WIDTH/2 - g_xerintosh_pop_up.w_pop_up/2;
-  int16_t _y_pop_up = g_xerintosh_pop_up.y_pop_up + POP_UP_HEIGHT;
+  int16_t _y_pop_up = g_xerintosh_pop_up.y_pop_up + pop_h;
 
   xerintosh_set_font(hal_get_cn_font());
 
   /* 外框 */
   g_xerintosh_draw_color = COLOR_BG;
   hal_draw_fill_round_rect((int16_t)(SCREEN_WIDTH/2 - (g_xerintosh_pop_up.w_pop_up + 4)/2 - 2), (int16_t)(g_xerintosh_pop_up.y_pop_up - 2),
-                  (int16_t)(g_xerintosh_pop_up.w_pop_up + 8), POP_UP_HEIGHT + 4, 5, g_xerintosh_draw_color);
+                  (int16_t)(g_xerintosh_pop_up.w_pop_up + 8), pop_h + 4, 5, g_xerintosh_draw_color);
 
   /* 内框 */
   g_xerintosh_draw_color = COLOR_FG;
   hal_draw_fill_round_rect(_x_pop_up - 2, (int16_t)g_xerintosh_pop_up.y_pop_up,
-                  (int16_t)(g_xerintosh_pop_up.w_pop_up + 4), POP_UP_HEIGHT, 3, g_xerintosh_draw_color);
+                  (int16_t)(g_xerintosh_pop_up.w_pop_up + 4), pop_h, 3, g_xerintosh_draw_color);
 
   /* 高光与文字 */
   g_xerintosh_draw_color = COLOR_BG;
@@ -110,14 +119,7 @@ void xerintosh_draw_pop_up()
 
   /* 多行文字渲染 */
   {
-    int16_t fh = hal_get_font_height();
-    uint8_t n = g_xerintosh_pop_up.wrap_line_count;
-    if (n < 1) n = 1;
-    if (n > POP_UP_WRAP_LINES) n = POP_UP_WRAP_LINES;
-
-    /* 垂直居中：总文字高度 = n * fh + (n-1) * 2，起始 y = popup_top + (POP_UP_HEIGHT - total) / 2 + fh */
-    int16_t total_h = (int16_t)(n * fh + (n - 1) * 2);
-    int16_t y_text = (int16_t)(g_xerintosh_pop_up.y_pop_up + (POP_UP_HEIGHT - total_h) / 2 + fh);
+    int16_t y_text = (int16_t)(g_xerintosh_pop_up.y_pop_up + (pop_h - content_h) / 2 + fh - 2);
 
     for (uint8_t i = 0; i < n; i++)
     {

@@ -26,6 +26,9 @@ extern void hal_power_off_hw(void);
 static bool g_dual_active = false;             /* 双键检测模式激活 */
 static bool g_dual_shutdown_triggered = false;  /* 已触发关机，防止重复 */
 static uint32_t g_dual_start_ms = 0;           /* 双键同时按下的起始时间 */
+static uint32_t g_dual_cooldown_end_ms = 0;    /* 双键松手后的冷却期截止时间 */
+
+#define DUAL_RELEASE_COOLDOWN_MS 300           /* 松手后隔离输入的冷却时长（毫秒） */
 
 /* ═══ 公共 API ═══ */
 
@@ -34,6 +37,7 @@ void power_key_popup_init(void)
     g_dual_active = false;
     g_dual_shutdown_triggered = false;
     g_dual_start_ms = 0;
+    g_dual_cooldown_end_ms = 0;
 }
 
 /**
@@ -48,6 +52,8 @@ void power_key_popup_update(void)
 
     if (a_pressed && b_pressed)
     {
+        g_dual_cooldown_end_ms = 0;  /* 重新进入双键模式时清除冷却 */
+
         if (!g_dual_active)
         {
             /* 首次检测到双键同时按下，记录起始时间 */
@@ -79,6 +85,13 @@ void power_key_popup_update(void)
     else
     {
         /* 松开任一键，触发动画退出弹窗并退出双键模式 */
+        if (g_dual_active)
+        {
+            /* 刚从双键状态退出：启动冷却期并重置输入状态机，
+               防止按钮释放边沿在下一帧被判定为短按/长按 */
+            g_dual_cooldown_end_ms = hal_get_ticks() + DUAL_RELEASE_COOLDOWN_MS;
+            hal_input_reset_events();
+        }
         xerintosh_dismiss_pop_up();
         g_dual_active = false;
         g_dual_shutdown_triggered = false;
@@ -93,5 +106,7 @@ bool power_key_popup_is_visible(void)
 
 bool power_key_popup_is_dual_active(void)
 {
-    return g_dual_active;
+    if (g_dual_active) return true;
+    if (g_dual_cooldown_end_ms != 0 && hal_get_ticks() < g_dual_cooldown_end_ms) return true;
+    return false;
 }
