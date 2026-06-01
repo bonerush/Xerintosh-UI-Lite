@@ -35,6 +35,7 @@ extern "C" {
 #include "app/storage/storage.h"
 #include "app/serial_input/serial_input.h"
 #include "app/svc_mgr_helper.h"
+#include "app/ui_service.h"
 #include "ui/ui_item.h"
 #include "ui/ui_core.h"
 #include "kernel/kern_task.h"
@@ -282,7 +283,7 @@ static void on_network_button_pressed(void *ud)
         return;
     }
 
-    xerintosh_push_pop_up("请在串口输入密码", 8000);
+    ui_svc_popup("请在串口输入密码", 8000);
     serial_request_wifi_password(content);
     g_state = WIFI_MGR_CONNECTING;
 }
@@ -314,7 +315,7 @@ static void on_saved_connect_pressed(void *ud)
     strncpy(g_connecting_ssid, ssid, STORAGE_SSID_MAX_LEN);
     g_connecting = true;
     g_connect_start_time = millis();
-    xerintosh_push_pop_up("连接中...", 3000);
+    ui_svc_notify_loading("连接中...");
 
     xerintosh_selector_exit_current_item();
 }
@@ -335,7 +336,7 @@ static void on_saved_delete_pressed(void *ud)
         storage_wifi_remove(idx);
     }
 
-    xerintosh_push_pop_up("已删除", 1500);
+    ui_svc_notify_success("已删除");
     xerintosh_selector_exit_current_item();
     rebuild_network_list(WiFi.scanComplete());
 }
@@ -354,18 +355,18 @@ static void on_scan_pressed(void *ud)
     WiFi.scanDelete();          /* 先释放过期结果 */
     int16_t scan_ret = WiFi.scanNetworks(true);    /* 异步扫描 */
     if (scan_ret == -2) {
-        xerintosh_push_pop_up("扫描失败", 2000);
+        ui_svc_notify_error("扫描失败");
         g_state = WIFI_MGR_IDLE;
     } else if (scan_ret >= 0) {
         /* 同步扫描完成 */
-        xerintosh_hide_pop_up();
+        ui_svc_popup_hide();
         rebuild_network_list(scan_ret);
         g_state = WIFI_MGR_SCAN_DONE;
         g_scan_retry_count = 0;
     } else {
         g_state = WIFI_MGR_SCANNING;
         g_wifi_scan_start_time = millis();
-        xerintosh_push_pop_up("扫描中...", WIFI_SCAN_TIMEOUT_MS);
+        ui_svc_popup("扫描中...", WIFI_SCAN_TIMEOUT_MS);
     }
 }
 
@@ -397,7 +398,7 @@ void wifi_mgr_update(void)
         /* 扫描超时检查 */
         if (millis() - g_wifi_scan_start_time >= WIFI_SCAN_TIMEOUT_MS) {
             WiFi.scanDelete();
-            xerintosh_hide_pop_up();
+            ui_svc_popup_hide();
             rebuild_network_list(0);
             g_state = WIFI_MGR_SCAN_DONE;
             g_scan_retry_count = 0;
@@ -406,7 +407,7 @@ void wifi_mgr_update(void)
 
         int16_t result = WiFi.scanComplete();
         if (result >= 0) {
-            xerintosh_hide_pop_up();
+            ui_svc_popup_hide();
             rebuild_network_list(result);
             g_state = WIFI_MGR_SCAN_DONE;
             g_scan_retry_count = 0;
@@ -418,8 +419,8 @@ void wifi_mgr_update(void)
                 WiFi.scanNetworks(true);
                 g_wifi_scan_start_time = millis();
             } else {
-                xerintosh_hide_pop_up();
-                xerintosh_push_pop_up("扫描失败", 2000);
+                ui_svc_popup_hide();
+                ui_svc_notify_error("扫描失败");
                 g_state = WIFI_MGR_IDLE;
                 g_scan_retry_count = 0;
             }
@@ -443,13 +444,13 @@ void wifi_mgr_update(void)
                 g_connecting = true;
                 g_connect_start_time = millis();
                 Serial.println("CONNECTING...");
-                xerintosh_push_pop_up("连接中...", 3000);
+                ui_svc_notify_loading("连接中...");
             }
         } else if (ss == SERIAL_STATE_CANCELLED) {
             restore_wifi_logs();
             g_connecting = false;
             g_state = WIFI_MGR_SCAN_DONE;
-            xerintosh_push_pop_up("已取消", 1500);
+            ui_svc_notify_info("已取消");
         }
 
         /* 检查 WiFi 连接状态 */
@@ -460,7 +461,7 @@ void wifi_mgr_update(void)
                 restore_wifi_logs();
                 g_connecting = false;
                 Serial.println("TIMEOUT");
-                xerintosh_push_pop_up("连接超时", 2000);
+                ui_svc_notify_error("连接超时");
                 g_state = WIFI_MGR_CONNECT_FAILED;
                 break;
             }
@@ -471,7 +472,7 @@ void wifi_mgr_update(void)
                 g_connecting = false;
                 storage_wifi_add(g_connecting_ssid, g_connecting_pass);
                 Serial.println("OK");
-                xerintosh_push_pop_up("已连接", 2000);
+                ui_svc_notify_success("已连接");
                 g_state = WIFI_MGR_CONNECTED;
                 rebuild_network_list(WiFi.scanComplete());
             } else if (status == WL_CONNECT_FAILED ||
@@ -479,7 +480,7 @@ void wifi_mgr_update(void)
                 restore_wifi_logs();
                 g_connecting = false;
                 Serial.println("FAIL");
-                xerintosh_push_pop_up("连接失败", 2000);
+                ui_svc_notify_error("连接失败");
                 g_state = WIFI_MGR_CONNECT_FAILED;
             }
             /* WL_IDLE_STATUS / WL_DISCONNECTED => 仍在尝试中 */
