@@ -11,8 +11,6 @@
 
 /* ═══ 相机 ═══ */
 
-xerintosh_camera_t g_xerintosh_camera = {0, 0, 0, 0}; /* 在 refresh 中加上 camera 的坐标 */
-
 /**
  * @brief  将选择器绑定到相机
  * @param  _selector 选择器指针
