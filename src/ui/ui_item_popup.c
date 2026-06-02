@@ -27,7 +27,10 @@ static const void *g_xerintosh_font = NULL;  /* 当前字体指针 */
  */
 void xerintosh_set_font(const void *_font)
 {
-  if (_font != g_xerintosh_font) hal_set_font(_font);
+  if (_font != g_xerintosh_font) {
+    g_xerintosh_font = _font;
+    hal_set_font(_font);
+  }
 }
 
 /* ═══ 换行辅助 ═══ */
