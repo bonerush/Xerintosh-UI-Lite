@@ -15,8 +15,6 @@
 
 /* ═══ 选择器 ═══ */
 
-xerintosh_selector_t g_xerintosh_selector = {};
-
 /**
  * @brief  在父项的子项列表中查找目标项的索引
  * @param  _parent 父项指针
@@ -56,10 +54,6 @@ bool xerintosh_bind_item_to_selector(xerintosh_list_item_t *_item)
 
   return true;
 }
-
-/* ═══ 全局标志定义 ═══ */
-
-bool g_xerintosh_refresh_list_value = true;
 
 /* ═══ 选择器导航 ═══ */
 
@@ -129,10 +123,6 @@ void xerintosh_selector_go_prev_item()
 
   g_xerintosh_selector.selected_item = g_xerintosh_selector.selected_item->parent->child_list_item[--g_xerintosh_selector.selected_index];
 }
-
-/* ═══ 退场动画标志 ═══ */
-
-bool g_xerintosh_exit_animation_finished = true;
 
 /* ═══ user_item / slider 辅助函数 ═══ */
 
