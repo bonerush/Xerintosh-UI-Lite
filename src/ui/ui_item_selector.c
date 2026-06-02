@@ -127,23 +127,6 @@ void xerintosh_selector_go_prev_item()
 /* ═══ user_item / slider 辅助函数 ═══ */
 
 /**
- * @brief 处理 user_item 进入状态重置
- * @param _user_item 目标 user_item
- */
-static void handle_user_item_enter(xerintosh_user_item_t *_user_item)
-{
-  g_xerintosh_exit_animation_finished = false;
-  g_xerintosh_exit_animation_status = 0;  /* 重置动画状态机 */
-  _user_item->entering_user_item = true;
-  _user_item->exiting_user_item = false;
-
-  /* 注册虚任务，使 App 对内核可见（/proc/tasks 可见、kill 可终止） */
-  if (_user_item->kernel_pid == KERN_PID_INVALID) {
-    _user_item->kernel_pid = kern_task_register_virtual(_user_item->base_item.content);
-  }
-}
-
-/**
  * @brief 处理 user_item 退出状态重置
  * @param _user_item 目标 user_item
  */
@@ -161,75 +144,13 @@ static void handle_user_item_exit(xerintosh_user_item_t *_user_item)
 }
 
 /**
- * @brief 处理滑块项确认态切换
- * @param _slider 目标 slider_item
- * @note  首次确认时备份原值；再次确认时触发 exit_function
- */
-static void handle_slider_confirm_toggle(xerintosh_slider_item_t *_slider)
-{
-  if (!_slider->is_confirmed)
-  {
-    _slider->is_confirmed = true;
-    _slider->value_backup = *_slider->value;
-    return;
-  }
-  if (_slider->exit_function)
-    _slider->exit_function(g_xerintosh_selector.selected_item->user_data);
-  _slider->is_confirmed = false;
-}
-
-/**
  * @brief 确认/进入当前选中的项
- * @note  根据项类型执行不同操作：
- *        - user_item：进入全屏 App
- *        - switch_item：翻转布尔值
- *        - button_item：触发回调
- *        - slider_item：切换确认态
- *        - list_item：进入子菜单
+ * @note  通过 xerintosh_dispatch_enter 派发表路由到具体类型处理器
  */
 void xerintosh_selector_jump_to_selected_item()
 {
   if (!g_in_xerintosh) return;
-
-  if (g_xerintosh_selector.selected_item->type == user_item)
-  {
-    handle_user_item_enter(xerintosh_to_user_item(g_xerintosh_selector.selected_item));
-    return;
-  }
-
-  if (g_xerintosh_selector.selected_item->type == switch_item)
-  {
-    xerintosh_switch_item_t* _selected_switch_item = xerintosh_to_switch_item(g_xerintosh_selector.selected_item);
-    *_selected_switch_item->value = !*_selected_switch_item->value;
-    if (_selected_switch_item->exit_function)
-      _selected_switch_item->exit_function(g_xerintosh_selector.selected_item->user_data);
-    return;
-  }
-
-  if (g_xerintosh_selector.selected_item->type == button_item)
-  {
-    xerintosh_button_item_t* _selected_button_item = xerintosh_to_button_item(g_xerintosh_selector.selected_item);
-    if (_selected_button_item->exit_function)
-      _selected_button_item->exit_function(g_xerintosh_selector.selected_item->user_data);
-    return;
-  }
-
-  if (g_xerintosh_selector.selected_item->type == slider_item)
-  {
-    handle_slider_confirm_toggle(xerintosh_to_slider_item(g_xerintosh_selector.selected_item));
-    return;
-  }
-
-  if (g_xerintosh_selector.selected_item->child_num == 0) return;
-
-  g_xerintosh_refresh_list_value = true;
-
-  /* 给选择的 item 的子 item 坐标清零，做动画 */
-  for (uint8_t i = 0; i < g_xerintosh_selector.selected_item->child_num; i++)
-    g_xerintosh_selector.selected_item->child_list_item[i]->y_list_item = 0;
-
-  g_xerintosh_selector.selected_index = 0;
-  g_xerintosh_selector.selected_item = g_xerintosh_selector.selected_item->child_list_item[0];
+  xerintosh_dispatch_enter(g_xerintosh_selector.selected_item);
 }
 
 /**

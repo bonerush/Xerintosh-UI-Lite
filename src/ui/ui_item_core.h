@@ -239,6 +239,12 @@ extern void xerintosh_clear_children_of_list(xerintosh_list_item_t *_parent);
  */
 extern void xerintosh_destroy_item_tree(xerintosh_list_item_t *_item);
 
+/**
+ * @brief  通过派发表执行确认/进入操作
+ * @param  item 列表项指针
+ */
+extern void xerintosh_dispatch_enter(xerintosh_list_item_t *item);
+
 #ifdef __cplusplus
 }
 #endif
