@@ -158,8 +158,13 @@ void xerintosh_draw_list_appearance()
   hal_draw_v_line(SCREEN_WIDTH - 1, 0, SCREEN_HEIGHT, g_xerintosh_draw_color);
 
   /* 滚动条 */
-  static float _length_each_part = 0;
-  _length_each_part = ceilf((SCREEN_HEIGHT - 10.0f) / (float) g_xerintosh_selector.selected_item->parent->child_num);
+  static uint8_t _cached_child_num = 0;
+  static float _cached_length = 0;
+  if (_cached_child_num != g_xerintosh_selector.selected_item->parent->child_num) {
+    _cached_child_num = g_xerintosh_selector.selected_item->parent->child_num;
+    _cached_length = ceilf((SCREEN_HEIGHT - 10.0f) / (float)_cached_child_num);
+  }
+  float _length_each_part = _cached_length;
   hal_draw_fill_rect(SCREEN_WIDTH - 4, 5 + g_xerintosh_selector.selected_index * _length_each_part, 3, _length_each_part, g_xerintosh_draw_color);
 
   /* 滚动条内部高光线 */
