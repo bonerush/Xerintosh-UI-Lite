@@ -244,6 +244,7 @@ typedef struct xerintosh_user_item_t
   xerintosh_cb_t init_function;      /* 进入时调用一次 */
   xerintosh_cb_t loop_function;      /* 每帧调用 */
   xerintosh_cb_t exit_function;      /* 退出时调用一次 */
+  xerintosh_cb_t destroy_callback;   /* 销毁时调用，供 App 清理 user_data */
   kern_pid_t kernel_pid;             /* 内核虚任务 PID（-1=未注册） */
 } xerintosh_user_item_t;
 
@@ -256,30 +257,39 @@ typedef struct xerintosh_user_item_t
 extern xerintosh_list_item_t *xerintosh_get_root_list(void);
 
 /**
+ * @brief  检查列表项是否为指定类型
+ * @param  _item 列表项指针
+ * @param  _type 期望的类型
+ * @return true  类型匹配
+ * @return false 类型不匹配或参数为 NULL
+ */
+extern bool xerintosh_is_type(xerintosh_list_item_t *_item, xerintosh_list_item_type_t _type);
+
+/**
  * @brief  安全类型转换：转为 switch_item
  * @param  _item 列表项指针
- * @return 转换后的指针；类型不匹配时返回根节点
+ * @return 转换后的指针；类型不匹配或参数为 NULL 时返回 NULL
  */
 extern xerintosh_switch_item_t *xerintosh_to_switch_item(xerintosh_list_item_t *_item);
 
 /**
  * @brief  安全类型转换：转为 button_item
  * @param  _item 列表项指针
- * @return 转换后的指针；类型不匹配时返回根节点
+ * @return 转换后的指针；类型不匹配或参数为 NULL 时返回 NULL
  */
 extern xerintosh_button_item_t *xerintosh_to_button_item(xerintosh_list_item_t *_item);
 
 /**
  * @brief  安全类型转换：转为 slider_item
  * @param  _item 列表项指针
- * @return 转换后的指针；类型不匹配时返回根节点
+ * @return 转换后的指针；类型不匹配或参数为 NULL 时返回 NULL
  */
 extern xerintosh_slider_item_t *xerintosh_to_slider_item(xerintosh_list_item_t *_item);
 
 /**
  * @brief  安全类型转换：转为 user_item
  * @param  _item 列表项指针
- * @return 转换后的指针；类型不匹配时返回根节点
+ * @return 转换后的指针；类型不匹配或参数为 NULL 时返回 NULL
  */
 extern xerintosh_user_item_t *xerintosh_to_user_item(xerintosh_list_item_t *_item);
 
@@ -368,6 +378,14 @@ extern bool xerintosh_remove_item_from_list(xerintosh_list_item_t *_parent, xeri
  * @param  _parent 父项指针
  */
 extern void xerintosh_clear_children_of_list(xerintosh_list_item_t *_parent);
+
+/**
+ * @brief  递归释放菜单项及其所有子节点
+ * @param  _item 要释放的菜单项指针
+ * @note   会调用 item 的 destroy_callback（如果存在）
+ * @note   此函数不负责从父项的 child_list_item 数组中移除指针
+ */
+extern void xerintosh_destroy_item_tree(xerintosh_list_item_t *_item);
 
 /**
  * @brief  安全移出选择器：若选择器位于即将被移除的子树内，将其移回父项
