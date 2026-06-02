@@ -31,7 +31,6 @@ bool g_bt_on = true;    /* 蓝牙默认开关状态 */
 #include "hal/hal_system.h"
 #include "hal/hal_display.h"
 #include "hal/hal_input.h"
-#include "ui/ui_draw_driver.h"
 #include "ui/ui_core.h"
 #include "ui/ui_item.h"
 #include "ui/ui_drawer.h"
@@ -162,7 +161,9 @@ void setup()
     M5.Display.setRotation(gfx_rotation);
 
     Serial.printf("[  OK  ] Display driver, free_heap=%u\n", ESP.getFreeHeap());
-    xerintosh_ui_driver_init();
+    hal_display_init();
+    hal_system_init();
+    hal_input_init();
 
     boot_screen_show();
     Serial.println("[  OK  ] Boot screen");
