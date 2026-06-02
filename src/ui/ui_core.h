@@ -13,16 +13,12 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+/* 全局上下文（替代分散的全局变量） */
+#include "ui/ui_context.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-/* ═══ 全局状态 ═══ */
-
-extern bool g_in_xerintosh;                  /* UI 是否处于激活状态 */
-extern bool g_anim_enabled;                  /* 动画是否启用 */
-extern bool g_xerintosh_exit_requested;      /* 外部请求退出当前 user_item */
-extern uint8_t g_xerintosh_exit_animation_status;  /* 退场动画阶段状态机 */
 
 /* ═══ 生命周期 ═══ */
 
