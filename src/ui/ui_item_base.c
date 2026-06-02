@@ -25,7 +25,12 @@ static xerintosh_list_item_t *xerintosh_safe_cast(xerintosh_list_item_t *_item,
 {
   if (_item != NULL && _item->type == _expected_type)
     return _item;
-  return xerintosh_get_root_list();
+  return NULL;
+}
+
+bool xerintosh_is_type(xerintosh_list_item_t *_item, xerintosh_list_item_type_t _expected_type)
+{
+  return (_item != NULL && _item->type == _expected_type);
 }
 
 xerintosh_switch_item_t *xerintosh_to_switch_item(xerintosh_list_item_t *_xerintosh_list_item)
@@ -194,6 +199,7 @@ xerintosh_list_item_t *xerintosh_new_user_item(const char *_content, xerintosh_c
   _item->init_function = _init_function;
   _item->loop_function = _loop_function;
   _item->exit_function = _exit_function;
+  _item->destroy_callback = NULL;
   _item->kernel_pid    = KERN_PID_INVALID;
   return (xerintosh_list_item_t*)_item;
 }

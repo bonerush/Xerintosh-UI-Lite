@@ -87,15 +87,8 @@ bool xerintosh_remove_item_from_list(xerintosh_list_item_t *_parent, xerintosh_l
       _parent->child_list_item[i]->y_list_item_trg = _parent->child_list_item[i - 1]->y_list_item_trg + LIST_ITEM_SPACING;
   }
 
-  if (_child->content) {
-    free((void*)_child->content);
-    _child->content = NULL;
-  }
-  if (_child->user_data) {
-    free(_child->user_data);
-    _child->user_data = NULL;
-  }
-  free(_child);
+  /* 递归释放子节点及其后代 */
+  xerintosh_destroy_item_tree(_child);
   return true;
 }
 
@@ -107,8 +100,49 @@ bool xerintosh_remove_item_from_list(xerintosh_list_item_t *_parent, xerintosh_l
 void xerintosh_clear_children_of_list(xerintosh_list_item_t *_parent)
 {
   if (_parent == NULL) return;
-  while (_parent->child_num > 0)
+
+  /* 递归释放所有子节点 */
+  for (uint8_t i = 0; i < _parent->child_num; i++)
   {
-    xerintosh_remove_item_from_list(_parent, _parent->child_list_item[_parent->child_num - 1]);
+    xerintosh_destroy_item_tree(_parent->child_list_item[i]);
+    _parent->child_list_item[i] = NULL;
   }
+  _parent->child_num = 0;
+}
+
+/**
+ * @brief  递归释放菜单项及其所有子节点
+ * @param  _item 要释放的菜单项指针
+ * @note   会调用 item 的 destroy_callback（如果存在）
+ * @note   此函数不负责从父项的 child_list_item 数组中移除指针
+ */
+void xerintosh_destroy_item_tree(xerintosh_list_item_t *_item)
+{
+  if (_item == NULL) return;
+
+  /* 递归释放所有子节点 */
+  for (uint8_t i = 0; i < _item->child_num; i++)
+  {
+    xerintosh_destroy_item_tree(_item->child_list_item[i]);
+    _item->child_list_item[i] = NULL;
+  }
+  _item->child_num = 0;
+
+  /* 如果是 user_item 且有 destroy_callback，先调用 */
+  if (_item->type == user_item)
+  {
+    xerintosh_user_item_t *user = (xerintosh_user_item_t *)_item;
+    if (user->destroy_callback != NULL && _item->user_data != NULL)
+      user->destroy_callback(_item->user_data);
+  }
+
+  /* 释放 content（由 strdup 分配） */
+  if (_item->content != NULL)
+  {
+    free((void *)_item->content);
+    _item->content = NULL;
+  }
+
+  /* 释放 item 本身 */
+  free(_item);
 }
