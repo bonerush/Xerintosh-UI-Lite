@@ -1,0 +1,102 @@
+/**
+ * @file   ui_types.h
+ * @brief  Xerintosh UI 基础类型与常量定义
+ * @details 统一存放枚举、回调类型、动画速度常量、列表项布局常量
+ *          及全局标志变量的声明，供各子模块共享。
+ *
+ * @copyright Copyright (c) 2026
+ */
+
+#ifndef UI_TYPES_H
+#define UI_TYPES_H
+
+#include <stdint.h>
+#include <stdbool.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/* ═══ 全局绘制颜色 ═══ */
+
+extern uint16_t g_xerintosh_draw_color;  /* 定义在 ui_core.c */
+
+/* ═══ 动画速度常量 ═══ */
+
+extern int16_t g_anim_speed;  /* 全局动画速度基准值 */
+
+#define ANIM_SPEED_LIST_ITEM    (g_anim_speed - 8) /* 列表项动画速度，适当慢于选择器 */
+#define ANIM_SPEED_SELECTOR     (g_anim_speed)     /* 选择器动画速度 */
+#define ANIM_SPEED_SELECTOR_H   (g_anim_speed + 1) /* 选择器高度动画稍快 */
+#define ANIM_SPEED_INFO_BAR     (g_anim_speed + 2) /* 信息栏动画速度 */
+#define ANIM_SPEED_INFO_BAR_W   (g_anim_speed + 3) /* 信息栏宽度动画稍快 */
+#define ANIM_SPEED_POP_UP_W     (g_anim_speed + 4) /* 弹窗宽度动画稍快 */
+#define ANIM_SPEED_POP_UP_Y     (g_anim_speed + 2) /* 弹窗 y 轴动画 */
+#define ANIM_SPEED_CAMERA       (g_anim_speed + 4) /* 相机动画速度 */
+#define ANIM_SPEED_EXIT         (g_anim_speed + 2) /* 退出动画速度 */
+
+/* ═══ 字体 ═══ */
+
+/**
+ * @brief 设置当前绘图字体
+ * @param _font 字体指针
+ */
+extern void xerintosh_set_font(const void* _font);
+
+/* ═══ 全局标志 ═══ */
+
+extern bool g_xerintosh_exit_animation_finished;  /* 退场动画是否已完成 */
+extern bool g_xerintosh_refresh_list_value;       /* 是否需要刷新列表项显示值 */
+
+/* ═══ 回调类型 ═══ */
+
+/**
+ * @brief 统一回调函数类型
+ * @param user_data 用户上下文指针（来自 xerintosh_list_item_t.user_data）
+ */
+typedef void (*xerintosh_cb_t)(void *user_data);
+
+/* ═══ 列表项类型枚举 ═══ */
+
+/**
+ * @brief 菜单项类型枚举
+ */
+typedef enum
+{
+  list_item,
+  switch_item,
+  slider_item,
+  user_item,
+  button_item,
+} xerintosh_list_item_type_t;
+
+/**
+ * @brief 列表项图标类型枚举
+ */
+typedef enum {
+    default_icon,
+    list_icon,
+    switch_icon,
+    plus_icon,
+    user_icon,
+    slider_icon,
+    flag_icon,
+    power_icon,
+    custom_icon,    /* 自定义位图图标，需配合 bitmap_data 使用 */
+} xerintosh_list_item_icon_t;
+
+/* ═══ 列表项布局常量 ═══ */
+
+#define MAX_LIST_CHILD_NUM 10   /* 每个父节点最多子项数 */
+#define MAX_LIST_LAYER 10       /* 菜单树最大深度 */
+#define LIST_ITEM_SPACING 18    /* 列表项纵向间距 */
+#define LIST_ITEM_LEFT_MARGIN 4 /* 列表项左边距 */
+#define LIST_ITEM_RIGHT_MARGIN 20  /* 列表项右边距（为右侧控件预留） */
+#define LIST_INFO_BAR_HEIGHT 3  /* 信息栏高度补偿 */
+#define LIST_FONT_TOP_MARGIN 6  /* 字体顶部边距 */
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* UI_TYPES_H */
