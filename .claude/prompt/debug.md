@@ -89,5 +89,9 @@ stateDiagram-v2
     **验证:** build(hw)=PASS build(native)=PASS tests=186/187 (1个预存SIGSEGV与本次无关)
     **文件:** src/app/ui_task.c
     **驳回重处理:** 之前的修复（移除 boot_screen_show 的 hal_delay_ms）方向正确但只覆盖了启动阶段——boot_screen_show 只在 setup() 中运行一次，而 bug 描述的是「打开 App 时」的退场动画卡死。本次修复针对的是运行时的持续看门狗饿死问题，覆盖所有 App 的进入/退出动画场景。
-- [AGENT] 烧录 Classic Bluetooth SPP 固件后开机触发看门狗重启（Flash 已压缩至 91.3%，排除空间不足）
+- [AGENT_FINISH] 烧录 Classic Bluetooth SPP 固件后开机触发看门狗重启（Flash 已压缩至 91.3%，排除空间不足）
+    **根因:** `bt-mgr` 内核任务栈仅 4096 字节，`BluetoothSerial.begin()` 初始化 Bluedroid Classic BT 协议栈时需要大量栈空间（>4KB），导致栈溢出或 FreeRTOS idle 任务被饿死，触发 TG1 看门狗重启。
+    **修复:** ① `bt-mgr` 任务栈从 4096 增至 8192 字节；② `BT_WARMUP_DELAY_MS` 从 1500ms 延至 3000ms，给 WiFi/系统更充裕的稳定时间；③ 在 `BluetoothSerial.begin()` 前后添加 `ESP.getFreeHeap()` 诊断日志，便于后续排查内存压力。
+    **验证:** build(hw)=PASS build(native)=PASS tests=186/187 (1个预存SIGSEGV与本次无关)
+    **文件:** src/main.cpp, src/app/bluetooth/bt_uart_service.cpp, src/app/bluetooth/bt_manager.cpp
 - [BUG] 对于蓝牙设备的扫描,大部分设备都是类似硬件地址那么一长串,但是确扫不到真正可用的设备,例如我想把我的开发板连接到我的电脑,我的电脑就没有办法扫描到开发板.

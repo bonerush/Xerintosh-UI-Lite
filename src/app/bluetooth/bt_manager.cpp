@@ -38,8 +38,6 @@ extern bool g_bt_on;  /* 定义在 main.cpp */
 
 static bool g_bt_enabled = false;
 static bt_mgr_state_t g_state = BT_MGR_IDLE;
-static unsigned long g_warmup_start_time = 0;
-#define BT_WARMUP_DELAY_MS 3000
 
 static xerintosh_list_item_t *g_settings_list = NULL;
 
@@ -54,11 +52,22 @@ void bt_mgr_init(void) {
 }
 
 void bt_mgr_enable(void) {
+    if (g_bt_enabled) return;
+
     Serial.println("[BT] bt_mgr_enable called");
     g_bt_enabled = true;
-    g_warmup_start_time = millis();
-    g_state = BT_MGR_WARMUP;
-    Serial.println("[BT] bt_mgr_enable done");
+
+    /* 直接在 setup() 上下文中初始化 BluetoothSerial，避免在 bt-mgr
+       内核任务中触发 Bluedroid 的 vQueueDelete(NULL) bug */
+    if (bt_uart_service_init()) {
+        g_state = BT_MGR_ENABLED;
+        Serial.println("[BT] bt_mgr_enable done");
+    } else {
+        g_bt_enabled = false;
+        g_state = BT_MGR_IDLE;
+        Serial.println("[BT] bt_uart_service_init failed");
+        ui_svc_notify_error("蓝牙启动失败");
+    }
 }
 
 void bt_mgr_disable(void) {
@@ -82,17 +91,6 @@ void bt_mgr_update(void) {
     }
 
     switch (g_state) {
-    case BT_MGR_WARMUP: {
-        if (millis() - g_warmup_start_time >= BT_WARMUP_DELAY_MS) {
-            if (bt_uart_service_init()) {
-                g_state = BT_MGR_ENABLED;
-            } else {
-                g_state = BT_MGR_IDLE;
-                ui_svc_notify_error("蓝牙启动失败");
-            }
-        }
-        break;
-    }
     case BT_MGR_ENABLED:
     case BT_MGR_CONNECTED: {
         bt_uart_poll();

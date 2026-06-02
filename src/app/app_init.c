@@ -144,12 +144,15 @@ static void on_baud_selected_cb(void *ud)
  */
 void app_init_managers(void)
 {
-    wifi_mgr_init();
     bt_mgr_init();
+    wifi_mgr_init();
     power_key_popup_init();
 
-    if (g_wifi_on) wifi_mgr_enable();
+    /* 先初始化蓝牙（Classic BT SPP），再给 WiFi 初始化，
+       避免 WiFi 占用大量 RAM 后 Bluedroid BLE 初始化分配失败
+       触发 ESP-IDF v4.4 的 vQueueDelete(NULL) bug */
     if (g_bt_on)   bt_mgr_enable();
+    if (g_wifi_on) wifi_mgr_enable();
 
     /* WiFi/BT 内核任务由 setup() 在 xerintosh_init_core() 之后启动，
        确保 g_xerintosh_selector 已初始化，避免 LoadStoreError */

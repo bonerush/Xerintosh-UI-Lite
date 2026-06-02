@@ -27,6 +27,7 @@ bool g_bt_on = true;    /* 蓝牙默认开关状态 */
 
 #include <M5Unified.h>
 #include <M5GFX.h>
+#include <esp_bt.h>
 
 #include "hal/hal_system.h"
 #include "hal/hal_display.h"
@@ -172,6 +173,17 @@ void setup()
     Serial.println("[  OK  ] UI initialised");
 
     Serial.printf("[  OK  ] App managers, free_heap=%u\n", ESP.getFreeHeap());
+
+    /* 释放 BLE controller 内存（仅使用 Classic BT SPP，不需要 BLE）
+     * 必须在任何 BT controller 初始化之前调用，否则 Bluedroid
+     * 在初始化 BLE GAP/GATT 时会因内存不足触发 vQueueDelete(NULL) bug */
+    esp_err_t bt_ret = esp_bt_controller_mem_release(ESP_BT_MODE_BLE);
+    if (bt_ret != ESP_OK) {
+        Serial.printf("[WARN] esp_bt_controller_mem_release failed: %d\n", bt_ret);
+    } else {
+        Serial.println("[  OK  ] BLE controller memory released");
+    }
+
     app_init_managers();
 
     xerintosh_init_core();
