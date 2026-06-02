@@ -1,7 +1,8 @@
 /**
  * @file   bt_manager.h
- * @brief  蓝牙管理器头文件
- * @details 提供蓝牙状态机、启用/禁用、扫描、配对及 UI 菜单动态构建接口。
+ * @brief  蓝牙管理器头文件（Classic Bluetooth SPP）
+ * @details 提供蓝牙状态机、启用/禁用及 UI 菜单接口。
+ *          基于 Classic Bluetooth SPP，BLE 扫描/配对功能已移除。
  *
  * @copyright Copyright (c) 2026
  */
@@ -21,17 +22,13 @@ extern "C" {
 /**
  * @brief 蓝牙管理器状态机枚举
  * @note  状态流转：
- *        IDLE → WARMUP → SCANNING → SCAN_DONE → PAIRING → PAIRED/PAIR_FAILED
+ *        IDLE → WARMUP → ENABLED → CONNECTED
  */
 typedef enum {
-    BT_MGR_IDLE,          /* 空闲/关闭 */
-    BT_MGR_WARMUP,        /* 预热中 */
-    BT_MGR_STARTING_SCAN, /* 正在启动扫描（异步） */
-    BT_MGR_SCANNING,      /* 扫描中 */
-    BT_MGR_SCAN_DONE,     /* 扫描完成 */
-    BT_MGR_PAIRING,       /* 等待串口输入配对码 */
-    BT_MGR_PAIRED,        /* 已配对 */
-    BT_MGR_PAIR_FAILED    /* 配对失败 */
+    BT_MGR_IDLE,       /* 空闲/关闭 */
+    BT_MGR_WARMUP,     /* 预热中（启动 BluetoothSerial） */
+    BT_MGR_ENABLED,    /* 已启用，等待连接 */
+    BT_MGR_CONNECTED,  /* 有客户端连接 */
 } bt_mgr_state_t;
 
 /* ═══ 生命周期 ═══ */
@@ -44,24 +41,25 @@ void bt_mgr_init(void);
 /* ═══ 操作函数 ═══ */
 
 /**
- * @brief 启用蓝牙（初始化 NimBLE 并开始预热）
+ * @brief 启用蓝牙（启动 BluetoothSerial 并开始预热）
  */
 void bt_mgr_enable(void);
 
 /**
- * @brief 禁用蓝牙（释放 NimBLE、清理菜单）
+ * @brief 禁用蓝牙（释放 BluetoothSerial）
  */
 void bt_mgr_disable(void);
 
 /**
  * @brief  查询是否正在等待串口输入配对码
  * @return true  等待输入中（PAIRING 状态）
+ * @note   Classic BT SPP 不需要串口输入配对码，始终返回 false
  */
 bool bt_mgr_is_waiting_input(void);
 
 /**
  * @brief 每帧更新蓝牙状态机（非阻塞）
- * @note  应在主循环中每帧调用，处理扫描超时、配对输入等
+ * @note  应在主循环中每帧调用，处理预热、连接状态检测等
  */
 void bt_mgr_update(void);
 

@@ -1,8 +1,8 @@
 /**
  * @file   bt_uart_service.h
- * @brief  BLE UART 服务头文件（Nordic UART Service）
- * @details 基于 NUS 标准 UUID 实现 BLE 无线串口通信。
- *          设备作为外设，手机 App 作为中心设备连接。
+ * @brief  Bluetooth UART 服务头文件（Classic Bluetooth SPP）
+ * @details 基于 ESP32 Arduino BluetoothSerial 实现经典蓝牙串口通信。
+ *          设备作为外设，手机/电脑作为中心设备连接。
  *
  * @copyright Copyright (c) 2026
  */
@@ -29,7 +29,7 @@ extern "C" {
  * @brief 接收数据回调函数类型
  * @param  data  接收到的数据指针
  * @param  len   数据长度（字节）
- * @note   回调在 BLE 事件上下文中执行，应尽快返回
+ * @note   回调在轮询上下文中执行，应尽快返回
  */
 typedef void (*bt_uart_rx_callback_t)(const uint8_t *data, uint16_t len);
 
@@ -42,15 +42,14 @@ typedef void (*bt_uart_connect_callback_t)(bool connected);
 /* ═══ 生命周期 ═══ */
 
 /**
- * @brief  初始化 BLE UART 服务
+ * @brief  初始化 Bluetooth UART 服务
  * @return true  初始化成功
- * @return false 初始化失败（NimBLE 未初始化或服务创建失败）
- * @note   必须在 NimBLEDevice::init() 之后调用
+ * @return false 初始化失败
  */
 bool bt_uart_service_init(void);
 
 /**
- * @brief 反初始化 BLE UART 服务
+ * @brief 反初始化 Bluetooth UART 服务
  */
 void bt_uart_service_deinit(void);
 
@@ -61,7 +60,7 @@ void bt_uart_service_deinit(void);
  * @param  data  数据指针
  * @param  len   数据长度（字节）
  * @return 实际发送的字节数，失败返回 0
- * @note   数据先写入环形缓冲区，由 notify 分块发送。
+ * @note   数据直接通过 BluetoothSerial 发送。
  *         单次调用最大可发送 BT_UART_TX_BUF_SIZE 字节。
  */
 uint16_t bt_uart_send(const uint8_t *data, uint16_t len);
