@@ -20,6 +20,7 @@
 #include "hal/hal_display.h"
 #include "hal/hal_input.h"
 #include "hal/hal_system.h"
+#include "app/ui_service.h"
 #include "ui/ui_core.h"
 #include "ui/ui_item.h"
 #include "ui/ui_anim_row.h"
@@ -188,7 +189,7 @@ void taskmgr_loop(void *ud)
                     }
 #endif
                     kern_task_kill(t->pid);
-                    xerintosh_push_pop_up("Killed", 1000);
+                    ui_svc_notify_info("Killed");
                 }
             }
             g_tm.confirming = false;
@@ -218,7 +219,7 @@ void taskmgr_loop(void *ud)
                     g_tm.confirming = true;
                     g_tm.confirm_tick = hal_get_ticks();
                 } else {
-                    xerintosh_push_pop_up("Protected", 1000);
+                    ui_svc_notify_info("Protected");
                 }
             }
         }
