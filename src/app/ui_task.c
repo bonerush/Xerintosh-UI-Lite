@@ -67,6 +67,14 @@ void ui_task_main(void *arg)
             kern_log(KERN_LOG_INFO, "ui frame %d flush done, yielding", frame);
         }
 
+#ifndef NATIVE_TEST
+        /* 释放 1ms 给 FreeRTOS idle 任务（优先级 0），
+         * 确保 TG1 系统看门狗能被及时喂狗。
+         * 内核任务和 Arduino loop 都在优先级 1，
+         * 若无此让步则 idle 任务会被永久饿死。 */
+        delay(1);
+#endif
+
         /* 协作式让出 CPU */
         kern_yield();
 

@@ -83,4 +83,10 @@ stateDiagram-v2
     **验证:** build=PASS native=PASS tests=186/187 (1个预存SIGSEGV与本次无关)
     **文件:** src/app/shutdown/power_key_popup.c
     **驳回重处理:** 在原有松手收起弹窗逻辑基础上，增加冷却期防止按钮释放边沿被误判为短按/长按，避免松手慢时触发
+- [AGENT_FINISH] 打开 App 时沙漏页面（退场动画）偶发卡住后直接 reboot，怀疑看门狗触发热重启
+    **根因:** FreeRTOS 内核任务（UI、WiFi、BT）均在优先级 `tskIDLE_PRIORITY + 1`（=1），与 Arduino loop 任务同级。ESP32 的 TG1 系统看门狗由 idle 任务（优先级 0）喂狗。在退场动画等多帧渲染期间，优先级 1 的任务通过双信号量令牌协议（kern_port.c）持续轮转——UI 任务执行→yield→调度器取回→再分派，idle 任务始终被饿死。TG1 看门狗超时（~5 秒）后热重启。
+    **修复:** 在 `ui_task_main()` 每帧 `kern_yield()` 前添加 `delay(1)`（`#ifndef NATIVE_TEST` 守卫），释放 1ms 给 FreeRTOS idle 任务喂 TG1 看门狗。不影响原生测试（native 无看门狗和 FreeRTOS）。硬件端每帧增加 1ms 开销（约 3% @ 30fps），对 UI 流畅度无影响。
+    **验证:** build(hw)=PASS build(native)=PASS tests=186/187 (1个预存SIGSEGV与本次无关)
+    **文件:** src/app/ui_task.c
+    **驳回重处理:** 之前的修复（移除 boot_screen_show 的 hal_delay_ms）方向正确但只覆盖了启动阶段——boot_screen_show 只在 setup() 中运行一次，而 bug 描述的是「打开 App 时」的退场动画卡死。本次修复针对的是运行时的持续看门狗饿死问题，覆盖所有 App 的进入/退出动画场景。
 - [BUG] 对于蓝牙设备的扫描,大部分设备都是类似硬件地址那么一长串,但是确扫不到真正可用的设备,例如我想把我的开发板连接到我的电脑,我的电脑就没有办法扫描到开发板.

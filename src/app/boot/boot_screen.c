@@ -74,5 +74,6 @@ void boot_screen_show(void)
     hal_draw_string(tx, ty, label, COLOR_FG);
 
     hal_display_flush();
-    hal_delay_ms(2000);
+    /* 耗时交由调用方（main.cpp setup()→loop()）自然过渡；
+     * setup() 中 hal_delay_ms(2000) 会触发 TG1 系统看门狗重启。 */
 }
