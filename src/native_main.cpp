@@ -14,7 +14,6 @@
 extern "C" {
 #include "hal/hal_system.h"
 #include "hal/hal_display.h"
-#include "ui/ui_draw_driver.h"
 #include "ui/ui_core.h"
 #include "ui/ui_item.h"
 
@@ -78,7 +77,8 @@ int main(int argc, char **argv)
     ::testing::InitGoogleTest(&argc, argv);
     hal_system_init();
     hal_display_init();
-    xerintosh_ui_driver_init();
+    hal_system_init();
+    hal_input_init();
     return RUN_ALL_TESTS();
 }
 
