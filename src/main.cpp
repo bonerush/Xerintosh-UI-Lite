@@ -14,7 +14,6 @@
 #include "app/app_init.h"
 
 extern "C" {
-int16_t g_anim_speed = 92;  /* 全局动画速度默认值 */
 void wifi_mgr_task_main(void *arg);
 void bt_mgr_task_main(void *arg);
 }
