@@ -1,19 +1,13 @@
 #include <gtest/gtest.h>
 
 extern "C" {
+#include "ui/ui_context.h"
 #include "ui/ui_core.h"
 #include "ui/ui_item.h"
 #include "ui/ui_drawer.h"
 #include "ui/ui_draw_driver.h"
 #include "hal/hal_system.h"
 #include "hal/hal_display.h"
-
-/* 外部符号声明 */
-extern uint8_t g_xerintosh_exit_animation_status;
-extern bool g_xerintosh_exit_animation_finished;
-extern bool g_in_xerintosh;
-extern xerintosh_selector_t g_xerintosh_selector;
-extern xerintosh_camera_t g_xerintosh_camera;
 }
 
 /* 简单的 stub 函数，供 user_item 使用 */
@@ -31,6 +25,7 @@ extern "C" void stub_user_exit(void *ud) { (void)ud; }
 TEST(ExitAnimationTest, AnimationCompletesInFiniteFrames)
 {
     /* 初始化 UI 核心 */
+    xerintosh_context_init();
     g_in_xerintosh = true;
     g_xerintosh_exit_animation_finished = true;
     g_xerintosh_exit_animation_status = 0;
@@ -95,6 +90,7 @@ TEST(ExitAnimationTest, AnimationCompletesInFiniteFrames)
  */
 TEST(ExitAnimationTest, MultipleEnterExitCycles)
 {
+    xerintosh_context_init();
     g_in_xerintosh = true;
     hal_system_init();
     hal_display_init();
