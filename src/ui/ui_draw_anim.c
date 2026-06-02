@@ -9,10 +9,6 @@
 #include "ui_drawer.h"
 #include "ui_core.h"
 
-/* ═══ 全局状态定义 ═══ */
-
-uint8_t g_xerintosh_exit_animation_status = 0;  /* 退场动画阶段状态机：0=初始/展开，1=到达底部，2=回缩 */
-
 /* ═══ 退场动画 ═══ */
 
 /**
