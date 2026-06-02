@@ -64,7 +64,7 @@ static void on_baud_selected_cb(void *ud);
  *        │       └── 230400（按钮）
  *        ├── 任务管理器（user_item）
  *        ├── 串口监视器（user_item）
- *        ├── BLE 串口（user_item）
+ *        ├── 蓝牙串口（user_item）
  *        └── 关于（user_item）
  */
 void app_init_ui(void)
@@ -79,7 +79,7 @@ void app_init_ui(void)
     xerintosh_list_item_t* item4 = xerintosh_new_user_item(
         "关于", about_init, about_loop, about_exit, user_icon);
     xerintosh_list_item_t* item5 = xerintosh_new_user_item(
-        "BLE 串口", ble_serial_init, ble_serial_loop, ble_serial_exit, default_icon);
+        "蓝牙串口", ble_serial_init, ble_serial_loop, ble_serial_exit, default_icon);
 
     xerintosh_list_item_t* sw1 = xerintosh_new_switch_item(
         "WiFi", &g_wifi_on, NULL, wifi_mgr_on_switch_toggle, default_icon);
@@ -110,7 +110,7 @@ void app_init_ui(void)
     xerintosh_push_item_to_list(root, item1);
     xerintosh_push_item_to_list(root, item2);
     xerintosh_push_item_to_list(root, item3);
-    xerintosh_push_item_to_list(root, item5);  /* BLE 串口 */
+    xerintosh_push_item_to_list(root, item5);  /* 蓝牙串口 */
     xerintosh_push_item_to_list(root, item4);  /* 关于（永远最后） */
     xerintosh_push_item_to_list(item1, sw1);
     xerintosh_push_item_to_list(item1, sw2);

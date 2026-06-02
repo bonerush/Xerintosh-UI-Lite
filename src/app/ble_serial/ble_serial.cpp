@@ -1,7 +1,7 @@
 /**
  * @file   ble_serial.cpp
- * @brief  BLE 串口监视器 App 实现
- * @details 通过 BLE UART（NUS）实现无线串口通信。
+ * @brief  蓝牙串口监视器 App 实现
+ * @details 通过 Classic Bluetooth SPP 实现无线串口通信。
  *          三段式布局：Header（标题）+ Body（数据区）+ Footer（状态栏）
  *          支持入场动画、BtnA 滚动、连接状态变化弹窗提示。
  *
@@ -70,7 +70,7 @@ static float s_entry_offset = 0.0f;
 static char     s_assembly[BLE_LINE_LEN];
 static uint16_t s_asm_pos = 0;
 
-/* ═══ BLE UART 回调 ═══ */
+/* ═══ 蓝牙串口回调 ═══ */
 
 #ifndef NATIVE_TEST
 #include "app/bluetooth/bt_uart_service.h"
@@ -109,11 +109,11 @@ static void draw_header(void)
     int16_t entry = (s_entry_offset < 1.0f) ? 0 : (int16_t)s_entry_offset;
 
     xerintosh_set_font(NULL);
-    int16_t title_w = hal_get_string_width("BLE Serial");
+    int16_t title_w = hal_get_string_width("BT Serial");
     int16_t title_x = HAL_CENTER_X(title_w);
     int16_t title_y = HAL_TEXT_BASELINE(HAL_MARGIN_SM) + entry;
 
-    hal_draw_string(title_x, title_y, "BLE Serial", COLOR_FG);
+    hal_draw_string(title_x, title_y, "BT Serial", COLOR_FG);
 
     /* 分隔线 */
     hal_draw_h_line(0, HAL_HEADER_BOTTOM() + entry, SCREEN_WIDTH, COLOR_FG);

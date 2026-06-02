@@ -21,7 +21,7 @@ extern "C" {
 
 #define BT_UART_TX_BUF_SIZE  512   /* 发送环形缓冲区大小（字节） */
 #define BT_UART_RX_BUF_SIZE  512   /* 接收环形缓冲区大小（字节） */
-#define BT_UART_DEFAULT_MTU  20    /* BLE 默认 MTU（不含 ATT 头） */
+#define BT_UART_DEFAULT_MTU  20    /* 兼容旧 API 保留常量名，SPP 无 MTU 限制 */
 
 /* ═══ 类型定义 ═══ */
 
