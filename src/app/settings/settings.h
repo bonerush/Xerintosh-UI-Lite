@@ -12,6 +12,9 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+/* UI 上下文（提供 g_anim_enabled 等全局状态宏） */
+#include "ui/ui_context.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -30,7 +33,6 @@ typedef enum {
 
 extern int16_t g_brightness_level;       /* 亮度等级 1-10 */
 extern int16_t g_anim_speed_level;       /* 动画速度等级 1-10 */
-extern bool    g_anim_enabled;           /* 动画开关 */
 extern int16_t g_screen_rotation_level;  /* 屏幕方向 1=竖屏, 2=横屏 */
 extern bool    g_is_landscape;           /* 横屏开关：true=横屏, false=竖屏 */
 extern int16_t g_serial_baud_rate;       /* 串口波特率等级 1-6 */

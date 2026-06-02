@@ -15,7 +15,6 @@
 
 int16_t g_brightness_level       = 5;                        /* 默认亮度等级 5 */
 int16_t g_anim_speed_level       = 5;                        /* 默认动画速度 5 */
-extern bool g_anim_enabled;                                  /* 动画开关（定义在 ui_core.h） */
 int16_t g_screen_rotation_level  = ORIENTATION_LANDSCAPE;    /* 默认横屏 */
 bool    g_is_landscape           = true;                     /* 默认横屏 */
 int16_t g_serial_baud_rate       = 5;                        /* 默认波特率等级 5 = 115200 */
