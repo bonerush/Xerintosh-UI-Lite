@@ -1,10 +1,14 @@
 # 绘制管线（UI Drawer）
 
-> **Parent:** [知识地图](../index.md) | **Related:** [核心引擎](core.md), [项目系统](item.md), [绘制驱动适配](draw-driver.md)
+> **Parent:** [UI 核心层索引](index.md) | **Related:** [核心引擎](core.md), [项目系统](item.md), [全局上下文](context.md)
 
 ## 概述
 
-`ui_drawer` 是 UI 框架的**渲染层**，负责把数据模型（`ui_item` 中的列表项、选择器、弹窗等）转换为实际的像素绘制指令。所有绘制通过 `oled_*` 宏（实际映射到 `hal_*`）输出到 TFT 后台缓冲区。
+`ui_drawer` 是 UI 框架的**渲染层**，负责把数据模型（`ui_item` 中的列表项、选择器、弹窗等）转换为实际的像素绘制指令。所有绘制通过 `hal_*` API 输出到 TFT 后台缓冲区。
+
+在 UI 重构中，此模块有两项关键改进：
+1. **`xerintosh_is_item_visible()` 公开化**：原 `static` 可见性判断提升为公共 API
+2. **滚动条长度缓存**：避免每帧重复计算 `ceilf()` 除法
 
 ---
 
@@ -17,9 +21,8 @@
 ```c
 void xerintosh_draw_list_appearance()
 {
-  oled_set_draw_color(1);
-  oled_draw_H_line(0, 1, 66);
-  oled_draw_H_line(0, 0, 67);
+  hal_draw_h_line(0, 1, 66, g_xerintosh_draw_color);
+  hal_draw_h_line(0, 0, 67, g_xerintosh_draw_color);
 
   // 右上角装饰像素簇
   const struct {
@@ -34,16 +37,21 @@ void xerintosh_draw_list_appearance()
   };
   for (uint8_t j = 0; j < sizeof(draw_cfg) / sizeof(draw_cfg[0]); ++j)
     for (uint8_t i = draw_cfg[j]._start; i <= draw_cfg[j]._end; i += draw_cfg[j]._step)
-      oled_draw_pixel(i, draw_cfg[j]._y);
+      hal_draw_pixel(i, draw_cfg[j]._y, g_xerintosh_draw_color);
 
   // 右侧滚动条背景
-  oled_draw_V_line(SCREEN_WIDTH - 5, 0, SCREEN_HEIGHT);
-  oled_draw_V_line(SCREEN_WIDTH - 1, 0, SCREEN_HEIGHT);
+  hal_draw_v_line(SCREEN_WIDTH - 5, 0, SCREEN_HEIGHT, g_xerintosh_draw_color);
+  hal_draw_v_line(SCREEN_WIDTH - 1, 0, SCREEN_HEIGHT, g_xerintosh_draw_color);
 
-  // 滚动条滑块
-  static float _length_each_part = 0;
-  _length_each_part = ceilf((SCREEN_HEIGHT - 10.0f) / (float) xerintosh_selector.selected_item->parent->child_num);
-  oled_draw_box(SCREEN_WIDTH - 4, 5 + xerintosh_selector.selected_index * _length_each_part, 3, _length_each_part);
+  // 滚动条滑块（含缓存优化）
+  static uint8_t _cached_child_num = 0;
+  static float _cached_length = 0;
+  if (_cached_child_num != g_xerintosh_selector.selected_item->parent->child_num) {
+    _cached_child_num = g_xerintosh_selector.selected_item->parent->child_num;
+    _cached_length = ceilf((SCREEN_HEIGHT - 10.0f) / (float)_cached_child_num);
+  }
+  float _length_each_part = _cached_length;
+  hal_draw_fill_rect(SCREEN_WIDTH - 4, 5 + g_xerintosh_selector.selected_index * _length_each_part, 3, _length_each_part, g_xerintosh_draw_color);
   // ... 滑块上的装饰分割线
 }
 ```
@@ -167,7 +175,25 @@ void xerintosh_draw_list_item()
 }
 ```
 
-**裁剪逻辑**：`SCREEN_HEIGHT = 160`，`LIST_INFO_BAR_HEIGHT = 3`。所有项只在大于 3px 且小于 160px 的 Y 范围内绘制，避免越界和无效绘制。
+**裁剪逻辑**：`SCREEN_HEIGHT`（竖屏 160 / 横屏 80），`LIST_INFO_BAR_HEIGHT = 3`。所有项只在大于 3px 且小于屏幕高度的 Y 范围内绘制，避免越界和无效绘制。
+
+**滚动条长度缓存**：`_cached_child_num` 记录了上次计算时的 `child_num`。如果子项数量未改变（绝大多数帧），跳过 `ceilf()` 除法运算。`ceilf()` 是浮点运算中较昂贵的操作，在 ESP32 上每帧避免一次除法可节省几十微秒。
+
+### 列表项可见性判断（公开 API）
+
+*📄 Source: [ui_draw_list.c](../../src/ui/ui_draw_list.c#L24-L27)*
+
+```c
+bool xerintosh_is_item_visible(int16_t _y_item)
+{
+    return (_y_item + 2 > LIST_INFO_BAR_HEIGHT && _y_item - 2 < SCREEN_HEIGHT);
+}
+```
+
+原为 `static bool is_item_visible()`，重构中提取为公开 `xerintosh_is_item_visible()`，声明在 `ui_types.h`。在以下场景中被调用：
+- `draw_list_item_*` 系列函数 — 跳过屏幕外项的绘制
+- `xerintosh_draw_slider_overlays()` — 跳过屏幕外滑条编辑框的绘制
+- 测试代码 — 验证边界条件下的可见性判断
 
 ### 选择器高亮（XOR 反色）
 
@@ -300,10 +326,11 @@ void xerintosh_draw_pop_up()
 
 ## 与其他组件的关系
 
-- **ui_core**：主循环中按顺序调用 `xerintosh_draw_list()` → `xerintosh_draw_widget()` → `xerintosh_draw_exit_animation()`
-- **ui_item**：读取 `xerintosh_selector`、`xerintosh_camera`、`xerintosh_info_bar`、`xerintosh_pop_up` 的状态数据
-- **hal_display**：所有 `oled_*` 宏最终落入 `hal_draw_*`，在 M5Canvas 上执行实际像素操作
+- **ui_core**：`xerintosh_ui_render_frame()` 调用 `xerintosh_draw_list()` 进行列表渲染
+- **ui_item**：读取 `g_xerintosh_selector`、`g_xerintosh_camera`、`g_xerintosh_info_bar`、`g_xerintosh_pop_up` 的状态数据
+- **ui_types.h**：声明 `xerintosh_is_item_visible()` 公开 API
+- **hal_display**：所有 `hal_draw_*` 调用在 M5Canvas 上执行实际像素操作
 
 ---
 
-> **See Also:** [核心引擎](core.md) | [项目系统](item.md) | [显示驱动](../hal/display.md)
+> **See Also:** [核心引擎](core.md) | [项目系统](item.md) | [全局上下文](context.md) | [显示驱动](../hal/display.md)

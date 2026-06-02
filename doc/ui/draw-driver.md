@@ -1,86 +1,68 @@
-# 绘制驱动适配（UI Draw Driver）
+# 绘制驱动适配（UI Draw Driver）⚠️ 已移除
 
-> **Parent:** [知识地图](../index.md) | **Related:** [项目系统](item.md), [绘制管线](drawer.md), [显示驱动](../hal/display.md)
+> **Parent:** [UI 核心层索引](index.md) | **Related:** [显示驱动](../hal/display.md)
 
-## 概述
+## ⚠️ 此模块已在 UI 重构（Task 4）中移除
 
-`ui_draw_driver` 是一个**宏桥接层**。原始 OLED 框架使用 `oled_*` 开头的函数（如 `oled_draw_box`、`oled_draw_UTF8`），而 TFT 移植版使用 `hal_*` 开头的 HAL API。本层通过宏定义将旧 API 映射到新 API，使 UI 核心代码几乎无需修改即可运行。
+`src/ui/ui_draw_driver.c` 和 `src/ui/ui_draw_driver.h` 两个文件已于 2026 年 6 月的 UI 框架深度重构中删除。
+
+### 移除原因
+
+1. **薄包装层无存在价值**：`xerintosh_ui_driver_init()` 仅包含三行调用（`hal_display_init()`、`hal_system_init()`、`hal_input_init()`），没有提供任何额外的抽象或逻辑。调用方直接使用 HAL API 即可。
+2. **减少文件数量**：遵循"多个小文件 > 少量大文件"原则，但排除价值为零的文件。此模块属于死代码（dead code）。
+3. **减少包含链**：移除后，`#include "ui_draw_driver.h"` 被替换为直接 `#include "hal/hal_display.h"` 等，减少了不必要的间接包含。
+
+### 迁移指南
+
+**重构前**（使用 `ui_draw_driver.h`）：
+```c
+#include "ui_draw_driver.h"
+
+void setup() {
+    xerintosh_ui_driver_init();  // 已删除
+}
+```
+
+**重构后**（直接使用 HAL）：
+```c
+#include "hal/hal_display.h"
+#include "hal/hal_system.h"
+#include "hal/hal_input.h"
+
+void setup() {
+    hal_display_init();
+    hal_system_init();
+    hal_input_init();
+}
+```
+
+所有 `#include "ui_draw_driver.h"` 的引用已在代码库中清理完毕，替换为直接包含 `hal/hal_display.h` 或具体需要的 HAL 头文件。
 
 ---
 
-## 关键概念
+## 历史参考（归档内容）
 
-### 宏映射表
+以下内容仅供历史参考，**当前代码已不再使用**。
 
-*📄 Source: [ui_draw_driver.h](../../src/ui/ui_draw_driver.h#L11-L35)*
+### 原宏映射表
 
-```c
-#define get_ticks() hal_get_ticks()
-#define delay(ms) hal_delay_ms(ms)
+原始 OLED 框架使用 `oled_*` 开头的函数，移植到 TFT（M5GFX）时通过宏桥接层映射到 `hal_*` API：
 
-#define oled_set_font(font) hal_set_font(font)
-#define oled_draw_str(x, y, str) hal_draw_string(x, y, str, COLOR_FG)
-#define oled_draw_UTF8(x, y, str) hal_draw_utf8(x, y, str, COLOR_FG)
-#define oled_get_str_width(str) hal_get_string_width(str)
-#define oled_get_UTF8_width(str) hal_get_utf8_width(str)
-#define oled_get_str_height() hal_get_font_height()
+| 原始 API | 映射到 | 说明 |
+|----------|--------|------|
+| `oled_set_font(f)` | `hal_set_font(f)` | 设置字体 |
+| `oled_draw_UTF8(x,y,s)` | `hal_draw_utf8(x,y,s, COLOR_FG)` | 绘制 UTF-8 文本 |
+| `oled_get_UTF8_width(s)` | `hal_get_utf8_width(s)` | 获取 UTF-8 文本宽度 |
+| `oled_get_str_height()` | `hal_get_font_height()` | 获取当前字体高度 |
+| `oled_draw_box(x,y,w,h)` | `hal_draw_fill_rect(x,y,w,h, COLOR_FG)` | 实心矩形 |
+| `oled_draw_pixel(x,y)` | `hal_draw_pixel(x,y, COLOR_FG)` | 单像素 |
+| `oled_draw_H_line(x,y,l)` | `hal_draw_h_line(x,y,l, COLOR_FG)` | 水平线 |
+| `oled_clear_buffer()` | `hal_display_clear()` | 清除缓冲区 |
+| `oled_send_buffer()` | `hal_display_flush()` | 刷新到屏幕 |
 
-#define oled_draw_pixel(x, y) hal_draw_pixel(x, y, COLOR_FG)
-#define oled_draw_circle(x, y, r) hal_draw_circle(x, y, r, COLOR_FG)
-#define oled_draw_R_box(x, y, w, h, r) hal_draw_fill_round_rect(x, y, w, h, r, COLOR_FG)
-#define oled_draw_box(x, y, w, h) hal_draw_fill_rect(x, y, w, h, COLOR_FG)
-#define oled_draw_frame(x, y, w, h) hal_draw_rect(x, y, w, h, COLOR_FG)
-#define oled_draw_R_frame(x, y, w, h, r) hal_draw_round_rect(x, y, w, h, r, COLOR_FG)
-#define oled_draw_H_line(x, y, l) hal_draw_h_line(x, y, l, COLOR_FG)
-#define oled_draw_V_line(x, y, h) hal_draw_v_line(x, y, h, COLOR_FG)
-#define oled_draw_line(x1, y1, x2, y2) hal_draw_line(x1, y1, x2, y2, COLOR_FG)
-```
+> **注意**：这些宏映射在代码中仍有使用，但定义已迁移到调用方或各自的头文件中，不再集中在一个"驱动适配"文件。
 
-#### 中文伪代码拆解
-
-```
-// 原始 OLED API          →    新的 TFT HAL API
-获取Tick()                →    hal_获取Tick()
-延时(毫秒)                →    hal_延时毫秒()
-
-设置字体(字体)            →    hal_设置字体(字体)
-绘制字符串(x,y,文本)      →    hal_绘制字符串(x,y,文本,前景色)
-绘制UTF8(x,y,文本)        →    hal_绘制UTF8(x,y,文本,前景色)
-获取字符串宽度(文本)      →    hal_获取字符串宽度(文本)
-获取UTF8宽度(文本)        →    hal_获取UTF8宽度(文本)
-获取字体高度()            →    hal_获取字体高度()
-
-绘制像素(x,y)             →    hal_绘制像素(x,y,前景色)
-绘制实心矩形(x,y,w,h)     →    hal_填充矩形(x,y,w,h,前景色)
-绘制圆角实心矩形(...)     →    hal_填充圆角矩形(...,前景色)
-// ... 以此类推
-```
-
-**核心思想**：OLED 使用“设置画笔颜色 → 绘制”的状态机模式；TFT HAL 使用“每次绘制都带颜色参数”的函数式模式。宏桥接层把旧的状态机调用自动填充 `COLOR_FG`（白色），实现无感迁移。
-
-### 已废弃的 OLED 专属 API
-
-*📄 Source: [ui_draw_driver.h](../../src/ui/ui_draw_driver.h#L38-L46)*
-
-```c
-#define oled_draw_H_dotted_line(x, y, l) /* placeholder */
-#define oled_draw_V_dotted_line(x, y, h) /* placeholder */
-#define oled_set_draw_color(color) /* color handled by HAL */
-#define oled_set_font_mode(mode) /* TFT doesn't need */
-#define oled_set_font_direction(dir) /* TFT doesn't need */
-#define oled_clear_buffer() hal_display_clear()
-#define oled_send_buffer() hal_display_flush()
-#define oled_send_area_buffer(x, y, w, h) /* not needed */
-```
-
-这些宏定义为空实现或映射到 HAL 的等价操作：
-- `oled_set_draw_color`：TFT 没有全局画笔颜色概念，每次绘制自带颜色参数
-- `oled_set_font_mode` / `oled_set_font_direction`：M5GFX 不需要这些 OLED 专属字体模式
-- `oled_clear_buffer` / `oled_send_buffer`：映射到双缓冲的 `clear` / `flush`
-
-### 驱动初始化
-
-*📄 Source: [ui_draw_driver.c](../../src/ui/ui_draw_driver.c)*
+### 原驱动初始化
 
 ```c
 void xerintosh_ui_driver_init(void) {
@@ -90,16 +72,8 @@ void xerintosh_ui_driver_init(void) {
 }
 ```
 
-`xerintosh_ui_driver_init()` 是 UI 层对外暴露的统一初始化入口，内部按顺序初始化显示、系统时钟和输入三个 HAL 子系统。
+此函数之所以被移除，是因为它是纯粹的"转发"——没有任何参数处理、错误检查或状态管理。调用方直接写三行 HAL 调用比通过一个包装函数更清晰。
 
 ---
 
-## 与其他组件的关系
-
-- **所有 UI `.c` 文件**：通过 `#include "ui_draw_driver.h"` 隐式使用宏映射
-- **hal_display**：宏的目标端，所有 `oled_draw_*` 最终落入 `hal_draw_*`
-- **main.cpp**：`setup()` 中调用 `xerintosh_ui_driver_init()`
-
----
-
-> **See Also:** [显示驱动](../hal/display.md) | [项目系统](item.md) | [绘制管线](drawer.md)
+> **See Also:** [显示驱动](../hal/display.md) | [核心引擎](core.md) | [全局上下文](context.md)

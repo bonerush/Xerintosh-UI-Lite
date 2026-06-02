@@ -297,45 +297,17 @@ void xerintosh_selector_go_next_item() {
 }
 ```
 
-### 确认与回退
+### 确认操作（重构后：类型派发）
 
-*📄 Source: [ui_item_selector.c](../../src/ui/ui_item_selector.c#L200-L253)*
+确认操作在重构后已大幅简化。原来的 ~60 行内联 `if/else if` 链被替换为一行派发调用：
+
+*📄 Source: [ui_item_selector.c](../../src/ui/ui_item_selector.c#L147-L151)*
 
 ```c
-void xerintosh_selector_jump_to_selected_item() {
-    if (!in_xerintosh) return;
-
-    if (xerintosh_selector.selected_item->type == user_item) {
-        // 进入用户自定义页面
-        xerintosh_exit_animation_finished = false;
-        _selected_user_item->entering_user_item = true;
-        return;
-    }
-
-    if (xerintosh_selector.selected_item->type == switch_item) {
-        *_selected_switch_item->value = !*_selected_switch_item->value;
-        if (_selected_switch_item->exit_function)
-            _selected_switch_item->exit_function();
-        return;
-    }
-
-    if (xerintosh_selector.selected_item->type == slider_item) {
-        if (!_selected_slider_item->is_confirmed) {
-            _selected_slider_item->is_confirmed = true;
-            _selected_slider_item->value_backup = *_selected_slider_item->value;
-            return;
-        }
-        if (_selected_slider_item->is_confirmed) {
-            if (_selected_slider_item->exit_function)
-                _selected_slider_item->exit_function();
-            _selected_slider_item->is_confirmed = false;
-            return;
-        }
-    }
-
-    // 普通列表项：进入子菜单
-    if (xerintosh_selector.selected_item->child_num == 0) return;
-    // ... 将选中项切到第一个子项
+void xerintosh_selector_jump_to_selected_item()
+{
+    if (!g_in_xerintosh) return;
+    xerintosh_dispatch_enter(g_xerintosh_selector.selected_item);
 }
 ```
 
@@ -343,36 +315,135 @@ void xerintosh_selector_jump_to_selected_item() {
 
 ```
 函数 确认当前选中项() {
-    if (当前项是用户页面) {
-        播放退场动画
-        标记为正在进入用户页面
-        return
-    }
-
-    if (当前项是开关) {
-        值 = !值          // 翻转布尔值
-        执行退出回调（副作用）
-        return
-    }
-
-    if (当前项是滑条) {
-        if (还没进入编辑模式) {
-            标记为已确认
-            备份当前值       // 长按取消时恢复用
-            return
-        } else {
-            执行退出回调
-            取消确认标记      // 退出编辑模式
-            return
-        }
-    }
-
-    // 普通列表项：进入子菜单
-    if (没有子项) return
-    选中索引 = 0
-    当前项 = 第一个子项
+    if (不在UI模式) return
+    派发确认操作(选择器.选中项)
+    // 所有具体的类型逻辑由 ui_dispatch.c 的派发表处理
 }
 ```
+
+实际执行逻辑由 `xerintosh_dispatch_enter()` → `s_enter_dispatch[item->type](item)` 在 O(1) 时间内路由到对应的处理函数。详见 [类型派发表文档](dispatch.md)。
+
+### 回退操作
+
+*📄 Source: [ui_item_selector.c](../../src/ui/ui_item_selector.c#L167-L192)*
+
+```c
+void xerintosh_selector_go_back_item()
+{
+    if (!g_in_xerintosh) return;
+    // 如果是 user_item，触发退出
+    if (g_xerintosh_selector.selected_item->type == user_item) {
+        handle_user_item_exit(xerintosh_to_user_item(g_xerintosh_selector.selected_item));
+        return;
+    }
+    // 如果是滑条编辑模式，恢复备份值
+    if (g_xerintosh_selector.selected_item->type == slider_item
+        && xerintosh_to_slider_item(g_xerintosh_selector.selected_item)->is_confirmed) {
+        *_slider->value = _slider->value_backup;
+        _slider->is_confirmed = false;
+        return;
+    }
+    // 切换到父项
+    if (g_xerintosh_selector.selected_item->parent != NULL) {
+        g_xerintosh_selector.selected_item = g_xerintosh_selector.selected_item->parent;
+        g_xerintosh_selector.selected_index = 0;
+    }
+}
+```
+
+### 子项坐标重算（重构新增）
+
+重构中将挂载和移除项时重复的坐标计算逻辑提取为独立函数，消除代码重复。
+
+*📄 Source: [ui_item_list.c](../../src/ui/ui_item_list.c#L16-L28)*
+
+```c
+static void recalc_child_y_positions(xerintosh_list_item_t *_parent)
+{
+    if (_parent == NULL) return;
+    xerintosh_set_font(hal_get_cn_font());
+    for (uint8_t i = 0; i < _parent->child_num; i++)
+    {
+        if (i == 0)
+            _parent->child_list_item[i]->y_list_item_trg = hal_get_font_height() + LIST_FONT_TOP_MARGIN - 1;
+        else
+            _parent->child_list_item[i]->y_list_item_trg = _parent->child_list_item[i - 1]->y_list_item_trg + LIST_ITEM_SPACING;
+    }
+}
+```
+
+#### 中文伪代码拆解
+
+```
+函数 重算子项Y坐标(父项) {
+    if (父项为空) return
+
+    设置字体
+
+    for (遍历父项的所有子项) {
+        if (第一个子项) {
+            子项.目标Y = 字体高度 + 顶部边距 - 1
+        } else {
+            子项.目标Y = 上一个子项.目标Y + 列表项间距(18)
+        }
+    }
+}
+```
+
+**被以下两处调用**：
+- `xerintosh_push_item_to_list()`：挂载新子项后重新计算所有子项坐标
+- `xerintosh_remove_item_from_list()`：移除子项后重新计算剩余子项坐标
+
+重构前这两处分別内联了相同的 for 循环，违反 DRY 原则。
+
+### 列表项可见性判断（重构新增公开 API）
+
+`xerintosh_is_item_visible()` 原是 `ui_draw_list.c` 中的 `static` 函数。重构中将其提取为公开 API，方便绘制代码和测试代码复用。
+
+*📄 Source: [ui_types.h](../../src/ui/ui_types.h#L96-L102)*
+
+```c
+/**
+ * @brief  判断列表项 Y 坐标是否在屏幕可视区域内
+ * @param  _y_item 项的 y 坐标（屏幕坐标）
+ * @return true  可见
+ * @return false 不可见（超出上下边界 + 2px 容差）
+ */
+extern bool xerintosh_is_item_visible(int16_t _y_item);
+```
+
+*📄 Source: [ui_draw_list.c](../../src/ui/ui_draw_list.c#L24-L27)*
+
+```c
+bool xerintosh_is_item_visible(int16_t _y_item)
+{
+    return (_y_item + 2 > LIST_INFO_BAR_HEIGHT && _y_item - 2 < SCREEN_HEIGHT);
+}
+```
+
+**2px 容差**：允许列表项有 2px 的部分超出边界仍被视为"可见"。这避免了列表项在刚好触及边界时被反复裁剪/绘制导致的闪烁。
+
+### 字体缓存修复（重构 Bug 修复）
+
+`xerintosh_set_font()` 原有的缓存逻辑存在 bug——缓存变量 `g_xerintosh_font` 从未被更新，因此每次调用都无条件执行 `hal_set_font()`，缓存形同虚设。
+
+*📄 Source: [ui_item_popup.c](../../src/ui/ui_item_popup.c#L27-L34)*
+
+```c
+static const void *g_xerintosh_font = NULL;
+
+void xerintosh_set_font(const void *_font)
+{
+    if (_font != g_xerintosh_font) {
+        g_xerintosh_font = _font;      // ← 修复：之前缺少这一行
+        hal_set_font(_font);
+    }
+}
+```
+
+**修复效果**：连续多次 `xerintosh_set_font(同一个字体)` 时，只有第一次会调用 `hal_set_font()`，后续调用被缓存命中跳过，减少了硬件端字体切换开销。
+
+**重要提示**：其他代码中直接调用 `hal_set_font()` 会**绕过**这个缓存。例如 App 使用 `hal_set_font(NULL)` 切换字体后，`g_xerintosh_font` 不会更新，后续 `xerintosh_set_font()` 可能因缓存命中而跳过真正的字体恢复。始终使用 `xerintosh_set_font()` 而非 `hal_set_font()` 来切换字体。
 
 ### 相机（Camera / Viewport）
 
