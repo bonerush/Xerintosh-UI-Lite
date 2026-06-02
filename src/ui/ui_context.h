@@ -39,6 +39,10 @@ typedef struct xerintosh_context_t
   uint16_t draw_color;                /* 当前前景色 */
   int16_t anim_speed;                 /* 全局动画速度基准值 */
 
+  /* 选择器宽度缓存（避免每帧重复 hal_get_string_width） */
+  const char *cached_selector_content;    /* 上次缓存时选中的内容指针 */
+  int16_t cached_selector_text_width;     /* 上次缓存时测得的文字宽度 */
+
   /* 子系统状态（指针，指向 ui_context.c 内部存储） */
   struct xerintosh_selector_t *selector;
   struct xerintosh_camera_t *camera;
@@ -71,6 +75,8 @@ void xerintosh_context_init(void);
 #define g_xerintosh_refresh_list_value       (xerintosh_get_context()->refresh_list_value)
 #define g_xerintosh_draw_color               (xerintosh_get_context()->draw_color)
 #define g_anim_speed                         (xerintosh_get_context()->anim_speed)
+#define g_xerintosh_cached_selector_content  (xerintosh_get_context()->cached_selector_content)
+#define g_xerintosh_cached_selector_width    (xerintosh_get_context()->cached_selector_text_width)
 
 /* ═══ 向后兼容宏：结构体实例（需完整类型定义，在 ui_item.h 末尾提供）═══ */
 /* #define g_xerintosh_selector  (*(xerintosh_get_context()->selector)) */
