@@ -18,16 +18,14 @@
 /* 内核 PID 类型（来自 kern_types.h，避免重复定义） */
 #include "kernel/kern_types.h"
 
+/* 全局上下文（替代分散的全局变量） */
+#include "ui/ui_context.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/* 全局绘制颜色（定义在 ui_core.c） */
-extern uint16_t g_xerintosh_draw_color;
-
 /* ═══ 动画速度常量 ═══ */
-
-extern int16_t g_anim_speed;  /* 全局动画速度基准值 */
 
 #define ANIM_SPEED_LIST_ITEM    (g_anim_speed - 8) /* 列表项动画速度，适当慢于选择器 */
 #define ANIM_SPEED_SELECTOR     (g_anim_speed)     /* 选择器动画速度 */
@@ -47,11 +45,6 @@ extern int16_t g_anim_speed;  /* 全局动画速度基准值 */
  */
 extern void xerintosh_set_font(const void* _font);
 
-/* ═══ 全局标志 ═══ */
-
-extern bool g_xerintosh_exit_animation_finished;  /* 退场动画是否已完成 */
-extern bool g_xerintosh_refresh_list_value;       /* 是否需要刷新列表项显示值 */
-
 /* ═══ 信息栏 ═══ */
 
 #define INFO_BAR_HEIGHT 15
@@ -70,8 +63,6 @@ typedef struct xerintosh_info_bar_t
   uint32_t time_start;       /* 开始显示的时间戳 */
   uint32_t time;             /* 最近一次更新的时间戳 */
 } xerintosh_info_bar_t;
-
-extern xerintosh_info_bar_t g_xerintosh_info_bar;
 
 /**
  * @brief 推送顶部信息栏
@@ -100,8 +91,6 @@ typedef struct xerintosh_pop_up_t
   const char *wrap_lines[POP_UP_WRAP_LINES];  /* 换行后的各行指针 */
   uint8_t wrap_line_count;   /* 实际行数 */
 } xerintosh_pop_up_t;
-
-extern xerintosh_pop_up_t g_xerintosh_pop_up;
 
 /**
  * @brief 推送中部弹窗
@@ -403,8 +392,6 @@ typedef struct xerintosh_selector_t
   xerintosh_list_item_t *selected_item;  /* 当前选中项指针 */
 } xerintosh_selector_t;
 
-extern xerintosh_selector_t g_xerintosh_selector;  /* 全局选择器实例 */
-
 /**
  * @brief  将指定项绑定到选择器
  * @param  _item 要绑定的列表项
@@ -459,13 +446,19 @@ typedef struct xerintosh_camera_t
   xerintosh_selector_t *selector;  /* 绑定的选择器 */
 } xerintosh_camera_t;
 
-extern xerintosh_camera_t g_xerintosh_camera;  /* 全局相机实例 */
-
 /**
  * @brief  将选择器绑定到相机
  * @param  _selector 选择器指针
  */
 extern void xerintosh_bind_selector_to_camera(xerintosh_selector_t *_selector);
+
+/* ═══ 向后兼容：子系统实例宏 ═══ */
+/* ui_context 中使用指针存储这些结构体，这里通过解引用宏保持对现有代码的兼容 */
+
+#define g_xerintosh_selector        (*(xerintosh_get_context()->selector))
+#define g_xerintosh_camera          (*(xerintosh_get_context()->camera))
+#define g_xerintosh_info_bar        (*(xerintosh_get_context()->info_bar))
+#define g_xerintosh_pop_up          (*(xerintosh_get_context()->pop_up))
 
 #ifdef __cplusplus
 }
