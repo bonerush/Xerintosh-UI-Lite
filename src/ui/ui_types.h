@@ -93,4 +93,12 @@ typedef enum {
 }
 #endif
 
+/**
+ * @brief  判断列表项 Y 坐标是否在屏幕可视区域内
+ * @param  _y_item 项的 y 坐标（屏幕坐标）
+ * @return true  可见
+ * @return false 不可见（超出上下边界 + 2px 容差）
+ */
+extern bool xerintosh_is_item_visible(int16_t _y_item);
+
 #endif /* UI_TYPES_H */

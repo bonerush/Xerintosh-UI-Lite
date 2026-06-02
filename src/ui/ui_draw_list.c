@@ -21,7 +21,7 @@
  * @return true  可见
  * @return false 不可见
  */
-static bool is_item_visible(int16_t _y_item)
+bool xerintosh_is_item_visible(int16_t _y_item)
 {
   return (_y_item + 2 > LIST_INFO_BAR_HEIGHT && _y_item - 2 < SCREEN_HEIGHT);
 }
@@ -33,7 +33,7 @@ static bool is_item_visible(int16_t _y_item)
  */
 static void draw_list_item_icon_only(xerintosh_list_item_t *_item, int16_t _x, int16_t _y)
 {
-  if (is_item_visible(_y))
+  if (xerintosh_is_item_visible(_y))
     xerintosh_draw_list_icon(_item->icon, _x, _y);
 }
 
@@ -44,7 +44,7 @@ static void draw_list_item_switch(xerintosh_switch_item_t *_switch, int16_t _x, 
 {
   if (_switch->init_function && g_xerintosh_refresh_list_value)
     _switch->init_function(_switch->base_item.user_data);
-  if (!is_item_visible(_y)) return;
+  if (!xerintosh_is_item_visible(_y)) return;
 
   xerintosh_draw_list_icon(_switch->base_item.icon, _x, _y);
 
@@ -72,7 +72,7 @@ static void draw_list_item_slider(xerintosh_slider_item_t *_slider, int16_t _x, 
 {
   if (_slider->init_function && g_xerintosh_refresh_list_value)
     _slider->init_function(_slider->base_item.user_data);
-  if (!is_item_visible(_y)) return;
+  if (!xerintosh_is_item_visible(_y)) return;
 
   xerintosh_draw_list_icon(_slider->base_item.icon, _x, _y);
 
@@ -106,7 +106,7 @@ static void xerintosh_draw_slider_overlays(void)
     if (!_slider->is_confirmed) continue;
 
     int16_t _y = _item->y_list_item + g_xerintosh_camera.y_camera - hal_get_font_height()/2;
-    if (!is_item_visible(_y)) continue;
+    if (!xerintosh_is_item_visible(_y)) continue;
 
     char _value_str[10] = {};
     sprintf(_value_str, "%d", *_slider->value);
