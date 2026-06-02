@@ -38,6 +38,7 @@ bool g_bt_on = true;    /* 蓝牙默认开关状态 */
 #include "app/serial_monitor/serial_monitor.h"
 #include "app/wifi/wifi_manager.h"
 #include "app/bluetooth/bt_manager.h"
+#include "app/bluetooth/bt_uart_service.h"
 #include "app/boot/boot_screen.h"
 
 /* Xeros 内核 */
@@ -182,6 +183,15 @@ void setup()
      * 内存不会导致 OOM。 */
 
     app_init_managers();
+
+    /* BluetoothSerial::begin() 必须在 Arduino 主任务（setup/loop）中调用，
+     * 在 Xeros 内核任务中调用会导致 Bluedroid 初始化失败并触发
+     * memset(NULL) StoreProhibited 崩溃。 */
+    if (g_bt_on) {
+        Serial.println("[  OK  ] BT init in setup() context...");
+        bt_uart_service_init();
+        Serial.println("[  OK  ] BT init done");
+    }
 
     xerintosh_init_core();
     Serial.println("[  OK  ] Xeros core");

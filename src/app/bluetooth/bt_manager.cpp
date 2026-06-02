@@ -38,14 +38,12 @@ extern bool g_bt_on;  /* 定义在 main.cpp */
 
 static bool g_bt_enabled = false;
 static bt_mgr_state_t g_state = BT_MGR_IDLE;
-static unsigned long g_warmup_start_time = 0;
 
 static xerintosh_list_item_t *g_settings_list = NULL;
 
 void bt_mgr_init(void) {
     g_bt_enabled = false;
     g_state = BT_MGR_IDLE;
-    g_warmup_start_time = 0;
 
     xerintosh_list_item_t *root = xerintosh_get_root_list();
     if (root && root->child_num > 0) {
@@ -58,15 +56,14 @@ void bt_mgr_enable(void) {
 
     Serial.println("[BT] bt_mgr_enable called");
     g_bt_enabled = true;
-    g_state = BT_MGR_WARMUP;
-    g_warmup_start_time = millis();
+    g_state = BT_MGR_ENABLED;
+    Serial.println("[BT] bt_mgr_enable done");
 }
 
 void bt_mgr_disable(void) {
     bt_uart_service_deinit();
     g_bt_enabled = false;
     g_state = BT_MGR_IDLE;
-    g_warmup_start_time = 0;
 }
 
 bool bt_mgr_is_waiting_input(void) {
@@ -84,22 +81,6 @@ void bt_mgr_update(void) {
     }
 
     switch (g_state) {
-    case BT_MGR_WARMUP: {
-        /* 预热 200ms 后在 bt-mgr 任务上下文中异步初始化 BluetoothSerial，
-         * 避免 g_bt_serial.begin() 在 setup() 中阻塞导致 UI 无法启动 */
-        if (millis() - g_warmup_start_time >= 200) {
-            if (bt_uart_service_init()) {
-                g_state = BT_MGR_ENABLED;
-                Serial.println("[BT] bt_uart_service_init done");
-            } else {
-                g_bt_enabled = false;
-                g_state = BT_MGR_IDLE;
-                Serial.println("[BT] bt_uart_service_init failed");
-                ui_svc_notify_error("蓝牙启动失败");
-            }
-        }
-        break;
-    }
     case BT_MGR_ENABLED:
     case BT_MGR_CONNECTED: {
         bt_uart_poll();
