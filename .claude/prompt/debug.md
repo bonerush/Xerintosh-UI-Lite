@@ -90,8 +90,9 @@ stateDiagram-v2
     **文件:** src/app/ui_task.c
     **驳回重处理:** 之前的修复（移除 boot_screen_show 的 hal_delay_ms）方向正确但只覆盖了启动阶段——boot_screen_show 只在 setup() 中运行一次，而 bug 描述的是「打开 App 时」的退场动画卡死。本次修复针对的是运行时的持续看门狗饿死问题，覆盖所有 App 的进入/退出动画场景。
 - [AGENT_FINISH] 烧录 Classic Bluetooth SPP 固件后开机触发看门狗重启（Flash 已压缩至 91.3%，排除空间不足）
-    **根因:** `bt-mgr` 内核任务栈仅 4096 字节，`BluetoothSerial.begin()` 初始化 Bluedroid Classic BT 协议栈时需要大量栈空间（>4KB），导致栈溢出或 FreeRTOS idle 任务被饿死，触发 TG1 看门狗重启。
-    **修复:** ① `bt-mgr` 任务栈从 4096 增至 8192 字节；② `BT_WARMUP_DELAY_MS` 从 1500ms 延至 3000ms，给 WiFi/系统更充裕的稳定时间；③ 在 `BluetoothSerial.begin()` 前后添加 `ESP.getFreeHeap()` 诊断日志，便于后续排查内存压力。
+    **根因:** 经 backtrace 解码，实际崩溃点在 ESP-IDF v4.4 Bluedroid 的 BLE GAP/GATT 初始化路径（`gap_ble.c:410` → `gatt_api.c:209` → `gatt_utils.c:341`）。即使仅使用 Classic BT SPP，Bluedroid 仍会初始化 BLE 组件。`gatt_alloc_hdl_buffer()` 内 `fixed_queue_new()` 分配失败（WiFi 已占用大量 RAM），清理路径调用 `fixed_queue_free()` → `osi_sem_free()` → `vQueueDelete(NULL)` 触发 FreeRTOS assertion 崩溃。
+    **修复:** ① 在 `setup()` 中于任何 BT 初始化前调用 `esp_bt_controller_mem_release(ESP_BT_MODE_BLE)` 释放 BLE controller 内存；② 调整 `app_init_managers()` 顺序，BT 先于 WiFi 初始化，减少内存竞争；③ 移除 warm-up 延迟，直接在 `setup()` 上下文中调用 `bt_uart_service_init()`，避免在 bt-mgr 内核任务中触发 Bluedroid bug；④ 保留 `bt-mgr` 任务栈 8192 字节的先前调整。
     **验证:** build(hw)=PASS build(native)=PASS tests=186/187 (1个预存SIGSEGV与本次无关)
-    **文件:** src/main.cpp, src/app/bluetooth/bt_uart_service.cpp, src/app/bluetooth/bt_manager.cpp
+    **文件:** src/main.cpp, src/app/app_init.c, src/app/bluetooth/bt_manager.cpp
+    **驳回重处理:** 修复后不再崩溃，但 `g_bt_serial.begin()` 在 `setup()` 中同步阻塞，导致 `loop()` 和 UI 任务无法启动，屏幕卡在开机画面。恢复异步 WARMUP 机制：在 `bt_mgr_enable()` 中设置 `BT_MGR_WARMUP` 状态并记录 `millis()`，在 `bt_mgr_update()` 中经过 200ms 预热后于 `bt-mgr` 任务上下文中调用 `bt_uart_service_init()`，彻底解除对 `setup()` 的阻塞。由于 BLE 内存已释放且 BT 先于 WiFi 初始化，异步路径不再有内存竞争导致的 Bluedroid crash 风险。
 - [BUG] 对于蓝牙设备的扫描,大部分设备都是类似硬件地址那么一长串,但是确扫不到真正可用的设备,例如我想把我的开发板连接到我的电脑,我的电脑就没有办法扫描到开发板.
