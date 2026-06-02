@@ -164,6 +164,66 @@ void xerintosh_ui_widget_core()
 }
 
 /**
+ * @brief  处理 user_item 生命周期（进入→运行→退出）
+ * @note   每帧调用一次，管理 init/loop/exit 回调的触发时机
+ */
+static void xerintosh_ui_update_lifecycle(void)
+{
+  xerintosh_list_item_t *item = g_xerintosh_selector.selected_item;
+  if (item->type != user_item) return;
+
+  xerintosh_user_item_t *user = xerintosh_to_user_item(item);
+
+  /* 进入阶段：退场动画完成后触发 init */
+  if (!user->in_user_item && user->entering_user_item
+      && g_xerintosh_exit_animation_status == 1)
+  {
+    if (user->init_function != NULL)
+      user->init_function(item->user_data);
+    user->in_user_item = 1;
+    user->entering_user_item = false;
+  }
+
+  /* 运行阶段：每帧调用 loop */
+  if (user->in_user_item && user->loop_function != NULL)
+    user->loop_function(item->user_data);
+
+  /* 外部 kill 请求 */
+  if (g_xerintosh_exit_requested) {
+    g_xerintosh_exit_requested = false;
+    user->exiting_user_item = true;
+  }
+
+  /* 退出阶段：退场动画完成后触发 exit */
+  if (user->exiting_user_item && g_xerintosh_exit_animation_status == 1)
+  {
+    if (user->exit_function != NULL)
+      user->exit_function(item->user_data);
+    user->in_user_item = 0;
+    user->exiting_user_item = false;
+  }
+
+  /* 兜底：动画已完成但标志未重置时强制清理，防止退出状态残留 */
+  if (user->exiting_user_item && g_xerintosh_exit_animation_finished) {
+    user->in_user_item = 0;
+    user->exiting_user_item = false;
+  }
+}
+
+/**
+ * @brief  渲染当前帧（列表模式）或由 user_item 自行渲染
+ */
+static void xerintosh_ui_render_frame(void)
+{
+  if (xerintosh_is_in_user_item()) return; /* user_item 自行绘制 */
+
+  xerintosh_refresh_camera_position();
+  xerintosh_refresh_list_item_position();
+  xerintosh_refresh_selector_position();
+  xerintosh_draw_list();
+}
+
+/**
  * @brief UI 主循环核心调度
  * @note  处理 user_item 生命周期、列表刷新、退场动画等
  */
@@ -171,62 +231,10 @@ void xerintosh_ui_main_core()
 {
   if (!g_in_xerintosh) return;
 
-  /* 切换 in_user_item 的逻辑 */
-  if (g_xerintosh_selector.selected_item->type == user_item
-      && !xerintosh_to_user_item(g_xerintosh_selector.selected_item)->in_user_item)
-  {
-    xerintosh_user_item_t *_selected_user_item = xerintosh_to_user_item(g_xerintosh_selector.selected_item);
+  xerintosh_ui_update_lifecycle();
+  xerintosh_ui_render_frame();
 
-    if (_selected_user_item->entering_user_item && g_xerintosh_exit_animation_status == 1)
-    {
-      if (_selected_user_item->init_function != NULL)
-        _selected_user_item->init_function(g_xerintosh_selector.selected_item->user_data);
-      _selected_user_item->in_user_item = 1;
-      _selected_user_item->entering_user_item = false;  /* 进入完成，重置标志 */
-    }
-  }
-
-  /* 渲染逻辑：user_item 内部由 App 自行绘制；列表模式由框架绘制 */
-  if (g_xerintosh_selector.selected_item->type == user_item
-      && xerintosh_to_user_item(g_xerintosh_selector.selected_item)->in_user_item)
-  {
-    xerintosh_user_item_t* _selected_user_item = xerintosh_to_user_item(g_xerintosh_selector.selected_item);
-
-    if (_selected_user_item->loop_function != NULL)
-    {
-      _selected_user_item->loop_function(g_xerintosh_selector.selected_item->user_data);
-    }
-
-    /* 外部 kill 请求：触发 user_item 退出 */
-    if (g_xerintosh_exit_requested) {
-      g_xerintosh_exit_requested = false;
-      _selected_user_item->exiting_user_item = true;
-    }
-
-    if (_selected_user_item->exiting_user_item && g_xerintosh_exit_animation_status == 1)
-    {
-        if (_selected_user_item->exit_function != NULL)
-            _selected_user_item->exit_function(g_xerintosh_selector.selected_item->user_data);
-        _selected_user_item->in_user_item = 0;
-        _selected_user_item->exiting_user_item = false;
-    }
-
-    /* 兜底：动画已完成但标志未重置时强制清理，防止退出状态残留 */
-    if (_selected_user_item->exiting_user_item && g_xerintosh_exit_animation_finished) {
-      _selected_user_item->in_user_item = 0;
-      _selected_user_item->exiting_user_item = false;
-    }
-  } else
-  {
-    xerintosh_refresh_camera_position();
-    xerintosh_refresh_list_item_position();
-    xerintosh_refresh_selector_position();
-    xerintosh_draw_list();
-  }
-
-  /* 退场动画 */
-  /* 上面都是正常应当绘制的内容；退场动画需要绘制时，只需在上面的基础上绘制遮罩即可 */
-  /* 双键关机模式下跳过退出动画，避免遮罩覆盖关机弹窗 */
+  /* 退场动画遮罩（双键关机模式下跳过） */
   if (!g_xerintosh_exit_animation_finished && !power_key_popup_is_dual_active())
     xerintosh_draw_exit_animation();
 }
