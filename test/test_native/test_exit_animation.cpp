@@ -5,7 +5,6 @@ extern "C" {
 #include "ui/ui_core.h"
 #include "ui/ui_item.h"
 #include "ui/ui_drawer.h"
-#include "ui/ui_draw_driver.h"
 #include "hal/hal_system.h"
 #include "hal/hal_display.h"
 }
@@ -31,7 +30,6 @@ TEST(ExitAnimationTest, AnimationCompletesInFiniteFrames)
     g_xerintosh_exit_animation_status = 0;
     hal_system_init();
     hal_display_init();
-    xerintosh_ui_driver_init();
     xerintosh_init_core();
 
     /* 手动创建一个 user_item 并绑定到选择器，避免 app_init_ui 的外部依赖 */
@@ -94,7 +92,6 @@ TEST(ExitAnimationTest, MultipleEnterExitCycles)
     g_in_xerintosh = true;
     hal_system_init();
     hal_display_init();
-    xerintosh_ui_driver_init();
     xerintosh_init_core();
 
     xerintosh_list_item_t* user_item_base = xerintosh_new_user_item(
