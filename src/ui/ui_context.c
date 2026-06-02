@@ -29,6 +29,10 @@ static xerintosh_context_t g_ui_ctx = {
   .anim_speed = 92,
   .cached_selector_content = NULL,
   .cached_selector_text_width = 0,
+  .exit_anim_temp_h = -8,
+  .exit_anim_temp_h_trg = -999,
+  .exit_anim_last_finished = true,
+  .exit_anim_prev_screen_h = -1,
   .selector = &s_selector,
   .camera = &s_camera,
   .info_bar = &s_info_bar,
@@ -53,6 +57,10 @@ void xerintosh_context_init(void)
   g_ui_ctx.anim_speed = 92;
   g_ui_ctx.cached_selector_content = NULL;
   g_ui_ctx.cached_selector_text_width = 0;
+  g_ui_ctx.exit_anim_temp_h = -8;
+  g_ui_ctx.exit_anim_temp_h_trg = -999;
+  g_ui_ctx.exit_anim_last_finished = true;
+  g_ui_ctx.exit_anim_prev_screen_h = -1;
 
   /* 重置子系统状态 */
   s_selector = (xerintosh_selector_t){};

@@ -43,6 +43,12 @@ typedef struct xerintosh_context_t
   const char *cached_selector_content;    /* 上次缓存时选中的内容指针 */
   int16_t cached_selector_text_width;     /* 上次缓存时测得的文字宽度 */
 
+  /* 退场动画状态（从 ui_draw_anim.c 的 static 变量迁移） */
+  float exit_anim_temp_h;              /* 遮罩当前高度 */
+  float exit_anim_temp_h_trg;          /* 遮罩目标高度 */
+  bool exit_anim_last_finished;        /* 上一帧的 finished 状态 */
+  int16_t exit_anim_prev_screen_h;     /* 上一帧的屏幕高度（方向切换检测） */
+
   /* 子系统状态（指针，指向 ui_context.c 内部存储） */
   struct xerintosh_selector_t *selector;
   struct xerintosh_camera_t *camera;
@@ -77,6 +83,10 @@ void xerintosh_context_init(void);
 #define g_anim_speed                         (xerintosh_get_context()->anim_speed)
 #define g_xerintosh_cached_selector_content  (xerintosh_get_context()->cached_selector_content)
 #define g_xerintosh_cached_selector_width    (xerintosh_get_context()->cached_selector_text_width)
+#define g_xerintosh_exit_anim_temp_h         (xerintosh_get_context()->exit_anim_temp_h)
+#define g_xerintosh_exit_anim_temp_h_trg     (xerintosh_get_context()->exit_anim_temp_h_trg)
+#define g_xerintosh_exit_anim_last_finished  (xerintosh_get_context()->exit_anim_last_finished)
+#define g_xerintosh_exit_anim_prev_screen_h  (xerintosh_get_context()->exit_anim_prev_screen_h)
 
 /* ═══ 向后兼容宏：结构体实例（需完整类型定义，在 ui_item.h 末尾提供）═══ */
 /* #define g_xerintosh_selector  (*(xerintosh_get_context()->selector)) */
