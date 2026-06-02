@@ -13,13 +13,6 @@
 #include <math.h>
 #include "app/shutdown/power_key_popup.h"
 
-/* ═══ 全局状态定义 ═══ */
-
-bool g_in_xerintosh = false;                 /* UI 是否处于激活状态 */
-uint16_t g_xerintosh_draw_color = 0xFFFF;    /* 当前前景色（默认白色） */
-bool g_anim_enabled = true;                  /* 动画是否启用 */
-bool g_xerintosh_exit_requested = false;     /* 外部请求退出当前 user_item（由 kill 等设置） */
-
 /* ═══ 生命周期 ═══ */
 
 /**
