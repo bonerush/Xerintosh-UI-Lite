@@ -108,7 +108,7 @@ static void draw_header(void)
 {
     int16_t entry = (s_entry_offset < 1.0f) ? 0 : (int16_t)s_entry_offset;
 
-    hal_set_font(NULL);
+    xerintosh_set_font(NULL);
     int16_t title_w = hal_get_string_width("BLE Serial");
     int16_t title_x = HAL_CENTER_X(title_w);
     int16_t title_y = HAL_TEXT_BASELINE(HAL_MARGIN_SM) + entry;
@@ -117,6 +117,9 @@ static void draw_header(void)
 
     /* 分隔线 */
     hal_draw_h_line(0, HAL_HEADER_BOTTOM() + entry, SCREEN_WIDTH, COLOR_FG);
+
+    /* 恢复中文主字体，同步 xerintosh_set_font 缓存 */
+    xerintosh_set_font(hal_get_cn_font());
 }
 
 /**
