@@ -74,8 +74,6 @@ static size_t find_wrap_break(const char *text, size_t len, int16_t avail)
 
 /* ═══ 信息栏 ═══ */
 
-xerintosh_info_bar_t g_xerintosh_info_bar = {0, 1, 0 - 2 * INFO_BAR_HEIGHT, 0 - 2 * INFO_BAR_HEIGHT, 80, 80, false, 0, 1};
-
 /**
  * @brief 推送顶部信息栏
  * @param _content 显示文本
@@ -106,8 +104,6 @@ void xerintosh_push_info_bar(const char *_content, const uint16_t _span)
 }
 
 /* ═══ 弹窗 ═══ */
-
-xerintosh_pop_up_t g_xerintosh_pop_up = {0, 1, 0 - 2 * POP_UP_HEIGHT, 0 - 2 * POP_UP_HEIGHT, 80, 80, false, 0, 1};
 
 /**
  * @brief 推送中部弹窗
