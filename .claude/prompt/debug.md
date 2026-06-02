@@ -95,4 +95,6 @@ stateDiagram-v2
     **验证:** build(hw)=PASS build(native)=PASS tests=186/187 (1个预存SIGSEGV与本次无关)
     **文件:** src/main.cpp, src/app/app_init.c, src/app/bluetooth/bt_manager.cpp
     **驳回重处理:** 修复后不再崩溃，但 `g_bt_serial.begin()` 在 `setup()` 中同步阻塞，导致 `loop()` 和 UI 任务无法启动，屏幕卡在开机画面。恢复异步 WARMUP 机制：在 `bt_mgr_enable()` 中设置 `BT_MGR_WARMUP` 状态并记录 `millis()`，在 `bt_mgr_update()` 中经过 200ms 预热后于 `bt-mgr` 任务上下文中调用 `bt_uart_service_init()`，彻底解除对 `setup()` 的阻塞。由于 BLE 内存已释放且 BT 先于 WiFi 初始化，异步路径不再有内存竞争导致的 Bluedroid crash 风险。
+    **再次驳回重处理:** 异步修复后 UI 正常启动 2 帧，但随后 `bt-mgr` 任务中 `g_bt_serial.begin()` 触发 `StoreProhibited`（`EXCVADDR=0x00000000`）。backtrace: `btu_task_start_up` → `BTE_DeinitStack` → `bta_sys_init` → `memset(NULL, 0, 0x130)`。根因：`esp_bt_controller_mem_release(ESP_BT_MODE_BLE)` 与 ESP32 Arduino `BluetoothSerial` 不兼容——`BluetoothSerial::begin()` 使用 BTDM（双模）配置初始化 Bluedroid，仍会尝试初始化 BLE 组件。释放 BLE 内存后，初始化失败 cleanup 路径访问空指针。
+    **最终修复:** 移除 `esp_bt_controller_mem_release(ESP_BT_MODE_BLE)` 调用，同时保留：① BT 先于 WiFi 的初始化顺序（避免 WiFi 先占内存导致 BT OOM）；② 异步 WARMUP 机制（`bt_mgr_update()` 中 200ms 后于 `bt-mgr` 任务内调用 `bt_uart_service_init()`，不阻塞 `setup()`）。当前 `free heap: 91364`，即使保留 BLE 内存也不足导致 OOM。
 - [BUG] 对于蓝牙设备的扫描,大部分设备都是类似硬件地址那么一长串,但是确扫不到真正可用的设备,例如我想把我的开发板连接到我的电脑,我的电脑就没有办法扫描到开发板.
