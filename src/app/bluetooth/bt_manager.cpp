@@ -39,7 +39,7 @@ extern bool g_bt_on;  /* 定义在 main.cpp */
 static bool g_bt_enabled = false;
 static bt_mgr_state_t g_state = BT_MGR_IDLE;
 static unsigned long g_warmup_start_time = 0;
-#define BT_WARMUP_DELAY_MS 1500
+#define BT_WARMUP_DELAY_MS 3000
 
 static xerintosh_list_item_t *g_settings_list = NULL;
 

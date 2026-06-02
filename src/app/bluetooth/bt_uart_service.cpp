@@ -220,7 +220,9 @@ bool bt_uart_service_init(void)
     g_rx_cb          = NULL;
     g_conn_cb        = NULL;
 
+    Serial.printf("[BT] free heap before begin: %u\n", ESP.getFreeHeap());
     g_bt_serial.begin("M5Stick-P1");
+    Serial.printf("[BT] free heap after begin: %u\n", ESP.getFreeHeap());
     g_initialized = true;
     return true;
 }

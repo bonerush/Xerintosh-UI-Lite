@@ -89,4 +89,5 @@ stateDiagram-v2
     **验证:** build(hw)=PASS build(native)=PASS tests=186/187 (1个预存SIGSEGV与本次无关)
     **文件:** src/app/ui_task.c
     **驳回重处理:** 之前的修复（移除 boot_screen_show 的 hal_delay_ms）方向正确但只覆盖了启动阶段——boot_screen_show 只在 setup() 中运行一次，而 bug 描述的是「打开 App 时」的退场动画卡死。本次修复针对的是运行时的持续看门狗饿死问题，覆盖所有 App 的进入/退出动画场景。
+- [AGENT] 烧录 Classic Bluetooth SPP 固件后开机触发看门狗重启（Flash 已压缩至 91.3%，排除空间不足）
 - [BUG] 对于蓝牙设备的扫描,大部分设备都是类似硬件地址那么一长串,但是确扫不到真正可用的设备,例如我想把我的开发板连接到我的电脑,我的电脑就没有办法扫描到开发板.
