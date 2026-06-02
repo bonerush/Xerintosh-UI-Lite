@@ -1,6 +1,6 @@
 /**
  * @file   test_ble_serial.cpp
- * @brief  BLE 串口监视器 App 基本测试
+ * @brief  蓝牙串口监视器 App 基本测试
  * @details 验证 init/exit 不崩溃，以及初始状态正确。
  *
  * @copyright Copyright (c) 2026

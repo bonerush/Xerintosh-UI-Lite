@@ -1,6 +1,6 @@
 /**
  * @file   test_ble_uart.cpp
- * @brief  TDD — BLE UART 服务单元测试
+ * @brief  TDD — 蓝牙串口服务单元测试
  * @details 验证 bt_uart_service 模块的初始化、发送、接收、
  *          连接状态查询及缓冲区管理功能。
  * @note   仅在 NATIVE_TEST 环境下编译运行。
