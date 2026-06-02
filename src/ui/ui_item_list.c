@@ -14,6 +14,24 @@
 #include "ui_core.h"
 
 /**
+ * @brief  重新计算父项所有子项的目标 Y 坐标
+ * @param  _parent 父项指针
+ */
+static void recalc_child_y_positions(xerintosh_list_item_t *_parent)
+{
+  if (_parent == NULL) return;
+
+  xerintosh_set_font(hal_get_cn_font());
+  for (uint8_t i = 0; i < _parent->child_num; i++)
+  {
+    if (i == 0)
+      _parent->child_list_item[i]->y_list_item_trg = hal_get_font_height() + LIST_FONT_TOP_MARGIN - 1;
+    else
+      _parent->child_list_item[i]->y_list_item_trg = _parent->child_list_item[i - 1]->y_list_item_trg + LIST_ITEM_SPACING;
+  }
+}
+
+/**
  * @brief  将子项挂载到父项下
  * @param  _parent 父项指针
  * @param  _child  子项指针
@@ -78,14 +96,7 @@ bool xerintosh_remove_item_from_list(xerintosh_list_item_t *_parent, xerintosh_l
   _parent->child_list_item[_parent->child_num] = NULL;
 
   /* 重新计算剩余子项的目标坐标 */
-  xerintosh_set_font(hal_get_cn_font());
-  for (uint8_t i = 0; i < _parent->child_num; i++)
-  {
-    if (i == 0)
-      _parent->child_list_item[i]->y_list_item_trg = hal_get_font_height() + LIST_FONT_TOP_MARGIN - 1;
-    else
-      _parent->child_list_item[i]->y_list_item_trg = _parent->child_list_item[i - 1]->y_list_item_trg + LIST_ITEM_SPACING;
-  }
+  recalc_child_y_positions(_parent);
 
   /* 递归释放子节点及其后代 */
   xerintosh_destroy_item_tree(_child);
