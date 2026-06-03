@@ -402,6 +402,7 @@ void storage_set_serial_baud_rate(int16_t val) {
 /* ═══ API Key ═══ */
 
 bool storage_get_deepseek_key(char *key, size_t max_len) {
+    if (!key || max_len == 0) return false;
     Preferences prefs;
     prefs.begin(NVS_NAMESPACE, true);
     size_t len = prefs.getString("ds_key_v1", key, max_len);
@@ -410,6 +411,7 @@ bool storage_get_deepseek_key(char *key, size_t max_len) {
 }
 
 void storage_set_deepseek_key(const char *key) {
+    if (!key) return;
     Preferences prefs;
     prefs.begin(NVS_NAMESPACE, false);
     prefs.putString("ds_key_v1", key);
@@ -417,6 +419,7 @@ void storage_set_deepseek_key(const char *key) {
 }
 
 bool storage_get_kimi_key(char *key, size_t max_len) {
+    if (!key || max_len == 0) return false;
     Preferences prefs;
     prefs.begin(NVS_NAMESPACE, true);
     size_t len = prefs.getString("kimi_key_v1", key, max_len);
@@ -425,6 +428,7 @@ bool storage_get_kimi_key(char *key, size_t max_len) {
 }
 
 void storage_set_kimi_key(const char *key) {
+    if (!key) return;
     Preferences prefs;
     prefs.begin(NVS_NAMESPACE, false);
     prefs.putString("kimi_key_v1", key);
