@@ -241,10 +241,16 @@ void hal_draw_circle(int16_t x, int16_t y, int16_t r, uint16_t color) {
 
 /* ─── 字体与文本（native 桩函数）─── */
 
+/**
+ * @brief 设置当前字体（native 桩：空操作）
+ */
 void hal_set_font(const void* font) {
     (void)font;
 }
 
+/**
+ * @brief 绘制 ASCII 字符串（native 桩：空操作）
+ */
 void hal_draw_string(int16_t x, int16_t y, const char* str, uint16_t color) {
     (void)x;
     (void)y;
@@ -252,15 +258,24 @@ void hal_draw_string(int16_t x, int16_t y, const char* str, uint16_t color) {
     (void)color;
 }
 
+/**
+ * @brief 获取 ASCII 字符串宽度（native 桩：始终返回 0）
+ */
 int16_t hal_get_string_width(const char* str) {
     (void)str;
     return 0;
 }
 
+/**
+ * @brief 获取当前字体高度（native 桩：返回固定值 8）
+ */
 int16_t hal_get_font_height(void) {
     return 8;
 }
 
+/**
+ * @brief 获取中文字体指针（native 桩：返回 NULL）
+ */
 const void* hal_get_cn_font(void) {
     return NULL;
 }
@@ -299,15 +314,24 @@ void hal_draw_xbitmap(int16_t x, int16_t y, int16_t w, int16_t h, const uint8_t*
     }
 }
 
+/**
+ * @brief 设置裁剪矩形（native 桩：空操作）
+ */
 void hal_set_clip_rect(int16_t x, int16_t y, int16_t w, int16_t h) {
     (void)x; (void)y; (void)w; (void)h;
 }
 
+/**
+ * @brief 清除裁剪矩形（native 桩：空操作）
+ */
 void hal_clear_clip_rect(void) {
 }
 
 /* ─── 测试钩子 ─── */
 
+/**
+ * @brief 读取帧缓冲中指定坐标的像素值（测试验证用）
+ */
 uint16_t hal_test_fb_read(int16_t x, int16_t y)
 {
     if (x < 0 || x >= SCREEN_WIDTH || y < 0 || y >= SCREEN_HEIGHT) return 0;

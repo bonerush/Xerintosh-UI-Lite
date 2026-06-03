@@ -2,7 +2,7 @@
  * @file   tu_ui.cpp
  * @brief  Token Usage UI 渲染实现
  * @details 使用 hal_draw_string / hal_draw_h_line 在屏幕上绘制
- *          Deepseek 余额和 Kimi Token 用量信息。
+ *          Deepseek 余额信息。
  */
 
 #include "tu_ui.h"
@@ -29,8 +29,7 @@ void tu_ui_draw(const tu_data_t *data, int selected) {
     const int16_t line_h = HAL_ROW_H();
     char buf[32];
 
-    /* 起始 y = header 下方 */
-    int16_t y = HAL_BODY_TOP() + HAL_MARGIN_LG;
+    int16_t y = HAL_HEADER_TOP();
 
     /* ── 标题 ── */
     hal_draw_string(x, HAL_TEXT_BASELINE(y), "Token Usage", COLOR_FG);
@@ -53,20 +52,6 @@ void tu_ui_draw(const tu_data_t *data, int selected) {
              data->deepseek.is_available ? "OK" : "Low");
     hal_draw_string(x + HAL_MARGIN_MD, HAL_TEXT_BASELINE(y),
                     buf, data->deepseek_ok ? COLOR_FG : C_GRAY);
-    y += line_h + HAL_MARGIN_LG;
-
-    /* ── Kimi 部分 ── */
-    hal_draw_string(x, HAL_TEXT_BASELINE(y), "Kimi:", COLOR_FG);
-    y += line_h;
-
-    snprintf(buf, sizeof(buf), "Tokens: %.0f", data->kimi.daily_tokens);
-    hal_draw_string(x + HAL_MARGIN_MD, HAL_TEXT_BASELINE(y),
-                    buf, data->kimi_ok ? COLOR_FG : C_GRAY);
-    y += line_h;
-
-    snprintf(buf, sizeof(buf), "Limit: %.0f", data->kimi.rate_limit);
-    hal_draw_string(x + HAL_MARGIN_MD, HAL_TEXT_BASELINE(y),
-                    buf, data->kimi_ok ? COLOR_FG : C_GRAY);
     y += line_h + HAL_MARGIN_LG;
 
     /* ── 刷新提示 ── */

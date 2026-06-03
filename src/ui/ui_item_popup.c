@@ -231,6 +231,7 @@ calc_height:
   /* 弹出 */
   if (!g_xerintosh_pop_up.is_running)
   {
+    g_xerintosh_pop_up.time = hal_get_ticks();  /* 重置 time，防止旧弹窗残留的时间戳导致新弹窗立即超时 */
     g_xerintosh_pop_up.time_start = hal_get_ticks();
     g_xerintosh_pop_up.is_running = true;
   }

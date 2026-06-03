@@ -47,6 +47,7 @@ static char     sm_bt_rx_buf[SM_TERM_LINE_LEN];
 static uint8_t  sm_bt_rx_len = 0;
 static uint32_t sm_bt_rx_count = 0;  /* BT RX 字节计数 */
 static bool     sm_prev_bt_connected = false; /* 连接状态变化检测 */
+static bool     sm_bt_lazy_inited = false;    /* 串口监视器是否懒加载了 BT */
 #endif
 
 /* ═══ 常量 ═══ */
@@ -112,6 +113,7 @@ void serial_monitor_init(void *ud)
     sm_bt_rx_len = 0;
     sm_bt_rx_count = 0;
     sm_prev_bt_connected = false;
+    sm_bt_lazy_inited = false;
     s_prev_landscape = g_is_landscape;
     if (!g_is_landscape) {
         /* 从竖屏菜单进入时临时切换到横屏 */
@@ -155,6 +157,11 @@ void serial_monitor_loop(void *ud)
         } else {
             /* 切换数据源 SER ↔ BLE */
             if (sm_source == SM_SOURCE_SER) {
+                /* 懒加载 BT：如果 BT 未启用，按需初始化 */
+                if (!bt_mgr_is_enabled()) {
+                    bt_mgr_enable();
+                    sm_bt_lazy_inited = true;
+                }
                 sm_source = SM_SOURCE_BLE;
                 sm_bt_connected = bt_uart_is_connected();
             } else {
@@ -234,6 +241,12 @@ void serial_monitor_exit(void *ud)
     /* 注销 BT 回调 */
     bt_uart_set_rx_callback(NULL);
     bt_uart_set_connect_callback(NULL);
+
+    /* 如果 BT 是由串口监视器懒加载的，退出时释放以归还内存给 WiFi */
+    if (sm_bt_lazy_inited && bt_mgr_is_enabled()) {
+        bt_mgr_disable();
+        sm_bt_lazy_inited = false;
+    }
 
     if (!s_prev_landscape) {
         /* 恢复之前的竖屏方向 */

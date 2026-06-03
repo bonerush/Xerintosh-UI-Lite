@@ -103,10 +103,22 @@ stateDiagram-v2
     **根因:** ① ESP32 Arduino 框架在 `setup()` 之前就预初始化了 BT 全栈（controller + Bluedroid + SPP 回调），`esp_spp_register_callback()` 返回 `ESP_ERR_INVALID_STATE`(259)；② `esp_bt_controller_get_status()` 返回过时的 0(IDLE) 导致 deinit+retry 策略使状态更混乱；③ BT 初始化（~92KB）在 `setup()` 中过早执行，与 WiFi（~38KB）+ 内核任务竞争内存，导致 FreeRTOS `xTaskCreate` 全部失败。
     **修复:** ① `bt_uart_service_init()` 从底层 ESP-IDF SPP API 改为 `BluetoothSerial` Arduino 库，内部正确复用框架已初始化的 BT 栈；② BT 初始化从 `app_init_managers()` 延迟到 `deferred_kernel_init()` 中内核任务 spawn 之后（137KB→40KB）；③ WiFi 默认关闭（`g_wifi_on=false`）释放 ~38KB。
     **验证:** build(hw)=PASS build(native)=PASS tests=186/187 (1个预存SIGSEGV与本次无关) 串口日志：BT init 成功，所有内核任务正常，BT state 0→2(ENABLED)。用户实测：电脑蓝牙串口连接成功，数据收发正常。
-    **文件:** src/app/bluetooth/bt_uart_service.cpp, src/main.cpp, src/app/app_init.c
-
-- [AGENT_FINISH] 串口监视器切换到 BLE 模式后，电脑蓝牙 SPP 连接立即断开，串口监视器显示 "BLE:--"
+    **文件:** src/app/bluetooth/bt_uart_service.cpp, src/main.cpp, src/app/app_init.
+- [VERIFIED] ~~串口监视器切换到 BLE 模式后，电脑蓝牙 SPP 连接立即断开，串口监视器显示 "BLE:--"~~
     **根因:** ① `g_bt_serial.connected()` 和 `g_bt_serial.read()` 在 bt-mgr FreeRTOS 子任务中调用，与 `begin()` 不在同一任务上下文，破坏 Bluedroid 内部状态导致 SPP 连接断开；② `sm_on_bt_rx` 回调在主任务中写 `sm_buffer`，`serial_monitor_draw()` 在 UI 任务中读，跨任务竞争可能导致内存损坏；③ `sm_on_bt_rx` 不检查 `sm_running`，BLE 数据始终写入缓冲区导致 RUN/STOP 失效。
     **修复:** ① 将 `bt_uart_poll()` 从 bt-mgr 子任务移至 `loop()` 主任务（50ms 节流），确保所有 `g_bt_serial` 操作在同一任务上下文；② 引入 FreeRTOS 队列做 RX 数据跨任务传递——主任务读 BT 数据入队，UI 任务通过 `bt_uart_drain_rx_queue()` 消费并调用回调写 `sm_buffer`，消除跨任务竞争；③ `sm_on_bt_rx` 增加 `sm_running` 检查。
     **验证:** build(hw)=PASS build(native)=PASS tests=182/183 (1个预存SIGSEGV与本次无关)
     **文件:** src/main.cpp, src/app/bluetooth/bt_manager.cpp, src/app/bluetooth/bt_uart_service.cpp, src/app/bluetooth/bt_uart_service.h, src/app/serial_monitor/sm_app.cpp
+- [VERIFIED] ~~wifi扫描没有提示弹窗，扫描刚开始会显示"扫描中..."弹窗，扫描结束之后显示"扫描完毕"；并且扫描之后可用网络没有生成设备列表~~
+    且已保存目录里面所有的列表点击进入连接，也不会显示连接的提示弹窗。
+    当我在打开蓝牙但是关闭wifi的情况下，存在我打开wifi之后会触发开门狗的问题。
+    另外 WiFi 扫描弹窗显示时机不对：每次开启 WiFi 都会弹出"扫描中..."，应仅在首次启动扫描或用户手动点击扫描时显示。
+    **根因:** ① 扫描完成后 `rebuild_network_list` 中 `ui_selector_rebuild_anchor` 将选择器提升到"网络"根节点，随后代码将选择器移到第一个子项"已保存"而非"可用网络"，导致用户看不到扫描结果；② `on_saved_connect_pressed` 未设置 `g_state = WIFI_MGR_CONNECTING`，状态机不会轮询连接结果，用户无反馈；③ `wifi_mgr_enable` 中 `WiFi.mode(WIFI_STA)` 在 BT 活跃时分配 DMA 内存阻塞，饿死 idle 任务触发 TG1 看门狗；④ WARMUP 扫描失败时错误设置为 `WIFI_MGR_CONNECTED` 而非 `WIFI_MGR_SCAN_DONE`；⑤ WiFi 扫描弹窗无首次标记，每次 enable 都会触发。
+    **修复:** ① `rebuild_network_list` 选择器逻辑改为：有可用网络时移到"可用网络"容器，否则移到"已保存"；② `on_saved_connect_pressed` 增加 `g_state = WIFI_MGR_CONNECTING` 和 `delay(1)` 喂狗；③ `wifi_mgr_enable` 在 `WiFi.mode(WIFI_STA)` 前加 `delay(1)` 防止看门狗；④ WARMUP 扫描失败状态改为 `WIFI_MGR_SCAN_DONE`；⑤ 新增 `g_initial_scan_shown` 标志，warmup 扫描和扫描完成弹窗均检查此标志，仅首次启动扫描时显示，后续 WiFi enable/disable 不再弹窗，手动扫描按钮不受影响。
+    **验证:** build(hw)=PASS build(native)=PASS tests=189/190 (1个预存SIGSEGV与本次无关) 用户实测：首次开机扫描有弹窗，后续开关 WiFi 无弹窗，手动扫描正常弹窗。
+    **文件:** src/app/wifi/wifi_manager.cpp
+- [VERIFIED] ~~Token Usage app 中连接 WiFi 后进入会卡死在沙漏界面（退场动画），随后触发看门狗重启；断网时正常；且无法配置 API Key，余额始终显示 0~~
+    **根因:** ① `tu_api_fetch_deepseek` 中 `HTTPClient::GET()` 在 WiFi 已连接时阻塞 5-15 秒，阻塞 UI 任务导致退场动画无法渲染，触发 TG1 看门狗；② `storage_set_deepseek_key` 已定义但从未被调用，设备上无 API Key 配置入口，key 永远为空，API 请求直接跳过；③ DeepSeek API 返回的 `total_balance` 等字段为字符串 `"5.81"` 而非数字，ArduinoJson 的 `| 0.0f` 运算符不会将字符串转为 float，类型不匹配时返回默认值 0.0f；④ 同时删除了 Kimi（Moonshot）相关代码，仅保留 DeepSeek。
+    **修复:** ① `tu_api_fetch_deepseek` 中添加 `http.setConnectTimeout(3000)` 和 `http.setTimeout(5000)` 限制 HTTP 阻塞时间，并在 GET/getString/end 后添加 `delay(1)` yield 给调度器；② 在 `kern_shell_cmds.c` 中新增 `dskey` Shell 命令，支持 `dskey <api_key>` 设置和 `dskey` 查看（脱敏显示），调用 `storage_set_deepseek_key` 存入 NVS；③ JSON 解析改用 `atof()` 显式将字符串转为 float；④ 移除 `tu_api_fetch_kimi`、`tu_kimi_usage_t` 及相关 UI/存储代码。
+    **验证:** build(hw)=PASS build(native)=PASS 串口调试：HTTP code=200, payload 正确返回余额, atof 解析正确显示 5.81 CNY。用户实测：连接 WiFi 后进入 Token Usage 不再卡死，余额正常显示。
+    **文件:** src/app/token_usage/tu_api.cpp, src/app/token_usage/tu_api.h, src/app/token_usage/tu_app.cpp, src/app/token_usage/tu_ui.cpp, src/kernel/kern_shell_cmds.c

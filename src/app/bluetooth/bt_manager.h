@@ -64,6 +64,13 @@ bool bt_mgr_is_waiting_input(void);
 void bt_mgr_update(void);
 
 /**
+ * @brief 查询蓝牙是否已启用
+ * @return true  蓝牙驱动已初始化
+ * @return false 蓝牙未初始化
+ */
+bool bt_mgr_is_enabled(void);
+
+/**
  * @brief 蓝牙开关切换回调（由 switch_item 的 exit_function 调用）
  * @note  根据 g_bt_on 全局变量决定启用或禁用
  */

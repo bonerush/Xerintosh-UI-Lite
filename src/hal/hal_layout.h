@@ -37,12 +37,39 @@ extern "C" {
 
 /* ═══ 层3: 区域边界 ═══ */
 
+/**
+ * @brief Header 区域顶部 y 坐标（始终为 0）
+ */
 #define HAL_HEADER_TOP()    ((int16_t)0)
+
+/**
+ * @brief Header 区域底部 y 坐标（= 标准行高）
+ */
 #define HAL_HEADER_BOTTOM() ((int16_t)HAL_ROW_H())
+
+/**
+ * @brief Footer 区域顶部 y 坐标（= 屏幕高度 - 标准行高）
+ */
 #define HAL_FOOTER_TOP()    ((int16_t)(SCREEN_HEIGHT - HAL_ROW_H()))
+
+/**
+ * @brief Footer 区域底部 y 坐标（= 屏幕高度）
+ */
 #define HAL_FOOTER_BOTTOM() ((int16_t)SCREEN_HEIGHT)
+
+/**
+ * @brief Body 区域顶部 y 坐标（= Header 底部）
+ */
 #define HAL_BODY_TOP()      ((int16_t)HAL_HEADER_BOTTOM())
+
+/**
+ * @brief Body 区域底部 y 坐标（= Footer 顶部）
+ */
 #define HAL_BODY_BOTTOM()   ((int16_t)HAL_FOOTER_TOP())
+
+/**
+ * @brief Body 区域可用高度（= Body 底部 - Body 顶部）
+ */
 #define HAL_BODY_HEIGHT()   ((int16_t)(HAL_BODY_BOTTOM() - HAL_BODY_TOP()))
 
 /* ═══ 层3: 对齐 ═══ */

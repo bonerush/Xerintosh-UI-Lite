@@ -52,13 +52,10 @@ void token_usage_loop(void *ud)
     if (g_needs_refresh || (now - g_last_refresh >= TU_REFRESH_INTERVAL)) {
         /* 获取 API key */
         char ds_key[STORAGE_API_KEY_MAX_LEN];
-        char kimi_key[STORAGE_API_KEY_MAX_LEN];
         storage_get_deepseek_key(ds_key, sizeof(ds_key));
-        storage_get_kimi_key(kimi_key, sizeof(kimi_key));
 
         /* 刷新数据 */
         g_tu_data.deepseek_ok = tu_api_fetch_deepseek(ds_key, &g_tu_data.deepseek);
-        g_tu_data.kimi_ok     = tu_api_fetch_kimi(kimi_key, &g_tu_data.kimi);
         g_tu_data.last_update = now;
 
         g_last_refresh  = now;

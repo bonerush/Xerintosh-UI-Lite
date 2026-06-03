@@ -59,6 +59,13 @@ void wifi_mgr_disable(void);
 bool wifi_mgr_is_waiting_input(void);
 
 /**
+ * @brief 查询 WiFi 是否已启用
+ * @return true  WiFi 驱动已初始化
+ * @return false WiFi 未初始化
+ */
+bool wifi_mgr_is_enabled(void);
+
+/**
  * @brief 每帧更新 WiFi 状态机（非阻塞）
  * @note  应在主循环中每帧调用，处理扫描超时、连接超时、状态转换等
  */

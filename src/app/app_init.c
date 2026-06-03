@@ -28,6 +28,9 @@
 #include "hal/hal_input.h"
 #include "hal/hal_display.h"
 
+/* WiFi 弹窗刷新（定义在 wifi_manager.cpp，UI 任务每帧调用） */
+extern void wifi_popup_refresh(void);
+
 /* 由 main.cpp / native_main.cpp 提供的外部变量 */
 extern bool g_wifi_on;
 extern bool g_bt_on;
@@ -83,8 +86,6 @@ void app_init_ui(void)
 
     xerintosh_list_item_t* sw1 = xerintosh_new_switch_item(
         "WiFi", &g_wifi_on, NULL, wifi_mgr_on_switch_toggle, default_icon);
-    xerintosh_list_item_t* sw2 = xerintosh_new_switch_item(
-        "蓝牙", &g_bt_on, NULL, bt_mgr_on_switch_toggle, default_icon);
     xerintosh_list_item_t* sl1 = xerintosh_new_slider_item(
         "亮度", &g_brightness_level, 1, 1, 10,
         NULL, on_brightness_change_cb, default_icon);
@@ -113,7 +114,6 @@ void app_init_ui(void)
     xerintosh_push_item_to_list(root, tu_item);
     xerintosh_push_item_to_list(root, item4);  /* 关于（永远最后） */
     xerintosh_push_item_to_list(item1, sw1);
-    xerintosh_push_item_to_list(item1, sw2);
     xerintosh_push_item_to_list(item1, sl1);
     xerintosh_push_item_to_list(item1, sw_anim);
     xerintosh_push_item_to_list(item1, sl_anim);
@@ -179,6 +179,9 @@ void app_input_process(void)
 
     /* 更新电源键弹窗（检测 A+B 双键关机事件） */
     power_key_popup_update();
+
+    /* 刷新 WiFi 弹窗（跨任务弹窗，每帧 push 以保持显示） */
+    wifi_popup_refresh();
 
     /* 双键按住模式下，隔离所有正常按钮事件，防止 UI 抖动 */
     if (power_key_popup_is_dual_active()) {

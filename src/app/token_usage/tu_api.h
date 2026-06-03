@@ -15,21 +15,12 @@ typedef struct {
 } tu_deepseek_balance_t;
 
 typedef struct {
-    float daily_tokens;
-    float rate_limit;
-    bool is_limited;
-} tu_kimi_usage_t;
-
-typedef struct {
     tu_deepseek_balance_t deepseek;
-    tu_kimi_usage_t kimi;
     bool deepseek_ok;
-    bool kimi_ok;
     uint32_t last_update;
 } tu_data_t;
 
 bool tu_api_fetch_deepseek(const char *api_key, tu_deepseek_balance_t *out);
-bool tu_api_fetch_kimi(const char *api_key, tu_kimi_usage_t *out);
 void tu_data_init(tu_data_t *data);
 
 #ifdef __cplusplus

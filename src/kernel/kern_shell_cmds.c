@@ -28,6 +28,7 @@
 #endif
 
 #include "kern_shell_cmds_internal.h"
+#include "app/storage/storage.h"
 
 #ifndef NATIVE_TEST
 #include <esp_system.h>
@@ -883,6 +884,38 @@ static void cmd_io(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_
     }
 }
 
+/* ═══ dskey — DeepSeek API Key 管理 ═══ */
+
+static void cmd_dskey(kern_fd_t tty, int argc, char *argv[],
+                      char *cwd, size_t cwd_size)
+{
+    (void)cwd; (void)cwd_size;
+
+    if (argc < 2) {
+        /* 显示当前 key（脱敏） */
+        char key[STORAGE_API_KEY_MAX_LEN];
+        if (storage_get_deepseek_key(key, sizeof(key)) && key[0] != '\0') {
+            size_t len = strlen(key);
+            kern_shell_print(tty, "Current key: ");
+            if (len <= 8) {
+                kern_shell_println(tty, "****");
+            } else {
+                /* 显示前 4 位 + **** + 后 4 位 */
+                char masked[64];
+                snprintf(masked, sizeof(masked), "%.4s****%.4s", key, key + len - 4);
+                kern_shell_println(tty, masked);
+            }
+        } else {
+            kern_shell_println(tty, "No key configured.");
+        }
+        kern_shell_println(tty, "Usage: dskey <api_key>");
+        return;
+    }
+
+    storage_set_deepseek_key(argv[1]);
+    kern_shell_println(tty, "DeepSeek API key saved. Reboot or re-enter Token Usage to apply.");
+}
+
 /* ═══ 内置命令表 ═══ */
 
 static const kern_shell_cmd_t g_builtin_cmds[] = {
@@ -928,6 +961,9 @@ static const kern_shell_cmd_t g_builtin_cmds[] = {
     { "info",      cmd_info,      "device summary info" },
     { "ping",      cmd_ping,      "network connectivity test (placeholder)" },
     { "io",        cmd_io,        "GPIO debug (get/set <pin> [value])" },
+
+    /* ── App 配置命令 ── */
+    { "dskey",     cmd_dskey,     "set/view DeepSeek API key" },
 };
 
 #define BUILTIN_COUNT (sizeof(g_builtin_cmds) / sizeof(g_builtin_cmds[0]))
