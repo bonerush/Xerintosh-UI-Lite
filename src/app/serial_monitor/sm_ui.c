@@ -19,8 +19,8 @@
 
 /**
  * @brief  绘制信息栏（顶部控制区）
- * @note   包含 START/STOP 按钮、波特率显示、NORM/DEBUG 按钮。
- *         Phase 3: 用 XOR 反色矩形实现灵动滑块，复用菜单选择框的 hal_draw_xor_rect，
+ * @note   包含 START/STOP 按钮、波特率/连接状态显示、SER/BLE 按钮。
+ *         用 XOR 反色矩形实现灵动滑块，复用菜单选择框的 hal_draw_xor_rect，
  *         区域内文字自动反色（白字→黑字，黑底→白底），无需文字裁剪。
  */
 static void draw_info_bar(void)
@@ -31,22 +31,29 @@ static void draw_info_bar(void)
     int16_t bar_y = HAL_MARGIN_SM + entry;
 
     const char *start_label = sm_running ? "STOP" : "RUN";
-    const char *mode_label = sm_debug ? "DBG" : "NORM";
+    const char *mode_label = (sm_source == SM_SOURCE_SER) ? "SER" : "BLE";
     int16_t start_w = hal_get_string_width(start_label) + HAL_MARGIN_MD;
     int16_t mode_w  = hal_get_string_width(mode_label) + HAL_MARGIN_MD;
 
-    char rate_str[16];
-    int32_t baud = settings_serial_baud_hw_value(g_serial_baud_rate);
-    snprintf(rate_str, sizeof(rate_str), "RATE:%ld", (long)baud);
-    int16_t rate_w = hal_get_string_width(rate_str);
+    /* 中间信息：根据数据源显示 */
+    char mid_str[20];
+    if (sm_source == SM_SOURCE_SER) {
+        int32_t baud = settings_serial_baud_hw_value(g_serial_baud_rate);
+        snprintf(mid_str, sizeof(mid_str), "RATE:%ld", (long)baud);
+    } else {
+        /* BLE 模式：显示连接状态 */
+        snprintf(mid_str, sizeof(mid_str), "%s",
+                 sm_bt_connected ? "BLE:OK" : "BLE:--");
+    }
+    int16_t mid_w = hal_get_string_width(mid_str);
 
-    int16_t total_w = start_w + rate_w + mode_w;
+    int16_t total_w = start_w + mid_w + mode_w;
     int16_t spacing = (SCREEN_WIDTH - HAL_MARGIN_MD * 2 - total_w) / 2;
     if (spacing < HAL_MARGIN_SM) spacing = HAL_MARGIN_SM;
 
     int16_t start_x = HAL_MARGIN_SM;
-    int16_t rate_x  = start_x + start_w + spacing;
-    int16_t mode_x  = rate_x + rate_w + spacing;
+    int16_t mid_x   = start_x + start_w + spacing;
+    int16_t mode_x  = mid_x + mid_w + spacing;
 
     int16_t ty = bar_y + (bar_h + font_h) / 2 - 3;
     int16_t start_tx = start_x + (start_w - hal_get_string_width(start_label)) / 2;
@@ -54,7 +61,7 @@ static void draw_info_bar(void)
 
     /* 1. 白色文字（所有文字统一绘制，为滑块外底色） */
     hal_draw_string(start_tx, ty, start_label, COLOR_FG);
-    hal_draw_string(rate_x, ty, rate_str, COLOR_FG);
+    hal_draw_string(mid_x, ty, mid_str, COLOR_FG);
     hal_draw_string(mode_tx, ty, mode_label, COLOR_FG);
 
     /* 2. XOR 反色滑块（复用菜单选择框机制，区域内白字变黑、黑底变白）
@@ -180,8 +187,15 @@ static void draw_terminal(void)
         }
 
         bool from_host = sm_buffer_get_line_source(&sm_buffer, buf_offset);
-        const char *prefix_label = from_host ? "[Master]:" : "[Slave]:";
-        uint16_t prefix_color = from_host ? COLOR_RED : COLOR_ACCENT;
+        const char *prefix_label;
+        uint16_t prefix_color;
+        if (sm_source == SM_SOURCE_BLE) {
+            prefix_label = from_host ? "[BT-RX]:" : "[BT-TX]:";
+            prefix_color = from_host ? COLOR_ACCENT : COLOR_RED;
+        } else {
+            prefix_label = from_host ? "[Master]:" : "[Slave]:";
+            prefix_color = from_host ? COLOR_RED : COLOR_ACCENT;
+        }
 
         /* 复制到可写缓冲区，以便处理换行符 */
         char temp_buf[SM_TERM_LINE_LEN];
