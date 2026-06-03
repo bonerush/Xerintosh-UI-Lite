@@ -12,6 +12,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <stddef.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -170,6 +171,40 @@ int16_t  storage_get_serial_baud_rate(void);
  * @param  val 波特率等级（1-6）
  */
 void     storage_set_serial_baud_rate(int16_t val);
+
+/* ═══ API Key ═══ */
+
+#define STORAGE_API_KEY_MAX_LEN  64
+
+/**
+ * @brief  从存储读取 Deepseek API Key
+ * @param  key   输出缓冲区
+ * @param  max_len 缓冲区大小
+ * @return true  读取成功
+ * @return false 未设置
+ */
+bool     storage_get_deepseek_key(char *key, size_t max_len);
+
+/**
+ * @brief  保存 Deepseek API Key 到存储
+ * @param  key API Key 字符串
+ */
+void     storage_set_deepseek_key(const char *key);
+
+/**
+ * @brief  从存储读取 Kimi API Key
+ * @param  key   输出缓冲区
+ * @param  max_len 缓冲区大小
+ * @return true  读取成功
+ * @return false 未设置
+ */
+bool     storage_get_kimi_key(char *key, size_t max_len);
+
+/**
+ * @brief  保存 Kimi API Key 到存储
+ * @param  key API Key 字符串
+ */
+void     storage_set_kimi_key(const char *key);
 
 #ifdef __cplusplus
 }

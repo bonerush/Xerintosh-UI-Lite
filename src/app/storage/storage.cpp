@@ -39,6 +39,14 @@ uint8_t  storage_get_screen_rotation(void) { return 2; }
 void     storage_set_screen_rotation(uint8_t val) { (void)val; }
 int16_t  storage_get_serial_baud_rate(void) { return 5; }
 void     storage_set_serial_baud_rate(int16_t val) { (void)val; }
+bool     storage_get_deepseek_key(char *key, size_t max_len) {
+    (void)max_len; key[0] = '\0'; return false;
+}
+void     storage_set_deepseek_key(const char *key) { (void)key; }
+bool     storage_get_kimi_key(char *key, size_t max_len) {
+    (void)max_len; key[0] = '\0'; return false;
+}
+void     storage_set_kimi_key(const char *key) { (void)key; }
 
 #else
 
@@ -388,6 +396,38 @@ void storage_set_serial_baud_rate(int16_t val) {
     Preferences prefs;
     prefs.begin(NVS_NAMESPACE, false);
     prefs.putShort("serial_baud_v1", val);
+    prefs.end();
+}
+
+/* ═══ API Key ═══ */
+
+bool storage_get_deepseek_key(char *key, size_t max_len) {
+    Preferences prefs;
+    prefs.begin(NVS_NAMESPACE, true);
+    size_t len = prefs.getString("ds_key_v1", key, max_len);
+    prefs.end();
+    return len > 0;
+}
+
+void storage_set_deepseek_key(const char *key) {
+    Preferences prefs;
+    prefs.begin(NVS_NAMESPACE, false);
+    prefs.putString("ds_key_v1", key);
+    prefs.end();
+}
+
+bool storage_get_kimi_key(char *key, size_t max_len) {
+    Preferences prefs;
+    prefs.begin(NVS_NAMESPACE, true);
+    size_t len = prefs.getString("kimi_key_v1", key, max_len);
+    prefs.end();
+    return len > 0;
+}
+
+void storage_set_kimi_key(const char *key) {
+    Preferences prefs;
+    prefs.begin(NVS_NAMESPACE, false);
+    prefs.putString("kimi_key_v1", key);
     prefs.end();
 }
 
