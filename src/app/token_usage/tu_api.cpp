@@ -7,7 +7,7 @@
 #include <ArduinoJson.h>
 
 bool tu_api_fetch_deepseek(const char *api_key, tu_deepseek_balance_t *out) {
-    if (!api_key || api_key[0] == '\0') return false;
+    if (!api_key || api_key[0] == '\0' || !out) return false;
 
     HTTPClient http;
     http.begin("https://api.deepseek.com/user/balance");
@@ -34,7 +34,7 @@ bool tu_api_fetch_deepseek(const char *api_key, tu_deepseek_balance_t *out) {
 }
 
 bool tu_api_fetch_kimi(const char *api_key, tu_kimi_usage_t *out) {
-    if (!api_key || api_key[0] == '\0') return false;
+    if (!api_key || api_key[0] == '\0' || !out) return false;
 
     HTTPClient http;
     http.begin("https://api.moonshot.cn/v1/usage");
@@ -82,5 +82,6 @@ bool tu_api_fetch_kimi(const char *api_key, tu_kimi_usage_t *out) {
 #endif
 
 void tu_data_init(tu_data_t *data) {
+    if (!data) return;
     memset(data, 0, sizeof(tu_data_t));
 }
