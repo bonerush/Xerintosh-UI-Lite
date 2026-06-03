@@ -248,6 +248,12 @@ Agent 在隔离 worktree 内完成编码，**完成后必须执行自测**：
   3. **逻辑整理**：分离主循环职责（lifecycle vs rendering）、引入类型派发表替代内联 switch
   4. **死代码清理**：移除 `xerintosh_ui_driver_init()` 等薄包装、消除重复的位置计算逻辑
   5. **可复用逻辑提取**：将 `is_item_visible()`、动画 easing、类型派发等模式抽取为公共工具
-- [FEAT_AGENT_FINISH] 我想把当前的蓝牙框架彻底重构，我想使用classic BLE的协议而不是当前的方案。我需要你做的是把当前的蓝牙框架彻底卸载换成支持classic BLE的协议，并且对当前ui系统中含有蓝牙的部分也修改成适配该协议的方案。
+- [VERIFIED] ~~我想把当前的蓝牙框架彻底重构，我想使用classic BLE的协议而不是当前的方案。我需要你做的是把当前的蓝牙框架彻底卸载换成支持classic BLE的协议，并且对当前ui系统中含有蓝牙的部分也修改成适配该协议的方案。~~
     - 分支: `feature/bt-classic-spp`
     - 概要: 已将 NimBLE-Arduino (BLE GATT/NUS) 完全替换为 ESP32 Arduino 内置 BluetoothSerial (Classic Bluetooth SPP)。bt_manager 状态机大幅简化（移除扫描/广告/配对码流程），bt_uart_service API 保持不变，UI 文本从 "BLE" 统一改为 "BT/蓝牙"。硬件编译通过（Flash 99.0%, RAM 21.4%），native 测试通过（186/187，末尾 SIGSEGV 为既有内核 IPC 问题）。
+- [FEAT_AGENT_FINISH] 当前蓝牙这个功能已经调试完毕，串口也能正常的传输数据和连接设备。在root菜单里面有蓝牙串口这个程序，我在仔细评估之后认为该app与串口监视器的这个app存在功能上的重合。因此我想把蓝牙串口这个app删除并且把功能整合进入串口监视器这个程序中。下面是大致的施行顺序。
+   1.首先对于NORM/DEBUG模式，我在几天的重度使用发现我基本上不会用到DEBUG模式，请删除掉相关的代码默认只使用norm模式，并且把原先UI界面的NORM/DEBUG按钮改成SER/BLE（有线串口/蓝牙串口）模式，并且原先的操控逻辑操控SER/BLE按钮的时候会切换对应的模式。对于串口的显示逻辑则有线串口/蓝牙串口为一致的。
+   2.修改调试完毕之后删除掉之前的死代码，保持项目的清洁。
+   3.最后更新相关的文档。
+    - 分支: `feature/bt-serial-merge`
+    - 概要: 已将独立的 ble_serial App 删除，功能整合到 serial_monitor App 中。用 SER/BLE 模式切换替代原有的 NORM/DEBUG 模式切换。删除 NORM/DEBUG 相关代码、ble_serial 源文件和测试文件。Native 测试 186/187 通过（末尾 SIGSEGV 为既有内核 IPC 问题），硬件编译成功（RAM 21.2%, Flash 91.2%）。
