@@ -109,9 +109,16 @@ uint16_t bt_uart_get_rx_buffer_usage(void);
 
 /**
  * @brief  轮询蓝牙串口：读取数据并检测连接状态变化
- * @note   由调用者定期调用（如每帧一次）
+ * @note   由调用者定期调用（如每帧一次）。
+ *         RX 数据放入内部队列，需配合 bt_uart_drain_rx_queue() 消费。
  */
 void bt_uart_poll(void);
+
+/**
+ * @brief  消费 RX 队列并调用回调
+ * @note   应在 UI 任务中调用，避免跨任务写缓冲区。
+ */
+void bt_uart_drain_rx_queue(void);
 
 #ifdef __cplusplus
 }

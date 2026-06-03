@@ -55,11 +55,14 @@ static bool     sm_prev_bt_connected = false; /* 连接状态变化检测 */
 
 #ifndef NATIVE_TEST
 /**
- * @brief BT RX 回调（在 bt_mgr_update 轮询上下文中执行）
- * @note  行组装逻辑：逐字节累积，遇 \n/\r 时写入 sm_buffer
+ * @brief BT RX 回调（在 UI 任务 bt_uart_drain_rx_queue 上下文中执行）
+ * @note  行组装逻辑：逐字节累积，遇 \n/\r 时写入 sm_buffer。
+ *        仅在监视器运行中（sm_running）时处理数据，尊重 RUN/STOP 状态。
  */
 static void sm_on_bt_rx(const uint8_t *data, uint16_t len)
 {
+    if (!sm_running) return;
+
     for (uint16_t i = 0; i < len; i++) {
         char c = (char)data[i];
         sm_bt_rx_count++;
@@ -196,10 +199,16 @@ void serial_monitor_loop(void *ud)
     }
 
 #ifndef NATIVE_TEST
-    /* BLE 模式下：更新连接状态 + 弹窗提示 */
-    if (sm_source == SM_SOURCE_BLE && sm_running) {
+    /* BLE 模式下：消费 RX 队列 + 更新连接状态 + 弹窗提示
+     * bt_uart_drain_rx_queue() 在 UI 任务上下文中调用回调，
+     * 确保 sm_buffer 写入与 serial_monitor_draw() 读取在同一任务，消除跨任务竞争。 */
+    if (sm_source == SM_SOURCE_BLE) {
+        if (sm_running) {
+            bt_uart_drain_rx_queue();
+        }
+        bool prev = sm_bt_connected;
         sm_bt_connected = bt_uart_is_connected();
-        if (sm_bt_connected != sm_prev_bt_connected) {
+        if (sm_bt_connected != prev) {
             xerintosh_push_pop_up(
                 sm_bt_connected ? "Connected" : "Disconnected", 1500);
             sm_prev_bt_connected = sm_bt_connected;

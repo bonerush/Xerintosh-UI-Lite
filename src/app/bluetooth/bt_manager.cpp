@@ -54,14 +54,12 @@ void bt_mgr_init(void) {
 void bt_mgr_enable(void) {
     if (g_bt_enabled) return;
 
-    Serial.println("[BT] bt_mgr_enable called");
     if (!bt_uart_service_init()) {
         Serial.println("[BT] bt_uart_service_init failed");
         return;
     }
     g_bt_enabled = true;
     g_state = BT_MGR_ENABLED;
-    Serial.println("[BT] bt_mgr_enable done");
 }
 
 void bt_mgr_disable(void) {
@@ -78,16 +76,12 @@ bool bt_mgr_is_waiting_input(void) {
 void bt_mgr_update(void) {
     if (!g_bt_enabled && g_state == BT_MGR_IDLE) return;
 
-    static bt_mgr_state_t last_state = BT_MGR_IDLE;
-    if (g_state != last_state) {
-        Serial.printf("[BT] State: %d -> %d\n", last_state, g_state);
-        last_state = g_state;
-    }
-
     switch (g_state) {
     case BT_MGR_ENABLED:
     case BT_MGR_CONNECTED: {
-        bt_uart_poll();
+        /* bt_uart_poll() 已移至 main.cpp loop() 中调用，
+         * 确保 g_bt_serial.connected()/read() 与 begin() 在同一任务上下文。
+         * 此处仅根据 g_connected 更新状态机。 */
         bool connected = bt_uart_is_connected();
         g_state = connected ? BT_MGR_CONNECTED : BT_MGR_ENABLED;
         break;

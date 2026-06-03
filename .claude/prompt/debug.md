@@ -105,4 +105,8 @@ stateDiagram-v2
     **验证:** build(hw)=PASS build(native)=PASS tests=186/187 (1个预存SIGSEGV与本次无关) 串口日志：BT init 成功，所有内核任务正常，BT state 0→2(ENABLED)。用户实测：电脑蓝牙串口连接成功，数据收发正常。
     **文件:** src/app/bluetooth/bt_uart_service.cpp, src/main.cpp, src/app/app_init.c
 
-    
+- [AGENT_FINISH] 串口监视器切换到 BLE 模式后，电脑蓝牙 SPP 连接立即断开，串口监视器显示 "BLE:--"
+    **根因:** ① `g_bt_serial.connected()` 和 `g_bt_serial.read()` 在 bt-mgr FreeRTOS 子任务中调用，与 `begin()` 不在同一任务上下文，破坏 Bluedroid 内部状态导致 SPP 连接断开；② `sm_on_bt_rx` 回调在主任务中写 `sm_buffer`，`serial_monitor_draw()` 在 UI 任务中读，跨任务竞争可能导致内存损坏；③ `sm_on_bt_rx` 不检查 `sm_running`，BLE 数据始终写入缓冲区导致 RUN/STOP 失效。
+    **修复:** ① 将 `bt_uart_poll()` 从 bt-mgr 子任务移至 `loop()` 主任务（50ms 节流），确保所有 `g_bt_serial` 操作在同一任务上下文；② 引入 FreeRTOS 队列做 RX 数据跨任务传递——主任务读 BT 数据入队，UI 任务通过 `bt_uart_drain_rx_queue()` 消费并调用回调写 `sm_buffer`，消除跨任务竞争；③ `sm_on_bt_rx` 增加 `sm_running` 检查。
+    **验证:** build(hw)=PASS build(native)=PASS tests=182/183 (1个预存SIGSEGV与本次无关)
+    **文件:** src/main.cpp, src/app/bluetooth/bt_manager.cpp, src/app/bluetooth/bt_uart_service.cpp, src/app/bluetooth/bt_uart_service.h, src/app/serial_monitor/sm_app.cpp

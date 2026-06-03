@@ -306,6 +306,19 @@ void loop()
 
     dev_ttyS0_poll();
     serial_monitor_update();
+
+    /* BT 轮询：在 Arduino 主任务中调用，与 g_bt_serial.begin() 同一任务上下文。
+     * BluetoothSerial 内部的 Bluedroid 不是线程安全的，
+     * connected()/read() 必须与 begin() 在同一 FreeRTOS 任务中调用。 */
+    {
+        static uint32_t last_bt_poll = 0;
+        uint32_t now = millis();
+        if (now - last_bt_poll >= 50) {
+            last_bt_poll = now;
+            bt_uart_poll();
+        }
+    }
+
     kern_sched_tick();
 }
 

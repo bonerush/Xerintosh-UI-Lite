@@ -138,6 +138,8 @@ uint16_t bt_uart_get_rx_buffer_usage(void)
 
 void bt_uart_poll(void) {}
 
+void bt_uart_drain_rx_queue(void) {}
+
 /* ═══ 测试辅助函数（仅 NATIVE_TEST，extern "C" 供测试链接） ═══ */
 
 extern "C" {
@@ -183,14 +185,27 @@ uint16_t bt_uart_test_consume_tx(uint16_t len)
 /* ═══ BluetoothSerial 实现 ═══
  * ESP32 Arduino 框架在 setup() 之前就初始化了 BT controller + Bluedroid。
  * BluetoothSerial.begin() 能正确检测并复用已初始化的栈。
- * 内存策略：WiFi 默认关闭（节省 ~38KB），BT 延迟到内核任务 spawn 后初始化。 */
+ * 内存策略：WiFi 默认关闭（节省 ~38KB），BT 延迟到内核任务 spawn 后初始化。
+ *
+ * 线程安全策略：
+ * - g_bt_serial 的 connected()/read()/write() 必须在 Arduino 主任务中调用
+ *   （与 begin() 同一任务上下文），避免 Bluedroid 跨任务崩溃。
+ * - RX 数据通过 FreeRTOS 队列传递给 UI 任务，消除 sm_buffer 跨任务竞争。 */
 
 #include <Arduino.h>
 #include <BluetoothSerial.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/queue.h>
+#include "esp_bt.h"
+#include "esp_bt_main.h"
 
 static BluetoothSerial g_bt_serial;
 static bool g_initialized    = false;
 static bool g_prev_connected = false;
+
+/* RX 数据跨任务传递队列（主任务写入，UI 任务消费） */
+#define BT_RX_QUEUE_SIZE 512
+static QueueHandle_t g_rx_queue = NULL;
 
 bool bt_uart_service_init(void)
 {
@@ -203,7 +218,10 @@ bool bt_uart_service_init(void)
     g_rx_cb          = NULL;
     g_conn_cb        = NULL;
 
-    Serial.printf("[BT] free heap before init: %u\n", ESP.getFreeHeap());
+    /* 创建 RX 数据跨任务队列 */
+    if (!g_rx_queue) {
+        g_rx_queue = xQueueCreate(BT_RX_QUEUE_SIZE, sizeof(uint8_t));
+    }
 
     bool ok = g_bt_serial.begin("M5Stick-P1");
     if (!ok) {
@@ -212,7 +230,6 @@ bool bt_uart_service_init(void)
     }
 
     g_initialized = true;
-    Serial.printf("[BT] BluetoothSerial init done, free_heap=%u\n", ESP.getFreeHeap());
     return true;
 }
 
@@ -222,11 +239,25 @@ void bt_uart_service_deinit(void)
 
     g_bt_serial.end();
 
+    /* BluetoothSerial.end() 可能未完全释放 Bluedroid 栈，
+     * 导致下次 begin() 时栈状态不一致，SPP 连接无法建立。
+     * 手动释放 Bluedroid + BT Controller，确保下次 begin() 从零初始化。 */
+    esp_bluedroid_disable();
+    esp_bluedroid_deinit();
+    esp_bt_controller_disable();
+    esp_bt_controller_deinit();
+
     g_connected      = false;
     g_prev_connected = false;
     g_initialized    = false;
     g_rx_cb          = NULL;
     g_conn_cb        = NULL;
+
+    /* 清空并删除 RX 队列 */
+    if (g_rx_queue) {
+        vQueueDelete(g_rx_queue);
+        g_rx_queue = NULL;
+    }
 }
 
 uint16_t bt_uart_send(const uint8_t *data, uint16_t len)
@@ -275,16 +306,38 @@ void bt_uart_poll(void)
     if (now_connected != g_prev_connected) {
         g_connected = now_connected;
         g_prev_connected = now_connected;
-        Serial.printf("[BT] Connection: %s\n", now_connected ? "connected" : "disconnected");
-        if (g_conn_cb) g_conn_cb(now_connected);
+        if (g_conn_cb) {
+            g_conn_cb(now_connected);
+        }
     }
 
+    /* 读取 RX 数据并放入跨任务队列（不在此处调用回调） */
     while (g_bt_serial.available()) {
         int b = g_bt_serial.read();
         if (b >= 0) {
             uint8_t byte = (uint8_t)b;
-            if (g_rx_cb) g_rx_cb(&byte, 1);
+            if (g_rx_queue) {
+                if (xQueueSend(g_rx_queue, &byte, 0) != pdTRUE) {
+                    Serial.println("[BT] WARN: RX queue full, dropping byte");
+                }
+            }
         }
+    }
+}
+
+/**
+ * @brief  消费 RX 队列并调用回调（在 UI 任务中调用）
+ * @note   从 FreeRTOS 队列中取出 bt_uart_poll() 攒下的 RX 数据，
+ *         以回调形式交给调用者。调用者应在自己的任务上下文中执行，
+ *         避免跨任务写 sm_buffer。
+ */
+void bt_uart_drain_rx_queue(void)
+{
+    if (!g_rx_queue || !g_rx_cb) return;
+
+    uint8_t byte;
+    while (xQueueReceive(g_rx_queue, &byte, 0) == pdTRUE) {
+        g_rx_cb(&byte, 1);
     }
 }
 
