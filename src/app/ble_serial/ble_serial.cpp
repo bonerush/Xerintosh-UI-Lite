@@ -216,7 +216,6 @@ void ble_serial_init(void *ud)
 
 #ifndef NATIVE_TEST
     hal_input_reset_events();
-    bt_uart_service_init();
     bt_uart_set_rx_callback(on_ble_rx);
     bt_uart_set_connect_callback(on_ble_connect);
 #endif
@@ -269,7 +268,6 @@ void ble_serial_exit(void *ud)
 #ifndef NATIVE_TEST
     bt_uart_set_rx_callback(NULL);
     bt_uart_set_connect_callback(NULL);
-    bt_uart_service_deinit();
     hal_input_reset_events();
 #endif
 }

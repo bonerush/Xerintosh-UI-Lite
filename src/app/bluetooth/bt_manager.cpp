@@ -55,6 +55,10 @@ void bt_mgr_enable(void) {
     if (g_bt_enabled) return;
 
     Serial.println("[BT] bt_mgr_enable called");
+    if (!bt_uart_service_init()) {
+        Serial.println("[BT] bt_uart_service_init failed");
+        return;
+    }
     g_bt_enabled = true;
     g_state = BT_MGR_ENABLED;
     Serial.println("[BT] bt_mgr_enable done");

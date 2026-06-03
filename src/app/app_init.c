@@ -151,7 +151,8 @@ void app_init_managers(void)
     /* 先初始化蓝牙（Classic BT SPP），再给 WiFi 初始化，
        避免 WiFi 占用大量 RAM 后 Bluedroid BLE 初始化分配失败
        触发 ESP-IDF v4.4 的 vQueueDelete(NULL) bug */
-    if (g_bt_on)   bt_mgr_enable();
+    /* BT 初始化已移至 deferred_kernel_init()（内核任务 spawn 之后），
+       避免在 setup() 中过早消耗内存导致 FreeRTOS 任务创建失败。 */
     if (g_wifi_on) wifi_mgr_enable();
 
     /* WiFi/BT 内核任务由 setup() 在 xerintosh_init_core() 之后启动，

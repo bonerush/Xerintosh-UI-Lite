@@ -83,13 +83,13 @@ stateDiagram-v2
     **验证:** build=PASS native=PASS tests=186/187 (1个预存SIGSEGV与本次无关)
     **文件:** src/app/shutdown/power_key_popup.c
     **驳回重处理:** 在原有松手收起弹窗逻辑基础上，增加冷却期防止按钮释放边沿被误判为短按/长按，避免松手慢时触发
-- [AGENT_FINISH] 打开 App 时沙漏页面（退场动画）偶发卡住后直接 reboot，怀疑看门狗触发热重启
+- [VERIFIED] ~~打开 App 时沙漏页面（退场动画）偶发卡住后直接 reboot，怀疑看门狗触发热重启~~
     **根因:** FreeRTOS 内核任务（UI、WiFi、BT）均在优先级 `tskIDLE_PRIORITY + 1`（=1），与 Arduino loop 任务同级。ESP32 的 TG1 系统看门狗由 idle 任务（优先级 0）喂狗。在退场动画等多帧渲染期间，优先级 1 的任务通过双信号量令牌协议（kern_port.c）持续轮转——UI 任务执行→yield→调度器取回→再分派，idle 任务始终被饿死。TG1 看门狗超时（~5 秒）后热重启。
     **修复:** 在 `ui_task_main()` 每帧 `kern_yield()` 前添加 `delay(1)`（`#ifndef NATIVE_TEST` 守卫），释放 1ms 给 FreeRTOS idle 任务喂 TG1 看门狗。不影响原生测试（native 无看门狗和 FreeRTOS）。硬件端每帧增加 1ms 开销（约 3% @ 30fps），对 UI 流畅度无影响。
     **验证:** build(hw)=PASS build(native)=PASS tests=186/187 (1个预存SIGSEGV与本次无关)
     **文件:** src/app/ui_task.c
     **驳回重处理:** 之前的修复（移除 boot_screen_show 的 hal_delay_ms）方向正确但只覆盖了启动阶段——boot_screen_show 只在 setup() 中运行一次，而 bug 描述的是「打开 App 时」的退场动画卡死。本次修复针对的是运行时的持续看门狗饿死问题，覆盖所有 App 的进入/退出动画场景。
-- [AGENT_FINISH] 烧录 Classic Bluetooth SPP 固件后开机触发看门狗重启（Flash 已压缩至 91.3%，排除空间不足）
+- [VERIFIED] ~~烧录 Classic Bluetooth SPP 固件后开机触发看门狗重启（Flash 已压缩至 91.3%，排除空间不足)~~
     **根因:** 经 backtrace 解码，实际崩溃点在 ESP-IDF v4.4 Bluedroid 的 BLE GAP/GATT 初始化路径（`gap_ble.c:410` → `gatt_api.c:209` → `gatt_utils.c:341`）。即使仅使用 Classic BT SPP，Bluedroid 仍会初始化 BLE 组件。`gatt_alloc_hdl_buffer()` 内 `fixed_queue_new()` 分配失败（WiFi 已占用大量 RAM），清理路径调用 `fixed_queue_free()` → `osi_sem_free()` → `vQueueDelete(NULL)` 触发 FreeRTOS assertion 崩溃。
     **修复:** ① 在 `setup()` 中于任何 BT 初始化前调用 `esp_bt_controller_mem_release(ESP_BT_MODE_BLE)` 释放 BLE controller 内存；② 调整 `app_init_managers()` 顺序，BT 先于 WiFi 初始化，减少内存竞争；③ 移除 warm-up 延迟，直接在 `setup()` 上下文中调用 `bt_uart_service_init()`，避免在 bt-mgr 内核任务中触发 Bluedroid bug；④ 保留 `bt-mgr` 任务栈 8192 字节的先前调整。
     **验证:** build(hw)=PASS build(native)=PASS tests=186/187 (1个预存SIGSEGV与本次无关)
@@ -99,4 +99,10 @@ stateDiagram-v2
     **最终修复:** 移除 `esp_bt_controller_mem_release(ESP_BT_MODE_BLE)` 调用，同时保留：① BT 先于 WiFi 的初始化顺序（避免 WiFi 先占内存导致 BT OOM）；② 异步 WARMUP 机制（`bt_mgr_update()` 中 200ms 后于 `bt-mgr` 任务内调用 `bt_uart_service_init()`，不阻塞 `setup()`）。当前 `free heap: 91364`，即使保留 BLE 内存也不足导致 OOM。
     **再次驳回重处理:** 移除 `mem_release` 后仍然在 `bt-mgr` 任务中崩溃（`StoreProhibited`），backtrace: `osi_thread_run` → `btu_task_start_up` → `BTE_DeinitStack` → `bta_sys_init` → `memset(NULL)`。根因：`BluetoothSerial::begin()` **根本不能在非 Arduino 主任务的 FreeRTOS 任务中调用**。Bluedroid 初始化与 Arduino 任务上下文有绑定关系，在子任务中初始化会导致内部全局状态未就绪，cleanup 路径访问空指针。
     **真正最终修复:** ① `bt_uart_service_init()` 必须在 `setup()` 中同步调用；② `bt_mgr_enable()` 只设置 `g_bt_enabled=true` 和 `g_state=BT_MGR_ENABLED`，不再做实际初始化；③ `bt_mgr_update()` 只负责连接状态 polling；④ `bt_mgr_disable()` 仍然调用 `bt_uart_service_deinit()`。此方案下 `setup()` 会阻塞几秒（BT 初始化时间），但开机画面已在屏幕上，初始化完成后 `loop()` 启动，UI 任务正常接管。避免了子任务中 `StoreProhibited` 崩溃。
-- [BUG] 对于蓝牙设备的扫描,大部分设备都是类似硬件地址那么一长串,但是确扫不到真正可用的设备,例如我想把我的开发板连接到我的电脑,我的电脑就没有办法扫描到开发板.
+- [VERIFIED] ~~蓝牙开关开启无效，蓝牙串口不可用~~
+    **根因:** ① ESP32 Arduino 框架在 `setup()` 之前就预初始化了 BT 全栈（controller + Bluedroid + SPP 回调），`esp_spp_register_callback()` 返回 `ESP_ERR_INVALID_STATE`(259)；② `esp_bt_controller_get_status()` 返回过时的 0(IDLE) 导致 deinit+retry 策略使状态更混乱；③ BT 初始化（~92KB）在 `setup()` 中过早执行，与 WiFi（~38KB）+ 内核任务竞争内存，导致 FreeRTOS `xTaskCreate` 全部失败。
+    **修复:** ① `bt_uart_service_init()` 从底层 ESP-IDF SPP API 改为 `BluetoothSerial` Arduino 库，内部正确复用框架已初始化的 BT 栈；② BT 初始化从 `app_init_managers()` 延迟到 `deferred_kernel_init()` 中内核任务 spawn 之后（137KB→40KB）；③ WiFi 默认关闭（`g_wifi_on=false`）释放 ~38KB。
+    **验证:** build(hw)=PASS build(native)=PASS tests=186/187 (1个预存SIGSEGV与本次无关) 串口日志：BT init 成功，所有内核任务正常，BT state 0→2(ENABLED)。用户实测：电脑蓝牙串口连接成功，数据收发正常。
+    **文件:** src/app/bluetooth/bt_uart_service.cpp, src/main.cpp, src/app/app_init.c
+
+    

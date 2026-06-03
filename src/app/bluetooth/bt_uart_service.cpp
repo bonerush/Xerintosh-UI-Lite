@@ -180,56 +180,48 @@ uint16_t bt_uart_test_consume_tx(uint16_t len)
 
 #else
 
-/* ═══ BluetoothSerial (Classic SPP) 硬件实现 ═══ */
+/* ═══ BluetoothSerial 实现 ═══
+ * ESP32 Arduino 框架在 setup() 之前就初始化了 BT controller + Bluedroid。
+ * BluetoothSerial.begin() 能正确检测并复用已初始化的栈。
+ * 内存策略：WiFi 默认关闭（节省 ~38KB），BT 延迟到内核任务 spawn 后初始化。 */
 
+#include <Arduino.h>
 #include <BluetoothSerial.h>
 
 static BluetoothSerial g_bt_serial;
-static bool            g_initialized    = false;
-static bool            g_prev_connected = false;
-
-/* 内部轮询：读取数据 + 检测连接状态变化 */
-static void bt_uart_do_poll(void)
-{
-    if (!g_initialized) return;
-
-    bool now_connected = g_bt_serial.connected();
-    if (now_connected != g_prev_connected) {
-        g_prev_connected = now_connected;
-        g_connected      = now_connected;
-        if (g_conn_cb) g_conn_cb(now_connected);
-    }
-
-    while (g_bt_serial.available() > 0) {
-        uint8_t buf[64];
-        int len = g_bt_serial.readBytes(buf, sizeof(buf));
-        if (len > 0) {
-            ringbuf_write(&g_rx_buf, buf, (uint16_t)len);
-            if (g_rx_cb) g_rx_cb(buf, (uint16_t)len);
-        }
-    }
-}
+static bool g_initialized    = false;
+static bool g_prev_connected = false;
 
 bool bt_uart_service_init(void)
 {
+    if (g_initialized) return true;
+
     ringbuf_init(&g_tx_buf, BT_UART_TX_BUF_SIZE);
     ringbuf_init(&g_rx_buf, BT_UART_RX_BUF_SIZE);
     g_connected      = false;
     g_prev_connected = false;
-    g_initialized    = false;
     g_rx_cb          = NULL;
     g_conn_cb        = NULL;
 
-    Serial.printf("[BT] free heap before begin: %u\n", ESP.getFreeHeap());
-    g_bt_serial.begin("M5Stick-P1");
-    Serial.printf("[BT] free heap after begin: %u\n", ESP.getFreeHeap());
+    Serial.printf("[BT] free heap before init: %u\n", ESP.getFreeHeap());
+
+    bool ok = g_bt_serial.begin("M5Stick-P1");
+    if (!ok) {
+        Serial.println("[BT] BluetoothSerial.begin() failed");
+        return false;
+    }
+
     g_initialized = true;
+    Serial.printf("[BT] BluetoothSerial init done, free_heap=%u\n", ESP.getFreeHeap());
     return true;
 }
 
 void bt_uart_service_deinit(void)
 {
+    if (!g_initialized) return;
+
     g_bt_serial.end();
+
     g_connected      = false;
     g_prev_connected = false;
     g_initialized    = false;
@@ -240,7 +232,8 @@ void bt_uart_service_deinit(void)
 uint16_t bt_uart_send(const uint8_t *data, uint16_t len)
 {
     if (!data || len == 0 || !g_connected || !g_initialized) return 0;
-    return (uint16_t)g_bt_serial.write(data, len);
+    size_t written = g_bt_serial.write(data, len);
+    return (uint16_t)written;
 }
 
 uint16_t bt_uart_send_string(const char *str)
@@ -276,7 +269,23 @@ uint16_t bt_uart_get_rx_buffer_usage(void)
 
 void bt_uart_poll(void)
 {
-    bt_uart_do_poll();
+    if (!g_initialized) return;
+
+    bool now_connected = g_bt_serial.connected();
+    if (now_connected != g_prev_connected) {
+        g_connected = now_connected;
+        g_prev_connected = now_connected;
+        Serial.printf("[BT] Connection: %s\n", now_connected ? "connected" : "disconnected");
+        if (g_conn_cb) g_conn_cb(now_connected);
+    }
+
+    while (g_bt_serial.available()) {
+        int b = g_bt_serial.read();
+        if (b >= 0) {
+            uint8_t byte = (uint8_t)b;
+            if (g_rx_cb) g_rx_cb(&byte, 1);
+        }
+    }
 }
 
 #endif /* NATIVE_TEST */

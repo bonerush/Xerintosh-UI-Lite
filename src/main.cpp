@@ -21,8 +21,8 @@ void bt_mgr_task_main(void *arg);
 #ifndef NATIVE_TEST
 
 extern "C" {
-bool g_wifi_on = true;  /* WiFi 默认开关状态 */
-bool g_bt_on = true;    /* 蓝牙默认开关状态 */
+bool g_wifi_on = false; /* WiFi 默认关闭（节省内存给 BT） */
+bool g_bt_on = true;    /* 蓝牙默认开（延迟到内核任务 spawn 后初始化） */
 }
 
 #include <M5Unified.h>
@@ -184,15 +184,6 @@ void setup()
 
     app_init_managers();
 
-    /* BluetoothSerial::begin() 必须在 Arduino 主任务（setup/loop）中调用，
-     * 在 Xeros 内核任务中调用会导致 Bluedroid 初始化失败并触发
-     * memset(NULL) StoreProhibited 崩溃。 */
-    if (g_bt_on) {
-        Serial.println("[  OK  ] BT init in setup() context...");
-        bt_uart_service_init();
-        Serial.println("[  OK  ] BT init done");
-    }
-
     xerintosh_init_core();
     Serial.println("[  OK  ] Xeros core");
     g_in_xerintosh = true;
@@ -286,6 +277,18 @@ static void deferred_kernel_init(void)
 
     /* 让出 CPU 给 FreeRTOS，使刚创建的任务有机会启动并阻塞在调度信号量上 */
     delay(10);
+
+    /* ── 延迟 BT 初始化 ──
+     * BT 在内核任务 spawn 之后初始化，确保任务栈已分配。
+     * WiFi 在 boot 时默认关闭（g_wifi_on=false），避免与 BT 竞争内存。
+     * BluetoothSerial.begin() 内部会正确复用 M5.begin() 已初始化的 BT 栈。 */
+    if (g_bt_on) {
+        Serial.printf("[BT] deferred enable, free_heap=%u\n", ESP.getFreeHeap());
+        bt_mgr_enable();
+    }
+
+    /* 蓝牙栈初始化已移至 bt_mgr_enable()，由 app_init_managers() 在 setup()
+     * 中根据 g_bt_on 状态触发。bt_mgr_update() 负责连接状态轮询。 */
 
     kern_log(KERN_LOG_INFO, "Xeros kernel boot complete, entering scheduler");
     Serial.println("[  OK  ] Kernel boot complete, entering scheduler loop");
