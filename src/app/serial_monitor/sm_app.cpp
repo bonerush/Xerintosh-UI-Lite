@@ -2,7 +2,7 @@
  * @file   sm_app.cpp
  * @brief  串口监视器 App 生命周期与后台读取
  * @details 实现串口监视器的初始化、主循环、退出及后台数据读取。
- *          Phase 2: 添加入场滑入动画和按钮平滑过渡。
+ *          支持有线串口（SER）和蓝牙串口（BLE）双数据源。
  *
  * @copyright Copyright (c) 2026
  */
@@ -12,6 +12,8 @@
 #include "sm_ui.h"
 #include "app/settings/settings.h"
 #include "app/serial_input/serial_input.h"
+#include "app/bluetooth/bt_manager.h"
+#include "app/bluetooth/bt_uart_service.h"
 #include "hal/hal_display.h"
 #include "hal/hal_input.h"
 #include "hal/hal_system.h"
@@ -21,13 +23,14 @@
 /* ═══ 状态变量 ═══ */
 
 bool        sm_running = false;
-bool        sm_debug = false;
+sm_source_t sm_source = SM_SOURCE_SER;
 uint8_t     sm_selected = 0;
+bool        sm_bt_connected = false;
 static uint32_t    sm_blink_tick = 0;
 static bool        sm_blink_on = false;
 sm_buffer_t sm_buffer;
 
-/* Phase 2: 动画状态 */
+/* 动画状态 */
 float       sm_entry_offset = 0.0f;
 static float       sm_btn_alpha_0 = 1.0f;
 float       sm_btn_alpha_1 = 0.0f;
@@ -38,11 +41,48 @@ float       sm_btn_alpha_1 = 0.0f;
 static char        sm_rx_buf[SM_TERM_LINE_LEN];
 static uint8_t     sm_rx_len = 0;
 static bool        s_prev_landscape = true; /* 保存进入前的屏幕方向 */
+
+/* BT RX 行组装缓冲区（迁移自 ble_serial.cpp） */
+static char     sm_bt_rx_buf[SM_TERM_LINE_LEN];
+static uint8_t  sm_bt_rx_len = 0;
+static uint32_t sm_bt_rx_count = 0;  /* BT RX 字节计数 */
+static bool     sm_prev_bt_connected = false; /* 连接状态变化检测 */
 #endif
 
 /* ═══ 常量 ═══ */
 
-#define SM_BLINK_PERIOD 500  /* 反色闪烁周期（毫秒，保留向后兼容） */
+#define SM_BLINK_PERIOD 500  /* 反色闪烁周期（毫秒） */
+
+#ifndef NATIVE_TEST
+/**
+ * @brief BT RX 回调（在 bt_mgr_update 轮询上下文中执行）
+ * @note  行组装逻辑：逐字节累积，遇 \n/\r 时写入 sm_buffer
+ */
+static void sm_on_bt_rx(const uint8_t *data, uint16_t len)
+{
+    for (uint16_t i = 0; i < len; i++) {
+        char c = (char)data[i];
+        sm_bt_rx_count++;
+        if (c == '\n' || c == '\r') {
+            if (sm_bt_rx_len > 0) {
+                sm_bt_rx_buf[sm_bt_rx_len] = '\0';
+                sm_buffer_add_line(&sm_buffer, sm_bt_rx_buf, true);
+                sm_bt_rx_len = 0;
+            }
+        } else if (sm_bt_rx_len < SM_TERM_LINE_LEN - 1) {
+            sm_bt_rx_buf[sm_bt_rx_len++] = c;
+        }
+    }
+}
+
+/**
+ * @brief BT 连接状态变化回调
+ */
+static void sm_on_bt_connect(bool connected)
+{
+    sm_bt_connected = connected;
+}
+#endif
 
 /**
  * @brief 初始化串口监视器 App
@@ -52,19 +92,23 @@ void serial_monitor_init(void *ud)
 {
     (void)ud;
     sm_running = false;
-    sm_debug = false;
+    sm_source = SM_SOURCE_SER;
     sm_selected = 0;
+    sm_bt_connected = false;
     sm_blink_tick = hal_get_ticks();
     sm_blink_on = false;
     sm_buffer_init(&sm_buffer);
 
-    /* Phase 2: 初始化动画状态 */
+    /* 初始化动画状态 */
     sm_entry_offset = (float)SCREEN_HEIGHT;
     sm_btn_alpha_0 = 100.0f;
     sm_btn_alpha_1 = 0.0f;
 
 #ifndef NATIVE_TEST
     sm_rx_len = 0;
+    sm_bt_rx_len = 0;
+    sm_bt_rx_count = 0;
+    sm_prev_bt_connected = false;
     s_prev_landscape = g_is_landscape;
     if (!g_is_landscape) {
         /* 从竖屏菜单进入时临时切换到横屏 */
@@ -77,6 +121,10 @@ void serial_monitor_init(void *ud)
     }
     hal_input_reset_events();
     hal_input_set_double_click_enabled(true);
+
+    /* 注册 BT 回调（BLE 模式下使用） */
+    bt_uart_set_rx_callback(sm_on_bt_rx);
+    bt_uart_set_connect_callback(sm_on_bt_connect);
 #endif
 }
 
@@ -102,7 +150,15 @@ void serial_monitor_loop(void *ud)
         if (sm_selected == 0) {
             sm_running = !sm_running;
         } else {
-            sm_debug = !sm_debug;
+            /* 切换数据源 SER ↔ BLE */
+            if (sm_source == SM_SOURCE_SER) {
+                sm_source = SM_SOURCE_BLE;
+                sm_bt_connected = bt_uart_is_connected();
+            } else {
+                sm_source = SM_SOURCE_SER;
+            }
+            /* 切换源时清空缓冲区，避免混淆 */
+            sm_buffer_clear(&sm_buffer);
         }
     }
 
@@ -121,7 +177,7 @@ void serial_monitor_loop(void *ud)
         }
     }
 
-    /* ── Phase 2: 动画更新 ── */
+    /* ── 动画更新 ── */
 
     /* 入场滑入动画 */
     xerintosh_animation(&sm_entry_offset, 0.0f, ANIM_SPEED_EXIT);
@@ -139,21 +195,37 @@ void serial_monitor_loop(void *ud)
         sm_blink_on = !sm_blink_on;
     }
 
-    /* 第八步：绘制界面 */
+#ifndef NATIVE_TEST
+    /* BLE 模式下：更新连接状态 + 弹窗提示 */
+    if (sm_source == SM_SOURCE_BLE && sm_running) {
+        sm_bt_connected = bt_uart_is_connected();
+        if (sm_bt_connected != sm_prev_bt_connected) {
+            xerintosh_push_pop_up(
+                sm_bt_connected ? "Connected" : "Disconnected", 1500);
+            sm_prev_bt_connected = sm_bt_connected;
+        }
+    }
+#endif
+
+    /* 绘制界面 */
     serial_monitor_draw();
 }
 
 /**
  * @brief 退出串口监视器 App
- * @note  NORM 模式下清空缓冲区；DEBUG 模式下保留历史缓存
+ * @note  清空缓冲区、注销 BT 回调、恢复屏幕方向
  */
 void serial_monitor_exit(void *ud)
 {
     (void)ud;
-    if (!sm_debug) {
-        sm_buffer_clear(&sm_buffer);
-    }
+    /* 始终清空缓冲区 */
+    sm_buffer_clear(&sm_buffer);
+
 #ifndef NATIVE_TEST
+    /* 注销 BT 回调 */
+    bt_uart_set_rx_callback(NULL);
+    bt_uart_set_connect_callback(NULL);
+
     if (!s_prev_landscape) {
         /* 恢复之前的竖屏方向 */
         g_is_landscape = false;
@@ -171,12 +243,16 @@ void serial_monitor_exit(void *ud)
 /**
  * @brief 后台串口数据读取
  * @note  供 main.cpp 的 loop() 每帧调用。
- *        仅在 START 或 DEBUG 状态下读取串口数据。
+ *        仅在 SER 模式下读取硬件 UART 数据。
+ *        BLE 模式下数据由 bt_uart_poll → sm_on_bt_rx 回调写入。
  *        若 serial_input 处于 WAITING 状态，暂停读取避免竞争。
  */
 void serial_monitor_update(void)
 {
-    if (!sm_running && !sm_debug) return;
+    if (!sm_running) return;
+
+    /* BLE 模式：数据由 bt_uart_poll → sm_on_bt_rx 回调写入，无需在此处主动读取 */
+    if (sm_source != SM_SOURCE_SER) return;
 
     /*
      * 当 serial_input 正在等待密码/配对码时，不消费串口字符。
@@ -204,7 +280,12 @@ void serial_monitor_update(void)
 #endif
 }
 
+/**
+ * @brief 查询串口监视器是否正在活跃
+ * @note  仅在 SER 模式运行时阻止 dev_ttyS0 消费 Serial 数据。
+ *        BLE 模式下不消费硬件 UART，Shell 和 dev_ttyS0 应正常工作。
+ */
 extern "C" bool serial_monitor_is_active(void)
 {
-    return sm_running || sm_debug;
+    return sm_running && sm_source == SM_SOURCE_SER;
 }

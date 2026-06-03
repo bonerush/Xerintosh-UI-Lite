@@ -2,6 +2,7 @@
  * @file   sm_app.h
  * @brief  串口监视器 App 内部状态头文件
  * @details 声明串口监视器的全局状态变量和动画变量（供 sm_ui.c 等内部模块使用）。
+ *          支持有线串口（SER）和蓝牙串口（BLE）双数据源。
  *
  * @copyright Copyright (c) 2026
  */
@@ -17,14 +18,25 @@
 extern "C" {
 #endif
 
+/* ═══ 数据源枚举 ═══ */
+
+typedef enum {
+    SM_SOURCE_SER = 0,   /* 有线串口（USB UART） */
+    SM_SOURCE_BLE = 1,   /* 蓝牙串口（Classic BT SPP） */
+} sm_source_t;
+
 /* ═══ 全局状态 ═══ */
 
-extern bool        sm_running;      /* 监视器是否正在工作 */
-extern bool        sm_debug;        /* DEBUG 模式 */
-extern uint8_t     sm_selected;     /* 0 = START/STOP, 1 = NORM/DEBUG */
+extern bool        sm_running;      /* 监视器是否正在捕获数据 */
+extern sm_source_t sm_source;       /* 当前数据源：SER 或 BLE */
+extern uint8_t     sm_selected;     /* 0 = START/STOP, 1 = SER/BLE */
 extern sm_buffer_t sm_buffer;       /* 终端缓冲区 */
 
-/* ═══ 动画状态（Phase 2）═══ */
+/* ═══ BLE 连接状态（供 sm_ui.c 读取） ═══ */
+
+extern bool        sm_bt_connected; /* BT 客户端是否已连接 */
+
+/* ═══ 动画状态 ═══ */
 
 extern float       sm_entry_offset;   /* 入场滑入偏移（SCREEN_HEIGHT → 0） */
 extern float       sm_btn_alpha_1;    /* 按钮 1 高亮度 (0.0~1.0) */
