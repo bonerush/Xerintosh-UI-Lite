@@ -5,4 +5,5 @@
 .vscode/ipch
 .DS_Store
 .playwright-mcp/
+.worktrees/
 
