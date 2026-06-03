@@ -66,6 +66,7 @@ bool tu_api_fetch_kimi(const char *api_key, tu_kimi_usage_t *out) {
 #else
 /* Native stubs */
 bool tu_api_fetch_deepseek(const char *api_key, tu_deepseek_balance_t *out) {
+    if (!api_key || !out) return false;
     out->total_balance = 4.95f;
     out->granted_balance = 0.0f;
     out->topped_up_balance = 4.95f;
@@ -74,6 +75,7 @@ bool tu_api_fetch_deepseek(const char *api_key, tu_deepseek_balance_t *out) {
 }
 
 bool tu_api_fetch_kimi(const char *api_key, tu_kimi_usage_t *out) {
+    if (!api_key || !out) return false;
     out->daily_tokens = 12345.0f;
     out->rate_limit = 100000.0f;
     out->is_limited = false;
