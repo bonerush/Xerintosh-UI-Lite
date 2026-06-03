@@ -18,6 +18,7 @@
 #include "serial_monitor/serial_monitor.h"
 #include "taskmgr/taskmgr.h"
 #include "about/about.h"
+#include "app/token_usage/token_usage.h"
 #include "shutdown/power_key_popup.h"
 
 #include "ui/ui_item.h"
@@ -63,6 +64,7 @@ static void on_baud_selected_cb(void *ud);
  *        │       └── 230400（按钮）
  *        ├── 任务管理器（user_item）
  *        ├── 串口监视器（user_item）
+ *        ├── Token Usage（user_item）
  *        └── 关于（user_item）
  */
 void app_init_ui(void)
@@ -74,6 +76,8 @@ void app_init_ui(void)
         "任务管理器", taskmgr_init, taskmgr_loop, taskmgr_exit, user_icon);
     xerintosh_list_item_t* item3 = xerintosh_new_user_item(
         "串口监视器", serial_monitor_init, serial_monitor_loop, serial_monitor_exit, default_icon);
+    xerintosh_list_item_t* tu_item = xerintosh_new_user_item(
+        "Token Usage", token_usage_init, token_usage_loop, token_usage_exit, default_icon);
     xerintosh_list_item_t* item4 = xerintosh_new_user_item(
         "关于", about_init, about_loop, about_exit, user_icon);
 
@@ -106,6 +110,7 @@ void app_init_ui(void)
     xerintosh_push_item_to_list(root, item1);
     xerintosh_push_item_to_list(root, item2);
     xerintosh_push_item_to_list(root, item3);
+    xerintosh_push_item_to_list(root, tu_item);
     xerintosh_push_item_to_list(root, item4);  /* 关于（永远最后） */
     xerintosh_push_item_to_list(item1, sw1);
     xerintosh_push_item_to_list(item1, sw2);
