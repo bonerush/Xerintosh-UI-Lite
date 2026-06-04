@@ -2,13 +2,14 @@
  * @file   kern_devices.c
  * @brief  物理设备初始化实现
  * @details 注册 /dev/fb0, /dev/input0, /dev/pwrkey, /dev/ttyS0 到 VFS。
+ *          /dev/pwrkey 使用统一设备模型（kern_device_t）。
  *
  * @copyright Copyright (c) 2026
  */
-
 #include "kern_devices.h"
 #include "../kern_devfs.h"
 #include "../kern_init.h"
+#include "../kern_device.h"
 
 #include "dev_fb0.h"
 #include "dev_input0.h"
@@ -40,8 +41,8 @@ int kern_devices_init(void)
         return rc;
     }
 
-    rc = kern_dev_register("pwrkey", dev_pwrkey_get_fops(),
-                            KERN_FILE_CHRDEV, NULL);
+    /* /dev/pwrkey — Proof-of-Concept: 使用统一设备模型 */
+    rc = kern_devfs_register_device(&g_pwrkey_dev);
     if (rc != KERN_OK) {
         kern_log(KERN_LOG_ERROR, "failed to register /dev/pwrkey: %d", rc);
         return rc;

@@ -29,6 +29,7 @@ struct kern_dentry;
  * @note  每个 inode 可以挂载不同的操作函数，实现多态
  */
 typedef struct kern_file_ops {
+    int     (*open)(struct kern_file *f, unsigned int flags);
     ssize_t (*read)(struct kern_file *f, char *buf, size_t len);
     ssize_t (*write)(struct kern_file *f, const char *buf, size_t len);
     int     (*ioctl)(struct kern_file *f, unsigned int cmd, unsigned long arg);

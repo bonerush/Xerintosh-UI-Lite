@@ -1,7 +1,7 @@
 /**
  * @file   dev_pwrkey.c
- * @brief  /dev/pwrkey 电源键设备实现
- * @details 将 HAL 电源键事件映射为 VFS 文件操作。
+ * @brief  /dev/pwrkey 电源键设备实现（新设备模型）
+ * @details 实现 kern_device_ops_t 的五项回调，
  *          read() 返回结构化电源键事件（9 字节）。
  *
  * @copyright Copyright (c) 2026
@@ -13,11 +13,25 @@
 
 #include <string.h>
 
-/* ═══ read ═══ */
+/* ═══ 设备回调实现 ═══ */
 
-static ssize_t dev_pwrkey_read(kern_file_t *f, char *buf, size_t len)
+static int pwrkey_open(kern_device_t *dev, int flags)
 {
-    (void)f;
+    (void)dev;
+    (void)flags;
+    return KERN_OK;
+}
+
+static int pwrkey_close(kern_device_t *dev)
+{
+    (void)dev;
+    return KERN_OK;
+}
+
+static int pwrkey_read(kern_device_t *dev, void *buf, size_t len, size_t *offset)
+{
+    (void)dev;
+    (void)offset;
 
     if (len < DEV_PWRKEY_EVENT_SIZE) {
         return KERN_EINVAL;
@@ -38,24 +52,39 @@ static ssize_t dev_pwrkey_read(kern_file_t *f, char *buf, size_t len)
     return DEV_PWRKEY_EVENT_SIZE;
 }
 
-/* ═══ release ═══ */
-
-static int dev_pwrkey_release(kern_file_t *f)
+static int pwrkey_write(kern_device_t *dev, const void *buf, size_t len, size_t *offset)
 {
-    (void)f;
-    return KERN_OK;
+    (void)dev;
+    (void)buf;
+    (void)len;
+    (void)offset;
+    return KERN_EINVAL;  /* 电源键设备不支持写入 */
 }
 
-/* ═══ 操作表 ═══ */
+static int pwrkey_ioctl(kern_device_t *dev, unsigned int cmd, unsigned long arg)
+{
+    (void)dev;
+    (void)cmd;
+    (void)arg;
+    return KERN_ENOTTY;  /* 电源键设备不支持 ioctl */
+}
 
-static kern_file_ops_t g_dev_pwrkey_fops = {
-    .read    = dev_pwrkey_read,
-    .write   = NULL,
-    .ioctl   = NULL,
-    .release = dev_pwrkey_release,
+/* ═══ 设备操作表 ═══ */
+
+static kern_device_ops_t g_pwrkey_ops = {
+    .open  = pwrkey_open,
+    .close = pwrkey_close,
+    .read  = pwrkey_read,
+    .write = pwrkey_write,
+    .ioctl = pwrkey_ioctl,
 };
 
-kern_file_ops_t *dev_pwrkey_get_fops(void)
-{
-    return &g_dev_pwrkey_fops;
-}
+/* ═══ 设备描述符 ═══ */
+
+kern_device_t g_pwrkey_dev = {
+    .name         = "pwrkey",
+    .type         = KERN_DEV_CHAR,
+    .ops          = &g_pwrkey_ops,
+    .private_data = NULL,
+    .next         = NULL,
+};

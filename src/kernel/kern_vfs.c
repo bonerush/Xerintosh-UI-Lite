@@ -8,9 +8,12 @@
  */
 
 #include "kern_vfs.h"
+#include "kern_resource.h"
+#include "kern_task.h"
 
 #include <string.h>
 #include <stdlib.h>
+#include <stdint.h>
 
 /* ═══ 常量 ═══ */
 
@@ -294,6 +297,16 @@ static kern_file_t *fd_get(kern_fd_t fd)
     return &g_fd_table[fd];
 }
 
+/* ═══ FD 资源释放回调 ═══ */
+
+static void fd_release(void *ptr)
+{
+    kern_fd_t fd = (kern_fd_t)(intptr_t)ptr;
+    if (fd >= 0) {
+        kern_close(fd);
+    }
+}
+
 /* ═══ 文件操作 ═══ */
 
 kern_fd_t kern_open(const char *path, unsigned int flags)
@@ -322,6 +335,22 @@ kern_fd_t kern_open(const char *path, unsigned int flags)
     f->f_pos = 0;
     f->private_data = NULL;
 
+    /* 调用设备的 open 回调（如果存在） */
+    if (f->fops != NULL && f->fops->open != NULL) {
+        int open_rc = f->fops->open(f, flags);
+        if (open_rc != KERN_OK) {
+            memset(f, 0, sizeof(kern_file_t));
+            return open_rc;
+        }
+    }
+
+    /* 追踪 FD 到当前任务 */
+    kern_task_t *cur = kern_task_current();
+    if (cur != NULL) {
+        kern_resource_track(cur, (void *)(intptr_t)fd,
+                            KERN_RES_FD, fd_release);
+    }
+
     return fd;
 }
 
@@ -330,6 +359,12 @@ int kern_close(kern_fd_t fd)
     kern_file_t *f = fd_get(fd);
     if (f == NULL) {
         return KERN_EBADF;
+    }
+
+    /* 从资源追踪中移除 */
+    kern_task_t *cur = kern_task_current();
+    if (cur != NULL) {
+        kern_resource_untrack(cur, (void *)(intptr_t)fd);
     }
 
     /* 调用设备的 release 回调 */

@@ -71,8 +71,14 @@ typedef struct kern_task {
     /* 标志位 */
     uint8_t             flags;          /* KERN_TASK_FLAG_* */
 
+    /* SMP 亲和性 */
+    uint8_t             cpu_id;         /* 绑定的 CPU（KERN_CPU_ANY 表示自动分配） */
+
     /* 链表指针 */
     struct kern_task   *next;           /* 下一个任务（就绪/睡眠队列） */
+
+    /* 资源追踪 */
+    struct kern_resource *resource_head; /* 持有的资源链表头 */
 } kern_task_t;
 
 /* ═══ 任务标志位 ═══ */

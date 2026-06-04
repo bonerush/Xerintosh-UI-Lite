@@ -35,16 +35,15 @@
 /* ═══ 全局调度状态 ═══ */
 
 kern_task_t   *g_task_list = NULL;
-kern_task_t   *g_current_task = NULL;
-kern_task_t   *g_idle_task = NULL;
+/* g_current_task, g_idle_task, g_sched_ticks, g_need_resched
+   由 kern_smp.h 以宏形式提供（映射到 g_per_cpu[]） */
 kern_task_t   *g_last_picked = NULL;
 kern_pid_t     g_next_pid = 0;
 uint8_t        g_task_count = 0;
-uint32_t       g_sched_ticks = 0;
 static bool    g_sched_initialized = false;
 
 #ifdef CONFIG_PREEMPT_ENABLED
-volatile bool  g_need_resched = false;
+/* g_need_resched 由 kern_smp.h 宏映射到 g_per_cpu[].need_resched */
 #endif
 
 #ifdef NATIVE_TEST
@@ -62,6 +61,7 @@ void kern_sched_init(void)
 {
     if (g_sched_initialized) return;
     g_sched_initialized = true;
+    kern_smp_init();
 
     /* 注册默认调度类 */
     kern_sched_class_register(&sched_class_rr);
@@ -105,10 +105,11 @@ void kern_sched_init(void)
 
 #elif defined(XEROS_NATIVE_SCHED)
 
-void kern_sched_init(void)
+void kern_sched_init(void) /* XEROS_NATIVE_SCHED */
 {
     if (g_sched_initialized) return;
     g_sched_initialized = true;
+    kern_smp_init();
 
     kern_sched_class_register(&sched_class_rr);
 
@@ -147,6 +148,7 @@ void kern_sched_init(void)
 {
     if (g_sched_initialized) return;
     g_sched_initialized = true;
+    kern_smp_init();
 
     kern_port_init();
 

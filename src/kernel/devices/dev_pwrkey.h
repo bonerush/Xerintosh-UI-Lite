@@ -1,7 +1,7 @@
 /**
  * @file   dev_pwrkey.h
  * @brief  /dev/pwrkey 电源键设备头文件
- * @details 将 HAL 电源键事件映射为 VFS 文件操作。
+ * @details 使用统一设备模型（kern_device_t）注册，
  *          read() 返回结构化电源键事件（9 字节）。
  *
  * @copyright Copyright (c) 2026
@@ -11,7 +11,7 @@
 #define DEV_PWRKEY_H
 
 #include "../kern_types.h"
-#include "../kern_vfs.h"
+#include "../kern_device.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -30,13 +30,13 @@ typedef struct {
     uint32_t timestamp;  /* hal_get_ticks() 时间戳 */
 } dev_pwrkey_event_t;
 
-/* ═══ 设备操作表 ═══ */
+/* ═══ 设备描述符 ═══ */
 
 /**
- * @brief  获取 /dev/pwrkey 的文件操作表
- * @return 文件操作表指针（静态分配，始终有效）
+ * @brief /dev/pwrkey 设备实例（统一设备模型）
+ * @note  通过 kern_devfs_register_device(&g_pwrkey_dev) 注册
  */
-extern kern_file_ops_t *dev_pwrkey_get_fops(void);
+extern kern_device_t g_pwrkey_dev;
 
 #ifdef __cplusplus
 }

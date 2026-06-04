@@ -12,6 +12,7 @@
 
 #include "kern_task.h"
 #include "kern_sched_class.h"
+#include "kern_smp.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -24,13 +25,11 @@ extern "C" {
 /* ═══ 调度器全局状态 ═══ */
 
 extern kern_task_t   *g_task_list;        /* 任务链表头 */
-extern kern_task_t   *g_current_task;     /* 当前运行的任务 */
-extern kern_task_t   *g_idle_task;        /* idle 任务（兜底） */
+/* g_current_task, g_idle_task, g_sched_ticks, g_need_resched
+   由 kern_smp.h 以宏形式提供（per-CPU 访问） */
 extern kern_task_t   *g_last_picked;      /* 上一轮选中的任务（Round-Robin 扫描起点） */
 extern kern_pid_t     g_next_pid;         /* 下一个分配的 PID */
 extern uint8_t        g_task_count;       /* 任务总数 */
-extern uint32_t       g_sched_ticks;      /* 调度 tick 计数 */
-extern volatile bool  g_need_resched;     /* 抢占请求标志（tick/更高优先级入队时设置） */
 
 #ifdef NATIVE_TEST
 extern ucontext_t     g_sched_ctx;        /* 调度器上下文 */

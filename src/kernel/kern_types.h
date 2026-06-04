@@ -43,6 +43,7 @@ typedef int16_t kern_pid_t;
 #define KERN_PID_INVALID   (-1)   /* 无效 PID */
 #define KERN_MAX_TASKS     16     /* 最大并发任务数 */
 #define KERN_TASK_NAME_LEN 16     /* 任务名称最大长度 */
+#define KERN_CPU_ANY       0xFF   /* 自动分配 CPU（SMP） */
 
 /**
  * @brief 任务状态枚举

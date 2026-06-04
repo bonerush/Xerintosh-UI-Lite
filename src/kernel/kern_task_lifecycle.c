@@ -9,6 +9,7 @@
 
 #include "kern_sched.h"
 #include "kern_task.h"
+#include "kern_resource.h"
 #include "kern_init.h"
 #include "kern_port.h"
 #include "kern_sched_rr.h"
@@ -43,6 +44,7 @@ kern_pid_t kern_spawn(const char *name, void (*entry)(void *arg),
     task->state = KERN_TASK_READY;
     task->priority = 128;
     task->timeslice_remaining = SCHED_RR_DEFAULT_TIMESLICE;
+    task->cpu_id = KERN_CPU_ANY;
     task->entry = entry;
     task->arg = arg;
 
@@ -102,6 +104,7 @@ kern_pid_t kern_spawn(const char *name, void (*entry)(void *arg),
     task->state = KERN_TASK_READY;
     task->priority = 128;
     task->timeslice_remaining = SCHED_RR_DEFAULT_TIMESLICE;
+    task->cpu_id = KERN_CPU_ANY;
     task->entry = entry;
     task->arg = arg;
 
@@ -152,6 +155,7 @@ kern_pid_t kern_spawn(const char *name, void (*entry)(void *arg),
     task->state = KERN_TASK_READY;
     task->priority = 128;
     task->timeslice_remaining = SCHED_RR_DEFAULT_TIMESLICE;
+    task->cpu_id = KERN_CPU_ANY;
     task->entry = entry;
     task->arg = arg;
 
@@ -256,6 +260,8 @@ void kern_exit(void)
     kern_task_t *cur = g_current_task;
     if (cur == NULL) return;
 
+    kern_resource_release_all(cur);
+
     cur->state = KERN_TASK_ZOMBIE;
     kern_log(KERN_LOG_DEBUG, "task %d (%s) exited", cur->pid, cur->name);
 
@@ -269,6 +275,8 @@ void kern_exit(void)
 {
     kern_task_t *cur = g_current_task;
     if (cur == NULL) return;
+
+    kern_resource_release_all(cur);
 
     cur->state = KERN_TASK_ZOMBIE;
     kern_log(KERN_LOG_DEBUG, "task %d (%s) exited", cur->pid, cur->name);
@@ -285,6 +293,8 @@ void kern_exit(void)
 {
     kern_task_t *cur = g_current_task;
     if (cur == NULL) return;
+
+    kern_resource_release_all(cur);
 
     cur->state = KERN_TASK_ZOMBIE;
     kern_log(KERN_LOG_DEBUG, "task %d (%s) exited", cur->pid, cur->name);
@@ -389,7 +399,8 @@ int kern_task_kill(kern_pid_t pid)
         return 0;
     }
 
-    /* 非虚任务：标记 ZOMBIE */
+    /* 非虚任务：先释放追踪资源，再标记 ZOMBIE */
+    kern_resource_release_all(task);
     task->state = KERN_TASK_ZOMBIE;
     kern_log(KERN_LOG_DEBUG, "task %d (%s) killed", task->pid, task->name);
 
