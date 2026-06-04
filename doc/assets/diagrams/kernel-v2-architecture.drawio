@@ -1,0 +1,227 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="drawio" version="26.0.0">
+  <diagram name="Kernel Architecture">
+    <mxGraphModel dx="1200" dy="900" grid="1" gridSize="10">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        
+        <!-- Title -->
+        <mxCell id="title" value="Xeros 内核 v2 架构总览" style="text;html=1;fontSize=22;fontStyle=1;fontColor=#333333;align=center;" vertex="1" parent="1">
+          <mxGeometry x="300" y="20" width="500" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- Layer: App Layer -->
+        <mxCell id="app-layer" value="App 层 (user_item / settings / wifi / bt ...)" style="swimlane;startSize=30;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="60" y="80" width="980" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="app-task1" value="ui_task" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;" vertex="1" parent="app-layer">
+          <mxGeometry x="30" y="40" width="100" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="app-task2" value="wifi_task" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;" vertex="1" parent="app-layer">
+          <mxGeometry x="160" y="40" width="100" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="app-task3" value="shell_task" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;" vertex="1" parent="app-layer">
+          <mxGeometry x="290" y="40" width="100" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="app-dots" value="..." style="text;html=1;fontSize=14;" vertex="1" parent="app-layer">
+          <mxGeometry x="420" y="45" width="40" height="30" as="geometry" />
+        </mxCell>
+
+        <!-- Layer: UI Core -->
+        <mxCell id="ui-layer" value="UI 核心层 (item / core / drawer / context)" style="swimlane;startSize=30;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="60" y="195" width="980" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="ui-dispatch" value="类型派发表 O(1)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="ui-layer">
+          <mxGeometry x="30" y="35" width="120" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="ui-anim" value="动画引擎 (easing)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="ui-layer">
+          <mxGeometry x="170" y="35" width="120" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="ui-drawer" value="选择器 (XOR 高亮)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="ui-layer">
+          <mxGeometry x="310" y="35" width="120" height="26" as="geometry" />
+        </mxCell>
+
+        <!-- Layer: Xeros Kernel v2 -->
+        <mxCell id="kernel-layer" value="Xeros 内核 v2 (调度 / VFS / 同步 / 资源 / 内存保护 / 设备模型)" style="swimlane;startSize=30;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="60" y="280" width="980" height="370" as="geometry" />
+        </mxCell>
+
+        <!-- Kernel sub: Scheduler group -->
+        <mxCell id="sched-group" value="调度器子系统" style="swimlane;startSize=22;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;fontStyle=1;" vertex="1" parent="kernel-layer">
+          <mxGeometry x="20" y="40" width="300" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="sched-class" value="调度类注册表&#xa;kern_sched_class_t[]" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="sched-group">
+          <mxGeometry x="10" y="30" width="130" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="sched-rr" value="Round-Robin&#xa;(sched_class_rr)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" vertex="1" parent="sched-group">
+          <mxGeometry x="10" y="80" width="130" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="sched-fifo" value="优先级 FIFO&#xa;(sched_class_fifo)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" vertex="1" parent="sched-group">
+          <mxGeometry x="160" y="80" width="130" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="sched-smp" value="per-CPU 数组&#xa;g_per_cpu[2]" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="sched-group">
+          <mxGeometry x="160" y="30" width="130" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="sched-task" value="TCB (kern_task_t)&#xa;Round-Robin + 动态栈" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="sched-group">
+          <mxGeometry x="10" y="125" width="280" height="18" as="geometry" />
+        </mxCell>
+
+        <!-- Kernel sub: VFS group -->
+        <mxCell id="vfs-group" value="VFS 虚拟文件系统" style="swimlane;startSize=22;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;fontStyle=1;" vertex="1" parent="kernel-layer">
+          <mxGeometry x="340" y="40" width="300" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="vfs-core" value="inode / dentry / file&#xa;三级结构" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="vfs-group">
+          <mxGeometry x="10" y="30" width="130" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="vfs-devfs" value="devfs (/dev)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" vertex="1" parent="vfs-group">
+          <mxGeometry x="160" y="30" width="130" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="vfs-procfs" value="procfs (/proc)&#xa;sysfs (/sys)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" vertex="1" parent="vfs-group">
+          <mxGeometry x="10" y="80" width="130" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="vfs-gpiofs" value="gpiofs (/sys/gpio)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" vertex="1" parent="vfs-group">
+          <mxGeometry x="160" y="80" width="130" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="vfs-device-bridge" value="设备模型 VFS Bridge" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;fontStyle=1;" vertex="1" parent="vfs-group">
+          <mxGeometry x="75" y="125" width="150" height="18" as="geometry" />
+        </mxCell>
+
+        <!-- Kernel sub: New v2 modules group -->
+        <mxCell id="v2-group" value="v2 新增模块" style="swimlane;startSize=22;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;fontStyle=1;" vertex="1" parent="kernel-layer">
+          <mxGeometry x="660" y="40" width="300" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="v2-smp" value="SMP 多核&#xa;per-CPU / CPU ID" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="v2-group">
+          <mxGeometry x="10" y="30" width="130" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="v2-sync" value="同步原语&#xa;spinlock / mutex" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="v2-group">
+          <mxGeometry x="160" y="30" width="130" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="v2-resource" value="资源追踪&#xa;链表自动回收" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="v2-group">
+          <mxGeometry x="10" y="80" width="130" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="v2-kmalloc" value="内核分配器&#xa;kmalloc/kfree" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="v2-group">
+          <mxGeometry x="160" y="80" width="130" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="v2-device" value="统一设备模型" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="v2-group">
+          <mxGeometry x="10" y="125" width="130" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="v2-mpu" value="MPU 内存保护" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="v2-group">
+          <mxGeometry x="160" y="125" width="130" height="18" as="geometry" />
+        </mxCell>
+
+        <!-- Kernel sub: Shell + Devices -->
+        <mxCell id="shell-dev-group" value="Shell 与物理设备" style="swimlane;startSize=22;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;fontStyle=1;" vertex="1" parent="kernel-layer">
+          <mxGeometry x="20" y="210" width="300" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="shell" value="Shell (30+ 命令)&#xa;解析器 / 动态注册" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;" vertex="1" parent="shell-dev-group">
+          <mxGeometry x="10" y="30" width="135" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="devices" value="物理设备&#xa;/dev/fb0 / input0 / ttyS0" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;" vertex="1" parent="shell-dev-group">
+          <mxGeometry x="155" y="30" width="135" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- Kernel sub: Init + Port + Types -->
+        <mxCell id="infra-group" value="基础设施" style="swimlane;startSize=22;fillColor=#f5f5f5;strokeColor=#666666;fontSize=11;fontStyle=1;" vertex="1" parent="kernel-layer">
+          <mxGeometry x="340" y="210" width="620" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="infra-init" value="kern_init()&#xa;启动序列" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=10;" vertex="1" parent="infra-group">
+          <mxGeometry x="10" y="28" width="90" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="infra-types" value="类型系统&#xa;errno / PID / 状态" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=10;" vertex="1" parent="infra-group">
+          <mxGeometry x="115" y="28" width="100" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="infra-port" value="可移植层&#xa;FreeRTOS / Native" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=10;" vertex="1" parent="infra-group">
+          <mxGeometry x="230" y="28" width="110" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="infra-version" value="版本信息" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=10;" vertex="1" parent="infra-group">
+          <mxGeometry x="355" y="28" width="80" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="infra-kmalloc2" value="内核分配器" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=10;" vertex="1" parent="infra-group">
+          <mxGeometry x="450" y="28" width="80" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="infra-resource2" value="资源追踪" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=10;" vertex="1" parent="infra-group">
+          <mxGeometry x="540" y="28" width="70" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- Layer: HAL / FreeRTOS -->
+        <mxCell id="hal-layer" value="HAL 层 (display / input / system) + FreeRTOS + Arduino (WiFi/BT 协议栈)" style="swimlane;startSize=30;fillColor=#f5f5f5;strokeColor=#666666;fontStyle=1;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="60" y="665" width="980" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="hal-display" value="TFT 双缓冲 (M5Canvas)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" vertex="1" parent="hal-layer">
+          <mxGeometry x="30" y="38" width="140" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="hal-input" value="按键消抖 (short/long)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" vertex="1" parent="hal-layer">
+          <mxGeometry x="200" y="38" width="140" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="hal-freertos" value="FreeRTOS (WiFi/BT 协议栈)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=10;" vertex="1" parent="hal-layer">
+          <mxGeometry x="370" y="38" width="160" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="hal-mpu-chip" value="ESP32 MPU (PMS_C0~C7)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="hal-layer">
+          <mxGeometry x="560" y="38" width="150" height="28" as="geometry" />
+        </mxCell>
+
+        <!-- Arrows: App → UI → Kernel -->
+        <mxCell id="arrow-app-ui" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#999999;endArrow=classic;" edge="1" parent="1" source="app-layer" target="ui-layer">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="arrow-ui-kernel" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#999999;endArrow=classic;" edge="1" parent="1" source="ui-layer" target="kernel-layer">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="arrow-kernel-hal" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#999999;endArrow=classic;" edge="1" parent="1" source="kernel-layer" target="hal-layer">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Annotations -->
+        <mxCell id="note-smp" value="CONFIG_SMP_ENABLED&#xa;守卫下零开销退化" style="shape=note;whiteSpace=wrap;html=1;size=12;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=9;align=left;" vertex="1" parent="1">
+          <mxGeometry x="690" y="355" width="130" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="note-mpu" value="CONFIG_MPU_ENABLED&#xa;守卫下零开销退化" style="shape=note;whiteSpace=wrap;html=1;size=12;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=9;align=left;" vertex="1" parent="1">
+          <mxGeometry x="690" y="405" width="130" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="note-preempt" value="CONFIG_PREEMPT_ENABLED&#xa;抢占式调度守卫" style="shape=note;whiteSpace=wrap;html=1;size=12;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=9;align=left;" vertex="1" parent="1">
+          <mxGeometry x="690" y="455" width="130" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- Legend -->
+        <mxCell id="legend-box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#cccccc;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="850" y="355" width="190" height="155" as="geometry" />
+        </mxCell>
+        <mxCell id="legend-title" value="图例" style="text;html=1;fontSize=12;fontStyle=1;fontColor=#333333;" vertex="1" parent="1">
+          <mxGeometry x="910" y="360" width="60" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="legend-core" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
+          <mxGeometry x="860" y="385" width="20" height="14" as="geometry" />
+        </mxCell>
+        <mxCell id="legend-core-label" value="v1 原有模块" style="text;html=1;fontSize=9;fontColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="885" y="383" width="70" height="16" as="geometry" />
+        </mxCell>
+        <mxCell id="legend-new" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="860" y="410" width="20" height="14" as="geometry" />
+        </mxCell>
+        <mxCell id="legend-new-label" value="v2 新增模块" style="text;html=1;fontSize=9;fontColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="885" y="408" width="70" height="16" as="geometry" />
+        </mxCell>
+        <mxCell id="legend-bridge" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="860" y="435" width="20" height="14" as="geometry" />
+        </mxCell>
+        <mxCell id="legend-bridge-label" value="VFS Bridge 桥接" style="text;html=1;fontSize=9;fontColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="885" y="433" width="85" height="16" as="geometry" />
+        </mxCell>
+        <mxCell id="legend-config" value="" style="shape=note;whiteSpace=wrap;html=1;size=6;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="860" y="460" width="20" height="14" as="geometry" />
+        </mxCell>
+        <mxCell id="legend-config-label" value="编译时守卫" style="text;html=1;fontSize=9;fontColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="885" y="458" width="70" height="16" as="geometry" />
+        </mxCell>
+        <mxCell id="legend-green" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="860" y="480" width="20" height="14" as="geometry" />
+        </mxCell>
+        <mxCell id="legend-green-label" value="实现/实体" style="text;html=1;fontSize=9;fontColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="885" y="478" width="70" height="16" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

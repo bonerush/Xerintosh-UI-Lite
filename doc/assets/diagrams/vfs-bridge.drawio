@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="drawio" version="26.0.0">
+  <diagram name="VFS Bridge">
+    <mxGraphModel dx="1100" dy="750" grid="1" gridSize="10">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <mxCell id="title" value="VFS Bridge: kern_device_t → kern_file_ops_t 桥接机制" style="text;html=1;fontSize=18;fontStyle=1;fontColor=#333333;align=center;" vertex="1" parent="1">
+          <mxGeometry x="150" y="15" width="600" height="35" as="geometry" />
+        </mxCell>
+
+        <!-- Left: User space -->
+        <mxCell id="user-box" value="用户态任务" style="swimlane;startSize=25;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="80" width="200" height="180" as="geometry" />
+        </mxCell>
+        <mxCell id="user-open" value="sys_open("/dev/fb0", ...)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;" vertex="1" parent="user-box">
+          <mxGeometry x="10" y="35" width="180" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="user-read" value="sys_read(fd, buf, size)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;" vertex="1" parent="user-box">
+          <mxGeometry x="10" y="75" width="180" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="user-write" value="sys_write(fd, buf, size)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;" vertex="1" parent="user-box">
+          <mxGeometry x="10" y="115" width="180" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="user-close" value="sys_close(fd)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;" vertex="1" parent="user-box">
+          <mxGeometry x="10" y="150" width="180" height="25" as="geometry" />
+        </mxCell>
+
+        <!-- Center: VFS Layer -->
+        <mxCell id="vfs-box" value="VFS 层 (kern_vfs.c)" style="swimlane;startSize=25;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="280" y="80" width="200" height="180" as="geometry" />
+        </mxCell>
+        <mxCell id="vfs-open" value="kern_vfs_open()&#xa;→ 路径解析 → 分配 fd" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="vfs-box">
+          <mxGeometry x="10" y="35" width="180" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="vfs-dispatch" value="dispatch: inode→i_fops→read()" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;fontStyle=2;" vertex="1" parent="vfs-box">
+          <mxGeometry x="10" y="75" width="180" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="vfs-dispatch-w" value="dispatch: inode→i_fops→write()" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;fontStyle=2;" vertex="1" parent="vfs-box">
+          <mxGeometry x="10" y="115" width="180" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="vfs-close" value="→ inode→i_fops→release()" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="vfs-box">
+          <mxGeometry x="10" y="150" width="180" height="25" as="geometry" />
+        </mxCell>
+
+        <!-- Right: Bridge -->
+        <mxCell id="bridge-box" value="VFS Bridge (kern_device.c)" style="swimlane;startSize=25;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="520" y="80" width="230" height="180" as="geometry" />
+        </mxCell>
+        <mxCell id="bridge-open" value="bridge_open()&#xa;→ dev→ops→open(dev, flags)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=10;fontStyle=2;" vertex="1" parent="bridge-box">
+          <mxGeometry x="10" y="35" width="210" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="bridge-read" value="bridge_read()&#xa;→ dev→ops→read(dev, buf, len, &amp;f_pos)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=10;fontStyle=2;" vertex="1" parent="bridge-box">
+          <mxGeometry x="10" y="75" width="210" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="bridge-write" value="bridge_write()&#xa;→ dev→ops→write(dev, buf, len, &amp;f_pos)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=10;fontStyle=2;" vertex="1" parent="bridge-box">
+          <mxGeometry x="10" y="115" width="210" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="bridge-close" value="bridge_release() → dev→ops→close()" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=10;fontStyle=2;" vertex="1" parent="bridge-box">
+          <mxGeometry x="10" y="150" width="210" height="25" as="geometry" />
+        </mxCell>
+
+        <!-- Bottom: Device implementations -->
+        <mxCell id="dev-box" value="设备驱动实现 (kern_device_ops_t)" style="swimlane;startSize=25;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="310" width="710" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="dev-fb0" value="dev_fb0&#xa;ops {&#xa;  .open  → NULL&#xa;  .read  → NULL&#xa;  .write → fb0_write()&#xa;  .ioctl → NULL&#xa;  .close → NULL&#xa;}" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=9;align=left;" vertex="1" parent="dev-box">
+          <mxGeometry x="10" y="30" width="160" height="95" as="geometry" />
+        </mxCell>
+        <mxCell id="dev-input0" value="dev_input0&#xa;ops {&#xa;  .open  → NULL&#xa;  .read  → input0_read()&#xa;  .write → NULL&#xa;  .ioctl → NULL&#xa;  .close → NULL&#xa;}" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=9;align=left;" vertex="1" parent="dev-box">
+          <mxGeometry x="185" y="30" width="160" height="95" as="geometry" />
+        </mxCell>
+        <mxCell id="dev-ttys0" value="dev_ttyS0&#xa;ops {&#xa;  .open  → ttyS0_open()&#xa;  .read  → ttyS0_read()&#xa;  .write → ttyS0_write()&#xa;  .ioctl → NULL&#xa;  .close → NULL&#xa;}" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=9;align=left;" vertex="1" parent="dev-box">
+          <mxGeometry x="360" y="30" width="160" height="95" as="geometry" />
+        </mxCell>
+        <mxCell id="dev-pwrkey" value="dev_pwrkey (v2 新模型)&#xa;kern_device_ops_t {&#xa;  .open → pwrkey_open()&#xa;  ...&#xa;}" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=9;align=left;fontStyle=2;" vertex="1" parent="dev-box">
+          <mxGeometry x="535" y="30" width="165" height="95" as="geometry" />
+        </mxCell>
+
+        <!-- Arrows: User → VFS -->
+        <mxCell id="arrow-u-v" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;strokeColor=#999999;" edge="1" parent="1" source="user-box" target="vfs-box">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Arrows: VFS → Bridge -->
+        <mxCell id="arrow-v-b" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;strokeColor=#cc0000;" edge="1" parent="1" source="vfs-box" target="bridge-box">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Arrows: Bridge → Devices -->
+        <mxCell id="arrow-b-fb0" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;strokeColor=#6c8ebf;exitX=0.25;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="bridge-box" target="dev-fb0">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="578" y="290" />
+              <mxPoint x="130" y="290" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="arrow-b-input0" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;strokeColor=#6c8ebf;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="bridge-box" target="dev-input0">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="635" y="290" />
+              <mxPoint x="265" y="290" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="arrow-b-ttys0" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;strokeColor=#6c8ebf;exitX=0.75;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="bridge-box" target="dev-ttys0">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="693" y="290" />
+              <mxPoint x="440" y="290" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- key insight note -->
+        <mxCell id="note-key" value="关键: file_to_dev()&#xa;f→inode→private_data → kern_device_t*&#xa;&#xa;共享单例: g_device_bridge_fops&#xa;所有设备共用同一份 bridge fops" style="shape=note;whiteSpace=wrap;html=1;size=14;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=9;align=left;fontStyle=2;" vertex="1" parent="1">
+          <mxGeometry x="790" y="80" width="220" height="100" as="geometry" />
+        </mxCell>
+
+        <mxCell id="note-register" value="设备注册流程:&#xa;kern_device_register(dev)&#xa;→ 前插到 g_device_list&#xa;kern_devfs_register_device(dev)&#xa;→ 创建 /dev/xxx inode&#xa;→ i_fops = bridge fops&#xa;→ private_data = dev" style="shape=note;whiteSpace=wrap;html=1;size=14;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=9;align=left;fontStyle=2;" vertex="1" parent="1">
+          <mxGeometry x="790" y="200" width="220" height="120" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

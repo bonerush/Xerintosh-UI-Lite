@@ -1,6 +1,6 @@
 # 项目系统（UI Item）
 
-> **Parent:** [知识地图](../index.md) | **Related:** [核心引擎](core.md), [绘制管线](drawer.md), [绘制驱动适配](draw-driver.md)
+> **Parent:** [知识地图](../index.md) | **Related:** [核心引擎](core.md), [绘制管线](drawer.md)
 
 ## 概述
 

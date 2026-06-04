@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="drawio" version="26.0.0">
+  <diagram name="SMP Architecture">
+    <mxGraphModel dx="1000" dy="700" grid="1" gridSize="10">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <mxCell id="title" value="SMP 多核架构：per-CPU 数据与 CONFIG 守卫" style="text;html=1;fontSize=18;fontStyle=1;fontColor=#333333;align=center;" vertex="1" parent="1">
+          <mxGeometry x="150" y="15" width="550" height="35" as="geometry" />
+
+        <!-- CONFIG_SMP_ENABLED mode -->
+        <mxCell id="smp-mode" value="CONFIG_SMP_ENABLED 已定义（双核模式）" style="swimlane;startSize=28;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="70" width="920" height="260" as="geometry" />
+        </mxCell>
+
+        <!-- CPU 0 -->
+        <mxCell id="cpu0-box" value="PRO_CPU (Core 0)" style="swimlane;startSize=22;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;fontStyle=1;" vertex="1" parent="smp-mode">
+          <mxGeometry x="20" y="35" width="420" height="210" as="geometry" />
+        </mxCell>
+        <mxCell id="cpu0-percpu" value="g_per_cpu[0]" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;fontStyle=1;" vertex="1" parent="cpu0-box">
+          <mxGeometry x="10" y="30" width="200" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="cpu0-fields" value="cpu_id: 0&#xa;current_task: → ui_task TCB&#xa;idle_task: → idle_0 TCB&#xa;sched_ticks: 12345&#xa;need_resched: false" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=10;align=left;fontStyle=2;" vertex="1" parent="cpu0-box">
+          <mxGeometry x="10" y="70" width="200" height="75" as="geometry" />
+        </mxCell>
+        <mxCell id="cpu0-macros" value="宏展开:&#xa;g_current_task → g_per_cpu[0].current_task&#xa;g_idle_task    → g_per_cpu[0].idle_task&#xa;g_sched_ticks  → g_per_cpu[0].sched_ticks" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=9;align=left;fontStyle=2;" vertex="1" parent="cpu0-box">
+          <mxGeometry x="10" y="155" width="200" height="48" as="geometry" />
+        </mxCell>
+        <mxCell id="cpu0-tasks" value="任务: ui_task (入口)&#xa;       shell_task&#xa;       idle_0" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=9;align=left;" vertex="1" parent="cpu0-box">
+          <mxGeometry x="230" y="30" width="180" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="cpu0-id" value="KERN_THIS_CPU = g_active_cpu&#xa;kern_cpu_id() → xPortGetCoreID()" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=10;fontStyle=2;" vertex="1" parent="cpu0-box">
+          <mxGeometry x="230" y="95" width="180" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- CPU 1 -->
+        <mxCell id="cpu1-box" value="APP_CPU (Core 1)" style="swimlane;startSize=22;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;fontStyle=1;" vertex="1" parent="smp-mode">
+          <mxGeometry x="470" y="35" width="420" height="210" as="geometry" />
+        </mxCell>
+        <mxCell id="cpu1-percpu" value="g_per_cpu[1]" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;fontStyle=1;" vertex="1" parent="cpu1-box">
+          <mxGeometry x="10" y="30" width="200" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="cpu1-fields" value="cpu_id: 1&#xa;current_task: → wifi_task TCB&#xa;idle_task: → idle_1 TCB&#xa;sched_ticks: 9876&#xa;need_resched: true" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=10;align=left;fontStyle=2;" vertex="1" parent="cpu1-box">
+          <mxGeometry x="10" y="70" width="200" height="75" as="geometry" />
+        </mxCell>
+        <mxCell id="cpu1-macros" value="宏展开:&#xa;g_current_task → g_per_cpu[1].current_task&#xa;g_idle_task    → g_per_cpu[1].idle_task&#xa;g_sched_ticks  → g_per_cpu[1].sched_ticks" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=9;align=left;fontStyle=2;" vertex="1" parent="cpu1-box">
+          <mxGeometry x="10" y="155" width="200" height="48" as="geometry" />
+        </mxCell>
+        <mxCell id="cpu1-tasks" value="任务: wifi_task&#xa;       bt_task&#xa;       idle_1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=9;align=left;" vertex="1" parent="cpu1-box">
+          <mxGeometry x="230" y="30" width="180" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="cpu1-init" value="kern_smp_start_core(1)&#xa;→ xTaskCreatePinnedToCore()&#xa;→ 在 Core 1 上创建 FreeRTOS 任务" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=10;fontStyle=2;" vertex="1" parent="cpu1-box">
+          <mxGeometry x="230" y="95" width="180" height="45" as="geometry" />
+        </mxCell>
+
+        <!-- Arrow between CPUs -->
+        <mxCell id="smp-sync-arrow" value="spinlock_t / mutex_t 跨核同步" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=9;fontColor=#cc0000;endArrow=classic;startArrow=classic;strokeColor=#cc0000;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="smp-mode" source="cpu0-box" target="cpu1-box">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Non-SMP mode -->
+        <mxCell id="nosmp-mode" value="CONFIG_SMP_ENABLED 未定义（单核零开销模式）" style="swimlane;startSize=28;fillColor=#f5f5f5;strokeColor=#666666;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="350" width="920" height="160" as="geometry" />
+        </mxCell>
+        <mxCell id="nosmp-percpu" value="g_per_cpu[0] (唯一使用)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=10;" vertex="1" parent="nosmp-mode">
+          <mxGeometry x="20" y="35" width="180" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="nosmp-macros" value="KERN_THIS_CPU → ((uint8_t)0)&#xa;kern_cpu_id() → return 0&#xa;kern_smp_init() → 空操作&#xa;kern_smp_start_core() → 空操作" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=10;align=left;fontStyle=2;" vertex="1" parent="nosmp-mode">
+          <mxGeometry x="20" y="75" width="250" height="65" as="geometry" />
+        </mxCell>
+        <mxCell id="nosmp-sync" value="spinlock_lock() → 空操作&#xa;spinlock_unlock() → 空操作&#xa;mutex_lock() → m→owner = g_current_task&#xa;mutex_unlock() → m→owner = NULL" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=10;align=left;fontStyle=2;" vertex="1" parent="nosmp-mode">
+          <mxGeometry x="300" y="35" width="280" height="65" as="geometry" />
+        </mxCell>
+        <mxCell id="nosmp-zero-overhead" value="编译器自动优化:&#xa;g_per_cpu[0].current_task → 直接内存访问&#xa;无额外指令开销" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;align=left;fontStyle=2;" vertex="1" parent="nosmp-mode">
+          <mxGeometry x="620" y="35" width="280" height="65" as="geometry" />
+        </mxCell>
+
+        <!-- Note about KERN_CPU_ANY -->
+        <mxCell id="note-any" value="kern_spawn() 中 cpu_id = KERN_CPU_ANY (0xFF)&#xa;→ 自动分配到负载最低的核心&#xa;→ 也可手动绑定: task→cpu_id = 0" style="shape=note;whiteSpace=wrap;html=1;size=14;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;align=left;fontStyle=2;" vertex="1" parent="1">
+          <mxGeometry x="40" y="530" width="380" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="note-tcb" value="TCB 新增字段:&#xa;cpu_id (uint8_t)&#xa;→ 记录任务绑定到哪个核心" style="shape=note;whiteSpace=wrap;html=1;size=14;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;align=left;fontStyle=2;" vertex="1" parent="1">
+          <mxGeometry x="460" y="530" width="250" height="60" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

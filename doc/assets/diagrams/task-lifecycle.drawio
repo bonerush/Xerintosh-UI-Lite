@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="drawio" version="26.0.0">
+  <diagram name="Task Lifecycle">
+    <mxGraphModel dx="900" dy="700" grid="1" gridSize="10">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <mxCell id="title" value="Xeros 任务生命周期状态机" style="text;html=1;fontSize=18;fontStyle=1;fontColor=#333333;align=center;" vertex="1" parent="1">
+          <mxGeometry x="200" y="15" width="380" height="35" as="geometry" />
+        </mxCell>
+
+        <!-- States -->
+        <mxCell id="state-init" value="INIT&#xa;(初始化)" style="ellipse;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="80" y="80" width="100" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="state-ready" value="READY&#xa;(就绪)" style="ellipse;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="340" y="80" width="100" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="state-running" value="RUNNING&#xa;(运行中)" style="ellipse;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;fontStyle=1;fontWeight=bold;" vertex="1" parent="1">
+          <mxGeometry x="340" y="250" width="100" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="state-sleeping" value="SLEEPING&#xa;(睡眠中)" style="ellipse;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="550" y="80" width="100" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="state-blocked" value="BLOCKED&#xa;(阻塞等待)" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="550" y="250" width="100" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="state-zombie" value="ZOMBIE&#xa;(僵尸/退出)" style="ellipse;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="340" y="400" width="100" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- Transitions -->
+        <mxCell id="edge-init-ready" value="kern_spawn()" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;fontColor=#666666;endArrow=classic;" edge="1" parent="1" source="state-init" target="state-ready">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="edge-ready-running" value="pick_next() 选中" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;fontColor=#666666;endArrow=classic;" edge="1" parent="1" source="state-ready" target="state-running">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="edge-running-ready" value="kern_yield()&#xa;时间片耗尽" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;fontColor=#666666;endArrow=classic;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="state-running" target="state-ready">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="260" y="280" />
+              <mxPoint x="260" y="110" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="edge-running-sleep" value="kern_sleep_ms(n)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;fontColor=#666666;endArrow=classic;" edge="1" parent="1" source="state-running" target="state-sleeping">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="460" y="280" />
+              <mxPoint x="460" y="110" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="edge-sleep-ready" value="wake_at ≤ now&#xa;(自动唤醒)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;fontColor=#666666;endArrow=classic;dashed=1;exitX=0.25;exitY=1;exitDx=0;exitDy=0;entryX=0.75;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="state-sleeping" target="state-ready">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="575" y="175" />
+              <mxPoint x="415" y="175" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="edge-running-blocked" value="等待互斥锁/信号量" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;fontColor=#666666;endArrow=classic;" edge="1" parent="1" source="state-running" target="state-blocked">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="edge-blocked-ready" value="资源可用&#xa;(被唤醒)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;fontColor=#666666;endArrow=classic;dashed=1;exitX=0.5;exitY=0;exitDx=0;entryX=0.5;entryY=0;" edge="1" parent="1" source="state-blocked" target="state-running">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="600" y="220" />
+              <mxPoint x="390" y="220" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="edge-running-zombie" value="kern_exit()&#xa;kern_task_kill()" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;fontColor=#cc0000;endArrow=classic;strokeColor=#cc0000;" edge="1" parent="1" source="state-running" target="state-zombie">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="edge-zombie-cleanup" value="reap_zombies()&#xa;→ 释放 TCB + 栈" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;fontColor=#cc0000;endArrow=classic;strokeColor=#cc0000;dashed=1;" edge="1" parent="1" source="state-zombie" target="state-init">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="280" y="430" />
+              <mxPoint x="280" y="500" />
+              <mxPoint x="130" y="500" />
+              <mxPoint x="130" y="110" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Side notes -->
+        <mxCell id="note-smp" value="SMP 模式:&#xa;per-CPU current_task&#xa;g_per_cpu[cpu].current_task" style="shape=note;whiteSpace=wrap;html=1;size=12;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=9;align=left;" vertex="1" parent="1">
+          <mxGeometry x="690" y="80" width="150" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="note-resource" value="ZOMBIE 阶段自动:&#xa;kern_resource_release_all()&#xa;→ 释放内存/互斥锁/FD" style="shape=note;whiteSpace=wrap;html=1;size=12;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=9;align=left;" vertex="1" parent="1">
+          <mxGeometry x="690" y="180" width="165" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="note-mpu" value="上下文切换时自动:&#xa;kern_mpu_apply(task)&#xa;→ 写入 MPU 寄存器" style="shape=note;whiteSpace=wrap;html=1;size=12;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=9;align=left;" vertex="1" parent="1">
+          <mxGeometry x="690" y="270" width="160" height="60" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

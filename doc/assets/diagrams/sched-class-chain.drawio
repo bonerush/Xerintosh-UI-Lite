@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="drawio" version="26.0.0">
+  <diagram name="Sched Class Chain">
+    <mxGraphModel dx="900" dy="600" grid="1" gridSize="10">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <mxCell id="title" value="可插拔调度类: pick_next_ready() 优先级链" style="text;html=1;fontSize=18;fontStyle=1;fontColor=#333333;align=center;" vertex="1" parent="1">
+          <mxGeometry x="150" y="15" width="450" height="35" as="geometry" />
+
+        <!-- Registration -->
+        <mxCell id="reg-box" value="kern_sched_init() 初始化" style="swimlane;startSize=22;fillColor=#f5f5f5;strokeColor=#666666;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="70" width="820" height="100" as="geometry" />
+        </mxCell>
+
+        <mxCell id="reg-step1" value="1. kern_sched_class_register(&amp;sched_class_fifo)&#xa;   → g_sched_classes[0] = &amp;sched_class_fifo" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;align=left;fontStyle=2;" vertex="1" parent="reg-box">
+          <mxGeometry x="15" y="25" width="380" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="reg-step2" value="2. kern_sched_class_register(&amp;sched_class_rr)&#xa;   → g_sched_classes[1] = &amp;sched_class_rr" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;align=left;fontStyle=2;" vertex="1" parent="reg-box">
+          <mxGeometry x="15" y="60" width="380" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="reg-note" value="先注册 = 高优先级&#xa;FIFO 先被查询 → FIFO 有就绪任务时不查 RR" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;align=left;fontStyle=2;" vertex="1" parent="reg-box">
+          <mxGeometry x="420" y="25" width="260" height="65" as="geometry" />
+        </mxCell>
+        <mxCell id="reg-array" value="g_sched_classes[] = {&amp;sched_class_fifo, &amp;sched_class_rr, NULL, ...}&#xa;g_sched_class_count = 2" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=10;align=left;fontStyle=2;" vertex="1" parent="reg-box">
+          <mxGeometry x="700" y="25" width="110" height="65" as="geometry" />
+        </mxCell>
+
+        <!-- pick_next_ready flow -->
+        <mxCell id="pick-box" value="pick_next_ready() 调度链" style="swimlane;startSize=22;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="190" width="820" height="200" as="geometry" />
+        </mxCell>
+
+        <!-- Step 1: FIFO -->
+        <mxCell id="pick-fifo" value="第 1 步 (i=0)&#xa;sched_class_fifo.pick_next()&#xa;→ 选择最高优先级就绪任务" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;align=left;fontStyle=2;" vertex="1" parent="pick-box">
+          <mxGeometry x="15" y="25" width="250" height="55" as="geometry" />
+        </mxCell>
+
+        <!-- Decision diamond -->
+        <mxCell id="pick-check" value="返回&#xa;NULL?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;fontStyle=1;" vertex="1" parent="pick-box">
+          <mxGeometry x="290" y="25" width="90" height="70" as="geometry" />
+        </mxCell>
+
+        <!-- Yes: continue -->
+        <mxCell id="pick-yes" value="是" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;fontColor=#cc0000;endArrow=classic;" edge="1" parent="pick-box" source="pick-check">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="335" y="60" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="335" y="120" />
+              <mxPoint x="140" y="120" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- No: return directly -->
+        <mxCell id="pick-no" value="否 → 直接返回该任务" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;fontColor=#82b366;endArrow=classic;" edge="1" parent="pick-box" source="pick-check">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="335" y="150" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Step 2: RR (only if FIFO returned NULL) -->
+        <mxCell id="pick-rr" value="第 2 步 (i=1)&#xa;sched_class_rr.pick_next()&#xa;→ Round-Robin 扫描" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;align=left;fontStyle=2;" vertex="1" parent="pick-box">
+          <mxGeometry x="15" y="140" width="250" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="pick-code" value="for (i = 0; i &lt; g_sched_class_count; i++) {&#xa;    task = g_sched_classes[i]→pick_next();&#xa;    if (task != NULL) return task;&#xa;}&#xa;return NULL;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=10;align=left;fontStyle=2;" vertex="1" parent="pick-box">
+          <mxGeometry x="430" y="25" width="370" height="80" as="geometry" />
+        </mxCell>
+
+        <!-- Call flow -->
+        <mxCell id="call-box" value="调度器主循环 kern_sched_tick()" style="swimlane;startSize=22;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="410" width="820" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="call-tick" value="kern_sched_tick()&#xa;├→ pick_next_ready()&#xa;│   ├→ sched_class_fifo.pick_next() → NULL (无就绪 FIFO 任务)&#xa;│   └→ sched_class_rr.pick_next() → ui_task (就绪)&#xa;├→ sched_class_rr.tick(current)&#xa;│   └→ timeslice_remaining--&#xa;│       if (==0) g_need_resched = true&#xa;└→ 上下文切换到 ui_task" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=10;align=left;fontStyle=2;" vertex="1" parent="call-box">
+          <mxGeometry x="15" y="25" width="400" height="85" as="geometry" />
+        </mxCell>
+        <mxCell id="call-tick-code" value="sched_class_fifo.tick(current)&#xa;├→ while (t in fifo):&#xa;│   if (t.priority &gt; current.priority):&#xa;│       g_need_resched = true&#xa;│   else: break (链表有序)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=10;align=left;fontStyle=2;" vertex="1" parent="call-box">
+          <mxGeometry x="445" y="25" width="360" height="80" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

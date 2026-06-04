@@ -1,10 +1,12 @@
 # 物理设备驱动（Kern Devices）
 
-> **Parent:** [内核总览](index.md) | **Related:** [devfs](kern-devfs.md), [VFS](kern-vfs.md), [Shell](kern-shell.md)
+> **Parent:** [内核总览](index.md) | **Related:** [devfs](kern-devfs.md), [VFS](kern-vfs.md), [设备驱动模型](kern-device-model.md), [Shell](kern-shell.md)
 
 ## 概述
 
 `kern_devices` 模块负责将物理硬件（传感器、显示屏、按键、串口）注册为 `/dev/*` 下的虚拟文件节点。每个设备实现 `kern_file_ops_t` 函数表，使得用户态任务可以通过 `sys_read`、`sys_write`、`sys_ioctl` 访问硬件。
+
+> **v2 注意**：v2 引入了 [统一设备驱动模型](kern-device-model.md)（`kern_device_ops_t` + VFS bridge），`/dev/pwrkey` 已率先迁移。fb0 / input0 / ttyS0 当前仍使用 `kern_file_ops_t` 直接注册，后续版本将统一迁移。
 
 设备统一在 `kern_devices_init()` 中注册，初始化顺序：fb0、input0、ttyS0。
 
@@ -200,4 +202,4 @@ ttyS0 数据流：
 
 ---
 
-> **See Also:** [devfs](kern-devfs.md) | [VFS](kern-vfs.md) | [Shell](kern-shell.md) | [HAL 显示驱动](../hal/display.md) | [HAL 输入系统](../hal/input.md)
+> **See Also:** [devfs](kern-devfs.md) | [VFS](kern-vfs.md) | [设备驱动模型](kern-device-model.md) | [Shell](kern-shell.md) | [HAL 显示驱动](../hal/display.md) | [HAL 输入系统](../hal/input.md)

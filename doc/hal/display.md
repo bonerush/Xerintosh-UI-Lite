@@ -205,4 +205,4 @@ Native 测试环境目前将文本绘制设为空实现（只返回固定字高 
 
 ---
 
-> **See Also:** [输入系统](input.md) | [绘制管线](../ui/drawer.md) | [绘制驱动适配](../ui/draw-driver.md)
+> **See Also:** [输入系统](input.md) | [绘制管线](../ui/drawer.md)

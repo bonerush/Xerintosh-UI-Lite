@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="drawio" version="26.0.0">
+  <diagram name="Resource Tracking">
+    <mxGraphModel dx="1000" dy="650" grid="1" gridSize="10">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <mxCell id="title" value="资源追踪链表：任务退出时的自动回收机制" style="text;html=1;fontSize=18;fontStyle=1;fontColor=#333333;align=center;" vertex="1" parent="1">
+          <mxGeometry x="150" y="15" width="550" height="35" as="geometry" />
+
+        <!-- TCB -->
+        <mxCell id="tcb" value="TCB (kern_task_t)&#xa;pid=42 "ui_task"" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="80" width="160" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- resource_head pointer -->
+        <mxCell id="tcb-head" value="resource_head →" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=9;fontStyle=2;" vertex="1" parent="1">
+          <mxGeometry x="40" y="150" width="160" height="25" as="geometry" />
+        </mxCell>
+
+        <!-- Node 1: kmalloc memory -->
+        <mxCell id="node1" value="kern_resource_t #1&#xa;ptr: 0x3FFB_1000&#xa;type: MEMORY&#xa;release: kmem_release" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=9;align=left;fontStyle=2;" vertex="1" parent="1">
+          <mxGeometry x="40" y="190" width="200" height="65" as="geometry" />
+        </mxCell>
+
+        <!-- Node 2: mutex -->
+        <mxCell id="node2" value="kern_resource_t #2&#xa;ptr: 0x3FFB_8000&#xa;type: MUTEX&#xa;release: mutex_unlock" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=9;align=left;fontStyle=2;" vertex="1" parent="1">
+          <mxGeometry x="40" y="270" width="200" height="65" as="geometry" />
+        </mxCell>
+
+        <!-- Node 3: FD -->
+        <mxCell id="node3" value="kern_resource_t #3&#xa;ptr: fd=5&#xa;type: FD&#xa;release: close_fd" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=9;align=left;fontStyle=2;" vertex="1" parent="1">
+          <mxGeometry x="40" y="350" width="200" height="65" as="geometry" />
+        </mxCell>
+
+        <!-- NULL termination -->
+        <mxCell id="null" value="next → NULL" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=10;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="40" y="430" width="200" height="30" as="geometry" />
+        </mxCell>
+
+        <!-- Arrows between nodes -->
+        <mxCell id="arrow-tcb-n1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;strokeColor=#6c8ebf;" edge="1" parent="1" source="tcb-head" target="node1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="arrow-n1-n2" value="next →" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=8;fontColor=#666666;endArrow=classic;" edge="1" parent="1" source="node1" target="node2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="arrow-n2-n3" value="next →" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=8;fontColor=#666666;endArrow=classic;" edge="1" parent="1" source="node2" target="node3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="arrow-n3-null" value="next →" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=8;fontColor=#666666;endArrow=classic;" edge="1" parent="1" source="node3" target="null">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Right side: Operations -->
+        <mxCell id="op-box" value="API 操作" style="swimlane;startSize=25;fillColor=#f5f5f5;strokeColor=#666666;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="300" y="80" width="390" height="200" as="geometry" />
+        </mxCell>
+
+        <mxCell id="op-track" value="kern_resource_track(task, ptr, type, release)&#xa;├→ malloc(kern_resource_t)&#xa;├→ res→ptr = ptr; res→type = type; res→release = release&#xa;└→ 插入链表头部 (O(1))" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;align=left;fontStyle=2;" vertex="1" parent="op-box">
+          <mxGeometry x="10" y="30" width="370" height="65" as="geometry" />
+        </mxCell>
+
+        <mxCell id="op-untrack" value="kern_resource_untrack(task, ptr)&#xa;├→ 遍历链表找到匹配节点&#xa;├→ 从链表中移除 (prev→next = cur→next)&#xa;└→ free(cur)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;align=left;fontStyle=2;" vertex="1" parent="op-box">
+          <mxGeometry x="10" y="105" width="370" height="65" as="geometry" />
+        </mxCell>
+
+        <mxCell id="op-release" value="kern_resource_release_all(task)&#xa;├→ while (cur != NULL):&#xa;│    next = cur→next&#xa;│    cur→release(cur→ptr)   // 调用释放回调&#xa;│    free(cur)              // 释放节点本身&#xa;└→ task→resource_head = NULL" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;align=left;fontStyle=2;" vertex="1" parent="op-box">
+          <mxGeometry x="10" y="175" width="370" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- Flow: task exit -->
+        <mxCell id="flow-box" value="任务退出的自动回收流程" style="swimlane;startSize=25;fillColor=#f5f5f5;strokeColor=#666666;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="300" y="310" width="390" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="flow-step1" value="1. kern_exit() 被调用" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;fontStyle=2;" vertex="1" parent="flow-box">
+          <mxGeometry x="10" y="30" width="370" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="flow-step2" value="2. kern_exit() → kern_resource_release_all(current_task)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;fontStyle=2;" vertex="1" parent="flow-box">
+          <mxGeometry x="10" y="60" width="370" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="flow-step3" value="3. 遍历链表: MEMORY→kmem_release, MUTEX→mutex_unlock, FD→close_fd" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;fontStyle=2;" vertex="1" parent="flow-box">
+          <mxGeometry x="10" y="90" width="370" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="flow-step4" value="4. 所有资源被清理，任务安全退出" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;fontStyle=2;" vertex="1" parent="flow-box">
+          <mxGeometry x="10" y="120" width="370" height="22" as="geometry" />
+        </mxCell>
+
+        <!-- Who calls track -->
+        <mxCell id="callers" value="调用方:" style="text;html=1;fontSize=11;fontStyle=1;fontColor=#333333;" vertex="1" parent="1">
+          <mxGeometry x="300" y="480" width="60" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="caller-kmalloc" value="kern_kmalloc → track(MEMORY, kmem_release)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;fontStyle=2;" vertex="1" parent="1">
+          <mxGeometry x="300" y="500" width="190" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="caller-vfs" value="kern_vfs_open → track(FD, close_fd)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;fontStyle=2;" vertex="1" parent="1">
+          <mxGeometry x="500" y="500" width="190" height="25" as="geometry" />
+        </mxCell>
+
+        <!-- Legend -->
+        <mxCell id="legend-box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#cccccc;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="300" y="550" width="390" height="65" as="geometry" />
+        </mxCell>
+        <mxCell id="leg1" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="310" y="558" width="15" height="12" as="geometry" />
+        </mxCell>
+        <mxCell id="leg1-label" value="MEMORY 资源" style="text;html=1;fontSize=9;fontColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="330" y="556" width="80" height="16" as="geometry" />
+        </mxCell>
+        <mxCell id="leg2" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="420" y="558" width="15" height="12" as="geometry" />
+        </mxCell>
+        <mxCell id="leg2-label" value="MUTEX 资源" style="text;html=1;fontSize=9;fontColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="440" y="556" width="80" height="16" as="geometry" />
+        </mxCell>
+        <mxCell id="leg3" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
+          <mxGeometry x="530" y="558" width="15" height="12" as="geometry" />
+        </mxCell>
+        <mxCell id="leg3-label" value="FD 资源" style="text;html=1;fontSize=9;fontColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="550" y="556" width="60" height="16" as="geometry" />
+        </mxCell>
+        <mxCell id="leg4-label" value="链表采用头插法 (O(1) 插入), release_all 时逐节点回调+释放" style="text;html=1;fontSize=9;fontColor=#666666;fontStyle=2;" vertex="1" parent="1">
+          <mxGeometry x="310" y="580" width="370" height="16" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

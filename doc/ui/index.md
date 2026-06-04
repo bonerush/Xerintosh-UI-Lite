@@ -18,7 +18,6 @@ UI 核心层是 Xerintosh 菜单框架的主体，纯 C 实现。它提供菜单
 | 全局上下文 | [context.md](context.md) | `src/ui/ui_context.c/h` | 单例状态容器、向后兼容宏、退场动画状态迁移 |
 | 绘制管线 | [drawer.md](drawer.md) | `src/ui/ui_draw_*.c`, `ui_drawer.h` | 列表外观、选择器 XOR 高亮、弹窗与信息栏、退场动画、图标 |
 | 行列表动画 | [ui-anim-row.md](ui-anim-row.md) | `src/ui/ui_anim_row.c/h` | 可复用行列表动画工具（入场滑入 + 高亮平滑过渡） |
-| 绘制驱动适配 | [draw-driver.md](draw-driver.md) | ⚠️ 已移除 | 原 `oled_*` → `hal_*` 宏桥接层，已在重构中删除 |
 
 ## 重构概述（2026 年 6 月）
 

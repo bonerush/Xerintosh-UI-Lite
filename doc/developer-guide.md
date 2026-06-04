@@ -2,7 +2,7 @@
 
 > 本文档介绍如何基于 Xerintosh UI Lite 框架设计菜单结构、创建自定义 App，以及推荐的项目组织方式。
 >
-> 关于各模块内部实现，请参考同目录下的 `core.md`、`item.md`、`drawer.md`、`draw-driver.md` 及 `hal/` 下的文档。
+> 关于各模块内部实现，请参考同目录下的 `core.md`、`item.md`、`drawer.md` 及 `hal/` 下的文档。
 
 ---
 
