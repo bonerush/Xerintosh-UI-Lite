@@ -199,12 +199,14 @@ void kern_sched_init(void)
 
     sched_class_rr.task_list = g_task_list;
 
-    /* Core 0 初始状态 */
-    g_current_task = g_per_cpu[0].idle_task;
+    /* ── per-CPU 初始状态 ── */
+    g_per_cpu[0].current_task = g_per_cpu[0].idle_task;
     g_per_cpu[0].task_count = 1;  /* idle 计入 */
+    g_per_cpu[1].current_task = g_per_cpu[1].idle_task;
+    g_per_cpu[1].task_count = 1;  /* idle 计入 */
 
-    /* ── 启动 Core 1 调度器核心 ── */
-    kern_smp_start_core(1, kern_smp_sched_loop);
+    /* ── 启动 Core 0 调度器核心 ── */
+    kern_smp_start_core(0, kern_smp_sched_loop);
 
     kern_log(KERN_LOG_DEBUG, "scheduler initialized (esp32-freertos, 2 cores)");
 }
@@ -320,7 +322,7 @@ void idle_entry(void *arg)
     }
 }
 
-/* ═══ Core 1 调度器循环 ═══ */
+/* ═══ Core 0 调度器循环 ═══ */
 
 #ifdef CONFIG_SMP_ENABLED
 
@@ -331,15 +333,14 @@ void kern_smp_sched_loop(void *arg)
 {
     (void)arg;
 
-    /* 设置 per-CPU 状态 */
-    g_active_cpu = 1;
-    g_current_task = g_per_cpu[1].idle_task;
-    g_per_cpu[1].task_count = 1;  /* idle 计入 */
-    g_per_cpu[1].last_picked = g_per_cpu[1].idle_task;
+    /* 设置 per-CPU 状态（运行在 Core 0，KERN_THIS_CPU = xPortGetCoreID() = 0） */
+    g_per_cpu[0].current_task = g_per_cpu[0].idle_task;
+    g_per_cpu[0].task_count = 1;  /* idle 计入 */
+    g_per_cpu[0].last_picked = g_per_cpu[0].idle_task;
 
-    kern_log(KERN_LOG_INFO, "SMP: core 1 scheduler entering loop");
+    kern_log(KERN_LOG_INFO, "SMP: core 0 scheduler entering loop");
 
-    /* Core 1 自有调度循环 */
+    /* Core 0 自有调度循环 */
     while (1) {
         kern_sched_tick();
     }

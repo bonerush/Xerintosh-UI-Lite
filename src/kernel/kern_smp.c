@@ -20,7 +20,7 @@ kern_per_cpu_t g_per_cpu[KERN_MAX_CPUS];
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 
-volatile uint8_t g_active_cpu = 0;
+volatile uint8_t g_cpu_ready = 0;  /* SMP 就绪标志（供外部查询） */
 
 /* ═══ CPU ID ═══ */
 

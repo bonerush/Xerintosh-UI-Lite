@@ -44,8 +44,7 @@ extern kern_per_cpu_t g_per_cpu[KERN_MAX_CPUS];
 
 #ifdef CONFIG_SMP_ENABLED
 
-extern volatile uint8_t g_active_cpu;  /* 当前执行调度器的 CPU */
-#define KERN_THIS_CPU  ((uint8_t)(g_active_cpu))
+#define KERN_THIS_CPU  ((uint8_t)(kern_cpu_id()))
 
 /** 返回当前 CPU ID（ESP32: xPortGetCoreID，native: 0） */
 uint8_t kern_cpu_id(void);

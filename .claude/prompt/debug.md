@@ -129,3 +129,8 @@ stateDiagram-v2
     **修复:** 新增 `try_auto_connect()` 辅助函数，在 `WIFI_MGR_SCAN_DONE` 中调用（仅一次）：① 遍历已保存网络，在扫描结果中匹配；② 多个匹配时选择 RSSI 最强的；③ 发起 `WiFi.begin()` 静默连接（`g_is_auto_connect=true` 抑制所有弹窗）。手动连接回调（`on_saved_connect_pressed`/`on_network_button_pressed`）重置 `g_is_auto_connect=false` 保留弹窗反馈。`wifi_mgr_enable()`/`wifi_mgr_disable()` 重置自动连接标志。
     **验证:** build(hw)=PASS RAM=22.1% Flash=99.1% native=3 ERRORED（均为预存问题，与本次无关）
     **文件:** src/app/wifi/wifi_manager.cpp
+- [AGENT] 烧录当前固件后菜单渲染正常但所有按键操作无响应，系统卡死在菜单页面
+    **根因:** SMP 双核调度引入的三个并发缺陷导致 Core 1 死锁：① `KERN_THIS_CPU` 使用全局变量 `g_active_cpu` 而非 `xPortGetCoreID()`，无法反映真实硬件核心；② `kern_smp_sched_loop()` 启动在 Core 1，与 `loop()` 在同一核心竞争 `g_per_cpu[1]`、`g_token_sem[1]`、`g_done_sem[1]`；③ 两个调度器同时调用 `kern_sched_tick()` → `pick_next_ready()` → `switch_to()` → `give(token)` → `take(done)`，信号量竞争导致其中一个永久阻塞，`ui_task` 无法获取 CPU，`hal_input_update()` 永不执行。
+    **修复:** ① `KERN_THIS_CPU` 从 `g_active_cpu` 改为 `kern_cpu_id()`（底层使用 `xPortGetCoreID()` 读取硬件 CPU ID），移除整个 `g_active_cpu` 变量；② `kern_smp_sched_loop()` 改为启动在 Core 0（`kern_smp_start_core(0, ...)`），Core 1 继续由 `loop()` 作为调度器；③ `kern_sched_init()` 中 `g_current_task`/`g_last_picked` 宏（依赖 `KERN_THIS_CPU`）替换为显式的 `g_per_cpu[i].xxx` 直接赋值，确保 per-CPU 初始化正确。
+    **验证:** build(hw)=PASS native=338 PASS
+    **文件:** src/kernel/kern_smp.h, src/kernel/kern_smp.c, src/kernel/kern_sched.c, doc/kernel/kern-smp.md, doc/assets/diagrams/smp-architecture.drawio

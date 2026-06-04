@@ -71,8 +71,8 @@ g_per_cpu[KERN_MAX_CPUS]
 ```
 SMP 模式 (CONFIG_SMP_ENABLED):
 
-    KERN_THIS_CPU → g_active_cpu（运行时读取当前 CPU）
-    g_current_task → g_per_cpu[g_active_cpu].current_task
+    KERN_THIS_CPU → kern_cpu_id() → xPortGetCoreID()（硬件寄存器读取）
+    g_current_task → g_per_cpu[kern_cpu_id()].current_task
                     → 间接寻址（通过 volatile 变量索引数组）
 
     开销: 一次 volatile 读取 + 一次数组偏移计算
@@ -114,8 +114,7 @@ SMP 模式 (CONFIG_SMP_ENABLED):
 #ifdef CONFIG_SMP_ENABLED
 /* ============ SMP 模式 ============ */
 
-extern volatile uint8_t g_active_cpu;
-#define KERN_THIS_CPU  ((uint8_t)(g_active_cpu))
+#define KERN_THIS_CPU  ((uint8_t)(kern_cpu_id()))
 
 uint8_t kern_cpu_id(void);            /* xPortGetCoreID() */
 void kern_smp_init(void);             /* 初始化 per-CPU 数组，启动 APP_CPU */
@@ -134,7 +133,7 @@ static inline uint8_t kern_cpu_id(void) { return 0; }
 
 | 特性 | SMP 模式 (`CONFIG_SMP_ENABLED`) | 单核模式 (未定义) |
 |------|------|------|
-| `KERN_THIS_CPU` | `g_active_cpu`（volatile 读取） | `0`（编译期常量） |
+| `KERN_THIS_CPU` | `kern_cpu_id()` → `xPortGetCoreID()`（硬件 ID） | `0`（编译期常量） |
 | `kern_cpu_id()` | `xPortGetCoreID()` → 实际 CPU 号 | `return 0`（内联为常量） |
 | `kern_smp_init()` | 遍历初始化 `g_per_cpu[0..1]`，启动 APP_CPU | `do {} while(0)`（空操作） |
 | `kern_smp_start_core()` | `xTaskCreatePinnedToCore()` 创建 FreeRTOS 任务 | 空操作（抑制参数未使用警告） |

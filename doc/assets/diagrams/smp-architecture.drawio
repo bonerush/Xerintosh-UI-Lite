@@ -30,7 +30,7 @@
         <mxCell id="cpu0-tasks" value="任务: ui_task (入口)&#xa;       shell_task&#xa;       idle_0" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=9;align=left;" vertex="1" parent="cpu0-box">
           <mxGeometry x="230" y="30" width="180" height="50" as="geometry" />
         </mxCell>
-        <mxCell id="cpu0-id" value="KERN_THIS_CPU = g_active_cpu&#xa;kern_cpu_id() → xPortGetCoreID()" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=10;fontStyle=2;" vertex="1" parent="cpu0-box">
+        <mxCell id="cpu0-id" value="KERN_THIS_CPU = kern_cpu_id()&#xa;kern_cpu_id() → xPortGetCoreID()" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=10;fontStyle=2;" vertex="1" parent="cpu0-box">
           <mxGeometry x="230" y="95" width="180" height="40" as="geometry" />
         </mxCell>
 
