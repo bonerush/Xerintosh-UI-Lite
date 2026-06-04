@@ -78,6 +78,23 @@ static size_t find_wrap_break(const char *text, size_t len, int16_t avail)
 /* ═══ 信息栏 ═══ */
 
 /**
+ * @brief 根据换行数计算弹窗高度
+ * @param wrap_line_count 内容行数
+ * @return 弹窗总高度（含 padding）
+ */
+static int16_t popup_compute_height(uint8_t wrap_line_count)
+{
+  int16_t fh = hal_get_font_height();
+  uint8_t n = wrap_line_count;
+  if (n < 1) n = 1;
+  if (n > POP_UP_WRAP_LINES) n = POP_UP_WRAP_LINES;
+  int16_t content_h = (int16_t)(n * fh + (n - 1) * 2);
+  int16_t pop_h = content_h + 8;
+  if (pop_h < 24) pop_h = 24;
+  return pop_h;
+}
+
+/**
  * @brief 推送顶部信息栏
  * @param _content 显示文本
  * @param _span    显示持续时间（毫秒）
@@ -95,12 +112,9 @@ void xerintosh_push_info_bar(const char *_content, const uint16_t _span)
   g_xerintosh_info_bar.is_running = false; /* 每次进入该函数都代表有新的消息涌入，所以需要重置 is_running */
 
   /* 展开弹窗；收回弹窗和同步时间戳需要在循环中进行，所以移到了 drawer 中 */
-  if (!g_xerintosh_info_bar.is_running)
-  {
-    g_xerintosh_info_bar.time_start = hal_get_ticks();
-    g_xerintosh_info_bar.y_info_bar_trg = 0;
-    g_xerintosh_info_bar.is_running = true;
-  }
+  g_xerintosh_info_bar.time_start = hal_get_ticks();
+  g_xerintosh_info_bar.y_info_bar_trg = 0;
+  g_xerintosh_info_bar.is_running = true;
 
   xerintosh_set_font(hal_get_cn_font());
   g_xerintosh_info_bar.w_info_bar_trg = hal_get_string_width(g_xerintosh_info_bar.content) + INFO_BAR_OFFSET;
@@ -201,13 +215,12 @@ void xerintosh_push_pop_up(const char *_content, const uint16_t _span)
 calc_height:
   /* 根据内容行数计算动态高度：文字高度 + 上下各 4px padding */
   {
+    int16_t pop_h = popup_compute_height(g_xerintosh_pop_up.wrap_line_count);
     int16_t fh = hal_get_font_height();
     uint8_t n = g_xerintosh_pop_up.wrap_line_count;
     if (n < 1) n = 1;
     if (n > POP_UP_WRAP_LINES) n = POP_UP_WRAP_LINES;
     int16_t content_h = (int16_t)(n * fh + (n - 1) * 2);
-    int16_t pop_h = content_h + 8;
-    if (pop_h < 24) pop_h = 24;
 
     /* 仅当指针不同且内容相同时才跳过重算
        （指针相同说明调用方复用了缓冲区，内容可能已变） */
@@ -229,12 +242,9 @@ calc_height:
   g_xerintosh_pop_up.is_running = false;
 
   /* 弹出 */
-  if (!g_xerintosh_pop_up.is_running)
-  {
-    g_xerintosh_pop_up.time = hal_get_ticks();  /* 重置 time，防止旧弹窗残留的时间戳导致新弹窗立即超时 */
-    g_xerintosh_pop_up.time_start = hal_get_ticks();
-    g_xerintosh_pop_up.is_running = true;
-  }
+  g_xerintosh_pop_up.time = hal_get_ticks();  /* 重置 time，防止旧弹窗残留的时间戳导致新弹窗立即超时 */
+  g_xerintosh_pop_up.time_start = hal_get_ticks();
+  g_xerintosh_pop_up.is_running = true;
 }
 
 /**

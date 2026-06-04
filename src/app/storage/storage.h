@@ -21,11 +21,8 @@ extern "C" {
 /* ═══ 常量 ═══ */
 
 #define STORAGE_MAX_WIFI_NETWORKS  5   /* 最大保存 WiFi 网络数 */
-#define STORAGE_MAX_BT_DEVICES     5   /* 最大保存蓝牙设备数 */
 #define STORAGE_SSID_MAX_LEN       33  /* SSID 最大长度（含 null） */
 #define STORAGE_PASS_MAX_LEN       65  /* 密码最大长度（含 null） */
-#define STORAGE_BT_NAME_MAX_LEN    33  /* 蓝牙名称最大长度 */
-#define STORAGE_BT_ADDR_MAX_LEN    18  /* 蓝牙 MAC 地址长度（含 null） */
 
 /* ═══ 生命周期 ═══ */
 
@@ -75,32 +72,6 @@ bool     storage_wifi_add(const char *ssid, const char *pass);
  * @return false 索引越界
  */
 bool     storage_wifi_remove(int index);
-
-/* ═══ BT 凭据 ═══ */
-
-/**
- * @brief  查找指定 MAC 地址的索引
- * @param  addr MAC 地址字符串
- * @return 索引（>=0）；未找到返回 -1
- */
-int      storage_bt_find(const char *addr);
-
-/**
- * @brief  添加或更新蓝牙设备信息
- * @param  addr MAC 地址
- * @param  name 设备名称
- * @return true  添加/更新成功
- * @return false 存储已满或参数无效
- */
-bool     storage_bt_add(const char *addr, const char *name);
-
-/**
- * @brief  删除指定索引的蓝牙设备
- * @param  index 索引
- * @return true  删除成功
- * @return false 索引越界
- */
-bool     storage_bt_remove(int index);
 
 /* ═══ 亮度 ═══ */
 
@@ -190,21 +161,6 @@ bool     storage_get_deepseek_key(char *key, size_t max_len);
  * @param  key API Key 字符串
  */
 void     storage_set_deepseek_key(const char *key);
-
-/**
- * @brief  从存储读取 Kimi API Key
- * @param  key   输出缓冲区
- * @param  max_len 缓冲区大小
- * @return true  读取成功
- * @return false 未设置
- */
-bool     storage_get_kimi_key(char *key, size_t max_len);
-
-/**
- * @brief  保存 Kimi API Key 到存储
- * @param  key API Key 字符串
- */
-void     storage_set_kimi_key(const char *key);
 
 #ifdef __cplusplus
 }

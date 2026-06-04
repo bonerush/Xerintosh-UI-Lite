@@ -34,14 +34,6 @@ typedef enum {
     HAL_PWR_KEY_HOLD           /* 持续按住（每 500ms 触发一次） */
 } hal_pwr_key_event_t;
 
-/* ═══ 生命周期 ═══ */
-
-/**
- * @brief 初始化电源键检测
- * @note  硬件环境：启用 AXP192 电源键中断；native 环境：空操作
- */
-extern void hal_power_key_init(void);
-
 /* ═══ 操作函数 ═══ */
 
 /**

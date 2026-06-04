@@ -16,15 +16,10 @@
 #include "serial_input.h"
 
 void serial_request_wifi_password(const char *ssid) { (void)ssid; }
-void serial_request_bt_pair_code(const char *device_name) { (void)device_name; }
-void serial_request_bt_pair_code_with_addr(const char *device_name, const char *device_addr) {
-    (void)device_name; (void)device_addr;
-}
 void serial_cancel(void) {}
 serial_state_t serial_poll(void) { return SERIAL_STATE_IDLE; }
 const char* serial_get_input(void) { return NULL; }
 const char* serial_get_target_name(void) { return NULL; }
-const char* serial_get_target_addr(void) { return NULL; }
 bool serial_input_is_waiting(void) { return false; }
 
 #else
@@ -99,36 +94,6 @@ void serial_request_wifi_password(const char *ssid)
     Serial.flush();
 
     enter_waiting_state(SERIAL_STATE_WAITING_PASSWORD, ssid);
-}
-
-/**
- * @brief 请求通过串口输入指定蓝牙设备的配对码
- */
-void serial_request_bt_pair_code(const char *device_name)
-{
-    Serial.print("PAIR CODE for ");
-    Serial.print(device_name);
-    Serial.print(": ");
-    Serial.flush();
-
-    g_target_addr[0] = '\0';
-    enter_waiting_state(SERIAL_STATE_WAITING_PAIR_CODE, device_name);
-}
-
-/**
- * @brief 请求通过串口输入指定蓝牙设备的配对码（含 MAC 地址）
- */
-void serial_request_bt_pair_code_with_addr(const char *device_name, const char *device_addr)
-{
-    Serial.print("PAIR CODE for ");
-    Serial.print(device_name);
-    Serial.print(" [");
-    Serial.print(device_addr);
-    Serial.print("]: ");
-    Serial.flush();
-
-    strlcpy(g_target_addr, device_addr ? device_addr : "", sizeof(g_target_addr));
-    enter_waiting_state(SERIAL_STATE_WAITING_PAIR_CODE, device_name);
 }
 
 /**
@@ -249,14 +214,6 @@ const char *serial_get_input(void)
 const char *serial_get_target_name(void)
 {
     return g_target_name;
-}
-
-/**
- * @brief 获取当前输入目标 MAC 地址
- */
-const char *serial_get_target_addr(void)
-{
-    return g_target_addr[0] ? g_target_addr : NULL;
 }
 
 bool serial_input_is_waiting(void)

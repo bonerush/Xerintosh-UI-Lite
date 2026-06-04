@@ -55,7 +55,7 @@ void xerintosh_animation(float *_pos, float _pos_trg, float _speed)
 /**
  * @brief 刷新信息栏位置与宽度
  */
-void xerintosh_refresh_info_bar()
+static void xerintosh_refresh_info_bar()
 {
   xerintosh_animation(&g_xerintosh_info_bar.y_info_bar, g_xerintosh_info_bar.y_info_bar_trg, ANIM_SPEED_INFO_BAR);
   xerintosh_animation(&g_xerintosh_info_bar.w_info_bar, g_xerintosh_info_bar.w_info_bar_trg, ANIM_SPEED_INFO_BAR_W);
@@ -64,7 +64,7 @@ void xerintosh_refresh_info_bar()
 /**
  * @brief 刷新弹窗位置与宽度
  */
-void xerintosh_refresh_pop_up()
+static void xerintosh_refresh_pop_up()
 {
   xerintosh_animation(&g_xerintosh_pop_up.y_pop_up, g_xerintosh_pop_up.y_pop_up_trg, ANIM_SPEED_POP_UP_Y);
   xerintosh_animation(&g_xerintosh_pop_up.w_pop_up, g_xerintosh_pop_up.w_pop_up_trg, ANIM_SPEED_POP_UP_W);
@@ -91,7 +91,7 @@ void xerintosh_refresh_camera_position()
  * @brief 初始化列表动画起始位置
  * @note  将所有根节点子项的 y 坐标归零，用于入场动画
  */
-void xerintosh_init_list()
+static void xerintosh_init_list()
 {
   /* 做动画：子项从屏幕外滑入 */
   for (uint8_t i = 0; i < xerintosh_get_root_list()->child_num; i++)

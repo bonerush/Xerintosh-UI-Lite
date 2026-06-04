@@ -59,7 +59,6 @@ extern void kern_shell_println(kern_fd_t tty, const char *msg);
 /* ═══ 命令表接口 ═══ */
 
 #define SHELL_MAX_BUILTIN_CMDS  48   /* 最大内置命令数（Phase 3 扩充） */
-#define SHELL_MAX_DYNAMIC_CMDS   8   /* 最大动态注册命令数 */
 
 /**
  * @brief  获取内置命令表
@@ -73,14 +72,7 @@ extern const kern_shell_cmd_t *kern_shell_get_builtin_cmds(void);
 extern int kern_shell_get_builtin_count(void);
 
 /**
- * @brief  注册一条动态命令
- * @param  cmd 命令条目（生命周期由调用者管理）
- * @return KERN_OK 成功，< 0 为错误码
- */
-extern int kern_shell_register_cmd(const kern_shell_cmd_t *cmd);
-
-/**
- * @brief  在命令表中查找命令（先动态后内置）
+ * @brief  在命令表中查找命令
  * @param  name 命令名
  * @return 匹配的 cmd 条目；未找到返回 NULL
  */

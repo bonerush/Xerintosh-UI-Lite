@@ -1,6 +1,6 @@
 # VFS 虚拟文件系统（Kern VFS）
 
-> **Parent:** [内核总览](index.md) | **Related:** [类型系统](kern-types.md), [devfs](kern-devfs.md), [procfs/sysfs](kern-procfs-sysfs.md), [系统调用](kern-syscall.md)
+> **Parent:** [内核总览](index.md) | **Related:** [类型系统](kern-types.md), [devfs](kern-devfs.md), [procfs/sysfs](kern-procfs-sysfs.md)
 
 ## 概述
 
@@ -327,9 +327,8 @@ sys_close(fd):
 - **kern_task**：每个 task 的 `fd_table[8]` 指向 `kern_file_t`，任务退出时自动 `close_all_fds()`
 - **kern_devfs**：`kern_devfs_init()` 创建 `/dev` 目录并注册 `file_ops` 实现
 - **kern_procfs / kern_sysfs**：创建并填充 `/proc` 和 `/sys` 目录
-- **kern_syscall**：`sys_open`、`sys_read`、`sys_write`、`sys_close`、`sys_ioctl` 直接映射到 VFS 顶层 API
 - **kern_shell**：Shell 命令（如 `cat`、`ls`、`cd`、`pwd`）全部通过 VFS API 实现
 
 ---
 
-> **See Also:** [设备文件系统](kern-devfs.md) | [/proc 与 /sys](kern-procfs-sysfs.md) | [系统调用](kern-syscall.md) | [Shell](kern-shell.md)
+> **See Also:** [设备文件系统](kern-devfs.md) | [/proc 与 /sys](kern-procfs-sysfs.md) | [Shell](kern-shell.md)

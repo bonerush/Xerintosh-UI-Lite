@@ -1,6 +1,6 @@
 # 协作式调度器（Kern Task）
 
-> **Parent:** [内核总览](index.md) | **Related:** [类型系统](kern-types.md), [VFS](kern-vfs.md), [系统调用](kern-syscall.md), [IPC](kern-ipc.md)
+> **Parent:** [内核总览](index.md) | **Related:** [类型系统](kern-types.md), [VFS](kern-vfs.md)
 
 ## 概述
 
@@ -307,12 +307,10 @@ kern_task_unregister_virtual(pid);
 
 ## 与其他组件的关系
 
-- **kern_syscall**：`sys_yield`、`sys_sleep_ms`、`sys_exit` 通过系统调用分发器路由到调度器
 - **kern_vfs**：每个 task 的 `fd_table` 引用 VFS 文件对象，任务退出时自动关闭所有 fd
-- **kern_ipc**：管道的阻塞读使用 `blocked_on` 字段等待写入任务
 - **kern_procfs**：`/proc/tasks` 遍历调度器链表显示任务信息
 - **kern_shell**：Shell 的 `ps` 命令通过 `kern_task_get_by_pid()` 遍历任务链表
 
 ---
 
-> **See Also:** [类型系统](kern-types.md) | [IPC](kern-ipc.md) | [系统调用](kern-syscall.md) | [调度器计划](../../.claude/plans/unified-cooperative-scheduler.plan.md)
+> **See Also:** [类型系统](kern-types.md) | [调度器计划](../../.claude/plans/unified-cooperative-scheduler.plan.md)

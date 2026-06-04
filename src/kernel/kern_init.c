@@ -123,25 +123,8 @@ void kern_panic(const char *msg)
 #endif
 }
 
-const char *kern_get_last_panic(void)
-{
-    return g_has_panic ? g_last_panic : NULL;
-}
-
 void kern_clear_panic(void)
 {
     g_has_panic = false;
     g_last_panic[0] = '\0';
-}
-
-/* ═══ 统计信息 ═══ */
-
-void kern_log_stats(void)
-{
-    kern_log(KERN_LOG_INFO, "--- Kernel Stats ---");
-    kern_log(KERN_LOG_INFO, "  Initialized: %s", g_kern_initialized ? "yes" : "no");
-    kern_log(KERN_LOG_INFO, "  Init count:  %u", g_init_count);
-    kern_log(KERN_LOG_INFO, "  Log level:   %s (%d)", log_level_str(g_log_level), (int)g_log_level);
-    kern_log(KERN_LOG_INFO, "  Has panic:   %s", g_has_panic ? "yes" : "no");
-    kern_log(KERN_LOG_INFO, "--------------------");
 }

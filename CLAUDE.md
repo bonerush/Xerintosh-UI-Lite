@@ -9,7 +9,7 @@ M5Stick-P1 is an embedded UI firmware for the M5Stick-C (ESP32-PICO + 80x160 TFT
 - **Language**: C core + C++ HAL bridge (M5GFX). All exposed headers must be C-compatible with `extern "C"`.
 - **Framework**: Arduino (ESP32) via PlatformIO.
 - **UI Framework name**: Xerintosh (renamed from AstraUI).
-- **Kernel name**: Xeros — cooperative microkernel (VFS / scheduler / shell / IPC).
+- **Kernel name**: Xeros — cooperative microkernel (VFS / scheduler / shell).
 - **Build system**: PlatformIO (`platformio.ini`).
 - **Target resolution**: 80x160 (portrait default, landscape via `setRotation(1)`).
 
@@ -100,8 +100,6 @@ Kernel Layer (src/kernel/) — Xeros cooperative microkernel ("everything is a f
 ├── kern_procfs.c/h           — /proc virtual filesystem
 ├── kern_sysfs.c/h            — /sys virtual filesystem
 ├── kern_gpiofs.c/h           — /sys/gpio pin state mapping
-├── kern_ipc.c/h              — IPC: anonymous pipe + named message queue
-├── kern_syscall.c/h          — Unified syscall dispatcher & user-mode wrappers
 ├── kern_init.c/h             — Kernel initialization sequence
 ├── kern_version.h            — Version & developer info management
 ├── kern_port.c/h             — Portability layer (FreeRTOS / native backends)
@@ -165,12 +163,12 @@ Entry Points
 ├─────────────────────────────────────────────┤
 │ Xeros Kernel Layer                          │
 │  ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐      │
-│  │Sched  │ │ VFS  │ │devfs │ │ IPC  │      │  Cooperative microkernel
-│  │coop   │ │(vrtl)│ │(dev) │ │(pipe)│      │
+│  │Sched  │ │ VFS  │ │devfs │ │procfs│      │  Cooperative microkernel
+│  │coop   │ │(vrtl)│ │(dev) │ │(/proc)│     │
 │  └──────┘ └──────┘ └──────┘ └──────┘      │
-│  ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐      │
-│  │sysfs  │ │procfs│ │Shell │ │Syscll│      │  "Everything is a file"
-│  └──────┘ └──────┘ └──────┘ └──────┘      │
+│  ┌──────┐ ┌──────┐ ┌──────┐               │
+│  │sysfs  │ │Shell │ │gpiofs│               │  "Everything is a file"
+│  └──────┘ └──────┘ └──────┘               │
 ├─────────────────────────────────────────────┤
 │ HAL Layer (display / input / system)        │  Hardware abstraction
 ├─────────────────────────────────────────────┤
@@ -197,7 +195,7 @@ Full-frame redraw, target 60fps.
 - **TFT double-buffering**: `M5Canvas` sprite must have `setColorDepth(16)` **before** `createSprite()`.
 - **XOR highlight**: TFT lacks OLED's `draw_color(2)`, so selector uses pixel-by-pixel `color ^ 0xFFFF`.
 - **Type dispatch**: `ui_dispatch.c` uses function pointer arrays for O(1) type routing (replaces inline switch).
-- **Cooperative kernel**: Round-Robin scheduling + dynamic stack + VFS "everything is a file" + pipe/mq IPC.
+- **Cooperative kernel**: Round-Robin scheduling + dynamic stack + VFS "everything is a file".
 
 ## Coding Conventions
 
@@ -255,7 +253,7 @@ All technical docs live under `doc/` and are written in **Chinese**. They mirror
 - `doc/index.md` — Central knowledge map (must be kept in sync).
 - `doc/coding-style.md` — C OOP naming, encapsulation, inheritance rules.
 - `doc/developer-guide.md` — How to build menus, create `user_item` apps, and organize code.
-- `doc/kernel/` — Xeros kernel subsystem docs (types, task, VFS, devfs, procfs, sysfs, GPIO, IPC, syscall, shell, devices, portability).
+- `doc/kernel/` — Xeros kernel subsystem docs (types, task, VFS, devfs, procfs, sysfs, GPIO, shell, devices, portability).
 - `doc/ui/` — UI core layer docs (item, core, context, dispatch, drawer, draw-icons, draw-anim, draw-list, draw-widgets, anim-row).
 - `doc/app/` — App layer docs (app-init, settings, taskmgr, serial-monitor, ui-task, svc-mgr-helper).
 - `doc/hal/` — HAL layer docs (display, input, system).

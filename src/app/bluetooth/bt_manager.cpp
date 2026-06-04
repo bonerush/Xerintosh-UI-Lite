@@ -27,12 +27,8 @@ void bt_mgr_on_switch_toggle(void *ud) { (void)ud; }
 #include "app/bluetooth/bt_uart_service.h"
 
 extern "C" {
-#include "app/svc_mgr_helper.h"
-#include "app/ui_service.h"
 #include "app/wifi/wifi_manager.h"
 #include "kernel/kern_task.h"
-#include "ui/ui_item.h"
-#include "ui/ui_core.h"
 }
 
 extern bool g_bt_on;  /* 定义在 main.cpp */
@@ -41,16 +37,9 @@ static bool g_bt_enabled = false;
 static bool g_wifi_was_on = false;  /* BT 启用前 WiFi 是否处于开启状态 */
 static bt_mgr_state_t g_state = BT_MGR_IDLE;
 
-static xerintosh_list_item_t *g_settings_list = NULL;
-
 void bt_mgr_init(void) {
     g_bt_enabled = false;
     g_state = BT_MGR_IDLE;
-
-    xerintosh_list_item_t *root = xerintosh_get_root_list();
-    if (root && root->child_num > 0) {
-        g_settings_list = root->child_list_item[0];  /* "设置" */
-    }
 }
 
 void bt_mgr_enable(void) {
@@ -114,7 +103,12 @@ void bt_mgr_update(void) {
 }
 
 void bt_mgr_on_switch_toggle(void *ud) {
-    svc_mgr_handle_switch_toggle(&g_bt_on, bt_mgr_enable, bt_mgr_disable, ud);
+    (void)ud;
+    if (g_bt_on) {
+        bt_mgr_enable();
+    } else {
+        bt_mgr_disable();
+    }
 }
 
 extern "C" void bt_mgr_task_main(void *arg)

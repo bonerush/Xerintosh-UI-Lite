@@ -65,18 +65,6 @@ extern void kern_vlog(kern_log_level_t level, const char *fmt, va_list args);
 extern void kern_panic(const char *msg);
 
 /**
- * @brief  获取上次 panic 信息
- * @return 上次 panic 的消息；若从未 panic 则返回 NULL
- * @note   用于 native 测试环境验证 panic 行为
- */
-extern const char *kern_get_last_panic(void);
-
-/**
- * @brief  输出所有已注册的内核统计信息
- */
-extern void kern_log_stats(void);
-
-/**
  * @brief  清除 panic 状态
  * @note   用于测试重置
  */

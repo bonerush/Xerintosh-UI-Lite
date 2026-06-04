@@ -5,7 +5,6 @@
  *          文件命令依赖 kern_shell_cmds_internal.h 声明。
  *
  *          命令表化设计：每条命令通过 kern_shell_cmd_t 注册，命令名精确匹配。
- *          支持 kern_shell_register_cmd() 动态注册扩展命令。
  *
  * @copyright Copyright (c) 2026
  */
@@ -105,14 +104,6 @@ const char *shell_history_get(int index)
               ? (g_hist_count - 1 - index)
               : ((g_hist_index - 1 - index + HISTORY_SIZE) % HISTORY_SIZE);
     return g_history[pos];
-}
-
-/**
- * @brief 获取当前历史条数
- */
-int shell_history_count(void)
-{
-    return g_hist_count;
 }
 
 /* ═══ ps — 列出所有任务 ═══ */
@@ -637,24 +628,6 @@ static void cmd_log(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd
     }
 }
 
-/* ═══ debug — 模块调试开关（Phase 3 新增）═══ */
-
-static void cmd_debug(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_size)
-{
-    (void)cwd; (void)cwd_size;
-    if (argc < 2) {
-        kern_shell_println(tty, "Usage: debug <on|off> [module]");
-        return;
-    }
-    if (strcmp(argv[1], "on") == 0) {
-        kern_shell_println(tty, "debug: all modules ON (module filter NYI)");
-    } else if (strcmp(argv[1], "off") == 0) {
-        kern_shell_println(tty, "debug: all modules OFF (module filter NYI)");
-    } else {
-        kern_shell_println(tty, "debug: expected 'on' or 'off'");
-    }
-}
-
 /* ═══ param — 参数配置（Phase 3 新增）═══ */
 
 static void cmd_param(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_size)
@@ -850,17 +823,6 @@ static void cmd_info(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cw
     cmd_date(tty, 0, NULL, cwd, cwd_size);
 }
 
-/* ═══ ping — 网络连通性测试（Phase 3 新增）═══ */
-
-static void cmd_ping(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_size)
-{
-    (void)argc; (void)cwd; (void)cwd_size;
-    if (argc < 2) { kern_shell_println(tty, "Usage: ping <host>"); return; }
-    char msg[64];
-    snprintf(msg, sizeof(msg), "ping: %s — not connected", argv[1]);
-    kern_shell_println(tty, msg);
-}
-
 /* ═══ io — GPIO 调试（Phase 3 新增）═══ */
 
 static void cmd_io(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_size)
@@ -949,17 +911,14 @@ static const kern_shell_cmd_t g_builtin_cmds[] = {
     { "top",       cmd_top,       "real-time task monitor" },
     { "mem",       cmd_free,      "show heap memory (alias: free)" },
     { "log",       cmd_log,       "view/set log level" },
-    { "debug",     cmd_debug,     "module debug switch" },
     { "param",     cmd_param,     "config parameters (list/get/set/save/load)" },
     { "bootloader",cmd_bootloader,"enter OTA bootloader mode" },
-    { "update",    cmd_ping,      "OTA update (NYI — placeholder)" },
     { "factory",   cmd_factory,   "factory reset (DANGER!)" },
     { "version",   cmd_version,   "firmware & hardware info" },
     { "scope",     cmd_scope,     "real-time data scope (add/start/stop)" },
     { "mode",      cmd_mode,      "view/set run mode" },
     { "ctrl",      cmd_ctrl,      "control algorithm start/stop/reset" },
     { "info",      cmd_info,      "device summary info" },
-    { "ping",      cmd_ping,      "network connectivity test (placeholder)" },
     { "io",        cmd_io,        "GPIO debug (get/set <pin> [value])" },
 
     /* ── App 配置命令 ── */
@@ -967,23 +926,6 @@ static const kern_shell_cmd_t g_builtin_cmds[] = {
 };
 
 #define BUILTIN_COUNT (sizeof(g_builtin_cmds) / sizeof(g_builtin_cmds[0]))
-
-/* ═══ 动态命令注册 ═══ */
-
-static kern_shell_cmd_t g_dynamic_cmds[SHELL_MAX_DYNAMIC_CMDS];
-static int g_dynamic_count = 0;
-
-int kern_shell_register_cmd(const kern_shell_cmd_t *cmd)
-{
-    if (cmd == NULL || cmd->name == NULL || cmd->handler == NULL) {
-        return KERN_EINVAL;
-    }
-    if (g_dynamic_count >= SHELL_MAX_DYNAMIC_CMDS) {
-        return KERN_ENOSPC;
-    }
-    g_dynamic_cmds[g_dynamic_count++] = *cmd;
-    return KERN_OK;
-}
 
 /* ═══ 命令查找 ═══ */
 
@@ -1001,14 +943,7 @@ const kern_shell_cmd_t *kern_shell_lookup_cmd(const char *name)
 {
     if (name == NULL || name[0] == '\0') return NULL;
 
-    /* 先查动态命令 */
-    for (int i = 0; i < g_dynamic_count; i++) {
-        if (strcmp(g_dynamic_cmds[i].name, name) == 0) {
-            return &g_dynamic_cmds[i];
-        }
-    }
-
-    /* 再查内置命令 */
+    /* 查内置命令 */
     for (size_t i = 0; i < BUILTIN_COUNT; i++) {
         if (strcmp(g_builtin_cmds[i].name, name) == 0) {
             return &g_builtin_cmds[i];

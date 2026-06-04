@@ -105,14 +105,6 @@ static hal_pwr_key_event_t pwr_key_process(uint32_t now_ms)
 /* ═══ Native 测试环境：桩实现 ═══ */
 
 /**
- * @brief 初始化电源键检测（空操作）
- */
-void hal_power_key_init(void)
-{
-    hal_power_key_test_reset();
-}
-
-/**
  * @brief 获取电源键事件（从内部状态机提取）
  */
 hal_pwr_key_event_t hal_power_key_get_event(void)
@@ -248,21 +240,6 @@ void hal_power_key_test_reset(void)
 #define PWR_KEY_LONG_TIMEOUT_MS  10000  /* 长按最大等待 */
 
 /**
- * @brief 初始化电源键检测
- */
-void hal_power_key_init(void)
-{
-    g_pwr.state = PWR_STATE_IDLE;
-    g_pwr.pressed = false;
-    g_pwr.press_time = 0;
-    g_pwr.last_event_time = 0;
-    g_pwr.pending = HAL_PWR_KEY_NONE;
-
-    /* 清除可能残留的按键状态 */
-    M5.Power.getKeyState();
-}
-
-/**
  * @brief  获取电源键事件（非阻塞，每帧调用）
  * @details 轮询 AXP192 的 getPekPress() 方法（读取寄存器 0x46），
  *          结合时间推算检测短按、长按和持续按住事件。
@@ -281,16 +258,8 @@ hal_pwr_key_event_t hal_power_key_get_event(void)
      * 返回值：0=none / 1=long pressed / 2=short clicked / 3=both */
     uint8_t pek = M5.Power.getKeyState();
 
-    /* 调试：每秒打印一次 PEK 状态 */
-    static uint32_t last_debug_ms = 0;
-    if (now_ms - last_debug_ms >= 2000) {
-        Serial.printf("[PWR] keyState=%d pressed=%d state=%d\n", pek, g_pwr.pressed, g_pwr.state);
-        last_debug_ms = now_ms;
-    }
-
     /* 检测按下边沿：getKeyState() 非零表示新的按键事件 */
     if (pek != 0) {
-        Serial.printf("[PWR] Key event: %d (1=long, 2=short, 3=both)\n", pek);
         g_pwr.pressed = true;
         g_pwr.press_time = now_ms;
 

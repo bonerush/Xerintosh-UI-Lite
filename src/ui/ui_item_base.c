@@ -28,11 +28,6 @@ static xerintosh_list_item_t *xerintosh_safe_cast(xerintosh_list_item_t *_item,
   return NULL;
 }
 
-bool xerintosh_is_type(xerintosh_list_item_t *_item, xerintosh_list_item_type_t _expected_type)
-{
-  return (_item != NULL && _item->type == _expected_type);
-}
-
 xerintosh_switch_item_t *xerintosh_to_switch_item(xerintosh_list_item_t *_xerintosh_list_item)
 {
   return (xerintosh_switch_item_t*)xerintosh_safe_cast(_xerintosh_list_item, switch_item);

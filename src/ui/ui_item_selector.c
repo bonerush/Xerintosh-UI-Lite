@@ -234,16 +234,6 @@ void ui_selector_rebuild_anchor(xerintosh_list_item_t *subtree_root,
     }
 }
 
-void ui_selector_move_to_first_child(xerintosh_list_item_t *parent)
-{
-    if (parent == NULL) return;
-    if (g_xerintosh_selector.selected_item == parent
-        && parent->child_num > 0) {
-        g_xerintosh_selector.selected_item  = parent->child_list_item[0];
-        g_xerintosh_selector.selected_index = 0;
-    }
-}
-
 void ui_selector_safety_move_out(xerintosh_list_item_t *subtree_root,
                                  xerintosh_list_item_t *fallback_parent)
 {

@@ -27,12 +27,6 @@ extern "C" {
  */
 extern void xerintosh_init_core(void);
 
-/**
- * @brief 初始化列表动画起始位置
- * @note  将所有根节点子项的 y 坐标归零，用于入场动画
- */
-extern void xerintosh_init_list(void);
-
 /* ═══ 主循环 ═══ */
 
 /**
@@ -62,16 +56,6 @@ extern void xerintosh_refresh_selector_position(void);
  * @brief 刷新相机位置，确保选择器始终处于可视区域
  */
 extern void xerintosh_refresh_camera_position(void);
-
-/**
- * @brief 刷新信息栏位置与宽度
- */
-extern void xerintosh_refresh_info_bar(void);
-
-/**
- * @brief 刷新弹窗位置与宽度
- */
-extern void xerintosh_refresh_pop_up(void);
 
 /* ═══ 动画工具 ═══ */
 

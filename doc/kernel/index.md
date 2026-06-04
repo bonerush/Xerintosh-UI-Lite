@@ -10,8 +10,6 @@ Xeros 是一个轻量级**协作式微内核**，运行在 M5Stick-C (ESP32-PICO
 1. **协作式调度**：手写 Round-Robin 调度器，任务主动让出 CPU，无需复杂锁机制
 2. **一切皆文件**：通过 VFS 将显示、按键、串口等硬件抽象为 `/dev/fb0`、`/dev/input0`、`/dev/ttyS0`
 3. **动态栈管理**：每个任务从 1KB 起始栈分配，按需扩展到上限 8KB，内置金丝雀溢出检测
-4. **IPC 机制**：匿名 pipe（环形缓冲区）和命名消息队列，支持任务间数据传递
-
 FreeRTOS 继续在底层为 WiFi/BT 协议栈服务，Xeros 运行在 Arduino `loop()` 的单一线程内，不创建新的 FreeRTOS 任务，也不与底层冲突。
 
 ## 架构图
@@ -30,14 +28,14 @@ FreeRTOS 继续在底层为 WiFi/BT 协议栈服务，Xeros 运行在 Arduino `l
 │  │Scheduler │ │   VFS    │ │  devfs   │ │  procfs  │        │
 │  │ (coop)   │ │(inode)   │ │(/dev/*)  │ │(/proc/*) │        │
 │  └──────────┘ └──────────┘ └──────────┘ └──────────┘        │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐        │
-│  │  sysfs   │ │   IPC    │ │  Shell   │ │ Syscall  │        │
-│  │(/sys/*)  │ │(pipe/mq) │ │(30+ cmd) │ │dispatch  │        │
-│  └──────────┘ └──────────┘ └──────────┘ └──────────┘        │
-│  ┌───────────┐ ┌───────────┐                                  │
-│  │  gpiofs   │ │  Scope    │                                  │
-│  │ /sys/gpio │ │(监测引擎) │                                  │
-│  └───────────┘ └───────────┘                                  │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐              │
+│  │  sysfs   │ │  Shell   │ │ gpiofs   │              │
+│  │(/sys/*)  │ │(30+ cmd) │ │/sys/gpio │              │
+│  └──────────┘ └──────────┘ └──────────┘              │
+│  ┌───────────┐ ┌───────────┐                          │
+│  │  Scope    │ │           │                          │
+│  │(监测引擎) │ │           │                          │
+│  └───────────┘ └───────────┘                          │
 ├─────────────────────────────────────────────────────────────┤
 │ HAL / FreeRTOS（底层，不动）                                │
 │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐        │
@@ -56,8 +54,6 @@ FreeRTOS 继续在底层为 WiFi/BT 协议栈服务，Xeros 运行在 Arduino `l
 | VFS 核心 | [kern-vfs.md](kern-vfs.md) | `kern_vfs.c/h` | inode/dentry/file 三级结构、路径解析、open/close/read/write |
 | 设备文件系统 | [kern-devfs.md](kern-devfs.md) | `kern_devfs.c/h` | /dev/ 目录创建、设备注册 |
 | /proc 与 /sys | [kern-procfs-sysfs.md](kern-procfs-sysfs.md) | `kern_procfs.c/h`, `kern_sysfs.c/h` | 内核状态信息、系统配置文件系统 |
-| IPC | [kern-ipc.md](kern-ipc.md) | `kern_ipc.c/h` | 匿名 pipe（环形缓冲区）+ 命名消息队列 |
-| 系统调用 | [kern-syscall.md](kern-syscall.md) | `kern_syscall.c/h` | 统一 syscall 分发器 + 用户态封装 |
 | Shell | [kern-shell.md](kern-shell.md) | `kern_shell.c/h`, `kern_shell_cmds.c/h` | 串口交互式命令行（30+ 命令，含 scope/top/param 等） |
 | Scope | [kern-shell.md](kern-shell.md#scope--实时数据监测引擎phase-3-新增) | `kern_shell_cmds.c`, `kern_shell_cmds_internal.h` | 实时数据监测引擎（周期 CSV 输出） |
 | GPIO 桥接 | [kern-gpiofs.md](kern-gpiofs.md) | `kern_gpiofs.c/h` | /sys/gpio 引脚状态映射与读写 |

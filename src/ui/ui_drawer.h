@@ -36,16 +36,6 @@ extern void xerintosh_draw_info_bar(void);
 extern void xerintosh_draw_pop_up(void);
 
 /**
- * @brief 绘制列表整体外观（边框、滚动条、装饰像素）
- */
-extern void xerintosh_draw_list_appearance(void);
-
-/**
- * @brief 绘制当前可见的所有列表项（含图标、文字、滚动效果）
- */
-extern void xerintosh_draw_list_item(void);
-
-/**
  * @brief 绘制指定类型的图标
  * @param icon 图标类型
  * @param x    图标左上角 x 坐标
@@ -61,11 +51,6 @@ extern void xerintosh_draw_list_icon(xerintosh_list_item_icon_t icon, uint16_t x
  * @note   当 icon 为 custom_icon 时由 draw_list_item_xxx 调用
  */
 extern void xerintosh_draw_item_bitmap(xerintosh_list_item_t *_item, uint16_t x, uint16_t y);
-
-/**
- * @brief 绘制选择器高亮框（XOR 反色矩形 + 右侧虚线装饰）
- */
-extern void xerintosh_draw_selector(void);
 
 /**
  * @brief  绘制长按进度提示条

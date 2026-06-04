@@ -10,7 +10,6 @@
 #define HAL_SYSTEM_H
 
 #include <stdint.h>
-#include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C" {

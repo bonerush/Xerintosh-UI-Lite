@@ -88,12 +88,6 @@ extern void ui_selector_safety_move_out(xerintosh_list_item_t *subtree_root,
 extern void ui_selector_rebuild_anchor(xerintosh_list_item_t *subtree_root,
                                        xerintosh_list_item_t *parent);
 
-/**
- * @brief  若选择器当前在 parent 上，移至其第一个子项
- * @param  parent 父项指针
- */
-extern void ui_selector_move_to_first_child(xerintosh_list_item_t *parent);
-
 #ifdef __cplusplus
 }
 #endif

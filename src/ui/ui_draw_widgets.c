@@ -68,6 +68,23 @@ void xerintosh_draw_info_bar()
 /* ═══ 弹窗 ═══ */
 
 /**
+ * @brief 根据换行数计算弹窗高度
+ * @param wrap_line_count 内容行数
+ * @return 弹窗总高度（含 padding）
+ */
+static int16_t popup_compute_height(uint8_t wrap_line_count)
+{
+  int16_t fh = hal_get_font_height();
+  uint8_t n = wrap_line_count;
+  if (n < 1) n = 1;
+  if (n > POP_UP_WRAP_LINES) n = POP_UP_WRAP_LINES;
+  int16_t content_h = (int16_t)(n * fh + (n - 1) * 2);
+  int16_t pop_h = content_h + 8;
+  if (pop_h < 24) pop_h = 24;
+  return pop_h;
+}
+
+/**
  * @brief 绘制中部弹窗
  * @note  与信息栏类似的三层圆角矩形堆叠，居中显示提示文字
  */
@@ -88,13 +105,12 @@ void xerintosh_draw_pop_up()
   }
 
   /* 根据实际内容计算动态高度：文字高度 + 上下各 4px padding */
+  int16_t pop_h = popup_compute_height(g_xerintosh_pop_up.wrap_line_count);
   int16_t fh = hal_get_font_height();
   uint8_t n = g_xerintosh_pop_up.wrap_line_count;
   if (n < 1) n = 1;
   if (n > POP_UP_WRAP_LINES) n = POP_UP_WRAP_LINES;
   int16_t content_h = (int16_t)(n * fh + (n - 1) * 2);
-  int16_t pop_h = content_h + 8;
-  if (pop_h < 24) pop_h = 24;
 
   int16_t _x_pop_up = SCREEN_WIDTH/2 - g_xerintosh_pop_up.w_pop_up/2;
   int16_t _y_pop_up = g_xerintosh_pop_up.y_pop_up + pop_h;

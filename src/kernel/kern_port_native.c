@@ -4,6 +4,10 @@
  * @details 基于 setjmp/longjmp + 手动栈管理实现协作式调度，
  *          完全不依赖 FreeRTOS 任务 API。
  *
+ * @deprecated 此文件具有互斥的 #ifdef 守卫（XEROS_NATIVE_SCHED），
+ *             在当前所有构建配置中均不参与编译。保留作为实验性参考代码。
+ *             不要在新代码中包含或引用此文件。
+ *
  * @note   当 XEROS_NATIVE_SCHED 启用时，调度逻辑直接在 kern_task.c 中实现，
  *         此文件不参与编译。
  */

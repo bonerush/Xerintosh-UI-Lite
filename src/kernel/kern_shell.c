@@ -27,7 +27,6 @@
 
 extern void shell_history_add(const char *cmd);
 extern const char *shell_history_get(int index);
-extern int shell_history_count(void);
 
 /* ═══ 输出辅助 ═══ */
 

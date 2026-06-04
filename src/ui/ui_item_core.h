@@ -109,15 +109,6 @@ typedef struct xerintosh_user_item_t
 extern xerintosh_list_item_t *xerintosh_get_root_list(void);
 
 /**
- * @brief  检查列表项是否为指定类型
- * @param  _item 列表项指针
- * @param  _type 期望的类型
- * @return true  类型匹配
- * @return false 类型不匹配或参数为 NULL
- */
-extern bool xerintosh_is_type(xerintosh_list_item_t *_item, xerintosh_list_item_type_t _type);
-
-/**
  * @brief  安全类型转换：转为 switch_item
  * @param  _item 列表项指针
  * @return 转换后的指针；类型不匹配或参数为 NULL 时返回 NULL

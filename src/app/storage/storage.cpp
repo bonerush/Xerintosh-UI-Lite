@@ -24,11 +24,6 @@ bool     storage_wifi_add(const char *ssid, const char *pass) {
     (void)ssid; (void)pass; return false;
 }
 bool     storage_wifi_remove(int index) { (void)index; return false; }
-int      storage_bt_find(const char *addr) { (void)addr; return -1; }
-bool     storage_bt_add(const char *addr, const char *name) {
-    (void)addr; (void)name; return false;
-}
-bool     storage_bt_remove(int index) { (void)index; return false; }
 int16_t  storage_get_brightness(void) { return 50; }
 void     storage_set_brightness(int16_t val) { (void)val; }
 uint8_t  storage_get_anim_speed(void) { return 92; }
@@ -43,10 +38,6 @@ bool     storage_get_deepseek_key(char *key, size_t max_len) {
     (void)max_len; key[0] = '\0'; return false;
 }
 void     storage_set_deepseek_key(const char *key) { (void)key; }
-bool     storage_get_kimi_key(char *key, size_t max_len) {
-    (void)max_len; key[0] = '\0'; return false;
-}
-void     storage_set_kimi_key(const char *key) { (void)key; }
 
 #else
 
@@ -121,10 +112,6 @@ typedef struct {
 static const credential_kind_t WIFI_KIND = {
     "wifi_count", "wifi_ssid_%d", "wifi_pass_%d",
     STORAGE_MAX_WIFI_NETWORKS, STORAGE_SSID_MAX_LEN, STORAGE_PASS_MAX_LEN
-};
-static const credential_kind_t BT_KIND = {
-    "bt_count", "bt_addr_%d", "bt_name_%d",
-    STORAGE_MAX_BT_DEVICES, STORAGE_BT_ADDR_MAX_LEN, STORAGE_BT_NAME_MAX_LEN
 };
 
 static int cred_get_count(const credential_kind_t *k) {
@@ -270,20 +257,6 @@ bool storage_wifi_remove(int index) {
     return cred_remove(&WIFI_KIND, index);
 }
 
-/* ═══ 蓝牙凭据 ═══ */
-
-int storage_bt_find(const char *addr) {
-    return cred_find(&BT_KIND, addr);
-}
-
-bool storage_bt_add(const char *addr, const char *name) {
-    return cred_add(&BT_KIND, addr, name);
-}
-
-bool storage_bt_remove(int index) {
-    return cred_remove(&BT_KIND, index);
-}
-
 /* ═══ 亮度 ═══ */
 
 int16_t storage_get_brightness(void) {
@@ -415,23 +388,6 @@ void storage_set_deepseek_key(const char *key) {
     Preferences prefs;
     prefs.begin(NVS_NAMESPACE, false);
     prefs.putString("ds_key_v1", key);
-    prefs.end();
-}
-
-bool storage_get_kimi_key(char *key, size_t max_len) {
-    if (!key || max_len == 0) return false;
-    Preferences prefs;
-    prefs.begin(NVS_NAMESPACE, true);
-    size_t len = prefs.getString("kimi_key_v1", key, max_len);
-    prefs.end();
-    return len > 0;
-}
-
-void storage_set_kimi_key(const char *key) {
-    if (!key) return;
-    Preferences prefs;
-    prefs.begin(NVS_NAMESPACE, false);
-    prefs.putString("kimi_key_v1", key);
     prefs.end();
 }
 

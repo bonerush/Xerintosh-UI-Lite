@@ -27,7 +27,7 @@ sm_source_t sm_source = SM_SOURCE_SER;
 uint8_t     sm_selected = 0;
 bool        sm_bt_connected = false;
 static uint32_t    sm_blink_tick = 0;
-static bool        sm_blink_on = false;
+static bool        sm_bt_lazy_inited = false;    /* 串口监视器是否懒加载了 BT */
 sm_buffer_t sm_buffer;
 
 /* 动画状态 */
@@ -45,9 +45,6 @@ static bool        s_prev_landscape = true; /* 保存进入前的屏幕方向 */
 /* BT RX 行组装缓冲区（迁移自 ble_serial.cpp） */
 static char     sm_bt_rx_buf[SM_TERM_LINE_LEN];
 static uint8_t  sm_bt_rx_len = 0;
-static uint32_t sm_bt_rx_count = 0;  /* BT RX 字节计数 */
-static bool     sm_prev_bt_connected = false; /* 连接状态变化检测 */
-static bool     sm_bt_lazy_inited = false;    /* 串口监视器是否懒加载了 BT */
 #endif
 
 /* ═══ 常量 ═══ */
@@ -66,7 +63,6 @@ static void sm_on_bt_rx(const uint8_t *data, uint16_t len)
 
     for (uint16_t i = 0; i < len; i++) {
         char c = (char)data[i];
-        sm_bt_rx_count++;
         if (c == '\n' || c == '\r') {
             if (sm_bt_rx_len > 0) {
                 sm_bt_rx_buf[sm_bt_rx_len] = '\0';
@@ -100,7 +96,6 @@ void serial_monitor_init(void *ud)
     sm_selected = 0;
     sm_bt_connected = false;
     sm_blink_tick = hal_get_ticks();
-    sm_blink_on = false;
     sm_buffer_init(&sm_buffer);
 
     /* 初始化动画状态 */
@@ -111,8 +106,6 @@ void serial_monitor_init(void *ud)
 #ifndef NATIVE_TEST
     sm_rx_len = 0;
     sm_bt_rx_len = 0;
-    sm_bt_rx_count = 0;
-    sm_prev_bt_connected = false;
     sm_bt_lazy_inited = false;
     s_prev_landscape = g_is_landscape;
     if (!g_is_landscape) {
@@ -202,7 +195,6 @@ void serial_monitor_loop(void *ud)
     uint32_t now = hal_get_ticks();
     if (now - sm_blink_tick >= SM_BLINK_PERIOD) {
         sm_blink_tick = now;
-        sm_blink_on = !sm_blink_on;
     }
 
 #ifndef NATIVE_TEST
@@ -218,7 +210,6 @@ void serial_monitor_loop(void *ud)
         if (sm_bt_connected != prev) {
             xerintosh_push_pop_up(
                 sm_bt_connected ? "Connected" : "Disconnected", 1500);
-            sm_prev_bt_connected = sm_bt_connected;
         }
     }
 #endif

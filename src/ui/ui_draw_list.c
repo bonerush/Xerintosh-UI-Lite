@@ -127,7 +127,7 @@ static void xerintosh_draw_slider_overlays(void)
  * @brief 绘制列表整体外观（边框、滚动条、装饰像素）
  * @note  顶部装饰横线 + 右侧滚动指示条（显示当前选中位置比例）
  */
-void xerintosh_draw_list_appearance()
+static void xerintosh_draw_list_appearance()
 {
   g_xerintosh_draw_color = COLOR_FG;
   hal_draw_h_line(0, 1, 66, g_xerintosh_draw_color);
@@ -195,7 +195,7 @@ void xerintosh_draw_list_appearance()
 /**
  * @brief 绘制当前可见的所有列表项（含图标、文字、滚动效果）
  */
-void xerintosh_draw_list_item()
+static void xerintosh_draw_list_item()
 {
   for (unsigned char i = 0; i < g_xerintosh_selector.selected_item->parent->child_num; i++)
   {
@@ -289,7 +289,7 @@ void xerintosh_draw_list_item()
 /**
  * @brief 绘制选择器高亮框（XOR 反色矩形 + 右侧虚线装饰）
  */
-void xerintosh_draw_selector()
+static void xerintosh_draw_selector()
 {
   int16_t _x_selector = g_xerintosh_camera.x_camera + LIST_ITEM_LEFT_MARGIN;
   int16_t _y_selector = g_xerintosh_selector.y_selector + g_xerintosh_camera.y_camera;

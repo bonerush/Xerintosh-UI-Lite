@@ -77,7 +77,6 @@ int main(int argc, char **argv)
     ::testing::InitGoogleTest(&argc, argv);
     hal_system_init();
     hal_display_init();
-    hal_system_init();
     hal_input_init();
     return RUN_ALL_TESTS();
 }

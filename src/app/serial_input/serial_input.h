@@ -40,19 +40,6 @@ typedef enum {
 void           serial_request_wifi_password(const char *ssid);
 
 /**
- * @brief 请求通过串口输入指定蓝牙设备的配对码
- * @param device_name 目标蓝牙设备名称
- */
-void           serial_request_bt_pair_code(const char *device_name);
-
-/**
- * @brief 请求通过串口输入指定蓝牙设备的配对码（含 MAC 地址）
- * @param device_name 目标蓝牙设备名称
- * @param device_addr 目标蓝牙设备 MAC 地址
- */
-void           serial_request_bt_pair_code_with_addr(const char *device_name, const char *device_addr);
-
-/**
  * @brief 取消当前串口输入请求
  */
 void           serial_cancel(void);
@@ -75,12 +62,6 @@ const char*    serial_get_input(void);
  * @return 目标名称指针
  */
 const char*    serial_get_target_name(void);
-
-/**
- * @brief  获取当前输入目标 MAC 地址（蓝牙配对时使用）
- * @return MAC 地址指针；无地址时返回 NULL
- */
-const char*    serial_get_target_addr(void);
 
 /**
  * @brief  查询是否正在等待用户输入（密码/配对码）

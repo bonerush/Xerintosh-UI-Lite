@@ -17,8 +17,6 @@ Project Root
 │   ├── [GPIO 桥接](kernel/kern-gpiofs.md)       ← /sys/gpio 引脚状态映射
 │   ├── [版本信息](kernel/kern-version.md)        ← 版本号与开发者信息管理
 │   ├── [可移植层](kernel/kern-port.md)          ← 调度原语抽象（FreeRTOS/原生双后端）
-│   ├── [IPC 机制](kernel/kern-ipc.md)           ← pipe + 命名消息队列
-│   ├── [系统调用](kernel/kern-syscall.md)       ← 统一 syscall 分发与封装
 │   ├── [内核 Shell](kernel/kern-shell.md)        ← 串口交互式命令行
 │   └── [物理设备](kernel/kern-devices.md)       ← /dev/fb0, /dev/input0, /dev/ttyS0
 ├── HAL 层（硬件抽象）
@@ -64,12 +62,12 @@ Project Root
 ├─────────────────────────────────────────────┤
 │ Xeros 内核层                                 │
 │  ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐      │
-│  │Sched  │ │ VFS  │ │ devfs│ │ IPC  │       │  协作式微内核
-│  │coop   │ │(vrtl)│ │(dev) │ │(pipe)│      │
-│  └──────┘ └──────┘ └──────┘ └──────┘      │
-│  ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐      │
-│  │sysfs  │ │procfs│ │Shell │ │Syscll│      │  "一切皆文件"
-│  └──────┘ └──────┘ └──────┘ └──────┘      │
+│  │Sched  │ │ VFS  │ │ devfs│ │procfs│        │  协作式微内核
+│  │coop   │ │(vrtl)│ │(dev) │ │(/proc)│       │
+│  └──────┘ └──────┘ └──────┘ └──────┘        │
+│  ┌──────┐ ┌──────┐ ┌──────┐                  │
+│  │sysfs  │ │Shell │ │gpiofs│                  │  "一切皆文件"
+│  └──────┘ └──────┘ └──────┘                  │
 ├─────────────────────────────────────────────┤
 │ HAL 层 (display / input / system)           │  硬件抽象
 ├─────────────────────────────────────────────┤
@@ -96,7 +94,7 @@ FreeRTOS 继续在底层为 WiFi/BT 协议栈服务；Xeros 内核运行在 Ardu
 - **XOR 选择器高亮**：TFT 不支持 OLED 的 `draw_color(2)` 反色，改用像素级 `color ^ 0xFFFF`
 - **C 风格面向对象**：基类 `xerintosh_list_item_t` 作为结构体第一个成员，派生类通过强制类型转换实现多态
 - **动画插值公式**：`current += (target - current) / (100.0f - speed)`
-- **协作式微内核**：Round-Robin 调度 + 动态栈管理 + VFS"一切皆文件" + pipe/mq IPC
+- **协作式微内核**：Round-Robin 调度 + 动态栈管理 + VFS"一切皆文件"
 
 ## 文档树
 
@@ -110,8 +108,6 @@ FreeRTOS 继续在底层为 WiFi/BT 协议栈服务；Xeros 内核运行在 Ardu
 - **[GPIO 桥接](kernel/kern-gpiofs.md)** — /sys/gpio 引脚状态映射与读写
 - **[版本信息管理](kernel/kern-version.md)** — 版本号与开发者信息集中管理
 - **[可移植层](kernel/kern-port.md)** — 调度原语抽象（FreeRTOS/原生双后端）
-- **[IPC 进程间通信](kernel/kern-ipc.md)** — 匿名 pipe + 命名消息队列
-- **[系统调用接口](kernel/kern-syscall.md)** — 统一分发器与用户态封装
 - **[内核 Shell](kernel/kern-shell.md)** — 串口交互式命令行（30+ 命令，含 scope/top/param 等）
 - **[物理设备驱动](kernel/kern-devices.md)** — /dev/fb0 / /dev/input0 / /dev/ttyS0
 - **[Shell 命令实现](kernel/kern-shell-cmds.md)** — 30+ 内置命令与动态注册

@@ -1,6 +1,6 @@
 # 内核优化分析报告
 
-> **Parent:** [知识地图](../index.md) | **Related:** [内核总览](kernel/index.md), [调度器](kernel/kern-task.md), [VFS](kernel/kern-vfs.md), [IPC](kernel/kern-ipc.md), [Shell](kernel/kern-shell.md)
+> **Parent:** [知识地图](../index.md) | **Related:** [内核总览](kernel/index.md), [调度器](kernel/kern-task.md), [VFS](kernel/kern-vfs.md), [Shell](kernel/kern-shell.md)
 
 > **来源**: 4 模块协同优化计划 Phase 4
 > **目标板**: M5Stick-C (ESP32-PICO)
@@ -10,7 +10,7 @@
 
 ## 概述
 
-本文对 Xeros 微内核的 7 个核心模块进行诊断、方案设计、代码示例和收益评估。每个模块独立可实施，按投入产出比排序。
+本文对 Xeros 微内核的 6 个核心模块进行诊断、方案设计、代码示例和收益评估。每个模块独立可实施，按投入产出比排序。
 
 ---
 
@@ -176,43 +176,7 @@ static ssize_t procfs_meminfo_generate(char *buf, size_t len) {
 
 ---
 
-## 4. IPC 优化
-
-### 问题诊断
-
-- **MQ 查找 O(N)**：每次 `mq_open()` 线性扫描消息队列表
-- **Pipe 唤醒顺序**：当前 `kern_sched_tick()` 按到达顺序唤醒，语义已正确
-
-### 优化方案
-
-#### 4.1 MQ 哈希表
-
-```c
-#define MQ_HASH_SIZE 8
-
-typedef struct {
-    char   name[32];
-    mq_queue_t *queue;
-    bool   in_use;
-} mq_hash_entry_t;
-
-static mq_hash_entry_t g_mq_hash[MQ_HASH_SIZE];
-
-static uint8_t mq_hash(const char *name) {
-    return (uint8_t)(name[0] + name[1] * 31) % MQ_HASH_SIZE;
-}
-```
-
-### 预期收益
-
-| 指标 | 优化前 | 优化后 |
-|------|--------|--------|
-| MQ 查找 | O(N) | O(1) |
-| Pipe 唤醒 | FIFO（已正确） | 无需修改 |
-
----
-
-## 5. Shell 与系统调用
+## 4. Shell 与系统调用
 
 ### 问题诊断
 
@@ -261,7 +225,7 @@ typedef struct {
 
 ---
 
-## 6. 内核可观测性
+## 5. 内核可观测性
 
 ### 问题诊断
 
@@ -314,7 +278,7 @@ void kern_stack_canary_scan_all(void) {
 
 ---
 
-## 7. 编译与内存优化
+## 6. 编译与内存优化
 
 ### 问题诊断
 
@@ -367,9 +331,8 @@ kern_task_t *pick_next_ready(void) { ... }
 | 调度器 | 中 | 高（UI 延迟 + 省电） | 低 | 1 |
 | 栈管理 | 低 | 中（碎片消除 + 预警） | 低 | 2 |
 | VFS | 低 | 中（路径缓存命中 >90%） | 低 | 3 |
-| IPC | 低 | 低（MQ 查找 O(1)） | 低 | 4 |
-| Shell | 中 | 高（自动化标定） | 中（脚本引擎） | 5 |
-| 可观测性 | 低 | 高（诊断效率） | 低 | 6 |
-| 编译内存 | 低 | 中（省 ~1.2KB SRAM） | 低 | 7 |
+| Shell | 中 | 高（自动化标定） | 中（脚本引擎） | 4 |
+| 可观测性 | 低 | 高（诊断效率） | 低 | 5 |
+| 编译内存 | 低 | 中（省 ~1.2KB SRAM） | 低 | 6 |
 
-全部 7 模块可按任意顺序独立实施，互不阻塞。
+全部 6 模块可按任意顺序独立实施，互不阻塞。

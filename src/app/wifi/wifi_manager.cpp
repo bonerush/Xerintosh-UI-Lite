@@ -34,8 +34,6 @@ void wifi_mgr_on_switch_toggle(void *ud) { (void)ud; }
 extern "C" {
 #include "app/storage/storage.h"
 #include "app/serial_input/serial_input.h"
-#include "app/svc_mgr_helper.h"
-#include "app/ui_service.h"
 #include "app/settings/settings.h"
 #include "ui/ui_item.h"
 #include "ui/ui_core.h"
@@ -67,17 +65,11 @@ static char  g_connecting_pass[STORAGE_PASS_MAX_LEN] = {0};     /* 正在连接�
 static unsigned long g_wifi_scan_start_time = 0;   /* 扫描开始时间 */
 static unsigned long g_warmup_start_time   = 0;    /* 预热开始时间 */
 static unsigned long g_connect_start_time  = 0;    /* 连接开始时间 */
-static int g_scan_retry_count = 0;                 /* 扫描重试计数 */
 static bool g_initial_scan_shown = false;           /* 首次启动扫描弹窗是否已显示 */
 
 /* ESP-IDF 异步扫描回调标志 */
 static volatile bool g_scan_done = false;
 static volatile uint16_t g_scan_ap_count = 0;
-
-/* AP 记录缓冲区（扫描完成后填充，供 rebuild_network_list 读取） */
-#define WIFI_SCAN_MAX_AP 16
-static wifi_ap_record_t g_ap_records[WIFI_SCAN_MAX_AP];
-static uint16_t g_ap_record_count = 0;
 
 /* ESP-IDF 扫描完成回调（WiFi 事件驱动）
  * 只设标志，不读取 AP 数量——Arduino WiFi 库的内部处理器先于回调执行，
@@ -279,7 +271,12 @@ void wifi_mgr_disable(void)
  */
 void wifi_mgr_on_switch_toggle(void *ud)
 {
-    svc_mgr_handle_switch_toggle(&g_wifi_on, wifi_mgr_enable, wifi_mgr_disable, ud);
+    (void)ud;
+    if (g_wifi_on) {
+        wifi_mgr_enable();
+    } else {
+        wifi_mgr_disable();
+    }
 }
 
 /* ═══ 网络菜单重建 ═══ */
@@ -362,8 +359,6 @@ static void rebuild_network_list(int scan_count)
             g_xerintosh_selector.selected_index = 0;
         }
     }
-
-    /* AP 记录由 g_ap_records 静态缓冲区持有，无需额外释放 */
 }
 
 /* ═══ 回调函数 ═══ */
@@ -435,7 +430,7 @@ static void on_saved_delete_pressed(void *ud)
 
     wifi_popup_request("已删除", 1500);
     xerintosh_selector_exit_current_item();
-    rebuild_network_list(g_ap_record_count);
+    rebuild_network_list(0);
 }
 
 /**
@@ -461,14 +456,11 @@ static void on_scan_pressed(void *ud)
     } else {
         g_state = WIFI_MGR_SCANNING;
         g_wifi_scan_start_time = millis();
-        g_scan_retry_count = 0;
         wifi_popup_request("扫描中...", WIFI_SCAN_TIMEOUT_MS);
     }
 }
 
 /* ═══ 每帧更新（非阻塞状态机）═══ */
-
-#define WIFI_SCAN_MAX_RETRIES 3  /* 扫描失败最大重试次数 */
 
 /**
  * @brief 每帧更新 WiFi 状态机（非阻塞）
@@ -503,7 +495,6 @@ void wifi_mgr_update(void)
             } else {
                 g_state = WIFI_MGR_SCANNING;
                 g_wifi_scan_start_time = millis();
-                g_scan_retry_count = 0;
                 if (!g_initial_scan_shown) {
                     wifi_popup_request("扫描中...", WIFI_SCAN_TIMEOUT_MS);
                 }
@@ -520,7 +511,6 @@ void wifi_mgr_update(void)
             }
             rebuild_network_list(0);
             g_state = WIFI_MGR_SCAN_DONE;
-            g_scan_retry_count = 0;
             g_initial_scan_shown = true;
             break;
         }
@@ -537,7 +527,6 @@ void wifi_mgr_update(void)
                 wifi_popup_request("扫描完毕", 1500);
             }
             g_state = WIFI_MGR_SCAN_DONE;
-            g_scan_retry_count = 0;
             g_initial_scan_shown = true;
         }
         /* else: 仍在扫描中，等待回调 */
@@ -586,7 +575,7 @@ void wifi_mgr_update(void)
                 storage_wifi_add(g_connecting_ssid, g_connecting_pass);
                 wifi_popup_request("已连接", 1500);
                 g_state = WIFI_MGR_CONNECTED;
-                rebuild_network_list(g_ap_record_count);
+                rebuild_network_list(0);
             } else if (status == WL_CONNECT_FAILED ||
                        status == WL_NO_SSID_AVAIL) {
                 restore_wifi_logs();

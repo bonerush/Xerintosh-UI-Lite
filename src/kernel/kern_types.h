@@ -24,11 +24,9 @@ extern "C" {
 #define KERN_OK         0       /* 成功 */
 #define KERN_ERR        (-1)    /* 通用错误 */
 #define KERN_ENOENT     (-2)    /* 无此文件或目录 */
-#define KERN_EIO        (-5)    /* I/O 错误 */
 #define KERN_ENOMEM     (-12)   /* 内存不足 */
 #define KERN_EACCES     (-13)   /* 权限不足 */
 #define KERN_EEXIST     (-17)   /* 文件已存在 */
-#define KERN_ENOTDIR    (-20)   /* 不是目录 */
 #define KERN_EISDIR     (-21)   /* 是目录 */
 #define KERN_EINVAL     (-22)   /* 参数无效 */
 #define KERN_EMFILE     (-24)   /* 打开文件过多 */
@@ -73,7 +71,6 @@ typedef enum {
     KERN_FILE_REGULAR = 0,  /* 普通文件 */
     KERN_FILE_DIR     = 1,  /* 目录 */
     KERN_FILE_CHRDEV  = 2,  /* 字符设备 */
-    KERN_FILE_BLKDEV  = 3,  /* 块设备 */
     KERN_FILE_FIFO    = 4,  /* 命名管道 */
 } kern_file_type_t;
 
