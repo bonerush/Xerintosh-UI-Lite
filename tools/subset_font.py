@@ -110,9 +110,11 @@ def main():
         new_glyph.append(total_sz & 0xFF)
         new_glyph.extend(data[orig_off : orig_off + data_sz])
 
-    # LUT: single block covering all kept codepoints
+    # LUT: single block. Offset = LUT byte size (4), since font pointer must
+    # jump past the LUT to reach glyph data. In the original font, the first
+    # LUT offset equals total LUT size (e.g., 74 entries × 4 = 296 bytes).
     max_cp = max(cp for cp, _, _ in kept) if kept else 0x4E00
-    new_lut = bytes([0, 0, (max_cp >> 8) & 0xFF, max_cp & 0xFF])
+    new_lut = bytes([0x00, 0x04, (max_cp >> 8) & 0xFF, max_cp & 0xFF])
 
     # ── Rebuild header ──
     new_hdr = bytearray(hdr)
