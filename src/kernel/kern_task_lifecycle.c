@@ -73,6 +73,8 @@ kern_pid_t kern_spawn(const char *name, void (*entry)(void *arg),
     makecontext(&task->ctx, task_entry_trampoline, 0);
     task_write_canary(task);
 
+    kern_mpu_setup_stack_guard(task, task->stack_base, task->stack_size);
+
     /* 挂载到任务链表尾部 */
     if (g_task_list == NULL) {
         g_task_list = task;
@@ -121,6 +123,8 @@ kern_pid_t kern_spawn(const char *name, void (*entry)(void *arg),
     uint8_t *stack_top = task->stack_base + task->stack_size;
     kern_ctx_init(&task->ctx, task->stack_base, stack_top, entry, arg);
     task_write_canary(task);
+
+    kern_mpu_setup_stack_guard(task, task->stack_base, task->stack_size);
 
     /* 插入任务链表（头部插入，保证 idle 保持在最前面） */
     if (g_task_list == NULL) {
@@ -195,6 +199,8 @@ kern_pid_t kern_spawn(const char *name, void (*entry)(void *arg),
         t->next = task;
     }
     g_task_count++;
+
+    kern_mpu_setup_stack_guard(task, task->stack_base, task->stack_size);
 
     kern_log(KERN_LOG_DEBUG, "spawned task %d: %s", task->pid, task->name);
     return task->pid;

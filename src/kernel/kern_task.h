@@ -16,6 +16,7 @@
 
 #include "kern_types.h"
 #include "kern_port.h"
+#include "kern_mpu.h"
 
 #ifdef NATIVE_TEST
 #include <ucontext.h>
@@ -79,6 +80,9 @@ typedef struct kern_task {
 
     /* 资源追踪 */
     struct kern_resource *resource_head; /* 持有的资源链表头 */
+
+    /* MPU 内存保护 */
+    kern_mpu_config_t    *mpu_config;    /* 每任务 MPU 配置（可为 NULL） */
 } kern_task_t;
 
 /* ═══ 任务标志位 ═══ */

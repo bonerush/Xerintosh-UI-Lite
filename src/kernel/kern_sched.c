@@ -11,6 +11,7 @@
 #include "kern_sched_class.h"
 #include "kern_sched_rr.h"
 #include "kern_task.h"
+#include "kern_mpu.h"
 #include "kern_init.h"
 #include "kern_port.h"
 
@@ -213,6 +214,7 @@ void kern_sched_tick(void)
         kern_task_t *next = pick_next_ready();
         if (next && next != g_current_task) {
             g_current_task = next;
+            kern_mpu_apply(next);
             g_switch_to_task = next;
             if (next->state != KERN_TASK_SLEEPING) next->state = KERN_TASK_RUNNING;
             swapcontext(&g_sched_ctx, &next->ctx);
@@ -235,6 +237,7 @@ void kern_sched_tick(void)
     kern_task_t *volatile next = pick_next_ready();
     if (next == NULL) return;
     g_current_task = next;
+    kern_mpu_apply(next);
     g_switch_to_task = next;
     swapcontext(&g_sched_ctx, &next->ctx);
 }
@@ -258,6 +261,7 @@ void kern_sched_tick(void)
         kern_task_t *next = pick_next_ready();
         if (next) {
             g_current_task = next;
+            kern_mpu_apply(next);
             if (next->state != KERN_TASK_SLEEPING) next->state = KERN_TASK_RUNNING;
             if (setjmp(g_sched_ctx.jmp) == 0) longjmp(next->ctx.jmp, 1);
         }
@@ -273,6 +277,7 @@ void kern_sched_tick(void)
         return;
     }
     g_current_task = next;
+    kern_mpu_apply(next);
     if (next->state != KERN_TASK_SLEEPING) next->state = KERN_TASK_RUNNING;
     if (setjmp(g_sched_ctx.jmp) == 0) longjmp(next->ctx.jmp, 1);
 }
@@ -296,6 +301,7 @@ void kern_sched_tick(void)
         kern_task_t *next = pick_next_ready();
         if (next) {
             g_current_task = next;
+            kern_mpu_apply(next);
             if (next->state != KERN_TASK_SLEEPING) next->state = KERN_TASK_RUNNING;
             kern_port_switch_to(next);
         }
@@ -311,6 +317,7 @@ void kern_sched_tick(void)
         return;
     }
     g_current_task = next;
+    kern_mpu_apply(next);
     if (next->state != KERN_TASK_SLEEPING) next->state = KERN_TASK_RUNNING;
     kern_port_switch_to(next);
 }
