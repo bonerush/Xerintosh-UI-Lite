@@ -345,6 +345,8 @@ uint16_t hal_test_fb_read(int16_t x, int16_t y)
 #include <M5Unified.h>
 #include <M5GFX.h>
 
+#include "fonts/cn_font_subset.h"
+
 static M5Canvas* g_canvas = nullptr;  /* 离屏画布 */
 int16_t g_screen_width = 160;         /* 默认屏幕宽度，init 时从硬件读取 */
 int16_t g_screen_height = 80;         /* 默认屏幕高度 */
@@ -529,10 +531,11 @@ void hal_clear_clip_rect(void) {
 
 /**
  * @brief 获取中文字体指针
- * @return efontCN_12 字体指针
+ * @return 子集中文字体（U8G2 格式，仅包含源码使用的汉字）
  */
 const void* hal_get_cn_font(void) {
-    return &fonts::efontCN_12;
+    static const lgfx::U8g2font cn_font(lgfx_cn_font_subset);
+    return &cn_font;
 }
 
 #endif
