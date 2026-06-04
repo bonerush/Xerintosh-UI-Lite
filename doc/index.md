@@ -118,7 +118,7 @@ FreeRTOS 继续在底层为 WiFi/BT 协议栈服务。SMP 模式下 Xeros 在每
 - **XOR 选择器高亮**：TFT 不支持 OLED 的 `draw_color(2)` 反色，改用像素级 `color ^ 0xFFFF`
 - **C 风格面向对象**：基类 `xerintosh_list_item_t` 作为结构体第一个成员，派生类通过强制类型转换实现多态
 - **动画插值公式**：`current += (target - current) / (100.0f - speed)`
-- **协作式微内核**：Round-Robin 调度 + 动态栈管理 + VFS"一切皆文件"
+- **抢占式微内核**：可插拔调度类 + 动态栈管理 + VFS"一切皆文件"
 
 ## 文档树
 

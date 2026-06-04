@@ -4,7 +4,7 @@
 
 ## 概述
 
-`sched_class_rr` 是 Xeros 内核的**默认调度类**，实现了经典的 Round-Robin 循环调度策略。它总是第一个被注册（在 `kern_sched_init()` 中），作为所有任务的兜底调度器。当 `CONFIG_PREEMPT_ENABLED` 未定义时，它是唯一活跃的调度类，提供与 v1 原始调度器完全兼容的行为。
+`sched_class_rr` 是 Xeros 内核的**默认调度类**，实现了经典的 Round-Robin 循环调度策略。它总是第一个被注册（在 `kern_sched_init()` 中），作为所有任务的兜底调度器。
 
 **核心算法**：两遍链表扫描 — 第一遍唤醒到期任务，第二遍从上一轮选中任务的下一个开始循环遍历。
 

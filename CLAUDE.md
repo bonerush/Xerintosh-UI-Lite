@@ -9,7 +9,7 @@ M5Stick-P1 is an embedded UI firmware for the M5Stick-C (ESP32-PICO + 80x160 TFT
 - **Language**: C core + C++ HAL bridge (M5GFX). All exposed headers must be C-compatible with `extern "C"`.
 - **Framework**: Arduino (ESP32) via PlatformIO.
 - **UI Framework name**: Xerintosh (renamed from AstraUI).
-- **Kernel name**: Xeros — cooperative microkernel (VFS / scheduler / shell).
+- **Kernel name**: Xeros — preemptive microkernel (VFS / scheduler / shell).
 - **Build system**: PlatformIO (`platformio.ini`).
 - **Target resolution**: 80x160 (portrait default, landscape via `setRotation(1)`).
 
@@ -92,9 +92,9 @@ App Layer (src/app/) — Each app in its own subdirectory
     ├── shutdown_screen.c/h   — Shutdown screen
     └── power_key_popup.c/h   — Power key long-press popup
 
-Kernel Layer (src/kernel/) — Xeros cooperative microkernel ("everything is a file")
+Kernel Layer (src/kernel/) — Xeros preemptive microkernel ("everything is a file")
 ├── kern_types.h              — Error codes, constants, logging macros
-├── kern_task.c/h             — Cooperative Round-Robin scheduler + dynamic stack
+├── kern_task.c/h             — 抢占式调度器 + 动态栈
 ├── kern_vfs.c/h              — Virtual File System (inode/dentry/file)
 ├── kern_devfs.c/h            — /dev/ device registration
 ├── kern_procfs.c/h           — /proc virtual filesystem
@@ -163,7 +163,7 @@ Entry Points
 ├─────────────────────────────────────────────┤
 │ Xeros Kernel Layer                          │
 │  ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐      │
-│  │Sched  │ │ VFS  │ │devfs │ │procfs│      │  Cooperative microkernel
+│  │Sched  │ │ VFS  │ │devfs │ │procfs│      │  Preemptive microkernel
 │  │coop   │ │(vrtl)│ │(dev) │ │(/proc)│     │
 │  └──────┘ └──────┘ └──────┘ └──────┘      │
 │  ┌──────┐ ┌──────┐ ┌──────┐               │
@@ -195,7 +195,7 @@ Full-frame redraw, target 60fps.
 - **TFT double-buffering**: `M5Canvas` sprite must have `setColorDepth(16)` **before** `createSprite()`.
 - **XOR highlight**: TFT lacks OLED's `draw_color(2)`, so selector uses pixel-by-pixel `color ^ 0xFFFF`.
 - **Type dispatch**: `ui_dispatch.c` uses function pointer arrays for O(1) type routing (replaces inline switch).
-- **Cooperative kernel**: Round-Robin scheduling + dynamic stack + VFS "everything is a file".
+- **抢占式微内核**：可插拔调度类 + 动态栈管理 + VFS"一切皆文件"
 
 ## Coding Conventions
 

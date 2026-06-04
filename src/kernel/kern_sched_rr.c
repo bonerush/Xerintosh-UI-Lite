@@ -1,10 +1,8 @@
 /**
  * @file   kern_sched_rr.c
  * @brief  Round-Robin 调度器类实现
- * @details 从 kern_sched.c 中提取原 pick_next_ready() 逻辑，
- *          封装为 kern_sched_class_t 接口实现。
- *          当仅注册此 class 且 CONFIG_PREEMPT_ENABLED 未定义时，
- *          行为与原始调度器完全一致。
+ * @details Round-Robin 调度器类，封装为 kern_sched_class_t 接口实现。
+ *          作为默认调度类，总是第一个注册，作为所有任务的兜底调度器。
  *
  * @copyright Copyright (c) 2026
  */
@@ -106,7 +104,6 @@ static kern_task_t *sched_rr_pick_next(void)
 
 static void sched_rr_tick(kern_task_t *current)
 {
-#ifdef CONFIG_PREEMPT_ENABLED
     if (current == NULL) return;
 
     if (current->timeslice_remaining > 0) {
@@ -117,9 +114,6 @@ static void sched_rr_tick(kern_task_t *current)
         current->timeslice_remaining = SCHED_RR_DEFAULT_TIMESLICE;
         g_need_resched = true;
     }
-#else
-    (void)current;
-#endif
 }
 
 /* ═══ prio_changed：优先级变更通知（RR 不使用优先级） ═══ */

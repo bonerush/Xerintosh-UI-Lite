@@ -102,7 +102,7 @@ void kern_sched_class_register(kern_sched_class_t *cls)
 
 /* 注册顺序决定优先级：
  * 1. kern_sched_init() 中先 register(&sched_class_rr)
- * 2. 如果 CONFIG_PREEMPT_ENABLED，再 register(&sched_class_fifo)
+ * 2. 再 register(&sched_class_fifo)
  *
  * pick_next_ready() 会按顺序查询：
  *   g_sched_classes[0] → RR class → 如果没有就绪任务，返回 NULL

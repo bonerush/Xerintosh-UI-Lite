@@ -1,8 +1,8 @@
 /**
  * @file   kern_task.h
- * @brief  Xeros 协作式多任务调度器头文件
+ * @brief  Xeros 抢占式多任务调度器头文件
  * @details 定义任务控制块（TCB）、动态栈管理、上下文切换、
- *          Round-Robin 调度策略及 sleep/wake 接口。
+ *          抢占式时间片调度及 sleep/wake 接口。
  *
  *          Native 测试：使用 ucontext（POSIX 独立栈）
  *          ESP32：使用 FreeRTOS 任务承载（每任务独立栈），

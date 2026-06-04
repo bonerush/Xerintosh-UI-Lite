@@ -8,7 +8,7 @@
 
 核心操作：
 - `kern_spawn(name, entry, arg, stack_min)` — 创建并启动新任务
-- `kern_yield()` — 主动让出 CPU（协作式调度）
+- `kern_yield()` — 主动让出 CPU（触发重调度）
 - `kern_sleep_ms(ms)` — 进入睡眠，ms 毫秒后自动唤醒
 - `kern_exit()` — 退出当前任务，自动释放所有资源
 - `kern_task_kill(pid)` — 从外部终止指定任务

@@ -36,14 +36,12 @@ static void sched_fifo_enqueue(kern_task_t *task)
         t->next = task;
     }
 
-#ifdef CONFIG_PREEMPT_ENABLED
     /* 如果入队任务优先级高于当前运行的任务，触发抢占 */
     if (g_current_task != NULL
         && task->state == KERN_TASK_READY
         && task->priority > g_current_task->priority) {
         g_need_resched = true;
     }
-#endif
 }
 
 /* ═══ FIFO dequeue：从链表中移除 ═══ */
@@ -91,7 +89,6 @@ static kern_task_t *sched_fifo_pick_next(void)
 
 static void sched_fifo_tick(kern_task_t *current)
 {
-#ifdef CONFIG_PREEMPT_ENABLED
     if (current == NULL) return;
 
     /* 检查 FIFO class 中是否有比当前任务优先级更高的就绪任务 */
@@ -107,9 +104,6 @@ static void sched_fifo_tick(kern_task_t *current)
         }
         t = t->next;
     }
-#else
-    (void)current;
-#endif
 }
 
 /* ═══ FIFO prio_changed：优先级变更时重新排序 ═══ */
