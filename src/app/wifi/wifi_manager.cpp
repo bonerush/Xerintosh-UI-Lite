@@ -66,6 +66,8 @@ static unsigned long g_wifi_scan_start_time = 0;   /* 扫描开始时间 */
 static unsigned long g_warmup_start_time   = 0;    /* 预热开始时间 */
 static unsigned long g_connect_start_time  = 0;    /* 连接开始时间 */
 static bool g_initial_scan_shown = false;           /* 首次启动扫描弹窗是否已显示 */
+static bool g_auto_connect_done = false;            /* 本次 enable 周期内是否已尝试自动连接 */
+static bool g_is_auto_connect   = false;            /* 当前连接是否为自动连接（抑制弹窗） */
 
 /* ESP-IDF 异步扫描回调标志 */
 static volatile bool g_scan_done = false;
@@ -145,6 +147,7 @@ static void on_saved_connect_pressed(void *ud);
 static void on_saved_delete_pressed(void *ud);
 static void on_scan_pressed(void *ud);
 static void rebuild_network_list(int scan_count);
+static bool try_auto_connect(void);
 static void suppress_wifi_logs(void);
 static void restore_wifi_logs(void);
 extern "C" void wifi_mgr_task_main(void *arg);
@@ -211,6 +214,8 @@ void wifi_mgr_enable(void)
 
     g_warmup_start_time = millis();
     g_state = WIFI_MGR_WARMUP;
+    g_auto_connect_done = false;
+    g_is_auto_connect = false;
     rebuild_network_list(0);
 }
 
@@ -262,6 +267,8 @@ void wifi_mgr_disable(void)
     g_scan_button         = NULL;
     g_connecting          = false;
     g_state               = WIFI_MGR_IDLE;
+    g_auto_connect_done   = false;
+    g_is_auto_connect     = false;
 }
 
 /* ═══ 开关切换回调 ═══ */
@@ -376,6 +383,7 @@ static void on_network_button_pressed(void *ud)
 
     wifi_popup_request("请在串口输入密码", 8000);
     serial_request_wifi_password(content);
+    g_is_auto_connect = false;
     g_state = WIFI_MGR_CONNECTING;
 }
 
@@ -406,6 +414,7 @@ static void on_saved_connect_pressed(void *ud)
     strncpy(g_connecting_pass, pass,  STORAGE_PASS_MAX_LEN);
     g_connecting = true;
     g_connect_start_time = millis();
+    g_is_auto_connect = false;
     g_state = WIFI_MGR_CONNECTING;
     wifi_popup_request("连接中...", 15000);
 
@@ -458,6 +467,65 @@ static void on_scan_pressed(void *ud)
         g_wifi_scan_start_time = millis();
         wifi_popup_request("扫描中...", WIFI_SCAN_TIMEOUT_MS);
     }
+}
+
+/* ═══ 自动连接 ═══ */
+
+/**
+ * @brief 扫描完成后尝试自动连接到最佳已保存网络
+ * @return true  如果发起了自动连接
+ * @note  单个已保存网络直接连接；多个已保存网络选择扫描结果中 RSSI 最强的。
+ *        不显示弹窗（静默连接）。
+ */
+static bool try_auto_connect(void)
+{
+    int saved_count = storage_wifi_get_count();
+    if (saved_count <= 0) return false;
+
+    int16_t scan_count = WiFi.scanComplete();
+    if (scan_count <= 0) return false;
+
+    /* 在扫描结果中查找已保存网络，选择信号最强的 */
+    int best_saved_idx = -1;
+    int8_t best_rssi = -128;
+
+    for (int i = 0; i < saved_count; i++) {
+        char ssid[STORAGE_SSID_MAX_LEN];
+        char pass[STORAGE_PASS_MAX_LEN];
+        if (!storage_wifi_get(i, ssid, pass)) continue;
+
+        for (int j = 0; j < scan_count; j++) {
+            String scanned = WiFi.SSID(j);
+            if (scanned.length() == 0) continue;
+            if (scanned.equals(ssid)) {
+                int8_t rssi = WiFi.RSSI(j);
+                if (rssi > best_rssi) {
+                    best_rssi = rssi;
+                    best_saved_idx = i;
+                }
+                break;
+            }
+        }
+    }
+
+    if (best_saved_idx < 0) return false;
+
+    /* 发起静默连接 */
+    char ssid[STORAGE_SSID_MAX_LEN];
+    char pass[STORAGE_PASS_MAX_LEN];
+    if (!storage_wifi_get(best_saved_idx, ssid, pass)) return false;
+
+    suppress_wifi_logs();
+    WiFi.disconnect();
+    delay(1);
+    WiFi.begin(ssid, pass);
+    strncpy(g_connecting_ssid, ssid, STORAGE_SSID_MAX_LEN);
+    strncpy(g_connecting_pass, pass,  STORAGE_PASS_MAX_LEN);
+    g_connecting = true;
+    g_connect_start_time = millis();
+    g_is_auto_connect = true;
+    g_state = WIFI_MGR_CONNECTING;
+    return true;
 }
 
 /* ═══ 每帧更新（非阻塞状态机）═══ */
@@ -563,7 +631,9 @@ void wifi_mgr_update(void)
                 WiFi.disconnect();
                 restore_wifi_logs();
                 g_connecting = false;
-                wifi_popup_request("连接超时", 2000);
+                if (!g_is_auto_connect) {
+                    wifi_popup_request("连接超时", 2000);
+                }
                 g_state = WIFI_MGR_CONNECT_FAILED;
                 break;
             }
@@ -573,17 +643,30 @@ void wifi_mgr_update(void)
                 restore_wifi_logs();
                 g_connecting = false;
                 storage_wifi_add(g_connecting_ssid, g_connecting_pass);
-                wifi_popup_request("已连接", 1500);
+                if (!g_is_auto_connect) {
+                    wifi_popup_request("已连接", 1500);
+                }
                 g_state = WIFI_MGR_CONNECTED;
                 rebuild_network_list(0);
             } else if (status == WL_CONNECT_FAILED ||
                        status == WL_NO_SSID_AVAIL) {
                 restore_wifi_logs();
                 g_connecting = false;
-                wifi_popup_request("连接失败", 2000);
+                if (!g_is_auto_connect) {
+                    wifi_popup_request("连接失败", 2000);
+                }
                 g_state = WIFI_MGR_CONNECT_FAILED;
             }
             /* WL_IDLE_STATUS / WL_DISCONNECTED => 仍在尝试中 */
+        }
+        break;
+    }
+
+    case WIFI_MGR_SCAN_DONE: {
+        /* 扫描完成后尝试自动连接（仅一次） */
+        if (!g_auto_connect_done) {
+            g_auto_connect_done = true;
+            try_auto_connect();
         }
         break;
     }

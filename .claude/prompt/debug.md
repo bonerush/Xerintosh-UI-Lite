@@ -122,3 +122,10 @@ stateDiagram-v2
     **修复:** ① `tu_api_fetch_deepseek` 中添加 `http.setConnectTimeout(3000)` 和 `http.setTimeout(5000)` 限制 HTTP 阻塞时间，并在 GET/getString/end 后添加 `delay(1)` yield 给调度器；② 在 `kern_shell_cmds.c` 中新增 `dskey` Shell 命令，支持 `dskey <api_key>` 设置和 `dskey` 查看（脱敏显示），调用 `storage_set_deepseek_key` 存入 NVS；③ JSON 解析改用 `atof()` 显式将字符串转为 float；④ 移除 `tu_api_fetch_kimi`、`tu_kimi_usage_t` 及相关 UI/存储代码。
     **验证:** build(hw)=PASS build(native)=PASS 串口调试：HTTP code=200, payload 正确返回余额, atof 解析正确显示 5.81 CNY。用户实测：连接 WiFi 后进入 Token Usage 不再卡死，余额正常显示。
     **文件:** src/app/token_usage/tu_api.cpp, src/app/token_usage/tu_api.h, src/app/token_usage/tu_app.cpp, src/app/token_usage/tu_ui.cpp, src/kernel/kern_shell_cmds.c
+- [AGENT_FINISH] 当前开机虽然自动扫描，但是没有自动连接。
+    自动连接的逻辑如下：当已保存列表只有一个网络的时候默认只连接那个，当列表存在多个网络的时候就需要轮询找出离当前开发版最近（信号强度最大，连接稳定性最好）的网络去连接，如果没有网络则什么都不做。
+    另外之前写过一个wifi的逻辑就是每次只要是用蓝牙就关闭wifi，当退出使用蓝牙的app时候wifi自动打开并且不弹出提示弹窗。在这里需要修改成自动打开且连接并且不弹出提示弹窗。
+    **根因:** 状态机在 `WIFI_MGR_SCAN_DONE` 后停死，`wifi_mgr_update()` 中该 case 仅为 `break`，无任何自动连接逻辑。`wifi_mgr_init()` 注释明确写"自动连接已移除"。
+    **修复:** 新增 `try_auto_connect()` 辅助函数，在 `WIFI_MGR_SCAN_DONE` 中调用（仅一次）：① 遍历已保存网络，在扫描结果中匹配；② 多个匹配时选择 RSSI 最强的；③ 发起 `WiFi.begin()` 静默连接（`g_is_auto_connect=true` 抑制所有弹窗）。手动连接回调（`on_saved_connect_pressed`/`on_network_button_pressed`）重置 `g_is_auto_connect=false` 保留弹窗反馈。`wifi_mgr_enable()`/`wifi_mgr_disable()` 重置自动连接标志。
+    **验证:** build(hw)=PASS RAM=22.1% Flash=99.1% native=3 ERRORED（均为预存问题，与本次无关）
+    **文件:** src/app/wifi/wifi_manager.cpp
