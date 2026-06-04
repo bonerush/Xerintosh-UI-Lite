@@ -24,6 +24,7 @@
 
 #include "kern_port.h"
 #include "kern_task.h"
+#include "kern_smp.h"
 #include "kern_init.h"
 
 #include <string.h>
@@ -97,8 +98,8 @@ const kern_port_ops_t g_kern_port_ops = {
 
 /* ═══ 内部状态 ═══ */
 
-static SemaphoreHandle_t g_token_sem = NULL;  /* CPU 令牌 */
-static SemaphoreHandle_t g_done_sem  = NULL;  /* 任务完成通知 */
+static SemaphoreHandle_t g_token_sem[KERN_MAX_CPUS];  /* 每核 CPU 令牌 */
+static SemaphoreHandle_t g_done_sem[KERN_MAX_CPUS];   /* 每核任务完成通知 */
 
 #ifdef CONFIG_PREEMPT_ENABLED
 static void (*g_timer_callback)(void) = NULL;
@@ -174,9 +175,11 @@ static void kern_port_freertos_timer_stop(void) {}
 static void task_wrapper(void *arg)
 {
     kern_task_t *task = (kern_task_t *)arg;
+    uint8_t cpu = task->cpu_id;
+    if (cpu >= KERN_MAX_CPUS) cpu = 0;
 
-    /* 等待调度器给我们令牌（首次运行或 yield 后恢复） */
-    xSemaphoreTake(g_token_sem, portMAX_DELAY);
+    /* 等待本任务所属 CPU 的调度器给我们令牌（首次运行或 yield 后恢复） */
+    xSemaphoreTake(g_token_sem[cpu], portMAX_DELAY);
 
     /* 获得了令牌：现在是我们运行的时间片 */
     task->state = KERN_TASK_RUNNING;
@@ -189,10 +192,10 @@ static void task_wrapper(void *arg)
 
     /* 入口返回：任务结束 */
     task->state = KERN_TASK_ZOMBIE;
-    kern_log(KERN_LOG_DEBUG, "task %d (%s) exited", task->pid, task->name);
+    kern_log(KERN_LOG_DEBUG, "task %d (%s) exited on cpu %d", task->pid, task->name, cpu);
 
-    /* 归还令牌（通过 done 信号量） */
-    xSemaphoreGive(g_done_sem);
+    /* 归还令牌（通过本 CPU 的 done 信号量） */
+    xSemaphoreGive(g_done_sem[cpu]);
 
     /* 删除自身（不会返回） */
     vTaskDelete(NULL);
@@ -202,14 +205,15 @@ static void task_wrapper(void *arg)
 
 static void kern_port_freertos_init(void)
 {
-    if (g_token_sem != NULL) return;  /* 已初始化 */
+    if (g_token_sem[0] != NULL) return;  /* 已初始化 */
 
-    g_token_sem = xSemaphoreCreateBinary();
-    configASSERT(g_token_sem != NULL);
-
-    g_done_sem = xSemaphoreCreateBinary();
-    configASSERT(g_done_sem != NULL);
-    /* 两个信号量初始 count=0，调度器持有概念上的令牌 */
+    for (uint8_t i = 0; i < KERN_MAX_CPUS; i++) {
+        g_token_sem[i] = xSemaphoreCreateBinary();
+        configASSERT(g_token_sem[i] != NULL);
+        g_done_sem[i] = xSemaphoreCreateBinary();
+        configASSERT(g_done_sem[i] != NULL);
+    }
+    /* 所有信号量初始 count=0，调度器持有概念上的令牌 */
 }
 
 /* ═══ 线程管理 ═══ */
@@ -231,13 +235,16 @@ static kern_port_thread_t kern_port_freertos_thread_spawn(
     }
 
     TaskHandle_t handle = NULL;
-    BaseType_t ret = xTaskCreate(
+    uint8_t cpu = task->cpu_id;
+    if (cpu >= KERN_MAX_CPUS) cpu = 0;
+    BaseType_t ret = xTaskCreatePinnedToCore(
         task_wrapper,           /* 包装函数 */
         name ? name : "xtask",  /* FreeRTOS 任务名 */
         (uint32_t)stack_size,   /* 栈大小（字） */
         task,                   /* 参数 = kern_task_t* */
         tskIDLE_PRIORITY + 1,   /* 优先级略高于 idle */
-        &handle
+        &handle,
+        cpu                     /* 引脚到任务分配的 CPU */
     );
 
     if (ret != pdPASS) {
@@ -250,11 +257,13 @@ static kern_port_thread_t kern_port_freertos_thread_spawn(
 
 static void kern_port_freertos_thread_exit(void)
 {
+    uint8_t cpu = KERN_THIS_CPU;
+    if (cpu >= KERN_MAX_CPUS) cpu = 0;
     /*
      * 通知调度器任务结束，然后删除当前 FreeRTOS 任务。
      * 注意：此函数不会返回。
      */
-    xSemaphoreGive(g_done_sem);
+    xSemaphoreGive(g_done_sem[cpu]);
     vTaskDelete(NULL);
 
     /* 不会到达这里，但让编译器满意 */
@@ -281,20 +290,23 @@ static size_t kern_port_freertos_thread_stack_usage(kern_port_thread_t thread)
 
 static void kern_port_freertos_switch_to(kern_task_t *task)
 {
+    uint8_t cpu = KERN_THIS_CPU;
+    if (cpu >= KERN_MAX_CPUS) cpu = 0;
+
     (void)task;
     /*
-     * 双信号量协议 — 调度器侧：
-     *   1. give(token) — 把 CPU 令牌交给目标任务
-     *   2. take(done)  — 阻塞等待任务 yield/exit 时归还
+     * 双信号量协议 — 调度器侧（每核独立）：
+     *   1. give(token[cpu]) — 把本 CPU 令牌交给目标任务
+     *   2. take(done[cpu])   — 阻塞等待任务 yield/exit 时归还
      */
-    if (xSemaphoreGive(g_token_sem) != pdTRUE) {
-        kern_log(KERN_LOG_ERROR, "port: give token failed");
+    if (xSemaphoreGive(g_token_sem[cpu]) != pdTRUE) {
+        kern_log(KERN_LOG_ERROR, "port: give token failed on cpu %d", cpu);
         return;
     }
 
     /* 等待任务完成（5 秒超时防止崩溃导致死锁） */
-    if (xSemaphoreTake(g_done_sem, pdMS_TO_TICKS(5000)) != pdTRUE) {
-        kern_log(KERN_LOG_ERROR, "port: task timeout - marking ZOMBIE");
+    if (xSemaphoreTake(g_done_sem[cpu], pdMS_TO_TICKS(5000)) != pdTRUE) {
+        kern_log(KERN_LOG_ERROR, "port: task timeout on cpu %d - marking ZOMBIE", cpu);
         if (task != NULL) {
             task->state = KERN_TASK_ZOMBIE;
         }
@@ -303,24 +315,28 @@ static void kern_port_freertos_switch_to(kern_task_t *task)
 
 static void kern_port_freertos_task_yield(void)
 {
+    uint8_t cpu = KERN_THIS_CPU;
+    if (cpu >= KERN_MAX_CPUS) cpu = 0;
     /*
      * 双信号量协议 — 任务侧（yield）：
-     *   1. give(done) — 通知调度器本任务已完成当前时间片
-     *   2. take(token) — 等待调度器再次分配 CPU 令牌
+     *   1. give(done[cpu]) — 通知本 CPU 调度器任务已完成当前时间片
+     *   2. take(token[cpu]) — 等待调度器再次分配 CPU 令牌
      */
-    xSemaphoreGive(g_done_sem);
-    xSemaphoreTake(g_token_sem, portMAX_DELAY);
+    xSemaphoreGive(g_done_sem[cpu]);
+    xSemaphoreTake(g_token_sem[cpu], portMAX_DELAY);
     /* 被唤醒：调度器已把我们设为 RUNNING */
 }
 
 static void kern_port_freertos_task_exit(void)
 {
+    uint8_t cpu = KERN_THIS_CPU;
+    if (cpu >= KERN_MAX_CPUS) cpu = 0;
     /*
      * 双信号量协议 — 任务侧（exit）：
-     *   1. give(done) — 通知调度器任务已退出
+     *   1. give(done[cpu]) — 通知本 CPU 调度器任务已退出
      *   2. vTaskDelete — 删除自身（不返回）
      */
-    xSemaphoreGive(g_done_sem);
+    xSemaphoreGive(g_done_sem[cpu]);
     vTaskDelete(NULL);
 
     /* 不会到达 */

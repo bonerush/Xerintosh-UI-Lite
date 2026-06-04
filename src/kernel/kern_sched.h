@@ -25,11 +25,14 @@ extern "C" {
 /* ═══ 调度器全局状态 ═══ */
 
 extern kern_task_t   *g_task_list;        /* 任务链表头 */
-/* g_current_task, g_idle_task, g_sched_ticks, g_need_resched
+/* g_current_task, g_idle_task, g_sched_ticks, g_need_resched, g_last_picked
    由 kern_smp.h 以宏形式提供（per-CPU 访问） */
-extern kern_task_t   *g_last_picked;      /* 上一轮选中的任务（Round-Robin 扫描起点） */
 extern kern_pid_t     g_next_pid;         /* 下一个分配的 PID */
 extern uint8_t        g_task_count;       /* 任务总数 */
+
+#ifdef CONFIG_SMP_ENABLED
+extern volatile bool  g_task_list_lock;    /* 共享任务列表自旋锁 */
+#endif
 
 #ifdef NATIVE_TEST
 extern ucontext_t     g_sched_ctx;        /* 调度器上下文 */

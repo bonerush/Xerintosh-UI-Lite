@@ -33,6 +33,8 @@ typedef struct kern_per_cpu {
     struct kern_task  *idle_task;       /* 此 CPU 的 idle 任务 */
     uint32_t      sched_ticks;     /* 调度 tick 计数 */
     volatile bool need_resched;    /* 抢占请求标志（可被 ISR 设置） */
+    struct kern_task  *last_picked;     /* RR 扫描起点（每核独立） */
+    uint8_t       task_count;      /* 此 CPU 管理的任务数 */
 } kern_per_cpu_t;
 
 /** 全局 per-CPU 数组（总是存在，SMP 禁用时仅使用 [0]） */
@@ -54,6 +56,9 @@ void kern_smp_init(void);
 /** 在指定 CPU 上启动调度器循环 */
 void kern_smp_start_core(uint8_t cpu_id, void (*entry)(void *arg));
 
+/** 为 KERN_CPU_ANY 任务分配 CPU（负载最低的核心） */
+uint8_t kern_smp_migrate_assign(void);
+
 #else /* !CONFIG_SMP_ENABLED — 单核零开销模式 */
 
 #define KERN_THIS_CPU  ((uint8_t)0)
@@ -61,6 +66,7 @@ void kern_smp_start_core(uint8_t cpu_id, void (*entry)(void *arg));
 static inline uint8_t kern_cpu_id(void) { return 0; }
 #define kern_smp_init()                 do {} while (0)
 #define kern_smp_start_core(c, e)       do { (void)(c); (void)(e); } while (0)
+static inline uint8_t kern_smp_migrate_assign(void) { return 0; }
 
 #endif /* CONFIG_SMP_ENABLED */
 
@@ -69,6 +75,8 @@ static inline uint8_t kern_cpu_id(void) { return 0; }
 #define g_current_task   (g_per_cpu[KERN_THIS_CPU].current_task)
 #define g_idle_task      (g_per_cpu[KERN_THIS_CPU].idle_task)
 #define g_sched_ticks    (g_per_cpu[KERN_THIS_CPU].sched_ticks)
+#define g_last_picked    (g_per_cpu[KERN_THIS_CPU].last_picked)
+#define g_percpu_task_count  (g_per_cpu[KERN_THIS_CPU].task_count)
 
 #ifdef CONFIG_PREEMPT_ENABLED
 #define g_need_resched   (g_per_cpu[KERN_THIS_CPU].need_resched)

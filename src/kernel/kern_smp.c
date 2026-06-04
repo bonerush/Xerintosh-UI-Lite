@@ -39,6 +39,8 @@ void kern_smp_init(void)
         g_per_cpu[i].idle_task    = NULL;
         g_per_cpu[i].sched_ticks  = 0;
         g_per_cpu[i].need_resched = false;
+        g_per_cpu[i].last_picked  = NULL;
+        g_per_cpu[i].task_count   = 0;
     }
     kern_log(KERN_LOG_INFO, "SMP: %d CPUs initialized", KERN_MAX_CPUS);
 }
@@ -63,6 +65,20 @@ void kern_smp_start_core(uint8_t cpu_id, void (*entry)(void *arg))
         kern_log(KERN_LOG_WARN, "SMP: failed to start core %d scheduler", cpu_id);
     } else {
         kern_log(KERN_LOG_INFO, "SMP: core %d scheduler started", cpu_id);
+    }
+}
+
+/* ═══ CPU 分配策略 ═══ */
+
+uint8_t kern_smp_migrate_assign(void)
+{
+    /* 简单策略：分配到任务数较少的 CPU */
+    if (g_per_cpu[0].task_count <= g_per_cpu[1].task_count) {
+        g_per_cpu[0].task_count++;
+        return 0;
+    } else {
+        g_per_cpu[1].task_count++;
+        return 1;
     }
 }
 

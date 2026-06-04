@@ -9,6 +9,7 @@
 
 #include "kern_sched.h"
 #include "kern_task.h"
+#include "kern_smp.h"
 #include "kern_init.h"
 
 #include <string.h>
@@ -41,9 +42,17 @@ kern_pid_t kern_task_register_virtual(const char *name)
     }
 
     /* 插入任务链表头部 */
+#ifdef CONFIG_SMP_ENABLED
+    while (__sync_lock_test_and_set(&g_task_list_lock, true)) {
+        asm volatile ("nop");
+    }
+#endif
     task->next = g_task_list;
     g_task_list = task;
     g_task_count++;
+#ifdef CONFIG_SMP_ENABLED
+    __sync_lock_release(&g_task_list_lock);
+#endif
 
     kern_log(KERN_LOG_DEBUG, "virtual task %d (%s) registered", task->pid, task->name);
     return task->pid;
@@ -64,6 +73,11 @@ void kern_task_unregister_virtual(kern_pid_t pid)
     kern_log(KERN_LOG_DEBUG, "virtual task %d (%s) unregistered", task->pid, task->name);
 
     /* 立即从链表中移除并回收（虚任务无需等待调度器） */
+#ifdef CONFIG_SMP_ENABLED
+    while (__sync_lock_test_and_set(&g_task_list_lock, true)) {
+        asm volatile ("nop");
+    }
+#endif
     kern_task_t *prev = NULL;
     kern_task_t *t = g_task_list;
     while (t != NULL) {
@@ -75,10 +89,16 @@ void kern_task_unregister_virtual(kern_pid_t pid)
             }
             if (g_last_picked == task) g_last_picked = NULL;
             g_task_count--;
+#ifdef CONFIG_SMP_ENABLED
+            __sync_lock_release(&g_task_list_lock);
+#endif
             free(task);
             return;
         }
         prev = t;
         t = t->next;
     }
+#ifdef CONFIG_SMP_ENABLED
+    __sync_lock_release(&g_task_list_lock);
+#endif
 }

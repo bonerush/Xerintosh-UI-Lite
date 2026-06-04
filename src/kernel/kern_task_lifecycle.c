@@ -45,6 +45,9 @@ kern_pid_t kern_spawn(const char *name, void (*entry)(void *arg),
     task->priority = 128;
     task->timeslice_remaining = SCHED_RR_DEFAULT_TIMESLICE;
     task->cpu_id = KERN_CPU_ANY;
+#ifdef CONFIG_SMP_ENABLED
+    task->cpu_id = kern_smp_migrate_assign();
+#endif
     task->entry = entry;
     task->arg = arg;
 
@@ -76,6 +79,11 @@ kern_pid_t kern_spawn(const char *name, void (*entry)(void *arg),
     kern_mpu_setup_stack_guard(task, task->stack_base, task->stack_size);
 
     /* 挂载到任务链表尾部 */
+#ifdef CONFIG_SMP_ENABLED
+    while (__sync_lock_test_and_set(&g_task_list_lock, true)) {
+        asm volatile ("nop");
+    }
+#endif
     if (g_task_list == NULL) {
         g_task_list = task;
     } else {
@@ -84,6 +92,9 @@ kern_pid_t kern_spawn(const char *name, void (*entry)(void *arg),
         t->next = task;
     }
     g_task_count++;
+#ifdef CONFIG_SMP_ENABLED
+    __sync_lock_release(&g_task_list_lock);
+#endif
 
     kern_log(KERN_LOG_DEBUG, "spawned task %d: %s", task->pid, task->name);
     return task->pid;
@@ -107,6 +118,9 @@ kern_pid_t kern_spawn(const char *name, void (*entry)(void *arg),
     task->priority = 128;
     task->timeslice_remaining = SCHED_RR_DEFAULT_TIMESLICE;
     task->cpu_id = KERN_CPU_ANY;
+#ifdef CONFIG_SMP_ENABLED
+    task->cpu_id = kern_smp_migrate_assign();
+#endif
     task->entry = entry;
     task->arg = arg;
 
@@ -160,6 +174,9 @@ kern_pid_t kern_spawn(const char *name, void (*entry)(void *arg),
     task->priority = 128;
     task->timeslice_remaining = SCHED_RR_DEFAULT_TIMESLICE;
     task->cpu_id = KERN_CPU_ANY;
+#ifdef CONFIG_SMP_ENABLED
+    task->cpu_id = kern_smp_migrate_assign();
+#endif
     task->entry = entry;
     task->arg = arg;
 
@@ -191,6 +208,11 @@ kern_pid_t kern_spawn(const char *name, void (*entry)(void *arg),
     }
 
     /* 挂载到任务链表尾部 */
+#ifdef CONFIG_SMP_ENABLED
+    while (__sync_lock_test_and_set(&g_task_list_lock, true)) {
+        asm volatile ("nop");
+    }
+#endif
     if (g_task_list == NULL) {
         g_task_list = task;
     } else {
@@ -199,6 +221,9 @@ kern_pid_t kern_spawn(const char *name, void (*entry)(void *arg),
         t->next = task;
     }
     g_task_count++;
+#ifdef CONFIG_SMP_ENABLED
+    __sync_lock_release(&g_task_list_lock);
+#endif
 
     kern_mpu_setup_stack_guard(task, task->stack_base, task->stack_size);
 
@@ -433,6 +458,13 @@ int kern_task_kill(kern_pid_t pid)
 
 void reap_zombies(void)
 {
+#ifdef CONFIG_SMP_ENABLED
+    /* 自旋锁保护：避免两个核心同时修改共享任务链表 */
+    while (__sync_lock_test_and_set(&g_task_list_lock, true)) {
+        asm volatile ("nop");
+    }
+#endif
+
     /* 遍历所有已注册调度类的任务链表，回收 ZOMBIE 任务 */
     for (uint8_t c = 0; c < g_sched_class_count; c++) {
         kern_sched_class_t *cls = g_sched_classes[c];
@@ -458,6 +490,10 @@ void reap_zombies(void)
             }
         }
     }
+
+#ifdef CONFIG_SMP_ENABLED
+    __sync_lock_release(&g_task_list_lock);
+#endif
 }
 
 /* ═══ 任务入口蹦床（Native） ═══ */

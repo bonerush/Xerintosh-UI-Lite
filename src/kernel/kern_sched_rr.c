@@ -10,8 +10,25 @@
 #include "kern_sched_rr.h"
 #include "kern_sched.h"
 #include "kern_task.h"
+#include "kern_smp.h"
 
 #include <stddef.h>
+
+/* ═══ SMP 自旋锁辅助 ═══ */
+
+#ifdef CONFIG_SMP_ENABLED
+static inline void task_list_lock(void) {
+    while (__sync_lock_test_and_set(&g_task_list_lock, true)) {
+        asm volatile ("nop");
+    }
+}
+static inline void task_list_unlock(void) {
+    __sync_lock_release(&g_task_list_lock);
+}
+#else
+#define task_list_lock()    do {} while (0)
+#define task_list_unlock()  do {} while (0)
+#endif
 
 /* ═══ Round-Robin 内部状态 ═══ */
 
@@ -23,17 +40,22 @@ static void sched_rr_enqueue(kern_task_t *task)
 {
     if (task == NULL) return;
 
+    task_list_lock();
+
     /* task_list 与 g_task_list 指向同一链表，直接追加 */
     kern_task_t **head = &sched_class_rr.task_list;
     kern_task_t *t = *head;
     if (t == NULL) {
         *head = task;
         task->next = NULL;
+        task_list_unlock();
         return;
     }
     while (t->next != NULL) t = t->next;
     t->next = task;
     task->next = NULL;
+
+    task_list_unlock();
 }
 
 /* ═══ dequeue：从链表中移除 ═══ */
@@ -41,6 +63,8 @@ static void sched_rr_enqueue(kern_task_t *task)
 static void sched_rr_dequeue(kern_task_t *task)
 {
     if (task == NULL) return;
+
+    task_list_lock();
 
     kern_task_t **head = &sched_class_rr.task_list;
     kern_task_t *prev = NULL;
@@ -53,18 +77,24 @@ static void sched_rr_dequeue(kern_task_t *task)
                 *head = t->next;
             }
             if (g_last_picked == task) g_last_picked = NULL;
+            task_list_unlock();
             return;
         }
         prev = t;
         t = t->next;
     }
+
+    task_list_unlock();
 }
 
 /* ═══ pick_next：Round-Robin 扫描（与原始 pick_next_ready 逻辑相同） ═══ */
 
 static kern_task_t *sched_rr_pick_next(void)
 {
+    uint8_t cpu = KERN_THIS_CPU;
     uint32_t now = g_sched_ticks;
+
+    task_list_lock();
 
     /* 第一遍：唤醒所有到期 sleep 任务 */
     kern_task_t *t = sched_class_rr.task_list;
@@ -75,20 +105,30 @@ static kern_task_t *sched_rr_pick_next(void)
         t = t->next;
     }
 
-    /* 第二遍：Round-Robin 扫描，从上一轮选中任务的下一个开始 */
+    /* 第二遍：Round-Robin 扫描，从 per-CPU 上一轮选中任务的下一个开始 */
     kern_task_t *start = (g_last_picked != NULL && g_last_picked->next != NULL)
                          ? g_last_picked->next
                          : sched_class_rr.task_list;
 
     if (start == NULL) {
+        task_list_unlock();
         return NULL;  /* 任务列表为空 */
     }
 
     t = start;
+    kern_task_t *first_candidate = NULL;
     do {
         if (t->state == KERN_TASK_READY) {
-            g_last_picked = t;
-            return t;
+            uint8_t tid = t->cpu_id;
+            /* CPU 亲和性检查：KERN_CPU_ANY 或匹配本核心 */
+            if (tid == KERN_CPU_ANY || tid == cpu) {
+                g_last_picked = t;
+                task_list_unlock();
+                return t;
+            }
+            if (first_candidate == NULL) {
+                first_candidate = t;  /* 记录第一个就绪但亲和性不匹配的任务 */
+            }
         }
         t = t->next;
         if (t == NULL) {
@@ -96,8 +136,10 @@ static kern_task_t *sched_rr_pick_next(void)
         }
     } while (t != start);
 
-    /* 所有任务都不可运行 */
-    return NULL;
+    task_list_unlock();
+
+    /* 无亲和性匹配任务时，返回 KERN_CPU_ANY 任务作为兜底 */
+    return first_candidate;
 }
 
 /* ═══ tick：时间片递减 + 抢占标记 ═══ */
