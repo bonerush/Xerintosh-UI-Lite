@@ -129,7 +129,7 @@ stateDiagram-v2
     **修复:** 新增 `try_auto_connect()` 辅助函数，在 `WIFI_MGR_SCAN_DONE` 中调用（仅一次）：① 遍历已保存网络，在扫描结果中匹配；② 多个匹配时选择 RSSI 最强的；③ 发起 `WiFi.begin()` 静默连接（`g_is_auto_connect=true` 抑制所有弹窗）。手动连接回调（`on_saved_connect_pressed`/`on_network_button_pressed`）重置 `g_is_auto_connect=false` 保留弹窗反馈。`wifi_mgr_enable()`/`wifi_mgr_disable()` 重置自动连接标志。
     **验证:** build(hw)=PASS RAM=22.1% Flash=99.1% native=3 ERRORED（均为预存问题，与本次无关）
     **文件:** src/app/wifi/wifi_manager.cpp
-- [AGENT_FINISH] 烧录当前固件后菜单渲染正常但所有按键操作无响应，系统卡死在菜单页面
+- [VERIFIED] ~~烧录当前固件后菜单渲染正常但所有按键操作无响应，系统卡死在菜单页面~~
     **根因:** ① SMP 死锁 → 输入无响应（commit f41e416 已修复）；② 修复 SMP 后 Core 0 看门狗超时重启：`kern_smp_sched_loop` (prio+2) 与 `xidle0` (prio+1) 信号量乒乓导致 FreeRTOS idle 任务 (prio+0) 饿死，TG1 5s 超时触发。
     **修复:** ① `KERN_THIS_CPU` → `kern_cpu_id()`，移除 `g_active_cpu`；② `kern_smp_sched_loop` 改为 Core 0；③ `kern_smp_sched_loop` 每 tick 后调用 `kern_port_idle()`（`vTaskDelay(1)`，10ms 喂狗窗口）。
     **验证:** build(hw)=PASS native=338 PASS
