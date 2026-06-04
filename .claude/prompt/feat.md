@@ -64,7 +64,7 @@ stateDiagram-v2
 | `using-git-worktrees` | Worktree 隔离开发最佳实践（检测、创建、清理） | Step 0 ~ Step 1 | 开发 Agent / 集成 Agent |
 | `EnterWorktree` / `ExitWorktree` | 原生 worktree 进入 / 退出工具 | Step 1a | 开发 Agent / 集成 Agent |
 | `writing-plans` | 复杂特性的实现规划与架构设计 | `FEAT` -> `FEAT_AGENT` | 开发 Agent（领取任务前） |
-| `executing-plans` | 按规划分阶段执行开发 | Step 2 | 开发 Agent |
+| `subagent-driven-development` | 使用多子代理按计划执行开发（每任务独立子 Agent + 两阶段审查） | Step 2 | 开发 Agent |
 | `test-driven-development` | 测试驱动开发（先写测试，再实现） | Step 2 | 开发 Agent |
 | `verification-before-completion` | 完成前的验证流程（检查清单、回归测试） | `FEAT_AGENT` -> `FEAT_AGENT_FINISH` | 开发 Agent |
 | `requesting-code-review` | 请求代码审查（生成 PR、描述、测试计划） | `FEAT_AGENT_FINISH` | 开发 Agent |
@@ -74,7 +74,7 @@ stateDiagram-v2
 ### 技能调用时机详解
 
 - **`using-git-worktrees`**：任何 Agent 在操作 worktree 之前**必须先调用此技能**，遵循其 Step 0 检测 -> Step 1a 原生工具 -> Step 1b 手动回退的流程。
-- **`writing-plans`** + **`executing-plans`**：当特性涉及 3+ 文件修改、架构变更或复杂逻辑时，开发 Agent 在领取任务后必须先调用 `writing-plans` 生成实现计划，获得用户确认后再按 `executing-plans` 执行。
+- **`writing-plans`** + **`subagent-driven-development`**：当特性涉及 3+ 文件修改、架构变更或复杂逻辑时，开发 Agent 在领取任务后必须先调用 `writing-plans` 生成实现计划，获得用户确认后再按 `subagent-driven-development` 执行。
 - **`test-driven-development`**：新特性开发必须遵循 TDD 流程：RED（写测试）-> GREEN（实现通过）-> REFACTOR（重构）-> COVERAGE（验证 >=80%）。
 - **`verification-before-completion`**：在将 `FEAT_AGENT` 改为 `FEAT_AGENT_FINISH` 之前，必须调用此技能完成验证检查清单，确保基线测试通过、无回归。
 - **`dispatching-parallel-agents`**：当需要同时开发多个独立特性时，由集成 Agent 或人工调用此技能，并行派发开发 Agent，每个 Agent 在独立 worktree 中工作。
@@ -243,26 +243,29 @@ Agent 在隔离 worktree 内完成编码，**完成后必须执行自测**：
 <!-- 请按照上方格式在下方添加特性条目 -->
 
 - [VERIFIED] ~~**UI 框架深度重构** — 对 `src/ui/` 全部核心模块进行系统性重构：~~
-  1. **可维护性优化**：简化复杂的 API 逻辑（消除向后兼容宏、统一内存管理、标准化错误处理）
-  2. **性能优化**：减少每帧重复计算（字体宽度缓存、脏区域跟踪、静态元素跳过）
-  3. **逻辑整理**：分离主循环职责（lifecycle vs rendering）、引入类型派发表替代内联 switch
-  4. **死代码清理**：移除 `xerintosh_ui_driver_init()` 等薄包装、消除重复的位置计算逻辑
-  5. **可复用逻辑提取**：将 `is_item_visible()`、动画 easing、类型派发等模式抽取为公共工具
+   1. **可维护性优化**：简化复杂的 API 逻辑（消除向后兼容宏、统一内存管理、标准化错误处理）
+   2. **性能优化**：减少每帧重复计算（字体宽度缓存、脏区域跟踪、静态元素跳过）
+   3. **逻辑整理**：分离主循环职责（lifecycle vs rendering）、引入类型派发表替代内联 switch
+   4. **死代码清理**：移除 `xerintosh_ui_driver_init()` 等薄包装、消除重复的位置计算逻辑
+   5. **可复用逻辑提取**：将 `is_item_visible()`、动画 easing、类型派发等模式抽取为公共工具
 - [VERIFIED] ~~我想把当前的蓝牙框架彻底重构，我想使用classic BLE的协议而不是当前的方案。我需要你做的是把当前的蓝牙框架彻底卸载换成支持classic BLE的协议，并且对当前ui系统中含有蓝牙的部分也修改成适配该协议的方案。~~
     - 分支: `feature/bt-classic-spp`
     - 概要: 已将 NimBLE-Arduino (BLE GATT/NUS) 完全替换为 ESP32 Arduino 内置 BluetoothSerial (Classic Bluetooth SPP)。bt_manager 状态机大幅简化（移除扫描/广告/配对码流程），bt_uart_service API 保持不变，UI 文本从 "BLE" 统一改为 "BT/蓝牙"。硬件编译通过（Flash 99.0%, RAM 21.4%），native 测试通过（186/187，末尾 SIGSEGV 为既有内核 IPC 问题）。
 - [VERIFIED] ~~当前蓝牙这个功能已经调试完毕，串口也能正常的传输数据和连接设备。在root菜单里面有蓝牙串口这个程序，我在仔细评估之后认为该app与串口监视器的这个app存在功能上的重合。因此我想把蓝牙串口这个app删除并且把功能整合进入串口监视器这个程序中。下面是大致的施行顺序。~~
-   1.首先对于NORM/DEBUG模式，我在几天的重度使用发现我基本上不会用到DEBUG模式，请删除掉相关的代码默认只使用norm模式，并且把原先UI界面的NORM/DEBUG按钮改成SER/BLE（有线串口/蓝牙串口）模式，并且原先的操控逻辑操控SER/BLE按钮的时候会切换对应的模式。对于串口的显示逻辑则有线串口/蓝牙串口为一致的。
-   2.修改调试完毕之后删除掉之前的死代码，保持项目的清洁。
-   3.最后更新相关的文档。
-    - 分支: `feature/bt-serial-merge`
-    - 概要: 已将独立的 ble_serial App 删除，功能整合到 serial_monitor App 中。用 SER/BLE 模式切换替代原有的 NORM/DEBUG 模式切换。删除 NORM/DEBUG 相关代码、ble_serial 源文件和测试文件。Native 测试 186/187 通过（末尾 SIGSEGV 为既有内核 IPC 问题），硬件编译成功（RAM 21.2%, Flash 91.2%）。
-- [FEAT_AGENT_FINISH] 我想做一个app，是把一些我的token用量实施显示到当前的开发板上
+   1. 首先对于NORM/DEBUG模式，我在几天的重度使用发现我基本上不会用到DEBUG模式，请删除掉相关的代码默认只使用norm模式，并且把原先UI界面的NORM/DEBUG按钮改成SER/BLE（有线串口/蓝牙串口）模式，并且原先的操控逻辑操控SER/BLE按钮的时候会切换对应的模式。对于串口的显示逻辑则有线串口/蓝牙串口为一致的。
+   2. 修改调试完毕之后删除掉之前的死代码，保持项目的清洁。
+   3. 最后更新相关的文档。
+      - 分支: `feature/bt-serial-merge`
+      - 概要: 已将独立的 ble_serial App 删除，功能整合到 serial_monitor App 中。用 SER/BLE 模式切换替代原有的 NORM/DEBUG 模式切换。删除 NORM/DEBUG 相关代码、ble_serial 源文件和测试文件。Native 测试 186/187 通过（末尾 SIGSEGV 为既有内核 IPC 问题），硬件编译成功（RAM 21.2%, Flash 91.2%）。
+- [VERIFIED] ~~我想做一个app，是把一些我的token用量实施显示到当前的开发板上~~
    - Deepseek：https://platform.deepseek.com/usage
       - 需要显示我的余额，本月消费是多少
       - API暂时给你：[REDACTED-DEEPSEEK]
-   - Kimi：https://www.kimi.com/code/console
-      - 需要显示当前本周的用量是多少，频限是多少
-      - API暂时给你：[REDACTED-KIMI]
    用户后续也可以通过串口来更改api-key，就像输入wifi密码那样。
    - 计划生成完毕默认使用subagent-driven
+- [FEAT_AGENT] 工作流：分析当前内核的缺陷和待优化的地方 --> 更具分析报告生成分模块的执行计划。因为本次FEAT是大的变更，所以请你在先在主工作区创立一个全新的分支，之后再去创立worktree，并且最后合并在这个创立的分支上。
+   - 对于内核的核心逻辑进行优化，尤其是当前的协作式内核我觉得已经不能满足对于该系统的开销，我想优化成抢占式内核。并且支持SMP（多核调度）。
+   - 内存保护是缺失的，你可以利用MPU和系统调用来保护内存。一个任务崩溃，MPU 会触发 MemManage 异常，内核可以捕获它并优雅地重启该任务，而不会让整个系统宕机。
+   - 实现资源追踪和安全终止，在内核的任务控制块 (TCB) 中，增加一个资源列表，记录本任务持有的所有互斥锁、信号量、动态内存指针。当任务退出或被强制终止时，内核遍历这个列表，自动释放所有锁并回收内存。这就需要一个更规范的内存分配器，并和内核紧密集成。
+   - 将调度算法从内核核心逻辑中解耦出来。定义一个“调度器接口”（比如 scheduler_select_next() 函数指针）。你可以实现多个调度类：固定优先级类、时间片轮转类、EDF 类。任务创建时可以选择它属于哪个调度类，内核按优先级顺序查询这些类，选出下一个任务。这就像 Linux 的调度类（CFS, RT, DEADLINE）的极简版。
+   - 构建驱动开发规范体系，定义统一的设备模型：struct device，包含名称、open/read/write/ioctl 等统一的函数指针。创建一个虚拟文件系统（DevFS）或者简单的设备注册表，让应用程序可以通过名字打开设备，获得句柄。将中断处理程序统一管理，底层硬件中断在驱动中处理为数据，然后通过你之前用过的“消息队列”发送给等待该设备的任务。
