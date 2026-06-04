@@ -226,4 +226,4 @@ int kern_shell_register_cmd(const char *name,
 
 ---
 
-> **See Also:** [内核 Shell](kern-shell.md) | [Shell 解析器](kern-shell-parser.md) | [协作式调度器](kern-task.md)
+> **See Also:** [内核 Shell](kern-shell.md) | [Shell 解析器](kern-shell-parser.md) | [抢占式调度器](kern-task.md)

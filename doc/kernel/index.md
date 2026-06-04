@@ -50,8 +50,6 @@ FreeRTOS 继续在底层为 WiFi/BT 协议栈服务，Xeros 运行在 Arduino `l
 │  │M5Unified │ │M5GFX     │ │WiFi Stack│ │BT Stack  │            │
 │  └──────────┘ └──────────┘ └──────────┘ └──────────┘            │
 └──────────────────────────────────────────────────────────────────┘
-
-* FIFO 需要 CONFIG_PREEMPT_ENABLED
 ```
 
 ## 模块导航
@@ -62,7 +60,7 @@ FreeRTOS 继续在底层为 WiFi/BT 协议栈服务，Xeros 运行在 Arduino `l
 |------|------|------|----------|
 | 类型系统 | [kern-types.md](kern-types.md) | `kern_types.h` | 错误码、PID、任务状态、日志级别、栈常量、CPU 标识 |
 | 初始化与日志 | [kern-init.md](kern-init.md) | `kern_init.c/h` | 内核启动入口、分级日志、panic 处理 |
-| 协作式调度器 | [kern-task.md](kern-task.md) | `kern_task.c/h` | TCB、yield/sleep/exit/spawn、虚任务、动态栈 |
+| 抢占式调度器 | [kern-task.md](kern-task.md) | `kern_task.c/h` | TCB、yield/sleep/exit/spawn、虚任务、动态栈 |
 | VFS 核心 | [kern-vfs.md](kern-vfs.md) | `kern_vfs.c/h` | inode/dentry/file 三级结构、路径解析、open/close/read/write |
 | 设备文件系统 | [kern-devfs.md](kern-devfs.md) | `kern_devfs.c/h` | /dev/ 目录创建、设备注册 |
 | /proc 与 /sys | [kern-procfs-sysfs.md](kern-procfs-sysfs.md) | `kern_procfs.c/h`, `kern_sysfs.c/h` | 内核状态信息、系统配置文件系统 |
@@ -89,11 +87,11 @@ FreeRTOS 继续在底层为 WiFi/BT 协议栈服务，Xeros 运行在 Arduino `l
 
 ## 关键设计决策
 
-### 为什么用协作式 + 可插拔调度类？
+### 为什么用可插拔调度类？
 
 在 520KB SRAM 的 ESP32 上：
-- **协作式默认**无真正并发，无复杂锁机制，编译后代码极小
-- **可插拔调度类**允许在需要时启用抢占式（`CONFIG_PREEMPT_ENABLED`），编译时选择调度策略
+- **抢占式时间片 + 优先级调度**：RR 默认公平轮转，FIFO 提供高优先级抢占响应
+- **可插拔调度类**允许按需扩展调度策略，编译时注册即可
 - 调度类按注册顺序决定优先级：RR 先注册（兜底），FIFO 后注册（高优先级优先）
 
 ### 为什么 per-CPU 宏能实现零开销？

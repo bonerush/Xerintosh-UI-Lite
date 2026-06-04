@@ -1,10 +1,10 @@
 # UI 任务（UI Task）
 
-> **Parent:** [App 层索引](index.md) | **Related:** [核心引擎](../ui/core.md), [输入系统](../hal/input.md), [协作式调度器](../kernel/kern-task.md)
+> **Parent:** [App 层索引](index.md) | **Related:** [核心引擎](../ui/core.md), [输入系统](../hal/input.md), [抢占式调度器](../kernel/kern-task.md)
 
 ## 概述
 
-`ui_task` 是将 Xerintosh UI 主循环包装为 **Xeros 内核任务**的入口。它将原本直接在 Arduino `loop()` 中运行的 UI 渲染逻辑，迁移到内核调度器的协作式多任务框架中，使 UI 与其他任务（如 WiFi、蓝牙、Shell）可以共享 CPU。
+`ui_task` 是将 Xerintosh UI 主循环包装为 **Xeros 内核任务**的入口。它将原本直接在 Arduino `loop()` 中运行的 UI 渲染逻辑，迁移到内核调度器的抢占式多任务框架中，使 UI 与其他任务（如 WiFi、蓝牙、Shell）可以共享 CPU。
 
 ---
 
@@ -47,7 +47,7 @@ void ui_task_main(void *arg)
             kern_log(KERN_LOG_INFO, "ui frame %d flush done, yielding", frame);
         }
 
-        /* 协作式让出 CPU */
+        /* 让出 CPU */
         kern_yield();
 
         if (frame <= 5) {
@@ -90,7 +90,7 @@ void ui_task_main(void *arg)
 
         if (前5帧) 记录日志: "第N帧刷新完成，准备让出"
 
-        // 第六步：协作式让出CPU
+        // 第六步：让出CPU
         内核让出()        // 切换到下一个内核任务
 
         if (前5帧) 记录日志: "第N帧恢复执行"
@@ -123,7 +123,7 @@ void ui_task_main(void *arg)
 | 方面 | 旧架构（直接在 loop()） | 新架构（ui_task） |
 |------|------------------------|------------------|
 | 运行位置 | Arduino `loop()` | Xeros 内核任务 |
-| 调度方式 | 独占 CPU | 协作式 yield |
+| 调度方式 | FreeRTOS 抢占 | kern_yield() 时间片让出 |
 | 与其他任务关系 | WiFi/BT 在 loop() 中轮询 | WiFi/BT 作为独立内核任务 |
 | 启动方式 | `setup()` 后直接调用 | `kern_spawn("ui", ui_task_main, ...)` |
 
@@ -152,4 +152,4 @@ UI 任务在 `main.cpp` 的 `setup()` 末尾通过 `kern_spawn()` 创建，栈�
 
 ---
 
-> **See Also:** [App 层索引](index.md) | [核心引擎](../ui/core.md) | [协作式调度器](../kernel/kern-task.md)
+> **See Also:** [App 层索引](index.md) | [核心引擎](../ui/core.md) | [抢占式调度器](../kernel/kern-task.md)

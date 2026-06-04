@@ -6,7 +6,7 @@
  *
  *          Native 测试：使用 ucontext（POSIX 独立栈）
  *          ESP32：使用 FreeRTOS 任务承载（每任务独立栈），
- *                 互斥锁实现协作式调度
+ *                 FreeRTOS 信号量令牌实现抢占式调度
  *
  * @copyright Copyright (c) 2026
  */

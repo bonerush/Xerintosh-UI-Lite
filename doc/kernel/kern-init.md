@@ -94,7 +94,7 @@ void kern_vlog(kern_log_level_t level, const char *fmt, va_list args)
 }
 ```
 
-**为什么切换为自旋锁？** 旧版使用 FreeRTOS `xSemaphoreTake/give`，但这意味着内核日志系统本身依赖 FreeRTOS——违反了「零 FreeRTOS 渗透」原则。在协作式调度中，自旋锁持有者不会阻塞（不会被抢占），短暂自旋即可，性能相当且消除了依赖。
+**为什么切换为自旋锁？** 旧版使用 FreeRTOS `xSemaphoreTake/give`，但这意味着内核日志系统本身依赖 FreeRTOS——违反了「零 FreeRTOS 渗透」原则。自旋锁持有者不应长时间阻塞，短暂自旋即可，性能相当且消除了依赖。
 
 ### Panic 处理
 

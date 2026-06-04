@@ -75,7 +75,7 @@ void ui_task_main(void *arg)
         delay(1);
 #endif
 
-        /* 协作式让出 CPU */
+        /* 让出 CPU */
         kern_yield();
 
         if (frame <= 5) {

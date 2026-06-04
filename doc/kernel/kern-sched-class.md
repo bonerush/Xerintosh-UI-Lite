@@ -160,7 +160,6 @@ struct kern_task *pick_next_ready(void)
 *📄 Source: [kern_sched.c](../../src/kernel/kern_sched.c#L206-L211)*
 
 ```c
-#ifdef CONFIG_PREEMPT_ENABLED
     /* 遍历所有 class 的 tick 回调 */
     for (int i = 0; i < g_sched_class_count; i++) {
         if (g_sched_classes[i] && g_sched_classes[i]->tick) {
@@ -171,7 +170,6 @@ struct kern_task *pick_next_ready(void)
     if (g_need_resched) {
         /* ... 抢占调度 ... */
     }
-#endif
 ```
 
 #### 完整调度流程图
@@ -188,7 +186,7 @@ struct kern_task *pick_next_ready(void)
                     └─────────┬───────────┘
                               │
                     ┌─────────▼───────────┐
-                    │ CONFIG_PREEMPT?     │
+                    │ 调度类 tick?       │
                     └──────┬──────┬───────┘
                            │ 是   │ 否
                            ▼      ▼
@@ -219,8 +217,7 @@ struct kern_task *pick_next_ready(void)
 
     注册 sched_class_rr (index=0)
         │
-        ├─ [CONFIG_PREEMPT_ENABLED]
-        │   注册 sched_class_fifo (index=1)
+        ├─ 注册 sched_class_fifo (index=1)
         │
         └─ 创建 idle 任务
            idle->scheduler_class_id = 0  (指向 RR class)
@@ -230,12 +227,10 @@ struct kern_task *pick_next_ready(void)
     分配 TCB
     task->scheduler_class_id = -1   (待分配)
     │
-    ├─ [CONFIG_PREEMPT_ENABLED]
-    │   task->scheduler_class_id = 1  (指向 FIFO class)
+    ├─ task->scheduler_class_id = 1  (指向 FIFO class)
     │   调用 sched_class_fifo.enqueue(task)  (按优先级插入)
     │
-    └─ [纯协作模式]
-        task->scheduler_class_id = 0  (指向 RR class)
+    └─ 调用 sched_class_rr.enqueue(task)  (追加到链表尾)
         调用 sched_class_rr.enqueue(task)  (追加到尾部)
 ```
 
@@ -279,7 +274,7 @@ struct kern_task *pick_next_ready(void)
 - **kern_sched**：调度器主循环调用 `pick_next_ready()` 和各 class 的 `tick()` 回调
 - **kern_task**：任务的 `scheduler_class_id` 指向所属 class 在 `g_sched_classes[]` 中的索引
 - **kern_sched_rr**：默认兜底调度类，总是第一个注册
-- **kern_sched_fifo**：抢占调度类，仅在 `CONFIG_PREEMPT_ENABLED` 时注册
+- **kern_sched_fifo**：抢占调度类，总是随内核初始化注册
 
 ---
 

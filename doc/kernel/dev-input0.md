@@ -132,7 +132,7 @@ for (;;) {
                    ev->button, ev->timestamp);
         }
     }
-    kern_yield();   /* 协作式让出，避免忙等 */
+    kern_yield();   /* 让出 CPU，避免忙等 */
 }
 ```
 

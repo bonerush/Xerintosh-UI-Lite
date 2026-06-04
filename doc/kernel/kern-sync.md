@@ -255,7 +255,7 @@ static inline void mutex_unlock(mutex_t *m)
   "我声明我正在使用这个资源"
 
 如果在单核模式下同一个任务重复 lock 同一个 mutex，
-不会报错（直接覆盖 owner），这简化了协作式调度的使用场景。
+不会报错（直接覆盖 owner），这简化了单核内核的使用场景。
 ```
 
 ---

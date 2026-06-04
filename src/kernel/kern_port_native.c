@@ -1,7 +1,7 @@
 /**
  * @file   kern_port_native.c
  * @brief  Xeros 内核可移植层 — 原生 setjmp/longjmp 后端（实验性）
- * @details 基于 setjmp/longjmp + 手动栈管理实现协作式调度，
+ * @details 基于 setjmp/longjmp + 手动栈管理实现抢占式调度，
  *          完全不依赖 FreeRTOS 任务 API。
  *
  * @deprecated 此文件具有互斥的 #ifdef 守卫（XEROS_NATIVE_SCHED），

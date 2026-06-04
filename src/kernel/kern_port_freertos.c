@@ -1,7 +1,7 @@
 /**
  * @file   kern_port_freertos.c
  * @brief  Xeros 内核可移植层 — FreeRTOS 后端实现
- * @details 基于 FreeRTOS 任务容器 + 双信号量令牌协议实现协作式调度。
+ * @details 基于 FreeRTOS 任务容器 + 双信号量令牌协议实现抢占式调度。
  *
  *          协议：
  *          ┌──────────┐    give(token)     ┌──────────┐
@@ -10,7 +10,7 @@
  *          └──────────┘    take(done)      └──────────┘
  *
  *          每个 Xeros 任务 = 1 个 FreeRTOS 任务。
- *          任务切换通过双二值信号量实现（无抢占，纯协作）。
+ *          任务切换通过双二值信号量实现，硬件定时器驱动抢占式调度。
  *
  *          此文件是项目中唯一直接调用 FreeRTOS API 的源文件。
  *          切换到原生调度器时，替换此文件为 kern_port_native.c 即可。

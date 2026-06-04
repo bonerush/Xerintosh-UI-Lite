@@ -1,7 +1,7 @@
 /**
  * @file   kern_sched_rr.h
  * @brief  Round-Robin 调度器类头文件
- * @details 声明 sched_class_rr 全局实例，提供与当前协作式调度器完全兼容的行为。
+ * @details 声明 sched_class_rr 全局实例，作为默认时间片轮转调度类。
  *
  * @copyright Copyright (c) 2026
  */

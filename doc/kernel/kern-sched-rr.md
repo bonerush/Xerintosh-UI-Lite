@@ -260,7 +260,6 @@ static kern_task_t *sched_rr_pick_next(void)
 ```c
 static void sched_rr_tick(kern_task_t *current)
 {
-#ifdef CONFIG_PREEMPT_ENABLED
     if (current == NULL) return;
 
     if (current->timeslice_remaining > 0) {
@@ -271,9 +270,6 @@ static void sched_rr_tick(kern_task_t *current)
         current->timeslice_remaining = SCHED_RR_DEFAULT_TIMESLICE;
         g_need_resched = true;
     }
-#else
-    (void)current;
-#endif
 }
 ```
 

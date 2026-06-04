@@ -139,7 +139,7 @@ kern_sched_tick()
 
 *📄 Source: [kern_port_freertos.c](../../src/kernel/kern_port_freertos.c#L103-L162)*
 
-当 `CONFIG_PREEMPT_ENABLED` 启用时，FreeRTOS 后端会配置 ESP32 的 `timer_group0/timer0` 硬件定时器：
+ESP32 抢占式调度通过硬件定时器（ESP32 `timer_group0/timer0`）驱动：
 
 | 参数 | 值 | 说明 |
 |------|-----|------|

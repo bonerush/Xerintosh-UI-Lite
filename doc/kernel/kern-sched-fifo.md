@@ -56,14 +56,12 @@ static void sched_fifo_enqueue(kern_task_t *task)
         t->next = task;
     }
 
-#ifdef CONFIG_PREEMPT_ENABLED
     /* 如果入队任务优先级高于当前运行的任务，触发抢占 */
     if (g_current_task != NULL
         && task->state == KERN_TASK_READY
         && task->priority > g_current_task->priority) {
         g_need_resched = true;
     }
-#endif
 }
 ```
 
@@ -214,7 +212,6 @@ static kern_task_t *sched_fifo_pick_next(void)
 ```c
 static void sched_fifo_tick(kern_task_t *current)
 {
-#ifdef CONFIG_PREEMPT_ENABLED
     if (current == NULL) return;
 
     /* 检查 FIFO class 中是否有比当前任务优先级更高的就绪任务 */
@@ -230,9 +227,6 @@ static void sched_fifo_tick(kern_task_t *current)
         }
         t = t->next;
     }
-#else
-    (void)current;
-#endif
 }
 ```
 
@@ -240,7 +234,6 @@ static void sched_fifo_tick(kern_task_t *current)
 
 ```
 函数 FIFO_tick(当前任务) {
-    [仅在抢占模式]
 
     if (当前任务 == NULL) 返回
 
@@ -348,7 +341,7 @@ taskC.priority 从 50 提升到 150:
 ## 与其他组件的关系
 
 - **kern_sched_class**：`sched_class_fifo` 是 `kern_sched_class_t` 接口的实例
-- **kern_sched**：`kern_sched_init()` 中仅在 `CONFIG_PREEMPT_ENABLED` 时注册此类
+- **kern_sched**：`kern_sched_init()` 中总是注册此类
 - **kern_task**：每个任务通过 `scheduler_class_id = 1` 指向此类。任务的 `priority` 字段决定链表中的位置
 - **kern_sched_rr**：与 RR class 协作完成两级调度（FIFO 优先，RR 兜底）
 

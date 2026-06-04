@@ -57,7 +57,7 @@ void mutex_lock(mutex_t *m)
         spinlock_unlock(&m->lock);
     } else {
         /* 已被其他任务持有：加入等待队列并自旋 */
-        /* 简单实现：当前为协作式调度，直接自旋等待 */
+        /* 简单实现：内核自旋锁，短临界区直接自旋等待 */
         spinlock_unlock(&m->lock);
 
         while (1) {

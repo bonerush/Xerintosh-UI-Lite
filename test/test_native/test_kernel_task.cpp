@@ -1,6 +1,6 @@
 /**
  * @file   test_kernel_task.cpp
- * @brief  Xeros 协作式调度器单元测试
+ * @brief  Xeros 抢占式调度器单元测试
  * @details 测试 spawn/yield/sleep/exit、动态栈、金丝雀检测、
  *          Round-Robin 调度。
  *

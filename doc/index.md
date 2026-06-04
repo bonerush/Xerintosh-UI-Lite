@@ -12,7 +12,7 @@ Project Root
 │   ├── 核心子系统 (v1)
 │   │   ├── [初始化与日志](kernel/kern-init.md)     ← 分级日志、panic、启动序列
 │   │   ├── [类型系统](kernel/kern-types.md)        ← 错误码、常量、枚举
-│   │   ├── [协作式调度器](kernel/kern-task.md)     ← TCB、yield/sleep/exit/spawn
+│   │   ├── [抢占式调度器](kernel/kern-task.md)     ← TCB、yield/sleep/exit/spawn
 │   │   ├── [VFS 核心](kernel/kern-vfs.md)          ← inode/dentry/file + fd_table
 │   │   ├── [设备文件系统](kernel/kern-devfs.md)    ← /dev/ 目录与设备注册
 │   │   ├── [/proc 与 /sys](kernel/kern-procfs-sysfs.md) ← 内核状态与配置接口
@@ -93,8 +93,6 @@ Project Root
 ├──────────────────────────────────────────────────────────────┤
 │ FreeRTOS + Arduino (WiFi / BT 协议栈)                        │
 └──────────────────────────────────────────────────────────────┘
-
-* FIFO 需要 CONFIG_PREEMPT_ENABLED
 ```
 
 FreeRTOS 继续在底层为 WiFi/BT 协议栈服务。SMP 模式下 Xeros 在每个 CPU 上创建 FreeRTOS 任务运行调度循环，与底层不冲突。
@@ -126,7 +124,7 @@ FreeRTOS 继续在底层为 WiFi/BT 协议栈服务。SMP 模式下 Xeros 在每
 - **[内核子系统总览](kernel/index.md)** — v2 架构总览、模块导航
 - **[初始化与日志](kernel/kern-init.md)** — 内核启动入口、分级日志、panic 处理
 - **[类型系统](kernel/kern-types.md)** — 错误码、PID、任务状态、CPU 标识
-- **[协作式调度器](kernel/kern-task.md)** — TCB、yield/sleep/exit/spawn、虚任务
+- **[抢占式调度器](kernel/kern-task.md)** — TCB、yield/sleep/exit/spawn、虚任务
 - **[SMP 多核支持](kernel/kern-smp.md)** — per-CPU 数组、宏零开销退化、多核启动
 - **[同步原语](kernel/kern-sync.md)** — spinlock_t + mutex_t、原子操作、单核退化
 - **[可插拔调度类](kernel/kern-sched-class.md)** — 调度类接口、注册与优先级链

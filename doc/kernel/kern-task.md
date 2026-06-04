@@ -1,4 +1,4 @@
-# 协作式调度器（Kern Task）
+# 抢占式调度器（Kern Task）
 
 > **Parent:** [内核总览](index.md) | **Related:** [类型系统](kern-types.md), [可插拔调度类](kern-sched-class.md), [SMP 支持](kern-smp.md), [MPU 保护](kern-mpu.md), [资源追踪](kern-resource.md)
 
