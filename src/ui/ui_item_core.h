@@ -11,7 +11,7 @@
 #define UI_ITEM_CORE_H
 
 #include "ui_types.h"
-#include "kernel/kern_types.h"
+#include <stddef.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -97,7 +97,7 @@ typedef struct xerintosh_user_item_t
   xerintosh_cb_t loop_function;      /* 每帧调用 */
   xerintosh_cb_t exit_function;      /* 退出时调用一次 */
   xerintosh_cb_t destroy_callback;   /* 销毁时调用，供 App 清理 user_data */
-  kern_pid_t kernel_pid;             /* 内核虚任务 PID（-1=未注册） */
+  void *kernel_pid;                  /* 活跃标记（NULL=未激活，非NULL=活跃） */
 } xerintosh_user_item_t;
 
 /* ═══ 列表项操作 ═══ */

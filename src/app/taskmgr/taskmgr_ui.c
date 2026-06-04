@@ -2,58 +2,38 @@
  * @file   taskmgr_ui.c
  * @brief  任务管理器 UI 渲染实现
  * @details 纯渲染函数：标题栏、任务列表、确认弹窗、底部信息栏。
- *          遵循 Xerintosh UI 框架规范：使用 hal_get_font_height()
- *          计算行高，baseline 对齐，标准颜色常量。
- *          Phase 1: 集成 ui_anim_row 动画坐标渲染。
+ *          使用 taskmgr_task_info_t 替代原 Xeros kern_task_t。
  *
  * @copyright Copyright (c) 2026
  */
 
 #include "taskmgr_ui.h"
 #include "taskmgr.h"
-#include "kernel/kern_task.h"
 #include "hal/hal_display.h"
 #include "hal/hal_layout.h"
 #include "ui/ui_anim_row.h"
 #include <stdio.h>
 
-/* ═══ 布局常量（对齐框架 ui_item.h 规范）═══ */
-
-/* 布局常量已统一迁移至 taskmgr.h 和 hal_layout.h — 此处不再定义 */
+/* ═══ 布局常量已统一迁移至 taskmgr.h 和 hal_layout.h — 此处不再定义 ═══ */
 
 /* ═══ 渲染辅助 ═══ */
-
-static const char *state_str(kern_task_state_t state)
-{
-    switch (state) {
-    case KERN_TASK_READY:    return "READY";
-    case KERN_TASK_RUNNING:  return "RUN  ";
-    case KERN_TASK_SLEEPING: return "SLEEP";
-    case KERN_TASK_BLOCKED:  return "BLOCK";
-    case KERN_TASK_ZOMBIE:   return "ZOMBI";
-    default:                 return "?????";
-    }
-}
 
 /**
  * @brief 格式化为单行显示字符串
  */
-static void format_line(kern_task_t *task, char *buf, size_t size)
+static void format_line(const taskmgr_task_info_t *task, char *buf, size_t size)
 {
     if (task == NULL || buf == NULL || size == 0) return;
 
-    bool is_prot = kern_task_is_protected(task);
-    const char *mark = is_prot ? "*" : " ";
+    const char *mark = task->is_protected ? "*" : " ";
 
-    if (task->flags & KERN_TASK_FLAG_VIRTUAL) {
+    if (task->is_virtual) {
         snprintf(buf, size, "%s%2d %-12s %s  n/a",
-                 mark, task->pid, task->name,
-                 state_str(task->state));
+                 mark, task->index, task->name, task->state_str);
     } else {
-        snprintf(buf, size, "%s%2d %-12s %s  %zu",
-                 mark, task->pid, task->name,
-                 state_str(task->state),
-                 kern_task_stack_usage(task));
+        snprintf(buf, size, "%s%2d %-12s %s  %d",
+                 mark, task->index, task->name, task->state_str,
+                 task->stack_free);
     }
 }
 
@@ -70,7 +50,7 @@ static void draw_header(void)
     /* 标题在 header 行内水平居中 */
     int16_t title_w = hal_get_string_width("Task Manager");
     int16_t title_x = HAL_CENTER_X(title_w);
-    int16_t title_y = HAL_TEXT_BASELINE(HAL_HEADER_TOP()) - 2;  /* 微调上移 */
+    int16_t title_y = HAL_TEXT_BASELINE(HAL_HEADER_TOP()) - 2;
     hal_draw_string(title_x, title_y, "Task Manager", COLOR_FG);
 
     /* 分隔线 */
@@ -102,7 +82,7 @@ static void draw_list(void)
 
     for (int i = 0; i < visible && (i + scroll) < count; i++) {
         int idx = i + scroll;
-        kern_task_t *t = taskmgr_get_task(idx);
+        const taskmgr_task_info_t *t = taskmgr_get_task(idx);
         if (t == NULL) continue;
 
         /* 使用动画 Y 坐标替代整数计算 */
@@ -135,14 +115,14 @@ static void draw_confirm_overlay(void)
 {
     if (!taskmgr_is_confirming()) return;
 
-    kern_task_t *t = taskmgr_get_task(taskmgr_get_selected());
+    const taskmgr_task_info_t *t = taskmgr_get_task(taskmgr_get_selected());
     if (t == NULL) return;
 
     int16_t fh = hal_get_font_height();
     hal_set_font(hal_get_cn_font());
 
-    int16_t bw = (int16_t)(SCREEN_WIDTH * 7 / 8);   /* 宽度比例自适应 */
-    int16_t bh = (int16_t)(fh * 2 + HAL_MARGIN_LG);  /* 两行文字 + 内边距 */
+    int16_t bw = (int16_t)(SCREEN_WIDTH * 7 / 8);
+    int16_t bh = (int16_t)(fh * 2 + HAL_MARGIN_LG);
     int16_t bx = HAL_CENTER_X(bw);
     int16_t by = HAL_CENTER_Y(bh);
 
@@ -168,7 +148,7 @@ static void draw_footer(void)
     hal_set_font(hal_get_cn_font());
 
     int selected = taskmgr_get_selected();
-    kern_task_t *t = taskmgr_get_task(selected);
+    const taskmgr_task_info_t *t = taskmgr_get_task(selected);
     if (t == NULL) return;
 
     /* 分隔线 */
@@ -178,16 +158,16 @@ static void draw_footer(void)
     bool is_prot = taskmgr_is_task_protected(selected);
     char info[64];
 
-    if (t->flags & KERN_TASK_FLAG_VIRTUAL) {
-        snprintf(info, sizeof(info), "PID:%d [V] %s",
-                 t->pid, is_prot ? "PROTECTED" : "killable");
+    if (t->is_virtual) {
+        snprintf(info, sizeof(info), "#%d [V] %s",
+                 t->index, is_prot ? "PROTECTED" : "killable");
     } else {
-        snprintf(info, sizeof(info), "PID:%d %s  stk:%zu/%zu  %s",
-                 t->pid, t->name,
-                 kern_task_stack_usage(t), t->stack_size,
+        snprintf(info, sizeof(info), "#%d %s  free:%d  %s",
+                 t->index, t->name,
+                 t->stack_free,
                  is_prot ? "PROTECTED" : "killable");
     }
-    int16_t text_y = HAL_FOOTER_BOTTOM() - HAL_MARGIN_SM;  /* 底部留边距 */
+    int16_t text_y = HAL_FOOTER_BOTTOM() - HAL_MARGIN_SM;
     hal_draw_string(TASKMGR_LEFT_MARGIN, text_y, info, COLOR_FG);
 }
 

@@ -271,3 +271,10 @@ Agent 在隔离 worktree 内完成编码，**完成后必须执行自测**：
      4. ✅ 检查所有 App 层对抢占式调度器的调用（无需修改）
      5. ✅ 测试验证：native 338/338 PASSED, 硬件编译 SUCCESS
    - 原始意见：我想彻底移除掉协作式调度器也就是v1版本的任何内容，系统底层只走抢占式调度器，并且把对接的app和相关内容重新适配一下
+
+## FreeRTOS-version
+- [FEAT_AGENT_FINISH] 移除 Xeros 内核，只保留 FreeRTOS。删除 ~53 个内核源文件 + ~15 个测试 + ~26 个文档，App 层全部适配。
+    - 分支: `feature/freertos-kernel-removal`
+    - 概要: 删除整个 src/kernel/（仅保留 kern_version_compat.h 版本宏），UI Core 层移除 kern_task 依赖（kernel_pid → void*），App 层全部适配 FreeRTOS API（kern_spawn→xTaskCreate，kern_poll_loop→vTaskDelay，kern_yield→删除），taskmgr 重写为任务注册表方案（替代 uxTaskGetSystemState），main.cpp 重构为 FreeRTOS 原生任务。Native 测试 121/121 PASSED，硬件编译 SUCCESS（Flash 86.9%, RAM 20.8%，节省 ~253KB Flash）。
+- [FEAT] 串口调试器（USB转串口烧录器功能），使用 G0/G26/G36 引脚，需等第一条 FEAT 完成。
+    - 支持离线烧录、接口顺序自定义、刷录进度显示

@@ -40,7 +40,6 @@ extern "C" {
 #include "app/settings/settings.h"
 #include "ui/ui_item.h"
 #include "ui/ui_core.h"
-#include "kernel/kern_task.h"
 }
 
 /* ═══ 外部全局变量 ═══ */
@@ -684,16 +683,19 @@ void wifi_mgr_update(void)
     }
 }
 
-/* ═══ 内核任务入口 ═══ */
+/* ═══ FreeRTOS 任务入口 ═══ */
 
 /**
- * @brief WiFi 管理器内核任务入口
+ * @brief WiFi 管理器 FreeRTOS 任务入口
  * @note  每 50ms 轮询一次状态机。
  */
 extern "C" void wifi_mgr_task_main(void *arg)
 {
     (void)arg;
-    kern_poll_loop(wifi_mgr_update, 50);
+    for (;;) {
+        wifi_mgr_update();
+        vTaskDelay(pdMS_TO_TICKS(50));
+    }
 }
 
 #endif /* NATIVE_TEST */

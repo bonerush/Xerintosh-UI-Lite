@@ -1,15 +1,14 @@
 /**
- * @file   kern_version.h
- * @brief  Xeros 内核版本信息头文件
- * @details 统一定义内核版本号、开发者信息和平台标识。
- *          所有需要显示版本信息的位置（/proc/version、uname 等）
- *          都应引用此头文件，避免版本号散落各处。
+ * @file   kern_version_compat.h
+ * @brief  版本信息兼容头文件（FreeRTOS-version 精简版）
+ * @details 从已删除的 kern_version.h 中提取版本宏定义。
+ *          此文件是 src/kernel/ 中唯一保留的文件。
  *
  * @copyright Copyright (c) 2026
  */
 
-#ifndef KERN_VERSION_H
-#define KERN_VERSION_H
+#ifndef KERN_VERSION_COMPAT_H
+#define KERN_VERSION_COMPAT_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -34,4 +33,4 @@ extern "C" {
 }
 #endif
 
-#endif /* KERN_VERSION_H */
+#endif /* KERN_VERSION_COMPAT_H */
