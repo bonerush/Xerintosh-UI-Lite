@@ -122,6 +122,10 @@ TEST(KernelVirtualTaskTest, UnregisterNonexistentDoesNotCrash)
 TEST(KernelVirtualTaskTest, VirtualTaskNotPickedByPickNextReady)
 {
     kern_sched_init();
+    /* 确保 idle 就绪 */
+    ASSERT_NE(g_idle_task, nullptr);
+    g_idle_task->state = KERN_TASK_READY;
+
     kern_pid_t pid = kern_task_register_virtual("nosched");
     ASSERT_GE(pid, 0);
 
