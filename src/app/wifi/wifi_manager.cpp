@@ -17,8 +17,11 @@ void wifi_mgr_init(void) {}
 void wifi_mgr_enable(void) {}
 void wifi_mgr_disable(void) {}
 bool wifi_mgr_is_waiting_input(void) { return false; }
+bool wifi_mgr_is_enabled(void) { return false; }
 void wifi_mgr_update(void) {}
 void wifi_mgr_on_switch_toggle(void *ud) { (void)ud; }
+extern "C" void wifi_popup_refresh(void) {}
+void wifi_mgr_task_main(void *arg) { (void)arg; }
 
 #else
 

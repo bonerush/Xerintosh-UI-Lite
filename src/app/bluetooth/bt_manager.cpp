@@ -17,6 +17,7 @@ void bt_mgr_init(void) {}
 void bt_mgr_enable(void) {}
 void bt_mgr_disable(void) {}
 bool bt_mgr_is_waiting_input(void) { return false; }
+bool bt_mgr_is_enabled(void) { return false; }
 void bt_mgr_update(void) {}
 void bt_mgr_on_switch_toggle(void *ud) { (void)ud; }
 
