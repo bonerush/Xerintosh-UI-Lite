@@ -43,7 +43,9 @@ void tu_ui_draw(const tu_data_t *data, int selected) {
     hal_draw_string(x, HAL_TEXT_BASELINE(y), "Deepseek:", COLOR_FG);
     y += line_h;
 
-    snprintf(buf, sizeof(buf), "Balance: %.2f CNY", data->deepseek.total_balance);
+    int whole = (int)data->deepseek.total_balance;
+    int cents = (int)((data->deepseek.total_balance - whole) * 100.0 + 0.5);
+    snprintf(buf, sizeof(buf), "Balance: %d.%02d CNY", whole, cents);
     hal_draw_string(x + HAL_MARGIN_MD, HAL_TEXT_BASELINE(y),
                     buf, data->deepseek_ok ? COLOR_FG : C_GRAY);
     y += line_h;
