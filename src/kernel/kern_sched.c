@@ -343,6 +343,10 @@ void kern_smp_sched_loop(void *arg)
     /* Core 0 自有调度循环 */
     while (1) {
         kern_sched_tick();
+        /* 短暂让出 CPU 给 FreeRTOS idle 任务喂看门狗。
+         * 信号量乒乓协议中 kern_smp_sched_loop (prio+2) 和 xidle0 (prio+1)
+         * 交替抢占，优先级 0 的 FreeRTOS idle 任务被完全饿死。 */
+        kern_port_idle();
     }
 }
 
