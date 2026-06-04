@@ -2,12 +2,14 @@
  * @file   kern_sched.c
  * @brief  Xeros 调度器核心实现
  * @details 包含全局调度状态、调度初始化、tick 分发、
- *          Round-Robin 就绪任务选择、idle 任务入口。
+ *          可插拔调度类注册与选择、idle 任务入口。
  *
  * @copyright Copyright (c) 2026
  */
 
 #include "kern_sched.h"
+#include "kern_sched_class.h"
+#include "kern_sched_rr.h"
 #include "kern_task.h"
 #include "kern_init.h"
 #include "kern_port.h"
@@ -20,29 +22,36 @@
 #elif defined(XEROS_NATIVE_SCHED)
 #include "kern_ctx_esp32.h"
 #include <setjmp.h>
-#include <esp_timer.h>
+#endif
+
+#ifdef CONFIG_PREEMPT_ENABLED
+#include "kern_sched_fifo.h"
 #endif
 
 /* ═══ IDLE 任务配置 ═══ */
 
-#define IDLE_STACK_MIN     2048   /* idle FreeRTOS 任务栈（需容纳 printf 调用） */
+#define IDLE_STACK_MIN     2048
 
 /* ═══ 全局调度状态 ═══ */
 
-kern_task_t   *g_task_list = NULL;        /* 任务链表头 */
-kern_task_t   *g_current_task = NULL;     /* 当前运行的任务 */
-kern_task_t   *g_idle_task = NULL;        /* idle 任务（兜底） */
-kern_task_t   *g_last_picked = NULL;      /* 上一轮选中的任务（Round-Robin 扫描起点） */
-kern_pid_t     g_next_pid = 0;            /* 下一个分配的 PID */
-uint8_t        g_task_count = 0;          /* 任务总数 */
-uint32_t       g_sched_ticks = 0;         /* 调度 tick 计数 */
+kern_task_t   *g_task_list = NULL;
+kern_task_t   *g_current_task = NULL;
+kern_task_t   *g_idle_task = NULL;
+kern_task_t   *g_last_picked = NULL;
+kern_pid_t     g_next_pid = 0;
+uint8_t        g_task_count = 0;
+uint32_t       g_sched_ticks = 0;
 static bool    g_sched_initialized = false;
 
+#ifdef CONFIG_PREEMPT_ENABLED
+volatile bool  g_need_resched = false;
+#endif
+
 #ifdef NATIVE_TEST
-ucontext_t     g_sched_ctx;               /* 调度器上下文 */
-kern_task_t   *g_switch_to_task = NULL;   /* makecontext 参数传递 */
+ucontext_t     g_sched_ctx;
+kern_task_t   *g_switch_to_task = NULL;
 #elif defined(XEROS_NATIVE_SCHED)
-kern_ctx_t     g_sched_ctx;               /* 调度器上下文 */
+kern_ctx_t     g_sched_ctx;
 #endif
 
 /* ═══ 初始化 ═══ */
@@ -54,6 +63,9 @@ void kern_sched_init(void)
     if (g_sched_initialized) return;
     g_sched_initialized = true;
 
+    /* 注册默认调度类 */
+    kern_sched_class_register(&sched_class_rr);
+
     g_idle_task = (kern_task_t *)calloc(1, sizeof(kern_task_t));
     if (g_idle_task == NULL) {
         kern_panic("failed to allocate idle task");
@@ -63,6 +75,7 @@ void kern_sched_init(void)
     g_idle_task->pid = g_next_pid++;
     g_idle_task->state = KERN_TASK_READY;
     g_idle_task->priority = 0;
+    g_idle_task->timeslice_remaining = SCHED_RR_DEFAULT_TIMESLICE;
     strncpy(g_idle_task->name, "idle", KERN_TASK_NAME_LEN);
     g_idle_task->entry = idle_entry;
     g_idle_task->arg = NULL;
@@ -82,9 +95,10 @@ void kern_sched_init(void)
     task_write_canary(g_idle_task);
 
     g_task_list = g_idle_task;
+    sched_class_rr.task_list = g_task_list;
     g_task_count = 1;
     g_current_task = g_idle_task;
-    g_last_picked = g_idle_task;  /* 首轮从 idle 之后开始扫描 */
+    g_last_picked = g_idle_task;
 
     kern_log(KERN_LOG_DEBUG, "scheduler initialized (native)");
 }
@@ -96,7 +110,8 @@ void kern_sched_init(void)
     if (g_sched_initialized) return;
     g_sched_initialized = true;
 
-    /* 创建 idle 任务（使用手动栈 + setjmp/longjmp） */
+    kern_sched_class_register(&sched_class_rr);
+
     g_idle_task = (kern_task_t *)calloc(1, sizeof(kern_task_t));
     if (g_idle_task == NULL) {
         kern_panic("failed to allocate idle task");
@@ -106,6 +121,7 @@ void kern_sched_init(void)
     g_idle_task->pid = g_next_pid++;
     g_idle_task->state = KERN_TASK_READY;
     g_idle_task->priority = 0;
+    g_idle_task->timeslice_remaining = SCHED_RR_DEFAULT_TIMESLICE;
     strncpy(g_idle_task->name, "idle", KERN_TASK_NAME_LEN);
     g_idle_task->entry = idle_entry;
     g_idle_task->arg = NULL;
@@ -117,6 +133,7 @@ void kern_sched_init(void)
     task_write_canary(g_idle_task);
 
     g_task_list = g_idle_task;
+    sched_class_rr.task_list = g_task_list;
     g_task_count = 1;
     g_current_task = g_idle_task;
     g_last_picked = g_idle_task;
@@ -124,17 +141,21 @@ void kern_sched_init(void)
     kern_log(KERN_LOG_DEBUG, "scheduler initialized (esp32-native-sched)");
 }
 
-#else /* ═══════════════ ESP32 (FreeRTOS 任务容器 + 协作锁) ═══════════════ */
+#else /* ═══════════════ ESP32 (FreeRTOS) ═══════════════ */
 
 void kern_sched_init(void)
 {
     if (g_sched_initialized) return;
     g_sched_initialized = true;
 
-    /* 初始化可移植层（创建调度基础设施） */
     kern_port_init();
 
-    /* 创建 idle 任务 */
+    /* 注册调度类：RR 为默认，FIFO 为抢占优化 */
+    kern_sched_class_register(&sched_class_rr);
+#ifdef CONFIG_PREEMPT_ENABLED
+    kern_sched_class_register(&sched_class_fifo);
+#endif
+
     g_idle_task = (kern_task_t *)calloc(1, sizeof(kern_task_t));
     if (g_idle_task == NULL) {
         kern_panic("failed to allocate idle task");
@@ -144,19 +165,14 @@ void kern_sched_init(void)
     g_idle_task->pid = g_next_pid++;
     g_idle_task->state = KERN_TASK_READY;
     g_idle_task->priority = 0;
+    g_idle_task->timeslice_remaining = SCHED_RR_DEFAULT_TIMESLICE;
     strncpy(g_idle_task->name, "idle", KERN_TASK_NAME_LEN);
     g_idle_task->entry = idle_entry;
     g_idle_task->arg = NULL;
     g_idle_task->stack_size = IDLE_STACK_MIN;
 
-    /* 通过可移植层创建底层线程 */
     g_idle_task->port_thread = kern_port_thread_spawn(
-        NULL,                    /* entry 为 NULL：使用 task_wrapper（由 port 层管理） */
-        g_idle_task,             /* arg = TCB */
-        "xidle",
-        IDLE_STACK_MIN,
-        g_idle_task
-    );
+        NULL, g_idle_task, "xidle", IDLE_STACK_MIN, g_idle_task);
     if (g_idle_task->port_thread == KERN_PORT_THREAD_NULL) {
         kern_panic("failed to create idle thread");
         free(g_idle_task);
@@ -164,11 +180,12 @@ void kern_sched_init(void)
     }
 
     g_task_list = g_idle_task;
+    sched_class_rr.task_list = g_task_list;
     g_task_count = 1;
     g_current_task = g_idle_task;
-    g_last_picked = g_idle_task;  /* 首轮从 idle 之后开始扫描 */
+    g_last_picked = g_idle_task;
 
-    kern_log(KERN_LOG_DEBUG, "scheduler initialized (esp32-freertos-wrapper)");
+    kern_log(KERN_LOG_DEBUG, "scheduler initialized (esp32-freertos)");
 }
 
 #endif
@@ -180,28 +197,41 @@ void kern_sched_init(void)
 void kern_sched_tick(void)
 {
     if (!g_sched_initialized) return;
-
     g_sched_ticks++;
+    reap_zombies();
 
-    reap_zombies();  /* 回收 ZOMBIE 任务 TCB */
+#ifdef CONFIG_PREEMPT_ENABLED
+    for (int i = 0; i < g_sched_class_count; i++) {
+        if (g_sched_classes[i] && g_sched_classes[i]->tick) {
+            g_sched_classes[i]->tick(g_current_task);
+        }
+    }
+    if (g_need_resched || (g_current_task && g_current_task->state != KERN_TASK_RUNNING)) {
+        g_need_resched = false;
+        kern_task_t *next = pick_next_ready();
+        if (next && next != g_current_task) {
+            g_current_task = next;
+            g_switch_to_task = next;
+            if (next->state != KERN_TASK_SLEEPING) next->state = KERN_TASK_RUNNING;
+            swapcontext(&g_sched_ctx, &next->ctx);
+        }
+        return;
+    }
+#endif
 
-    /* 栈使用率监控：超过 75% 时警告 */
     if (g_current_task != NULL && g_current_task != g_idle_task
-        && (g_sched_ticks % 500) == 0) {  /* 每 500 tick 检查一次 */
+        && (g_sched_ticks % 500) == 0) {
         size_t usage = kern_task_stack_usage(g_current_task);
         if (usage > 0 && g_current_task->stack_size > 0
             && usage > g_current_task->stack_size * 3 / 4) {
             kern_log(KERN_LOG_WARN,
                      "task %s stack usage %zu/%zu (>75%%)",
-                     g_current_task->name,
-                     usage,
-                     g_current_task->stack_size);
+                     g_current_task->name, usage, g_current_task->stack_size);
         }
     }
 
     kern_task_t *volatile next = pick_next_ready();
     if (next == NULL) return;
-
     g_current_task = next;
     g_switch_to_task = next;
     swapcontext(&g_sched_ctx, &next->ctx);
@@ -212,60 +242,74 @@ void kern_sched_tick(void)
 void kern_sched_tick(void)
 {
     if (!g_sched_initialized) return;
-
     g_sched_ticks++;
+    reap_zombies();
 
-    reap_zombies();  /* 回收 ZOMBIE 任务 TCB */
+#ifdef CONFIG_PREEMPT_ENABLED
+    for (int i = 0; i < g_sched_class_count; i++) {
+        if (g_sched_classes[i] && g_sched_classes[i]->tick) {
+            g_sched_classes[i]->tick(g_current_task);
+        }
+    }
+    if (g_need_resched || (g_current_task && g_current_task->state != KERN_TASK_RUNNING)) {
+        g_need_resched = false;
+        kern_task_t *next = pick_next_ready();
+        if (next) {
+            g_current_task = next;
+            if (next->state != KERN_TASK_SLEEPING) next->state = KERN_TASK_RUNNING;
+            if (setjmp(g_sched_ctx.jmp) == 0) longjmp(next->ctx.jmp, 1);
+        }
+        return;
+    }
+#endif
 
     kern_task_t *next = pick_next_ready();
-
     if (next == NULL) {
-        if (g_sched_ticks % 1000 == 0) {
+        if (g_sched_ticks % 1000 == 0)
             kern_log(KERN_LOG_WARN, "sched tick=%u: no ready tasks", g_sched_ticks);
-        }
         kern_port_idle();
         return;
     }
-
     g_current_task = next;
-    if (next->state != KERN_TASK_SLEEPING) {
-        next->state = KERN_TASK_RUNNING;
-    }
-
-    /* setjmp 保存调度器上下文，longjmp 切换到目标任务 */
-    if (setjmp(g_sched_ctx.jmp) == 0) {
-        longjmp(next->ctx.jmp, 1);  /* 跳转到任务的上次 setjmp 点 */
-    }
-    /* 任务 yield/exit 后回到此处 */
+    if (next->state != KERN_TASK_SLEEPING) next->state = KERN_TASK_RUNNING;
+    if (setjmp(g_sched_ctx.jmp) == 0) longjmp(next->ctx.jmp, 1);
 }
 
-#else /* ESP32: 协作式 tick，通过可移植层释放令牌给下一个任务 */
+#else /* ESP32: FreeRTOS */
 
 void kern_sched_tick(void)
 {
     if (!g_sched_initialized) return;
-
     g_sched_ticks++;
+    reap_zombies();
 
-    reap_zombies();  /* 回收 ZOMBIE 任务 TCB */
+#ifdef CONFIG_PREEMPT_ENABLED
+    for (int i = 0; i < g_sched_class_count; i++) {
+        if (g_sched_classes[i] && g_sched_classes[i]->tick) {
+            g_sched_classes[i]->tick(g_current_task);
+        }
+    }
+    if (g_need_resched || (g_current_task && g_current_task->state != KERN_TASK_RUNNING)) {
+        g_need_resched = false;
+        kern_task_t *next = pick_next_ready();
+        if (next) {
+            g_current_task = next;
+            if (next->state != KERN_TASK_SLEEPING) next->state = KERN_TASK_RUNNING;
+            kern_port_switch_to(next);
+        }
+        return;
+    }
+#endif
 
     kern_task_t *next = pick_next_ready();
-    
     if (next == NULL) {
-        /* 无就绪任务，通过可移植层短暂让出 CPU */
-        if (g_sched_ticks % 1000 == 0) {
+        if (g_sched_ticks % 1000 == 0)
             kern_log(KERN_LOG_WARN, "sched tick=%u: no ready tasks", g_sched_ticks);
-        }
         kern_port_idle();
         return;
     }
-
     g_current_task = next;
-    if (next->state != KERN_TASK_SLEEPING) {
-        next->state = KERN_TASK_RUNNING;
-    }
-
-    /* 通过可移植层切换到目标任务（阻塞等待任务 yield/exit） */
+    if (next->state != KERN_TASK_SLEEPING) next->state = KERN_TASK_RUNNING;
     kern_port_switch_to(next);
 }
 
@@ -280,83 +324,3 @@ void idle_entry(void *arg)
         kern_yield();
     }
 }
-
-/* ═══ Round-Robin 就绪任务选择 ═══ */
-
-#if defined(NATIVE_TEST) || defined(XEROS_NATIVE_SCHED)
-
-kern_task_t *pick_next_ready(void)
-{
-    uint32_t now = g_sched_ticks;
-
-    /* 第一遍：唤醒所有到期 sleep 任务 */
-    kern_task_t *t = g_task_list;
-    while (t != NULL) {
-        if (t->state == KERN_TASK_SLEEPING && t->wake_time <= now) {
-            t->state = KERN_TASK_READY;
-        }
-        t = t->next;
-    }
-
-    /* 第二遍：Round-Robin 扫描，从上一轮选中任务的下一个开始 */
-    kern_task_t *start = (g_last_picked != NULL && g_last_picked->next != NULL)
-                         ? g_last_picked->next
-                         : g_task_list;
-
-    t = start;
-    do {
-        if (t->state == KERN_TASK_READY) {
-            g_last_picked = t;
-            return t;
-        }
-        t = t->next;
-        if (t == NULL) {
-            t = g_task_list;
-        }
-    } while (t != start);
-
-    /* 所有任务都不可运行：返回 NULL */
-    return NULL;
-}
-
-#else /* ═══════════════ ESP32 (FreeRTOS 任务容器) ═══════════════ */
-
-kern_task_t *pick_next_ready(void)
-{
-    uint32_t now = g_sched_ticks;
-
-    /* 第一遍：唤醒所有到期 sleep 任务 */
-    kern_task_t *t = g_task_list;
-    while (t != NULL) {
-        if (t->state == KERN_TASK_SLEEPING && t->wake_time <= now) {
-            t->state = KERN_TASK_READY;
-        }
-        t = t->next;
-    }
-
-    /* 第二遍：Round-Robin 扫描 */
-    kern_task_t *start = (g_last_picked != NULL && g_last_picked->next != NULL)
-                         ? g_last_picked->next
-                         : g_task_list;
-
-    if (start == NULL) {
-        return NULL;  /* 任务列表为空 */
-    }
-
-    t = start;
-    do {
-        if (t->state == KERN_TASK_READY) {
-            g_last_picked = t;
-            return t;
-        }
-        t = t->next;
-        if (t == NULL) {
-            t = g_task_list;
-        }
-    } while (t != start);
-
-    /* 所有任务都不可运行 */
-    return NULL;
-}
-
-#endif

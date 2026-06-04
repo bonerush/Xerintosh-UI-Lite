@@ -64,6 +64,11 @@ static void kern_port_native_sched_idle(void)
     }
 }
 
+static int kern_port_native_sched_timer_set(uint32_t period_us, void (*cb)(void))
+{ (void)period_us; (void)cb; return 0; }
+
+static void kern_port_native_sched_timer_stop(void) {}
+
 const kern_port_ops_t g_kern_port_ops = {
     .init                = kern_port_native_sched_init,
     .thread_spawn        = kern_port_native_sched_thread_spawn,
@@ -74,6 +79,8 @@ const kern_port_ops_t g_kern_port_ops = {
     .task_yield          = kern_port_native_sched_task_yield,
     .task_exit           = kern_port_native_sched_task_exit,
     .idle                = kern_port_native_sched_idle,
+    .timer_set_periodic  = kern_port_native_sched_timer_set,
+    .timer_stop          = kern_port_native_sched_timer_stop,
 };
 
 #else /* FreeRTOS 后端（默认）*/
@@ -83,10 +90,76 @@ const kern_port_ops_t g_kern_port_ops = {
 #include <freertos/task.h>
 #include <freertos/semphr.h>
 
+#ifdef CONFIG_PREEMPT_ENABLED
+#include <driver/timer.h>
+#include <esp_attr.h>
+#endif
+
 /* ═══ 内部状态 ═══ */
 
 static SemaphoreHandle_t g_token_sem = NULL;  /* CPU 令牌 */
 static SemaphoreHandle_t g_done_sem  = NULL;  /* 任务完成通知 */
+
+#ifdef CONFIG_PREEMPT_ENABLED
+static void (*g_timer_callback)(void) = NULL;
+static volatile bool g_timer_active = false;
+
+/* ESP32 硬件定时器 ISR（timer_group0, timer0, 1ms 周期） */
+static bool IRAM_ATTR sched_timer_isr(void *arg)
+{
+    (void)arg;
+    if (g_timer_callback != NULL) {
+        g_timer_callback();
+    }
+    /* 清除中断标志 */
+    TIMERG0.int_clr_timers.t0 = 1;
+    TIMERG0.hw_timer[0].update = 1;
+    return true;  /* 返回 true 表示需要 yield（低优先级任务需重调度） */
+}
+
+static int kern_port_freertos_timer_set(uint32_t period_us, void (*cb)(void))
+{
+    if (g_timer_active) return 0;  /* 已启动 */
+
+    g_timer_callback = cb;
+
+    timer_config_t config = {
+        .divider     = 80,   /* 80MHz / 80 = 1MHz → 1 tick = 1us */
+        .counter_dir = TIMER_COUNT_UP,
+        .counter_en  = TIMER_PAUSE,
+        .alarm_en    = TIMER_ALARM_EN,
+        .auto_reload = true,
+        .intr_type   = TIMER_INTR_LEVEL,
+    };
+
+    if (timer_init(TIMER_GROUP_0, TIMER_0, &config) != ESP_OK) {
+        return -1;
+    }
+
+    timer_set_counter_value(TIMER_GROUP_0, TIMER_0, 0);
+    timer_set_alarm_value(TIMER_GROUP_0, TIMER_0, period_us);
+
+    timer_isr_callback_add(TIMER_GROUP_0, TIMER_0, sched_timer_isr, NULL, 0);
+    timer_start(TIMER_GROUP_0, TIMER_0);
+    g_timer_active = true;
+
+    return 0;
+}
+
+static void kern_port_freertos_timer_stop(void)
+{
+    if (!g_timer_active) return;
+    timer_pause(TIMER_GROUP_0, TIMER_0);
+    timer_isr_callback_remove(TIMER_GROUP_0, TIMER_0);
+    g_timer_active = false;
+    g_timer_callback = NULL;
+}
+#else
+static int kern_port_freertos_timer_set(uint32_t period_us, void (*cb)(void))
+{ (void)period_us; (void)cb; return 0; }
+
+static void kern_port_freertos_timer_stop(void) {}
+#endif
 
 /* ═══ 任务包装器 ═══ */
 
@@ -272,6 +345,8 @@ const kern_port_ops_t g_kern_port_ops = {
     .task_yield          = kern_port_freertos_task_yield,
     .task_exit           = kern_port_freertos_task_exit,
     .idle                = kern_port_freertos_idle,
+    .timer_set_periodic  = kern_port_freertos_timer_set,
+    .timer_stop          = kern_port_freertos_timer_stop,
 };
 
 #endif /* defined(XEROS_NATIVE_SCHED) */
@@ -301,6 +376,11 @@ static void kern_port_native_test_task_exit(void) { while(1){} }
 
 static void kern_port_native_test_idle(void) {}
 
+static int kern_port_native_test_timer_set(uint32_t period_us, void (*cb)(void))
+{ (void)period_us; (void)cb; return 0; }
+
+static void kern_port_native_test_timer_stop(void) {}
+
 const kern_port_ops_t g_kern_port_ops = {
     .init                = kern_port_native_test_init,
     .thread_spawn        = kern_port_native_test_thread_spawn,
@@ -311,6 +391,8 @@ const kern_port_ops_t g_kern_port_ops = {
     .task_yield          = kern_port_native_test_task_yield,
     .task_exit           = kern_port_native_test_task_exit,
     .idle                = kern_port_native_test_idle,
+    .timer_set_periodic  = kern_port_native_test_timer_set,
+    .timer_stop          = kern_port_native_test_timer_stop,
 };
 
 #endif /* NATIVE_TEST */

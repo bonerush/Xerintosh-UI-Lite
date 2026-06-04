@@ -11,6 +11,7 @@
 #include "kern_task.h"
 #include "kern_init.h"
 #include "kern_port.h"
+#include "kern_sched_rr.h"
 
 #include <string.h>
 #include <stdlib.h>
@@ -41,6 +42,7 @@ kern_pid_t kern_spawn(const char *name, void (*entry)(void *arg),
     task->pid = g_next_pid++;
     task->state = KERN_TASK_READY;
     task->priority = 128;
+    task->timeslice_remaining = SCHED_RR_DEFAULT_TIMESLICE;
     task->entry = entry;
     task->arg = arg;
 
@@ -99,6 +101,7 @@ kern_pid_t kern_spawn(const char *name, void (*entry)(void *arg),
     task->pid = g_next_pid++;
     task->state = KERN_TASK_READY;
     task->priority = 128;
+    task->timeslice_remaining = SCHED_RR_DEFAULT_TIMESLICE;
     task->entry = entry;
     task->arg = arg;
 
@@ -148,6 +151,7 @@ kern_pid_t kern_spawn(const char *name, void (*entry)(void *arg),
     task->pid = g_next_pid++;
     task->state = KERN_TASK_READY;
     task->priority = 128;
+    task->timeslice_remaining = SCHED_RR_DEFAULT_TIMESLICE;
     task->entry = entry;
     task->arg = arg;
 
@@ -412,21 +416,29 @@ int kern_task_kill(kern_pid_t pid)
 
 void reap_zombies(void)
 {
-    kern_task_t *prev = NULL;
-    kern_task_t *t = g_task_list;
-    while (t != NULL) {
-        if (t->state == KERN_TASK_ZOMBIE && !(t->flags & KERN_TASK_FLAG_VIRTUAL)) {
-            kern_task_t *zombie = t;
-            t = t->next;
-            if (prev) prev->next = t;
-            else g_task_list = t;
-            if (g_last_picked == zombie) g_last_picked = NULL;
-            g_task_count--;
-            kern_log(KERN_LOG_DEBUG, "reaped zombie %d (%s)", zombie->pid, zombie->name);
-            free(zombie);
-        } else {
-            prev = t;
-            t = t->next;
+    /* 遍历所有已注册调度类的任务链表，回收 ZOMBIE 任务 */
+    for (uint8_t c = 0; c < g_sched_class_count; c++) {
+        kern_sched_class_t *cls = g_sched_classes[c];
+        if (cls == NULL) continue;
+
+        kern_task_t *prev = NULL;
+        kern_task_t *t = cls->task_list;
+        while (t != NULL) {
+            if (t->state == KERN_TASK_ZOMBIE && !(t->flags & KERN_TASK_FLAG_VIRTUAL)) {
+                kern_task_t *zombie = t;
+                t = t->next;
+                if (prev) prev->next = t;
+                else cls->task_list = t;
+                if (g_last_picked == zombie) g_last_picked = NULL;
+                /* 同步更新 g_task_list（如为此 list） */
+                if (g_task_list == zombie) g_task_list = t;
+                g_task_count--;
+                kern_log(KERN_LOG_DEBUG, "reaped zombie %d (%s)", zombie->pid, zombie->name);
+                free(zombie);
+            } else {
+                prev = t;
+                t = t->next;
+            }
         }
     }
 }

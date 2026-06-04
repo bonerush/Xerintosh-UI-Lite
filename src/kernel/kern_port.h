@@ -84,6 +84,10 @@ typedef struct kern_port_ops {
 
     /* 空闲处理 */
     void  (*idle)(void);
+
+    /* 定时器基础设施（抢占式调度用） */
+    int   (*timer_set_periodic)(uint32_t period_us, void (*callback)(void));
+    void  (*timer_stop)(void);
 } kern_port_ops_t;
 
 /**
@@ -194,6 +198,28 @@ static inline void kern_port_task_exit(void)
 static inline void kern_port_idle(void)
 {
     g_kern_port_ops.idle();
+}
+
+/* ═══ 定时器基础设施 ═══ */
+
+/**
+ * @brief  启动周期性硬件定时器
+ * @param  period_us 周期（微秒）
+ * @param  callback  定时器回调（ISR 上下文）
+ * @return 0 成功，< 0 失败
+ */
+static inline int kern_port_timer_set_periodic(uint32_t period_us,
+                                                void (*callback)(void))
+{
+    return g_kern_port_ops.timer_set_periodic(period_us, callback);
+}
+
+/**
+ * @brief  停止硬件定时器
+ */
+static inline void kern_port_timer_stop(void)
+{
+    g_kern_port_ops.timer_stop();
 }
 
 #ifdef __cplusplus

@@ -11,6 +11,7 @@
 #define KERN_SCHED_H
 
 #include "kern_task.h"
+#include "kern_sched_class.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -29,6 +30,7 @@ extern kern_task_t   *g_last_picked;      /* 上一轮选中的任务（Round-Ro
 extern kern_pid_t     g_next_pid;         /* 下一个分配的 PID */
 extern uint8_t        g_task_count;       /* 任务总数 */
 extern uint32_t       g_sched_ticks;      /* 调度 tick 计数 */
+extern volatile bool  g_need_resched;     /* 抢占请求标志（tick/更高优先级入队时设置） */
 
 #ifdef NATIVE_TEST
 extern ucontext_t     g_sched_ctx;        /* 调度器上下文 */

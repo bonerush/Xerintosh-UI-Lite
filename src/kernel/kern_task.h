@@ -59,8 +59,10 @@ typedef struct kern_task {
 #endif
 
     /* 调度信息 */
-    uint32_t            wake_time;      /* 唤醒时间戳（毫秒，sleep 用） */
-    uint8_t             priority;       /* 优先级（0 最低，255 最高） */
+    uint32_t            wake_time;           /* 唤醒时间戳（毫秒，sleep 用） */
+    uint8_t             priority;            /* 优先级（0 最低，255 最高） */
+    uint8_t             timeslice_remaining; /* 当前时间片剩余 tick 数（RR class 用） */
+    int8_t              scheduler_class_id;  /* 所属调度器 class 索引，-1 表示未分配 */
 
     /* 入口 */
     void              (*entry)(void *arg);  /* 任务主函数 */
