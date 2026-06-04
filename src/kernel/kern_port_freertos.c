@@ -1,5 +1,5 @@
 /**
- * @file   kern_port.c
+ * @file   kern_port_freertos.c
  * @brief  Xeros 内核可移植层 — FreeRTOS 后端实现
  * @details 基于 FreeRTOS 任务容器 + 双信号量令牌协议实现协作式调度。
  *
@@ -14,6 +14,10 @@
  *
  *          此文件是项目中唯一直接调用 FreeRTOS API 的源文件。
  *          切换到原生调度器时，替换此文件为 kern_port_native.c 即可。
+ *
+ *          通过 kern_port_ops_t 结构体提供后端多态：
+ *          所有公共函数以 _freertos / _native_sched / _native_test 后缀
+ *          命名，由 g_kern_port_ops 表统一分派。
  *
  * @copyright Copyright (c) 2026
  */
@@ -31,34 +35,46 @@
 
 /* ═══ XEROS_NATIVE_SCHED 桩：调度逻辑在 kern_task.c 中实现 ═══ */
 
-void kern_port_init(void) {}
+static void kern_port_native_sched_init(void) {}
 
-kern_port_thread_t kern_port_thread_spawn(
+static kern_port_thread_t kern_port_native_sched_thread_spawn(
     void (*entry)(void *arg), void *arg, const char *name,
     size_t stack_size, kern_task_t *task)
 { (void)entry; (void)arg; (void)name; (void)stack_size; (void)task;
   return KERN_PORT_THREAD_NULL; }
 
-void kern_port_thread_exit(void) { while (1) {} }
+static void kern_port_native_sched_thread_exit(void) { while (1) {} }
 
-void kern_port_thread_kill(kern_port_thread_t thread) { (void)thread; }
+static void kern_port_native_sched_thread_kill(kern_port_thread_t thread) { (void)thread; }
 
-size_t kern_port_thread_stack_usage(kern_port_thread_t thread)
+static size_t kern_port_native_sched_thread_stack_usage(kern_port_thread_t thread)
 { (void)thread; return 0; }
 
-void kern_port_switch_to(kern_task_t *task) { (void)task; }
+static void kern_port_native_sched_switch_to(kern_task_t *task) { (void)task; }
 
-void kern_port_task_yield(void) {}
+static void kern_port_native_sched_task_yield(void) {}
 
-void kern_port_task_exit(void) { while (1) {} }
+static void kern_port_native_sched_task_exit(void) { while (1) {} }
 
-void kern_port_idle(void)
+static void kern_port_native_sched_idle(void)
 {
     /* 无就绪任务时短暂忙等待让出 CPU */
     for (volatile int i = 0; i < 10000; i++) {
         __asm__ volatile("nop");
     }
 }
+
+const kern_port_ops_t g_kern_port_ops = {
+    .init                = kern_port_native_sched_init,
+    .thread_spawn        = kern_port_native_sched_thread_spawn,
+    .thread_exit         = kern_port_native_sched_thread_exit,
+    .thread_kill         = kern_port_native_sched_thread_kill,
+    .thread_stack_usage  = kern_port_native_sched_thread_stack_usage,
+    .switch_to           = kern_port_native_sched_switch_to,
+    .task_yield          = kern_port_native_sched_task_yield,
+    .task_exit           = kern_port_native_sched_task_exit,
+    .idle                = kern_port_native_sched_idle,
+};
 
 #else /* FreeRTOS 后端（默认）*/
 
@@ -111,7 +127,7 @@ static void task_wrapper(void *arg)
 
 /* ═══ 生命周期 ═══ */
 
-void kern_port_init(void)
+static void kern_port_freertos_init(void)
 {
     if (g_token_sem != NULL) return;  /* 已初始化 */
 
@@ -125,7 +141,7 @@ void kern_port_init(void)
 
 /* ═══ 线程管理 ═══ */
 
-kern_port_thread_t kern_port_thread_spawn(
+static kern_port_thread_t kern_port_freertos_thread_spawn(
     void (*entry)(void *arg),
     void *arg,
     const char *name,
@@ -159,7 +175,7 @@ kern_port_thread_t kern_port_thread_spawn(
     return (kern_port_thread_t)handle;
 }
 
-void kern_port_thread_exit(void)
+static void kern_port_freertos_thread_exit(void)
 {
     /*
      * 通知调度器任务结束，然后删除当前 FreeRTOS 任务。
@@ -172,24 +188,25 @@ void kern_port_thread_exit(void)
     while (1) {}
 }
 
-void kern_port_thread_kill(kern_port_thread_t thread)
+static void kern_port_freertos_thread_kill(kern_port_thread_t thread)
 {
     if (thread == KERN_PORT_THREAD_NULL) return;
     vTaskDelete((TaskHandle_t)thread);
 }
 
-size_t kern_port_thread_stack_usage(kern_port_thread_t thread)
+static size_t kern_port_freertos_thread_stack_usage(kern_port_thread_t thread)
 {
     if (thread == KERN_PORT_THREAD_NULL) return 0;
     TaskHandle_t handle = (TaskHandle_t)thread;
     uint32_t high_water = uxTaskGetStackHighWaterMark(handle);
     /* FreeRTOS 返回剩余字数，转换为已使用字节数（近似） */
+    (void)high_water;
     return 0;  /* 调用者从 TCB 获取 stack_size，此处返回 0 表示"由 FreeRTOS 管理" */
 }
 
 /* ═══ 上下文切换 ═══ */
 
-void kern_port_switch_to(kern_task_t *task)
+static void kern_port_freertos_switch_to(kern_task_t *task)
 {
     (void)task;
     /*
@@ -211,7 +228,7 @@ void kern_port_switch_to(kern_task_t *task)
     }
 }
 
-void kern_port_task_yield(void)
+static void kern_port_freertos_task_yield(void)
 {
     /*
      * 双信号量协议 — 任务侧（yield）：
@@ -223,7 +240,7 @@ void kern_port_task_yield(void)
     /* 被唤醒：调度器已把我们设为 RUNNING */
 }
 
-void kern_port_task_exit(void)
+static void kern_port_freertos_task_exit(void)
 {
     /*
      * 双信号量协议 — 任务侧（exit）：
@@ -239,28 +256,61 @@ void kern_port_task_exit(void)
 
 /* ═══ 空闲处理 ═══ */
 
-void kern_port_idle(void)
+static void kern_port_freertos_idle(void)
 {
     /* 无就绪任务时短暂让出 CPU，让 FreeRTOS 处理 WiFi/BT 事务 */
     vTaskDelay(1);
 }
 
+const kern_port_ops_t g_kern_port_ops = {
+    .init                = kern_port_freertos_init,
+    .thread_spawn        = kern_port_freertos_thread_spawn,
+    .thread_exit         = kern_port_freertos_thread_exit,
+    .thread_kill         = kern_port_freertos_thread_kill,
+    .thread_stack_usage  = kern_port_freertos_thread_stack_usage,
+    .switch_to           = kern_port_freertos_switch_to,
+    .task_yield          = kern_port_freertos_task_yield,
+    .task_exit           = kern_port_freertos_task_exit,
+    .idle                = kern_port_freertos_idle,
+};
+
 #endif /* defined(XEROS_NATIVE_SCHED) */
 
 #else /* NATIVE_TEST — 空桩：原生模式不使用此文件 */
 
-void kern_port_init(void) {}
-kern_port_thread_t kern_port_thread_spawn(
+static void kern_port_native_test_init(void) {}
+
+static kern_port_thread_t kern_port_native_test_thread_spawn(
     void (*entry)(void *arg), void *arg, const char *name,
     size_t stack_size, kern_task_t *task)
 { (void)entry; (void)arg; (void)name; (void)stack_size; (void)task;
   return KERN_PORT_THREAD_NULL; }
-void kern_port_thread_exit(void) { while(1){} }
-void kern_port_thread_kill(kern_port_thread_t thread) { (void)thread; }
-size_t kern_port_thread_stack_usage(kern_port_thread_t thread) { (void)thread; return 0; }
-void kern_port_switch_to(kern_task_t *task) { (void)task; }
-void kern_port_task_yield(void) {}
-void kern_port_task_exit(void) { while(1){} }
-void kern_port_idle(void) {}
+
+static void kern_port_native_test_thread_exit(void) { while(1){} }
+
+static void kern_port_native_test_thread_kill(kern_port_thread_t thread) { (void)thread; }
+
+static size_t kern_port_native_test_thread_stack_usage(kern_port_thread_t thread)
+{ (void)thread; return 0; }
+
+static void kern_port_native_test_switch_to(kern_task_t *task) { (void)task; }
+
+static void kern_port_native_test_task_yield(void) {}
+
+static void kern_port_native_test_task_exit(void) { while(1){} }
+
+static void kern_port_native_test_idle(void) {}
+
+const kern_port_ops_t g_kern_port_ops = {
+    .init                = kern_port_native_test_init,
+    .thread_spawn        = kern_port_native_test_thread_spawn,
+    .thread_exit         = kern_port_native_test_thread_exit,
+    .thread_kill         = kern_port_native_test_thread_kill,
+    .thread_stack_usage  = kern_port_native_test_thread_stack_usage,
+    .switch_to           = kern_port_native_test_switch_to,
+    .task_yield          = kern_port_native_test_task_yield,
+    .task_exit           = kern_port_native_test_task_exit,
+    .idle                = kern_port_native_test_idle,
+};
 
 #endif /* NATIVE_TEST */

@@ -10,6 +10,11 @@
  *
  * @note   当 XEROS_NATIVE_SCHED 启用时，调度逻辑直接在 kern_task.c 中实现，
  *         此文件不参与编译。
+ *
+ * @note   kernel-v2-phase1 引入了 kern_port_ops_t 多态模式：
+ *         如果将来激活此后端，应将各 kern_port_* 函数重命名为静态函数
+ *         （例如 kern_port_native_init），并定义 g_kern_port_ops 操作表。
+ *         当前此文件不编译，因此无需改动。
  */
 
 #ifndef XEROS_NATIVE_SCHED
