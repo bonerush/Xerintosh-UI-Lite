@@ -263,7 +263,7 @@ Agent 在隔离 worktree 内完成编码，**完成后必须执行自测**：
       - API暂时给你：[REDACTED-DEEPSEEK]
    用户后续也可以通过串口来更改api-key，就像输入wifi密码那样。
    - 计划生成完毕默认使用subagent-driven
-- [FEAT_AGENT_FINISH] ~~工作流：分析当前内核的缺陷和待优化的地方 --> 更具分析报告生成分模块的执行计划。因为本次FEAT是大的变更，所以请你在先在主工作区创立一个全新的分支，之后再去创立worktree，并且最后合并在这个创立的分支上。~~
+- [VERIFIED] ~~工作流：分析当前内核的缺陷和待优化的地方 --> 更具分析报告生成分模块的执行计划。因为本次FEAT是大的变更，所以请你在先在主工作区创立一个全新的分支，之后再去创立worktree，并且最后合并在这个创立的分支上。~~
    - **已提交（commit 494f1f5）**：基于 Phase 1-4 已实现的抢占式调度器做最终清理。branch: `feature/kernel-v2`
      1. ✅ 删除 kern_sched.c/task 中所有非抢占回退路径（#else 分支死代码）
      2. ✅ 全局清理 cooperative/协作式 命名，统一为 preemptive/抢占式
