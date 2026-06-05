@@ -8,7 +8,7 @@
  */
 
 #include "about.h"
-#include "kernel/kern_version.h"
+#include "kernel/kern_version_compat.h"
 #include "app/boot/boot_screen.h"
 #include "hal/hal_display.h"
 #include "hal/hal_layout.h"

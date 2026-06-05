@@ -10,7 +10,6 @@
 #include "ui_core.h"
 #include "ui_drawer.h"
 #include "hal/hal_input.h"
-#include "kernel/kern_task.h"
 #include <stddef.h>
 
 /* ═══ 选择器 ═══ */
@@ -136,10 +135,9 @@ static void handle_user_item_exit(xerintosh_user_item_t *_user_item)
   _user_item->entering_user_item = false;
   _user_item->exiting_user_item = true;
 
-  /* 注销虚任务，从内核任务链表移除 */
-  if (_user_item->kernel_pid != KERN_PID_INVALID) {
-    kern_task_unregister_virtual(_user_item->kernel_pid);
-    _user_item->kernel_pid = KERN_PID_INVALID;
+  /* 移除虚任务活跃标记 */
+  if (_user_item->kernel_pid != NULL) {
+    _user_item->kernel_pid = NULL;
   }
 }
 

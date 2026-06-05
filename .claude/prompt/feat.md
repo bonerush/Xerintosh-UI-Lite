@@ -273,10 +273,8 @@ Agent 在隔离 worktree 内完成编码，**完成后必须执行自测**：
    - 原始意见：我想彻底移除掉协作式调度器也就是v1版本的任何内容，系统底层只走抢占式调度器，并且把对接的app和相关内容重新适配一下
 
 ## FreeRTOS-version
-- [FEAT_AGENT_FINISH] 你所在是一个全新的分支，这个分支需要做的内容是精简，也就是删除掉一切xeros内核，只保留纯粹的FreeRTOS内核来进行系统调度。你创建gitworktre也是在当前的freertos分支上去合并和创建，请你在保证app和所有功能的正常运作下内核只使用freertos即可。并且在处理的过程也需要把文档和上下文也一并处理。我想保留更大的flash空间来写更多app。
+- [FEAT_AGENT_FINISH] 移除 Xeros 内核，只保留 FreeRTOS。删除 ~53 个内核源文件 + ~15 个测试 + ~26 个文档，App 层全部适配。
     - 分支: `feature/freertos-kernel-removal`
-    - 概要: 删除整个 src/kernel/（仅保留 kern_version_compat.h），全部 App/UI 适配 FreeRTOS。Native 121/121，硬件 Flash 86.9%（节省 ~253KB）。
-- [FEAT] 此FEAT必须在第一条FEAT确认完成后执行，我需要你做一个串口调试器，就类似Usb转串口的烧录器一样。因为我需要你用到当前板子（m5stick-c）空出来的接口G0，G26，G36来作为RX TX和DTR这三个功能口。需要支持的功能如下：
-   - 首先支持离线烧录，就是提前把二进制程序放在flash中之后离线烧录
-   - 支持接口顺序的自定义，举个例G0，G26，G36可以分别代表RX TX DTR也可以修改设置为TX RX DTR也可以是DTR RX TX等等，并且这种映射顺序是可以在板子上更改的（不连接上位机，不使用串口）
-   - 支持刷录的进度显示
+    - 概要: 删除整个 src/kernel/（仅保留 kern_version_compat.h 版本宏），UI Core 层移除 kern_task 依赖（kernel_pid → void*），App 层全部适配 FreeRTOS API（kern_spawn→xTaskCreate，kern_poll_loop→vTaskDelay，kern_yield→删除），taskmgr 重写为任务注册表方案（替代 uxTaskGetSystemState），main.cpp 重构为 FreeRTOS 原生任务。Native 测试 121/121 PASSED，硬件编译 SUCCESS（Flash 86.9%, RAM 20.8%，节省 ~253KB Flash）。
+- [FEAT] 串口调试器（USB转串口烧录器功能），使用 G0/G26/G36 引脚，需等第一条 FEAT 完成。
+    - 支持离线烧录、接口顺序自定义、刷录进度显示

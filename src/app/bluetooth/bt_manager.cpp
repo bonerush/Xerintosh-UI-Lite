@@ -29,7 +29,6 @@ void bt_mgr_on_switch_toggle(void *ud) { (void)ud; }
 
 extern "C" {
 #include "app/wifi/wifi_manager.h"
-#include "kernel/kern_task.h"
 }
 
 extern bool g_bt_on;  /* 定义在 main.cpp */
@@ -115,7 +114,10 @@ void bt_mgr_on_switch_toggle(void *ud) {
 extern "C" void bt_mgr_task_main(void *arg)
 {
     (void)arg;
-    kern_poll_loop(bt_mgr_update, 50);
+    for (;;) {
+        bt_mgr_update();
+        vTaskDelay(pdMS_TO_TICKS(50));
+    }
 }
 
 #endif /* NATIVE_TEST */

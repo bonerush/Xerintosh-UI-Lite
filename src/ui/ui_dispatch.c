@@ -8,7 +8,6 @@
 
 #include "ui_item.h"
 #include "ui_core.h"
-#include "kernel/kern_task.h"
 
 /* ═══ 派发函数实现 ═══ */
 
@@ -19,8 +18,8 @@ static void dispatch_enter_user(xerintosh_list_item_t *item)
     g_xerintosh_exit_animation_status = 0;
     user->entering_user_item = true;
     user->exiting_user_item = false;
-    if (user->kernel_pid == KERN_PID_INVALID)
-        user->kernel_pid = kern_task_register_virtual(user->base_item.content);
+    if (user->kernel_pid == NULL)
+        user->kernel_pid = (void*)1;  /* 标记 user_item 活跃 */
 }
 
 static void dispatch_enter_switch(xerintosh_list_item_t *item)

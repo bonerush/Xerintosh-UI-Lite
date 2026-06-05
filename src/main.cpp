@@ -1,8 +1,8 @@
 /**
  * @file   main.cpp
- * @brief  M5Stick-C 固件主入口
+ * @brief  M5Stick-C 固件主入口（FreeRTOS 精简版）
  * @details 硬件环境主程序：初始化 M5Unified、NVS 存储、设置、显示驱动、
- *          UI 菜单及管理器，进入主循环处理输入、更新状态机及渲染 UI。
+ *          UI 菜单及管理器，使用 FreeRTOS 原生任务替代 Xeros 内核。
  *
  * @copyright Copyright (c) 2026
  */
@@ -28,6 +28,9 @@ bool g_bt_on = false;   /* 蓝牙默认关，仅在串口监视器 BLE 模式时
 #include <M5Unified.h>
 #include <M5GFX.h>
 
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+
 #include "hal/hal_system.h"
 #include "hal/hal_display.h"
 #include "hal/hal_input.h"
@@ -40,18 +43,7 @@ bool g_bt_on = false;   /* 蓝牙默认关，仅在串口监视器 BLE 模式时
 #include "app/bluetooth/bt_manager.h"
 #include "app/bluetooth/bt_uart_service.h"
 #include "app/boot/boot_screen.h"
-
-/* Xeros 内核 */
-#include "kernel/kern_init.h"
-#include "kernel/kern_task.h"
-#include "kernel/kern_vfs.h"
-#include "kernel/kern_devfs.h"
-#include "kernel/kern_procfs.h"
-#include "kernel/kern_sysfs.h"
-#include "kernel/kern_gpiofs.h"
-#include "kernel/devices/kern_devices.h"
-#include "kernel/devices/dev_ttyS0.h"
-#include "kernel/kern_shell.h"
+#include "app/taskmgr/taskmgr.h"
 
 /* UI 任务入口 */
 extern "C" void ui_task_main(void *arg);
@@ -140,7 +132,7 @@ void setup()
     /* 最早进行串口初始化，确保后续 printf/日志能立即输出 */
     Serial.begin(115200);
     delay(100);
-    Serial.println("\n[  BOOT] M5Stick-P1 kernel starting...");
+    Serial.println("\n[  BOOT] M5Stick-P1 FreeRTOS starting...");
 
     M5.begin();
     Serial.println("[  OK  ] M5.begin()");
@@ -185,119 +177,71 @@ void setup()
     app_init_managers();
 
     xerintosh_init_core();
-    Serial.println("[  OK  ] Xeros core");
+    Serial.println("[  OK  ] UI core initialized");
     g_in_xerintosh = true;
 
-    /* 内核初始化延迟到 loop() 第一帧，避免 setup() 累积时间
-     * 触发 TG1 系统看门狗（FreeRTOS idle 任务在 setup 返回后喂狗） */
-    Serial.println("[  OK  ] Hardware init complete, deferring kernel init");
+    /* FreeRTOS 任务创建延迟到 loop() 第一帧，避免 setup() 累积时间
+     * 触发 TG1 系统看门狗 */
+    Serial.println("[  OK  ] Hardware init complete, deferring task creation");
 }
 
-/* ═══ 延迟内核初始化（loop() 第一帧）═══ */
+/* ═══ 延迟任务创建（loop() 第一帧）═══ */
 
-static bool g_kernel_inited = false;
+static bool g_tasks_started = false;
 
-static void deferred_kernel_init(void)
+static void start_freertos_tasks(void)
 {
-    if (g_kernel_inited) return;
-    g_kernel_inited = true;
+    if (g_tasks_started) return;
+    g_tasks_started = true;
 
-    /* ── 内核子系统初始化 ── */
-    kern_init();
-    kern_log_set_level(KERN_LOG_INFO);
-    kern_vfs_init();
-    kern_devfs_init();
-    kern_procfs_init();
-    kern_sysfs_init();
-
-    /* ── GPIO 文件系统 ── */
-    kern_gpiofs_init();
-
-    /* ── sysfs → 硬件双向绑定 ── */
-
-    /* brightness: sysfs 写入时同步到 M5 屏幕背光 */
-    kern_sysfs_bind(KERN_SYSFS_BRIGHTNESS,
-        [](kern_sysfs_attr_t attr, int32_t val, void *ud) {
-            (void)attr; (void)ud;
-            uint8_t hw = (uint8_t)(val > 255 ? 255 : val);
-            M5.Display.setBrightness(hw);
-            brightness = (int16_t)val;
-            storage_set_brightness(val);
-        }, NULL);
-
-    /* rotation: sysfs 写入时同步到 M5 屏幕方向 */
-    kern_sysfs_bind(KERN_SYSFS_ROTATION,
-        [](kern_sysfs_attr_t attr, int32_t val, void *ud) {
-            (void)attr; (void)ud;
-            if (val < 0 || val > 3) return;
-            M5.Display.setRotation((int32_t)val);
-            g_screen_rotation_level = (val == 0 || val == 2)
-                                      ? ORIENTATION_PORTRAIT
-                                      : ORIENTATION_LANDSCAPE;
-            g_is_landscape = (g_screen_rotation_level == ORIENTATION_LANDSCAPE);
-            storage_set_screen_rotation((uint8_t)g_screen_rotation_level);
-            hal_display_init();
-            g_xerintosh_exit_animation_finished = true;
-            g_xerintosh_exit_animation_status = 0;
-        }, NULL);
-
-    /* anim_speed: sysfs 写入时同步到全局动画速度 */
-    kern_sysfs_bind(KERN_SYSFS_ANIM_SPEED,
-        [](kern_sysfs_attr_t attr, int32_t val, void *ud) {
-            (void)attr; (void)ud;
-            if (val < 0 || val > 100) return;
-            g_anim_speed = (int16_t)val;
-            storage_set_anim_speed((uint8_t)val);
-        }, NULL);
-
-    /* anim_enabled: sysfs 写入时同步到全局开关 */
-    kern_sysfs_bind(KERN_SYSFS_ANIM_ENABLED,
-        [](kern_sysfs_attr_t attr, int32_t val, void *ud) {
-            (void)attr; (void)ud;
-            g_anim_enabled = (val != 0);
-            storage_set_anim_enabled(g_anim_enabled);
-        }, NULL);
-
-    kern_devices_init();
-    Serial.printf("[  OK  ] Kernel subsystems, free_heap=%u\n", ESP.getFreeHeap());
-
-    /* ── 启动 Shell ── */
-    kern_shell_init();
-    Serial.println("[  OK  ] Shell spawned on /dev/ttyS0");
+    TaskHandle_t handle = NULL;
 
     /* ── 启动 UI 任务 ── */
-    kern_pid_t ui_pid = kern_spawn("ui", ui_task_main, NULL, 4096);
-    Serial.printf("[  OK  ] UI task spawned (pid=%d)\n", ui_pid);
+    BaseType_t ret = xTaskCreatePinnedToCore(
+        ui_task_main,    /* 任务函数 */
+        "ui",            /* 任务名 */
+        4096,            /* 栈大小（字） */
+        NULL,            /* 参数 */
+        1,               /* 优先级 */
+        &handle,         /* 任务句柄 */
+        1                /* 绑定到 Core 1 */
+    );
+    Serial.printf("[  OK  ] UI task created (ret=%d)\n", ret);
+    if (ret == pdPASS) taskmgr_register_task(handle, "ui", true);
 
-    /* WiFi/BT 管理器作为独立内核任务运行，与 UI 任务解耦 */
-    kern_spawn("wifi-mgr", wifi_mgr_task_main, NULL, 4096);
-    Serial.println("[  OK  ] WiFi manager spawned as kernel task");
-    kern_spawn("bt-mgr",   bt_mgr_task_main, NULL, 8192);
-    Serial.println("[  OK  ] BT manager spawned as kernel task");
+    /* WiFi 管理器 */
+    ret = xTaskCreatePinnedToCore(
+        wifi_mgr_task_main, "wifi-mgr", 4096, NULL, 1, &handle, 1);
+    Serial.printf("[  OK  ] WiFi manager task created (ret=%d)\n", ret);
+    if (ret == pdPASS) taskmgr_register_task(handle, "wifi-mgr", true);
 
-    /* 让出 CPU 给 FreeRTOS，使刚创建的任务有机会启动并阻塞在调度信号量上 */
+    /* BT 管理器 */
+    ret = xTaskCreatePinnedToCore(
+        bt_mgr_task_main, "bt-mgr", 8192, NULL, 1, &handle, 1);
+    Serial.printf("[  OK  ] BT manager task created (ret=%d)\n", ret);
+    if (ret == pdPASS) taskmgr_register_task(handle, "bt-mgr", true);
+
+    /* 让出 CPU 给 FreeRTOS，使刚创建的任务有机会启动 */
     delay(10);
 
-    /* ── BT 懒加载 ──
+    /* BT 懒加载：
      * BT 默认关闭（g_bt_on=false），不在此处初始化。
      * 仅当用户进入串口监视器并切换到 BLE 模式时，由 sm_app.cpp 调用
-     * bt_mgr_enable() 按需初始化。这样 WiFi 启动时有充足堆内存（~163KB）。 */
+     * bt_mgr_enable() 按需初始化。 */
 
-    kern_log(KERN_LOG_INFO, "Xeros kernel boot complete, entering scheduler");
-    Serial.println("[  OK  ] Kernel boot complete, entering scheduler loop");
+    Serial.println("[  OK  ] FreeRTOS boot complete, entering scheduler loop");
 }
 
 /**
- * @brief Arduino loop()：Xeros 内核调度入口
- * @note  M5.update() 已迁移至 hal_input_update()（由 ui_task 在按键读取前调用），
- *        避免 FreeRTOS 多任务环境下跨任务边沿标志丢失。
- *        每个 kern_sched_tick() 运行一个任务切片后返回。
+ * @brief Arduino loop()：FreeRTOS 调度入口
+ * @note  FreeRTOS 抢占式调度器自动在各任务间切换。
+ *        loop() 处理串口监视器和 BT 轮询，每次迭代 yield 1ms
+ *        以确保 idle 任务（优先级 0）能及时喂狗。
  */
 void loop()
 {
-    deferred_kernel_init();
+    start_freertos_tasks();
 
-    dev_ttyS0_poll();
     serial_monitor_update();
 
     /* BT 轮询：仅在 BT 已启用时执行。
@@ -312,7 +256,8 @@ void loop()
         }
     }
 
-    kern_sched_tick();
+    /* 释放 CPU 给 FreeRTOS idle 任务喂狗 */
+    vTaskDelay(1);
 }
 
 #endif /* NATIVE_TEST */

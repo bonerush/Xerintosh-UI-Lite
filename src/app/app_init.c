@@ -22,7 +22,6 @@
 #include "shutdown/power_key_popup.h"
 
 #include "ui/ui_item.h"
-#include "kernel/kern_task.h"
 #include "ui/ui_core.h"
 #include "ui/ui_drawer.h"
 #include "hal/hal_input.h"

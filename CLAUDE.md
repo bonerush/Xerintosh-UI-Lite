@@ -9,7 +9,7 @@ M5Stick-P1 is an embedded UI firmware for the M5Stick-C (ESP32-PICO + 80x160 TFT
 - **Language**: C core + C++ HAL bridge (M5GFX). All exposed headers must be C-compatible with `extern "C"`.
 - **Framework**: Arduino (ESP32) via PlatformIO.
 - **UI Framework name**: Xerintosh (renamed from AstraUI).
-- **Kernel name**: Xeros — preemptive microkernel (VFS / scheduler / shell).
+- **Kernel**: FreeRTOS (native ESP32 Arduino runtime).
 - **Build system**: PlatformIO (`platformio.ini`).
 - **Target resolution**: 80x160 (portrait default, landscape via `setRotation(1)`).
 
@@ -56,12 +56,12 @@ rm -rf .pio/build/
 
 ## Architecture
 
-The project uses a **four-layer architecture** with strict module prefixes:
+The project uses a **three-layer architecture** with strict module prefixes:
 
 ```
 App Layer (src/app/) — Each app in its own subdirectory
 ├── app_init.c/h              — Menu tree construction, input dispatch
-├── ui_task.c                 — Xeros kernel task wrapper (input→render→yield)
+├── ui_task.c                 — FreeRTOS task wrapper (input→render)
 ├── ui_service.c/h            — UI service layer (shared UI utilities)
 ├── svc_mgr_helper.c/h        — WiFi/BT shared toggle abstraction
 ├── boot/
@@ -92,30 +92,8 @@ App Layer (src/app/) — Each app in its own subdirectory
     ├── shutdown_screen.c/h   — Shutdown screen
     └── power_key_popup.c/h   — Power key long-press popup
 
-Kernel Layer (src/kernel/) — Xeros preemptive microkernel ("everything is a file")
-├── kern_types.h              — Error codes, constants, logging macros
-├── kern_task.c/h             — 抢占式调度器 + 动态栈
-├── kern_vfs.c/h              — Virtual File System (inode/dentry/file)
-├── kern_devfs.c/h            — /dev/ device registration
-├── kern_procfs.c/h           — /proc virtual filesystem
-├── kern_sysfs.c/h            — /sys virtual filesystem
-├── kern_gpiofs.c/h           — /sys/gpio pin state mapping
-├── kern_init.c/h             — Kernel initialization sequence
-├── kern_version.h            — Version & developer info management
-├── kern_port.c/h             — Portability layer (FreeRTOS / native backends)
-├── kern_port_native.c        — Native (desktop) portability backend
-├── kern_ctx_esp32.h          — ESP32-specific context
-├── kern_shell.c/h            — Interactive serial shell (30+ commands)
-├── kern_shell_cmds.c/h       — Shell command implementations
-├── kern_shell_cmds_internal.h — Shell command internal helpers
-├── kern_shell_parser.c/h     — Shell input parser (quote support, arg splitting)
-├── debug_serial.cpp/h        — Debug serial output helpers
-└── devices/
-    ├── kern_devices.c/h      — Device registry (/dev/fb0, /dev/input0, /dev/ttyS0)
-    ├── dev_fb0.c/h           — Framebuffer device
-    ├── dev_input0.c/h        — Input device
-    ├── dev_ttyS0.cpp/h       — Serial UART device
-    └── dev_pwrkey.c/h        — Power key device
+Kernel Layer (FreeRTOS) — Native ESP32 preemptive scheduler, no custom kernel
+├── kern_version_compat.h      — Version info macros (legacy compatibility)
 
 UI Core Layer (src/ui/) — Pure C, do not modify framework logic lightly
 ├── ui_item.h                 — Menu tree data model (5 item types), public API
@@ -161,22 +139,13 @@ Entry Points
 ├─────────────────────────────────────────────┤
 │ UI Core Layer (item / core / drawer / ctx)  │  Menu framework
 ├─────────────────────────────────────────────┤
-│ Xeros Kernel Layer                          │
-│  ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐      │
-│  │Sched  │ │ VFS  │ │devfs │ │procfs│      │  Preemptive microkernel
-│  │coop   │ │(vrtl)│ │(dev) │ │(/proc)│     │
-│  └──────┘ └──────┘ └──────┘ └──────┘      │
-│  ┌──────┐ ┌──────┐ ┌──────┐               │
-│  │sysfs  │ │Shell │ │gpiofs│               │  "Everything is a file"
-│  └──────┘ └──────┘ └──────┘               │
-├─────────────────────────────────────────────┤
 │ HAL Layer (display / input / system)        │  Hardware abstraction
 ├─────────────────────────────────────────────┤
-│ FreeRTOS + Arduino (WiFi / BT protocol)     │  Runtime
+│ FreeRTOS (ESP32 native preemptive scheduler)│  Runtime
 └─────────────────────────────────────────────┘
 ```
 
-FreeRTOS serves WiFi/BT at the bottom; Xeros runs inside Arduino `loop()` as a "logical process layer" — no conflict.
+FreeRTOS is the native ESP32 scheduler; all tasks (ui, wifi-mgr, bt-mgr) are FreeRTOS tasks created via `xTaskCreatePinnedToCore()`.
 
 ### Rendering Pipeline (per frame)
 
@@ -195,7 +164,7 @@ Full-frame redraw, target 60fps.
 - **TFT double-buffering**: `M5Canvas` sprite must have `setColorDepth(16)` **before** `createSprite()`.
 - **XOR highlight**: TFT lacks OLED's `draw_color(2)`, so selector uses pixel-by-pixel `color ^ 0xFFFF`.
 - **Type dispatch**: `ui_dispatch.c` uses function pointer arrays for O(1) type routing (replaces inline switch).
-- **抢占式微内核**：可插拔调度类 + 动态栈管理 + VFS"一切皆文件"
+- **FreeRTOS 调度**：任务通过 `xTaskCreatePinnedToCore()` 创建，抢占式调度自动管理。
 
 ## Coding Conventions
 
