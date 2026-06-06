@@ -9,6 +9,8 @@ extern "C" {
 }
 #endif
 
+#include "app/flasher/flasher.h"
+
 class FlasherGpioTest : public ::testing::Test {
 protected:
     void SetUp() override {
@@ -142,4 +144,13 @@ TEST(FlasherProtocolTest, ProgressClamped) {
     flasher_session_init(&s, 0x10000, 100);
     s.written_size = 200;
     EXPECT_EQ(flasher_get_progress(&s), 100);
+}
+
+/* ═══ App Lifecycle Tests ═══ */
+
+TEST(FlasherAppTest, LifecycleSmoke) {
+    flasher_init(nullptr);
+    flasher_loop(nullptr);
+    flasher_exit(nullptr);
+    SUCCEED();
 }
