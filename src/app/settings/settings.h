@@ -83,6 +83,18 @@ int16_t settings_anim_speed_value(void);
  */
 int32_t settings_serial_baud_hw_value(int16_t level);
 
+/* 烧录器引脚配置（由 flasher_gpio 管理，settings 层透传） */
+
+/**
+ * @brief 从 NVS 加载烧录器引脚映射配置
+ */
+void settings_load_flasher_pins(void);
+
+/**
+ * @brief 将烧录器引脚映射配置保存到 NVS
+ */
+void settings_save_flasher_pins(void);
+
 #ifdef __cplusplus
 }
 #endif

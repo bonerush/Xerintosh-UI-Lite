@@ -39,6 +39,14 @@ bool     storage_get_deepseek_key(char *key, size_t max_len) {
 }
 void     storage_set_deepseek_key(const char *key) { (void)key; }
 
+uint8_t storage_get_flasher_pin_role(uint8_t pin) {
+    (void)pin;
+    return 0; /* default NONE */
+}
+void storage_set_flasher_pin_role(uint8_t pin, uint8_t role) {
+    (void)pin; (void)role;
+}
+
 #else
 
 /* ═══ 硬件环境：ESP32 Preferences 实现 ═══ */
@@ -388,6 +396,25 @@ void storage_set_deepseek_key(const char *key) {
     Preferences prefs;
     prefs.begin(NVS_NAMESPACE, false);
     prefs.putString("ds_key_v1", key);
+    prefs.end();
+}
+
+uint8_t storage_get_flasher_pin_role(uint8_t pin) {
+    Preferences prefs;
+    prefs.begin(NVS_NAMESPACE, true);
+    char key[16];
+    snprintf(key, sizeof(key), "flash_pin%u", pin);
+    uint8_t val = prefs.getUChar(key, 0);
+    prefs.end();
+    return val;
+}
+
+void storage_set_flasher_pin_role(uint8_t pin, uint8_t role) {
+    Preferences prefs;
+    prefs.begin(NVS_NAMESPACE, false);
+    char key[16];
+    snprintf(key, sizeof(key), "flash_pin%u", pin);
+    prefs.putUChar(key, role);
     prefs.end();
 }
 

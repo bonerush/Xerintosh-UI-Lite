@@ -162,6 +162,22 @@ bool     storage_get_deepseek_key(char *key, size_t max_len);
  */
 void     storage_set_deepseek_key(const char *key);
 
+/* ═══ 烧录器引脚映射 ═══ */
+
+/**
+ * @brief  从存储读取烧录器指定引脚的角色
+ * @param  pin 引脚编号
+ * @return 信号角色枚举值；未设置时默认返回 0（NONE）
+ */
+uint8_t storage_get_flasher_pin_role(uint8_t pin);
+
+/**
+ * @brief  保存烧录器指定引脚的角色到存储
+ * @param  pin  引脚编号
+ * @param  role 信号角色枚举值
+ */
+void    storage_set_flasher_pin_role(uint8_t pin, uint8_t role);
+
 #ifdef __cplusplus
 }
 #endif

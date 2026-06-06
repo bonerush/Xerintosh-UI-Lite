@@ -10,6 +10,7 @@
 #include "settings.h"
 
 #include "app/storage/storage.h"
+#include "app/flasher/flasher_gpio.h"
 
 /* ═══ 全局状态定义 ═══ */
 
@@ -161,3 +162,15 @@ int32_t settings_serial_baud_hw_value(int16_t level)
     }
     return s_baud_rate_table[level - 1];
 }
+
+/* ═══ 烧录器引脚配置透传 ═══ */
+
+/**
+ * @brief 从 NVS 加载烧录器引脚映射配置（透传至 flasher_gpio 层）
+ */
+void settings_load_flasher_pins(void) { flasher_load_pin_config(); }
+
+/**
+ * @brief 将烧录器引脚映射配置保存到 NVS（透传至 flasher_gpio 层）
+ */
+void settings_save_flasher_pins(void) { flasher_save_pin_config(); }
