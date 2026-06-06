@@ -10,6 +10,7 @@
 #include "app_init.h"
 
 #include <stddef.h>
+#include <stdio.h>
 #include "settings/settings.h"
 #include "storage/storage.h"
 #include "wifi/wifi_manager.h"
@@ -21,6 +22,7 @@
 #include "app/token_usage/token_usage.h"
 #include "shutdown/power_key_popup.h"
 
+#include "app/flasher/flasher_gpio.h"
 #include "ui/ui_item.h"
 #include "kernel/kern_task.h"
 #include "ui/ui_core.h"
@@ -44,6 +46,7 @@ extern void on_serial_baud_change_cb(void *ud);
 
 /* 波特率选择回调（前向声明）*/
 static void on_baud_selected_cb(void *ud);
+static void on_flasher_pin_selected_cb(void *ud);
 
 /* ═══ 菜单构建 ═══ */
 
@@ -57,12 +60,14 @@ static void on_baud_selected_cb(void *ud);
  *        │   ├── 亮度（滑块 1-10）
  *        │   ├── 动画效果（开关）
  *        │   ├── 动画速度（滑块 1-10）
- *        │   └── 横屏/竖屏（开关）
- *        │   └── 波特率（子菜单）
- *        │       ├── 9600（按钮）
- *        │       ├── 19200（按钮）
- *        │       ├── 38400（按钮）
- *        │       ├── 57600（按钮）
+       │   │   └── 波特率（子菜单）
+       │   │       ├── 9600（按钮）
+       │   │       └── ...
+       │   └── 烧录器引脚（子菜单）
+       │       ├── G0（按钮）
+       ├── 任务管理器（user_item）
+       ├── 串口监视器（user_item）
+       ├── Token Usage（user_item）
  *        │       ├── 115200（按钮）
  *        │       └── 230400（按钮）
  *        ├── 任务管理器（user_item）
@@ -108,6 +113,17 @@ void app_init_ui(void)
         xerintosh_push_item_to_list(baud_menu, btn);
     }
 
+    /* 烧录器引脚映射子菜单 */
+    xerintosh_list_item_t* flasher_pin_menu = xerintosh_new_list_item("烧录器引脚", list_icon);
+    const char* pin_labels[] = {"G0", "G26", "G36"};
+    uint8_t pin_nums[] = {0, 26, 36};
+    for (int i = 0; i < 3; i++) {
+        xerintosh_list_item_t* btn = xerintosh_new_button_item(
+            pin_labels[i], on_flasher_pin_selected_cb, default_icon);
+        btn->user_data = (void*)(intptr_t)pin_nums[i];
+        xerintosh_push_item_to_list(flasher_pin_menu, btn);
+    }
+
     xerintosh_push_item_to_list(root, item1);
     xerintosh_push_item_to_list(root, item2);
     xerintosh_push_item_to_list(root, item3);
@@ -118,6 +134,7 @@ void app_init_ui(void)
     xerintosh_push_item_to_list(item1, sw_anim);
     xerintosh_push_item_to_list(item1, sl_anim);
     xerintosh_push_item_to_list(item1, sw_rot);
+    xerintosh_push_item_to_list(item1, flasher_pin_menu);
     xerintosh_push_item_to_list(item1, baud_menu);
 }
 
@@ -137,6 +154,35 @@ static void on_baud_selected_cb(void *ud)
     xerintosh_selector_exit_current_item();
 }
 
+/* ═══ 烧录器引脚选择回调 ═══ */
+
+static void on_flasher_pin_selected_cb(void *ud)
+{
+    (void)ud;
+    xerintosh_list_item_t *item = g_xerintosh_selector.selected_item;
+    uint8_t pin = (uint8_t)(intptr_t)item->user_data;
+    flasher_signal_t current = FLASHER_SIG_NONE;
+    for (int i = 0; i < FLASHER_AVAILABLE_PINS; i++) {
+        if (g_flasher_pins[i].pin_num == pin) {
+            current = g_flasher_pins[i].role;
+            break;
+        }
+    }
+    flasher_signal_t next = (flasher_signal_t)(((int)current + 1) % FLASHER_SIG_COUNT);
+    if (pin == 36 && next != FLASHER_SIG_NONE && next != FLASHER_SIG_RX) {
+        next = FLASHER_SIG_NONE;
+    } else if (pin != 36 && next == FLASHER_SIG_RX) {
+        next = (flasher_signal_t)(((int)next + 1) % FLASHER_SIG_COUNT);
+    }
+    if (flasher_set_pin_role(pin, next)) {
+        flasher_save_pin_config();
+        char buf[24];
+        snprintf(buf, sizeof(buf), "%s -> %s", pin == 0 ? "G0" : (pin == 26 ? "G26" : "G36"),
+                 settings_flasher_role_label(next));
+        xerintosh_push_pop_up(buf, 800);
+    }
+    xerintosh_selector_exit_current_item();
+}
 /* ═══ 管理器初始化 ═══ */
 
 /**

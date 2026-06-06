@@ -174,3 +174,18 @@ void settings_load_flasher_pins(void) { flasher_load_pin_config(); }
  * @brief 将烧录器引脚映射配置保存到 NVS（透传至 flasher_gpio 层）
  */
 void settings_save_flasher_pins(void) { flasher_save_pin_config(); }
+
+/* ═══ 烧录器引脚角色标签 ═══ */
+
+const char* settings_flasher_role_label(flasher_signal_t role)
+{
+    switch (role) {
+        case FLASHER_SIG_NONE: return "未分配";
+        case FLASHER_SIG_TX:   return "TX";
+        case FLASHER_SIG_RX:   return "RX";
+        case FLASHER_SIG_DTR:  return "DTR";
+        case FLASHER_SIG_RTS:  return "RTS";
+        case FLASHER_SIG_BOOT: return "BOOT";
+        default: return "?";
+    }
+}

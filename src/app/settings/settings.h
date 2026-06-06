@@ -14,6 +14,7 @@
 
 /* UI 上下文（提供 g_anim_enabled 等全局状态宏） */
 #include "ui/ui_context.h"
+#include "app/flasher/flasher_gpio.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -94,6 +95,15 @@ void settings_load_flasher_pins(void);
  * @brief 将烧录器引脚映射配置保存到 NVS
  */
 void settings_save_flasher_pins(void);
+
+/* ═══ 烧录器引脚角色标签 ═══ */
+
+/**
+ * @brief  获取信号角色的显示标签
+ * @param  role 信号角色枚举
+ * @return 角色中文/英文标签字符串
+ */
+const char* settings_flasher_role_label(flasher_signal_t role);
 
 #ifdef __cplusplus
 }
