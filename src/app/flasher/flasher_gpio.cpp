@@ -62,3 +62,82 @@ void flasher_save_pin_config(void)
         storage_set_flasher_pin_role(g_flasher_pins[i].pin_num, (uint8_t)g_flasher_pins[i].role);
     }
 }
+
+#ifndef NATIVE_TEST
+#include <Arduino.h>
+
+static HardwareSerial *s_flasher_uart = nullptr;
+
+void flasher_init_pins(void)
+{
+    uint8_t tx_pin = flasher_get_pin_for_signal(FLASHER_SIG_TX);
+    uint8_t rx_pin = flasher_get_pin_for_signal(FLASHER_SIG_RX);
+    if (tx_pin == 255 || rx_pin == 255) return;
+
+    if (s_flasher_uart == nullptr) {
+        s_flasher_uart = &Serial1;
+    }
+    s_flasher_uart->begin(115200, SERIAL_8N1, rx_pin, tx_pin);
+
+    uint8_t dtr_pin = flasher_get_pin_for_signal(FLASHER_SIG_DTR);
+    uint8_t rts_pin = flasher_get_pin_for_signal(FLASHER_SIG_RTS);
+    uint8_t boot_pin = flasher_get_pin_for_signal(FLASHER_SIG_BOOT);
+    if (dtr_pin != 255) { pinMode(dtr_pin, OUTPUT); digitalWrite(dtr_pin, HIGH); }
+    if (rts_pin != 255) { pinMode(rts_pin, OUTPUT); digitalWrite(rts_pin, HIGH); }
+    if (boot_pin != 255) { pinMode(boot_pin, OUTPUT); digitalWrite(boot_pin, HIGH); }
+}
+
+void flasher_set_dtr(bool active) {
+    uint8_t pin = flasher_get_pin_for_signal(FLASHER_SIG_DTR);
+    if (pin != 255) digitalWrite(pin, active ? LOW : HIGH);
+}
+
+void flasher_set_rts(bool active) {
+    uint8_t pin = flasher_get_pin_for_signal(FLASHER_SIG_RTS);
+    if (pin != 255) digitalWrite(pin, active ? LOW : HIGH);
+}
+
+void flasher_set_boot(bool low) {
+    uint8_t pin = flasher_get_pin_for_signal(FLASHER_SIG_BOOT);
+    if (pin != 255) digitalWrite(pin, low ? LOW : HIGH);
+}
+
+void flasher_enter_download_mode(void) {
+    flasher_set_boot(true);  /* LOW */
+    flasher_set_rts(true);   /* LOW */
+    delay(100);
+    flasher_set_rts(false);  /* HIGH */
+    delay(100);
+}
+
+void flasher_reset_target(void) {
+    flasher_set_boot(false); /* HIGH */
+    flasher_set_rts(true);   /* LOW */
+    delay(100);
+    flasher_set_rts(false);  /* HIGH */
+}
+
+int flasher_uart_write(const uint8_t *data, int len) {
+    if (!s_flasher_uart || !data || len <= 0) return 0;
+    return s_flasher_uart->write(data, len);
+}
+
+int flasher_uart_read(uint8_t *buf, int max_len) {
+    if (!s_flasher_uart || !buf || max_len <= 0) return 0;
+    int n = 0;
+    while (n < max_len && s_flasher_uart->available()) {
+        buf[n++] = s_flasher_uart->read();
+    }
+    return n;
+}
+
+#else /* NATIVE_TEST */
+void flasher_init_pins(void) {}
+void flasher_set_dtr(bool a) { (void)a; }
+void flasher_set_rts(bool a) { (void)a; }
+void flasher_set_boot(bool l) { (void)l; }
+void flasher_enter_download_mode(void) {}
+void flasher_reset_target(void) {}
+int flasher_uart_write(const uint8_t *d, int l) { (void)d; (void)l; return l; }
+int flasher_uart_read(uint8_t *b, int m) { (void)b; (void)m; return 0; }
+#endif

@@ -64,6 +64,59 @@ void flasher_load_pin_config(void);
  */
 void flasher_save_pin_config(void);
 
+/**
+ * @brief  根据配置初始化 GPIO 引脚和 UART
+ * @note   配置 TX/RX 引脚到 Serial1，设置 DTR/RTS/BOOT 为输出
+ */
+void flasher_init_pins(void);
+
+/**
+ * @brief  设置 DTR 信号电平
+ * @param  active true=LOW（有效），false=HIGH（无效）
+ */
+void flasher_set_dtr(bool active);
+
+/**
+ * @brief  设置 RTS 信号电平
+ * @param  active true=LOW（有效），false=HIGH（无效）
+ */
+void flasher_set_rts(bool active);
+
+/**
+ * @brief  设置 BOOT 引脚电平
+ * @param  low true=LOW，false=HIGH
+ */
+void flasher_set_boot(bool low);
+
+/**
+ * @brief  将目标 ESP32 进入下载模式
+ * @note   时序：BOOT=LOW, RTS=LOW, delay(100), RTS=HIGH, delay(100)
+ *         BOOT 保持 LOW 直到烧录完成
+ */
+void flasher_enter_download_mode(void);
+
+/**
+ * @brief  复位目标 ESP32（正常启动）
+ * @note   时序：BOOT=HIGH, RTS=LOW, delay(100), RTS=HIGH
+ */
+void flasher_reset_target(void);
+
+/**
+ * @brief  通过烧录器 UART 发送数据
+ * @param  data 数据缓冲区
+ * @param  len  数据长度
+ * @return 实际发送的字节数
+ */
+int flasher_uart_write(const uint8_t *data, int len);
+
+/**
+ * @brief  从烧录器 UART 读取数据
+ * @param  buf 接收缓冲区
+ * @param  max_len 最大读取长度
+ * @return 实际读取的字节数
+ */
+int flasher_uart_read(uint8_t *buf, int max_len);
+
 #ifdef __cplusplus
 }
 #endif
