@@ -197,11 +197,15 @@ static void xerintosh_draw_list_appearance()
  */
 static void xerintosh_draw_list_item()
 {
+  xerintosh_set_font(hal_get_cn_font());
+  int16_t _font_h = hal_get_font_height();
+  int16_t _font_h_2 = _font_h / 2;
+
   for (unsigned char i = 0; i < g_xerintosh_selector.selected_item->parent->child_num; i++)
   {
     xerintosh_list_item_t *_item = g_xerintosh_selector.selected_item->parent->child_list_item[i];
     int16_t _x_list_item = g_xerintosh_camera.x_camera + LIST_ITEM_LEFT_MARGIN;
-    int16_t _y_list_item = _item->y_list_item + g_xerintosh_camera.y_camera - hal_get_font_height()/2;
+    int16_t _y_list_item = _item->y_list_item + g_xerintosh_camera.y_camera - _font_h_2;
 
     /* 根据类型分发到对应的绘制函数 */
     g_xerintosh_draw_color = COLOR_FG;
@@ -228,10 +232,9 @@ static void xerintosh_draw_list_item()
       xerintosh_draw_item_bitmap(_item, _x_list_item, _y_list_item);
     }
 
-    /* ═══ 文字滚动效果 ═══ */
-    xerintosh_set_font(hal_get_cn_font());
-    if (_y_list_item + hal_get_font_height() / 2 > LIST_INFO_BAR_HEIGHT &&
-        _y_list_item + hal_get_font_height() / 2 < SCREEN_HEIGHT)
+    /* ═══ 文字绘制与滚动效果 ═══ */
+    if (_y_list_item + _font_h_2 > LIST_INFO_BAR_HEIGHT &&
+        _y_list_item + _font_h_2 < SCREEN_HEIGHT)
     {
       int16_t _text_width = hal_get_string_width(_item->content);
       bool _has_right_control = (_item->type == switch_item || _item->type == slider_item);
@@ -261,8 +264,8 @@ static void xerintosh_draw_list_item()
 
       /* 设置裁剪区域：限制文字只在 icon 右侧到控件左侧之间显示 */
       int16_t _clip_x = LIST_ITEM_LEFT_MARGIN + 10;
-      int16_t _clip_y = _y_list_item - hal_get_font_height() / 2 - 2;
-      int16_t _clip_h = hal_get_font_height() + 4;
+      int16_t _clip_y = _y_list_item - _font_h_2 - 2;
+      int16_t _clip_h = _font_h + 4;
       hal_set_clip_rect(_clip_x, _clip_y, _avail_width, _clip_h);
 
       int16_t _cycle_dist = _text_width + _avail_width;
@@ -270,10 +273,10 @@ static void xerintosh_draw_list_item()
 
       /* 绘制两份相同文字，形成无缝循环跑马灯 */
       hal_draw_string(_draw_x,
-                     _y_list_item + hal_get_font_height() / 2,
+                     _y_list_item + _font_h_2,
                      _item->content, g_xerintosh_draw_color);
       hal_draw_string(_draw_x + _cycle_dist,
-                     _y_list_item + hal_get_font_height() / 2,
+                     _y_list_item + _font_h_2,
                      _item->content, g_xerintosh_draw_color);
 
       hal_clear_clip_rect();

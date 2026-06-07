@@ -487,27 +487,29 @@ int16_t hal_get_font_height(void) {
 
 /**
  * @brief XOR 反色矩形（硬件实现：逐行读取-异或-回写）
+ * @note  直接操作 sprite 缓冲区，避免 readRect/pushImage 逐行开销
  */
 void hal_draw_xor_rect(int16_t x, int16_t y, int16_t w, int16_t h) {
     if (!g_canvas || w <= 0 || h <= 0) return;
-    uint16_t* buf = (uint16_t*)malloc(w * sizeof(uint16_t));
-    if (!buf) return;
+
+    uint16_t* fb = (uint16_t*)g_canvas->getBuffer();
+    if (!fb) return;
+    int16_t cw = g_canvas->width();
+    int16_t ch = g_canvas->height();
+
     for (int16_t row = 0; row < h; row++) {
         int16_t py = y + row;
-        if (py < 0 || py >= SCREEN_HEIGHT) continue;
+        if (py < 0 || py >= ch) continue;
         int16_t px_start = x;
         int16_t px_end = x + w - 1;
         if (px_start < 0) px_start = 0;
-        if (px_end >= SCREEN_WIDTH) px_end = SCREEN_WIDTH - 1;
+        if (px_end >= cw) px_end = cw - 1;
         int16_t read_w = px_end - px_start + 1;
         if (read_w <= 0) continue;
-        g_canvas->readRect(px_start, py, read_w, 1, buf);
-        for (int16_t i = 0; i < read_w; i++) {
-            buf[i] ^= 0xFFFF;
-        }
-        g_canvas->pushImage(px_start, py, read_w, 1, buf);
+        uint16_t* row_ptr = fb + py * cw + px_start;
+        for (int16_t i = 0; i < read_w; i++)
+            row_ptr[i] ^= 0xFFFF;
     }
-    free(buf);
 }
 
 /**
