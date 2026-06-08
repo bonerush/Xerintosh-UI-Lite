@@ -89,8 +89,6 @@ void flasher_ui_draw(const flasher_ui_state_t *st)
 {
     if (!st) return;
 
-    hal_display_clear();
-
     /* 计算进度条宽度 */
     int16_t bar_w = (int16_t)((SCREEN_WIDTH * st->progress) / 100);
     int16_t bar_y = 4;
@@ -130,7 +128,6 @@ void flasher_ui_draw(const flasher_ui_state_t *st)
     uint16_t color = (text_center < bar_w) ? COLOR_BG : flasher_ui_text_color(st->status);
 
     hal_draw_string(tx, ty, text, color);
-    hal_display_flush();
 }
 
 #ifdef __cplusplus

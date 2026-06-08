@@ -49,6 +49,27 @@ extern void on_serial_baud_change_cb(void *ud);
 static void on_baud_selected_cb(void *ud);
 static void on_flasher_pin_selected_cb(void *ud);
 
+/* 烧录器引脚标签缓冲区（动态显示当前角色） */
+static char g_pin_label_bufs[3][24];
+
+/**
+ * @brief 更新烧录器引脚按钮标签，显示当前角色
+ */
+static void update_flasher_pin_label(uint8_t pin)
+{
+    flasher_signal_t role = FLASHER_SIG_NONE;
+    for (int i = 0; i < FLASHER_AVAILABLE_PINS; i++) {
+        if (g_flasher_pins[i].pin_num == pin) {
+            role = g_flasher_pins[i].role;
+            break;
+        }
+    }
+    int idx = (pin == 0) ? 0 : (pin == 26) ? 1 : 2;
+    const char *pin_name = (pin == 0) ? "G0" : (pin == 26) ? "G26" : "G36";
+    snprintf(g_pin_label_bufs[idx], sizeof(g_pin_label_bufs[idx]),
+             "%s [%s]", pin_name, settings_flasher_role_label(role));
+}
+
 /* ═══ 菜单构建 ═══ */
 
 /**
@@ -118,11 +139,11 @@ void app_init_ui(void)
 
     /* 烧录器引脚映射子菜单 */
     xerintosh_list_item_t* flasher_pin_menu = xerintosh_new_list_item("烧录器引脚", list_icon);
-    const char* pin_labels[] = {"G0", "G26", "G36"};
     uint8_t pin_nums[] = {0, 26, 36};
     for (int i = 0; i < 3; i++) {
+        update_flasher_pin_label(pin_nums[i]);
         xerintosh_list_item_t* btn = xerintosh_new_button_item(
-            pin_labels[i], on_flasher_pin_selected_cb, default_icon);
+            g_pin_label_bufs[i], on_flasher_pin_selected_cb, default_icon);
         btn->user_data = (void*)(intptr_t)pin_nums[i];
         xerintosh_push_item_to_list(flasher_pin_menu, btn);
     }
@@ -172,14 +193,21 @@ static void on_flasher_pin_selected_cb(void *ud)
             break;
         }
     }
-    flasher_signal_t next = (flasher_signal_t)(((int)current + 1) % FLASHER_SIG_COUNT);
-    if (pin == 36 && next != FLASHER_SIG_NONE && next != FLASHER_SIG_RX) {
-        next = FLASHER_SIG_NONE;
-    } else if (pin != 36 && next == FLASHER_SIG_RX) {
-        next = (flasher_signal_t)(((int)next + 1) % FLASHER_SIG_COUNT);
+    flasher_signal_t next;
+    if (pin == 36) {
+        /* G36 为输入-only，只能在 NONE 和 RX 之间切换 */
+        next = (current == FLASHER_SIG_NONE) ? FLASHER_SIG_RX : FLASHER_SIG_NONE;
+    } else {
+        next = (flasher_signal_t)(((int)current + 1) % FLASHER_SIG_COUNT);
+        if (next == FLASHER_SIG_RX) {
+            next = (flasher_signal_t)(((int)next + 1) % FLASHER_SIG_COUNT);
+        }
     }
     if (flasher_set_pin_role(pin, next)) {
         flasher_save_pin_config();
+        /* 更新按钮标签以反映新角色 */
+        update_flasher_pin_label(pin);
+        item->content = g_pin_label_bufs[(pin == 0) ? 0 : (pin == 26) ? 1 : 2];
         char buf[24];
         snprintf(buf, sizeof(buf), "%s -> %s", pin == 0 ? "G0" : (pin == 26 ? "G26" : "G36"),
                  settings_flasher_role_label(next));
