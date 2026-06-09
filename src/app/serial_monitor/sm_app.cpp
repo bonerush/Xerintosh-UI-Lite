@@ -80,6 +80,9 @@ static void sm_on_bt_rx(const uint8_t *data, uint16_t len)
  */
 static void sm_on_bt_connect(bool connected)
 {
+    Serial.printf("[SM-DBG] sm_on_bt_connect(%d) from core=%d ms=%lu\n",
+                  (int)connected, (int)xPortGetCoreID(), (unsigned long)millis());
+    Serial.flush();
     sm_bt_connected = connected;
 }
 #endif
@@ -150,15 +153,28 @@ void serial_monitor_loop(void *ud)
         } else {
             /* 切换数据源 SER ↔ BLE */
             if (sm_source == SM_SOURCE_SER) {
-                /* 懒加载 BT：如果 BT 未启用，按需初始化 */
+#ifndef NATIVE_TEST
+                Serial.printf("[SM-DBG] switching to BLE mode, bt_enabled=%d ms=%lu\n",
+                              (int)bt_mgr_is_enabled(), (unsigned long)millis());
+                Serial.flush();
+#endif
+
                 if (!bt_mgr_is_enabled()) {
-                    bt_mgr_enable();
+                    bt_mgr_request_enable();
                     sm_bt_lazy_inited = true;
                 }
                 sm_source = SM_SOURCE_BLE;
                 sm_bt_connected = bt_uart_is_connected();
+#ifndef NATIVE_TEST
+                Serial.printf("[SM-DBG] BLE mode set, connected=%d\n", (int)sm_bt_connected);
+                Serial.flush();
+#endif
             } else {
                 sm_source = SM_SOURCE_SER;
+#ifndef NATIVE_TEST
+                Serial.printf("[SM-DBG] back to SER mode\n");
+                Serial.flush();
+#endif
             }
             /* 切换源时清空缓冲区，避免混淆 */
             sm_buffer_clear(&sm_buffer);
@@ -202,11 +218,20 @@ void serial_monitor_loop(void *ud)
      * bt_uart_drain_rx_queue() 在 UI 任务上下文中调用回调，
      * 确保 sm_buffer 写入与 serial_monitor_draw() 读取在同一任务，消除跨任务竞争。 */
     if (sm_source == SM_SOURCE_BLE) {
+        static bool s_prev_ble_active = false;
+        if (!s_prev_ble_active) {
+            Serial.printf("[SM-DBG] BLE loop active, running=%d ms=%lu\n",
+                          (int)sm_running, (unsigned long)millis()); Serial.flush();
+            s_prev_ble_active = true;
+        }
         if (sm_running) {
             bt_uart_drain_rx_queue();
         }
         bool prev = sm_bt_connected;
         sm_bt_connected = bt_uart_is_connected();
+        Serial.printf("[SM-DBG] conn state check: prev=%d now=%d\n",
+                      (int)prev, (int)sm_bt_connected);
+        Serial.flush();
         if (sm_bt_connected != prev) {
             xerintosh_push_pop_up(
                 sm_bt_connected ? "Connected" : "Disconnected", 1500);

@@ -355,16 +355,31 @@ int16_t g_screen_width = 160;         /* 默认屏幕宽度，init 时从硬件�
 int16_t g_screen_height = 80;         /* 默认屏幕高度 */
 
 /**
- * @brief 初始化显示：创建 M5Canvas 并设置颜色深度为 16bit
+ * @brief 初始化显示：创建 M5Canvas 并设置颜色深度为 8bit（RGB332, 256 色）
+ * @note  8-bit 帧缓冲 80×160×1 = 12.8KB，相比 16-bit 节省 12.8KB，
+ *        相比 4-bit 多 256 色精度，确保 RED/GREEN 文本正确渲染。
+ *        使 ESP32-PICO 无 PSRAM 也能同时运行 Classic BT SPP + UI 渲染。
  */
 void hal_display_init(void) {
     if (!g_canvas) {
         g_canvas = new M5Canvas(&M5.Display);
     }
-    g_canvas->setColorDepth(16);
+    g_canvas->setColorDepth(8);   /* 8-bit 色深：RGB332, 256 色，每像素 1 字节 */
     g_screen_width = M5.Display.width();
     g_screen_height = M5.Display.height();
     g_canvas->createSprite(g_screen_width, g_screen_height);
+}
+
+
+/**
+ * @brief 释放离屏帧缓冲（8-bit: 12.8KB），保留 canvas 对象以便后续重新 createSprite
+ * @note  调用后所有绘制 API 因 sprite 不存在而跳过。屏幕保持最后一次
+ *        pushSprite 的内容。再次调用 hal_display_init() 可恢复。
+ */
+void hal_display_deinit(void) {
+    if (g_canvas) {
+        g_canvas->deleteSprite();  /* 释放 80×160×8bit = 12.8KB 帧缓冲 */
+    }
 }
 
 /**
@@ -486,29 +501,32 @@ int16_t hal_get_font_height(void) {
 }
 
 /**
- * @brief XOR 反色矩形（硬件实现：逐行读取-异或-回写）
- * @note  直接操作 sprite 缓冲区，避免 readRect/pushImage 逐行开销
+ * @brief XOR 反色矩形（硬件实现：逐行 readRect-异或-pushImage）
+ * @note  使用 readRect/pushImage 而非裸帧缓冲指针，以兼容 4/8/16-bit
+ *        色深。readRect 始终返回 RGB565，异或后 pushImage 自动转换回
+ *        当前色深。帧缓冲在内存中（M5Canvas），操作无 SPI 开销。
+ * @note  最大行宽 160px，临时行缓冲仅 320 字节，栈安全。
  */
 void hal_draw_xor_rect(int16_t x, int16_t y, int16_t w, int16_t h) {
     if (!g_canvas || w <= 0 || h <= 0) return;
 
-    uint16_t* fb = (uint16_t*)g_canvas->getBuffer();
-    if (!fb) return;
     int16_t cw = g_canvas->width();
     int16_t ch = g_canvas->height();
+    /* 裁剪 */
+    if (x < 0) { w += x; x = 0; }
+    if (y < 0) { h += y; y = 0; }
+    if (x + w > cw) w = cw - x;
+    if (y + h > ch) h = ch - y;
+    if (w <= 0 || h <= 0) return;
+
+    /* 行缓冲：最大 160×2 = 320 字节，栈安全 */
+    uint16_t row_buf[160];
 
     for (int16_t row = 0; row < h; row++) {
-        int16_t py = y + row;
-        if (py < 0 || py >= ch) continue;
-        int16_t px_start = x;
-        int16_t px_end = x + w - 1;
-        if (px_start < 0) px_start = 0;
-        if (px_end >= cw) px_end = cw - 1;
-        int16_t read_w = px_end - px_start + 1;
-        if (read_w <= 0) continue;
-        uint16_t* row_ptr = fb + py * cw + px_start;
-        for (int16_t i = 0; i < read_w; i++)
-            row_ptr[i] ^= 0xFFFF;
+        g_canvas->readRect(x, y + row, w, 1, row_buf);
+        for (int16_t i = 0; i < w; i++)
+            row_buf[i] ^= 0xFFFF;
+        g_canvas->pushImage(x, y + row, w, 1, row_buf);
     }
 }
 

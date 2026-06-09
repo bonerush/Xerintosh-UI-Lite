@@ -211,14 +211,14 @@ void flasher_init(void *ud)
         s_running = false;
     }
 
-    /* 懒加载 BT：如果 BT 未启用，按需初始化 */
     bool bt_was_off = !bt_mgr_is_enabled();
+    /* 懒加载 BT：如果 BT 未启用，发起异步初始化请求 */
     if (!bt_mgr_is_enabled()) {
-        bt_mgr_enable();
+        bt_mgr_request_enable();
         s_bt_lazy_inited = true;
     }
 
-    /* 注册 BT 回调：必须在 bt_mgr_enable() 之后，否则 bt_uart_service_init() 会清空回调 */
+    /* 注册 BT 回调：异步请求后即可注册，bt_uart_service_init() 不再清空回调 */
     bt_uart_set_rx_callback(flasher_on_bt_rx);
     bt_uart_set_connect_callback(flasher_on_bt_connect);
 

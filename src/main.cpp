@@ -272,7 +272,7 @@ static void deferred_kernel_init(void)
     /* WiFi/BT 管理器作为独立内核任务运行，与 UI 任务解耦 */
     kern_spawn("wifi-mgr", wifi_mgr_task_main, NULL, 4096);
     Serial.println("[  OK  ] WiFi manager spawned as kernel task");
-    kern_spawn("bt-mgr",   bt_mgr_task_main, NULL, 8192);
+     kern_spawn("bt-mgr",   bt_mgr_task_main, NULL, 4096);  /* 仅状态更新，4KB 充足 */
     Serial.println("[  OK  ] BT manager spawned as kernel task");
 
     /* 让出 CPU 给 FreeRTOS，使刚创建的任务有机会启动并阻塞在调度信号量上 */
@@ -297,17 +297,47 @@ void loop()
 {
     deferred_kernel_init();
 
+    /* DBG: 每 200 次 loop 打印一次心跳 + 堆内存 */
+    static uint32_t s_loop_cnt = 0;
+    s_loop_cnt++;
+    /* DBG: 堆内存变化跟踪（每次显著变化打印） */
+    static uint32_t s_last_heap = 0;
+    uint32_t cur_heap = ESP.getFreeHeap();
+    if (s_last_heap == 0 || labs((long)(cur_heap - s_last_heap)) > 20000) {
+        Serial.printf("[LOOP-DBG] HEAP change: %u → %u (Δ=%+ld) ms=%lu wifi=%d bt=%d\n",
+                      s_last_heap, cur_heap, (long)(cur_heap - s_last_heap),
+                      (unsigned long)millis(), (int)wifi_mgr_is_enabled(), (int)bt_mgr_is_enabled());
+        Serial.flush();
+        s_last_heap = cur_heap;
+    }
+    if ((s_loop_cnt % 200) == 0) {
+        Serial.printf("[LOOP-DBG] heartbeat#%lu free_heap=%u ms=%lu\n",
+                      (unsigned long)s_loop_cnt, ESP.getFreeHeap(), (unsigned long)millis());
+        Serial.flush();
+    }
+
+
     dev_ttyS0_poll();
     serial_monitor_update();
 
+    /* 处理 BT 启用/禁用异步请求。必须在 loop() 上下文中执行，
+     * 确保 begin() / connected() / read() 在同一 FreeRTOS 任务。 */
+    bt_mgr_process_requests();
+
     /* BT 轮询：仅在 BT 已启用时执行。
-     * BluetoothSerial 内部的 Bluedroid 不是线程安全的，
-     * connected()/read() 必须与 begin() 在同一 FreeRTOS 任务中调用。 */
+     * BluetoothSerial 内部 Bluedroid 不是线程安全的，
+     * connected()/read() 已与 begin() 统一到 loop() 任务上下文。 */
     if (bt_mgr_is_enabled()) {
         static uint32_t last_bt_poll = 0;
         uint32_t now = millis();
         if (now - last_bt_poll >= 50) {
             last_bt_poll = now;
+            /* DBG: 堆内存过低时告警 */
+            uint32_t free_h = ESP.getFreeHeap();
+            if (free_h < 20000) {
+                Serial.printf("[LOOP-DBG] LOW HEAP before bt_uart_poll: %lu\n", (unsigned long)free_h);
+                Serial.flush();
+            }
             bt_uart_poll();
         }
     }

@@ -254,6 +254,12 @@ void wifi_mgr_disable(void)
                                  wifi_scan_done_handler);
     WiFi.disconnect(true);
     WiFi.mode(WIFI_OFF);
+    /* 显式释放 WiFi 驱动内存（~38KB）。
+     * WiFi.mode(WIFI_OFF) 内部会调用 esp_wifi_deinit()，但某些 Arduino
+     * 封装版本可能不完全释放。显式二次调用确保内存在 BT 启用前回收。
+     * esp_wifi_deinit() 在已反初始化状态下是安全的（返回 ESP_ERR_WIFI_NOT_INIT）。 */
+    esp_wifi_stop();
+    esp_wifi_deinit();
     g_wifi_enabled = false;
 
     if (g_networks_list) {

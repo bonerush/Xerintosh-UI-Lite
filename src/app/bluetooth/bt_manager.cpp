@@ -6,6 +6,13 @@
  *          - 硬件环境时：Classic Bluetooth SPP 简化实现。
  *            BLE 扫描/配对功能已移除，仅保留开关生命周期管理。
  *
+ *          线程安全架构（v2）：
+ *          - BluetoothSerial API 调用（begin/connected/read）必须全部在
+ *            Arduino main loop() 任务上下文中执行。
+ *          - UI 任务通过 bt_mgr_request_enable/disable() 发起异步请求。
+ *          - bt_mgr_process_requests() 在 loop() 中执行实际操作。
+ *          - 这避免了跨任务 Bluedroid 死锁 → TWDT 看门狗复位。
+ *
  * @copyright Copyright (c) 2026
  */
 
@@ -16,6 +23,9 @@
 void bt_mgr_init(void) {}
 void bt_mgr_enable(void) {}
 void bt_mgr_disable(void) {}
+void bt_mgr_request_enable(void) {}
+void bt_mgr_request_disable(void) {}
+void bt_mgr_process_requests(void) {}
 bool bt_mgr_is_waiting_input(void) { return false; }
 bool bt_mgr_is_enabled(void) { return false; }
 void bt_mgr_update(void) {}
@@ -38,15 +48,36 @@ static bool g_bt_enabled = false;
 static bool g_wifi_was_on = false;  /* BT 启用前 WiFi 是否处于开启状态 */
 static bt_mgr_state_t g_state = BT_MGR_IDLE;
 
+/* ═══ 异步请求标志 ═══ */
+static volatile bool g_enable_requested  = false;
+static volatile bool g_disable_requested = false;
+
 void bt_mgr_init(void) {
     g_bt_enabled = false;
     g_state = BT_MGR_IDLE;
+    g_enable_requested  = false;
+    g_disable_requested = false;
 }
 
 void bt_mgr_enable(void) {
     if (g_bt_enabled) return;
 
-    /* BT/WiFi 互斥：启用 BT 前关闭 WiFi 以释放内存 */
+    Serial.printf("[BT-DBG] bt_mgr_enable() entry free_heap=%u ms=%lu\n",
+                  ESP.getFreeHeap(), (unsigned long)millis()); Serial.flush();
+
+    /* ═══ 堆内存安全守卫 ═══
+     * Bluedroid Classic BT SPP 初始化 + 连接建链约需 ~70KB。
+     * （BLE 内存已在 bt_uart_service_init 中通过
+     *  esp_bt_controller_mem_release 释放，节省 ~25KB） */
+    const uint32_t BT_MIN_HEAP = 70000;
+    if (ESP.getFreeHeap() < BT_MIN_HEAP) {
+        Serial.printf("[BT] FATAL: heap too low for BT (%u < %u).\n",
+                      ESP.getFreeHeap(), BT_MIN_HEAP);
+        Serial.flush();
+        return;
+    }
+
+    /* BT/WiFi 互斥：启用 BT 前关闭 WiFi 以释放 ~34KB 内存 */
     g_wifi_was_on = wifi_mgr_is_enabled();
     if (g_wifi_was_on) {
         wifi_mgr_disable();
@@ -62,10 +93,15 @@ void bt_mgr_enable(void) {
     }
     g_bt_enabled = true;
     g_state = BT_MGR_ENABLED;
+    Serial.printf("[BT-DBG] bt_mgr_enable() done free_heap=%u ms=%lu\n",
+                  ESP.getFreeHeap(), (unsigned long)millis()); Serial.flush();
 }
 
 void bt_mgr_disable(void) {
+    Serial.printf("[BT-DBG] bt_mgr_disable() free_heap=%u ms=%lu\n",
+                  ESP.getFreeHeap(), (unsigned long)millis()); Serial.flush();
     bt_uart_service_deinit();
+
     g_bt_enabled = false;
     g_state = BT_MGR_IDLE;
 
@@ -73,6 +109,49 @@ void bt_mgr_disable(void) {
     if (g_wifi_was_on) {
         wifi_mgr_enable();
         g_wifi_was_on = false;
+    }
+}
+
+/* ═══ 异步请求接口（供 UI 任务调用） ═══ */
+
+void bt_mgr_request_enable(void)
+{
+    Serial.printf("[BT-DBG] bt_mgr_request_enable() from core=%d ms=%lu\n",
+                  (int)xPortGetCoreID(), (unsigned long)millis()); Serial.flush();
+    g_enable_requested = true;
+    g_disable_requested = false;  /* 互斥：取消待处理的禁用请求 */
+}
+
+void bt_mgr_request_disable(void)
+{
+    Serial.printf("[BT-DBG] bt_mgr_request_disable() from core=%d ms=%lu\n",
+                  (int)xPortGetCoreID(), (unsigned long)millis()); Serial.flush();
+    g_disable_requested = true;
+    g_enable_requested = false;   /* 互斥：取消待处理的启用请求 */
+}
+
+/**
+ * @brief  处理待处理的启用/禁用请求
+ * @note   **必须在 Arduino loop() 中调用**，与实际 BluetoothSerial API
+ *         调用在同一 FreeRTOS 任务上下文中。
+ */
+void bt_mgr_process_requests(void)
+{
+    if (g_disable_requested) {
+        Serial.printf("[BT-DBG] processing disable request free_heap=%u\n",
+                      ESP.getFreeHeap()); Serial.flush();
+        g_disable_requested = false;
+        if (g_bt_enabled) {
+            bt_mgr_disable();
+        }
+    }
+    if (g_enable_requested) {
+        Serial.printf("[BT-DBG] processing enable request free_heap=%u ms=%lu\n",
+                      ESP.getFreeHeap(), (unsigned long)millis()); Serial.flush();
+        g_enable_requested = false;
+        if (!g_bt_enabled) {
+            bt_mgr_enable();
+        }
     }
 }
 
@@ -106,9 +185,9 @@ void bt_mgr_update(void) {
 void bt_mgr_on_switch_toggle(void *ud) {
     (void)ud;
     if (g_bt_on) {
-        bt_mgr_enable();
+        bt_mgr_request_enable();
     } else {
-        bt_mgr_disable();
+        bt_mgr_request_disable();
     }
 }
 

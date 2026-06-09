@@ -4,6 +4,14 @@
  * @details 提供蓝牙状态机、启用/禁用及 UI 菜单接口。
  *          基于 Classic Bluetooth SPP，BLE 扫描/配对功能已移除。
  *
+ *          关键线程安全约束：
+ *          - BluetoothSerial::begin() / connected() / read() 必须在同一
+ *            FreeRTOS 任务中调用（Arduino 主任务 / loop() 上下文）。
+ *          - UI 任务通过 bt_mgr_request_enable/disable() 发起异步请求，
+ *            bt_mgr_process_requests() 在 Arduino loop() 中实际执行
+ *            BluetoothSerial 操作。这避免了跨任务调用导致的 Bluedroid
+ *            内部死锁 → TWDT 看门狗复位。
+ *
  * @copyright Copyright (c) 2026
  */
 
@@ -42,13 +50,41 @@ void bt_mgr_init(void);
 
 /**
  * @brief 启用蓝牙（启动 BluetoothSerial 并开始预热）
+ * @note  **仅在 Arduino 主任务（loop()）中调用**。
+ *        UI 任务应使用 bt_mgr_request_enable()。
  */
 void bt_mgr_enable(void);
 
 /**
  * @brief 禁用蓝牙（释放 BluetoothSerial）
+ * @note  **仅在 Arduino 主任务（loop()）中调用**。
+ *        UI 任务应使用 bt_mgr_request_disable()。
  */
 void bt_mgr_disable(void);
+
+/* ═══ 异步请求接口（供 UI 任务调用） ═══ */
+
+/**
+ * @brief  请求启用蓝牙（从任意任务安全调用）
+ * @note   设置内部标志；实际初始化由 bt_mgr_process_requests()
+ *         在 Arduino loop() 中执行。此函数立即返回，不阻塞。
+ */
+void bt_mgr_request_enable(void);
+
+/**
+ * @brief  请求禁用蓝牙（从任意任务安全调用）
+ * @note   设置内部标志；实际释放由 bt_mgr_process_requests()
+ *         在 Arduino loop() 中执行。此函数立即返回，不阻塞。
+ */
+void bt_mgr_request_disable(void);
+
+/**
+ * @brief  处理待处理的启用/禁用请求
+ * @note   **必须在 Arduino loop() 中每帧调用**，
+ *         在实际执行 BluetoothSerial API 调用的同一任务上下文中。
+ *         应在 bt_uart_poll() 之前调用。
+ */
+void bt_mgr_process_requests(void);
 
 /**
  * @brief  查询是否正在等待串口输入配对码

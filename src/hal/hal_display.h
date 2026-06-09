@@ -41,6 +41,13 @@ extern int16_t g_screen_height;  /* 运行时屏幕高度 */
 extern void hal_display_init(void);
 
 /**
+ * @brief 反初始化显示子系统，释放 M5Canvas 帧缓冲内存
+ * @note  调用后所有绘制操作变为空操作（安全跳过）。
+ *        可随后再次调用 hal_display_init() 重新创建。
+ */
+extern void hal_display_deinit(void);
+
+/**
  * @brief 清屏（填充背景色）
  */
 extern void hal_display_clear(void);
