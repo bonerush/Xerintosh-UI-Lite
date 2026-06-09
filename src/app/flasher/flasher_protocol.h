@@ -1,8 +1,8 @@
 /**
  * @file   flasher_protocol.h
- * @brief  ESP32 ROM Bootloader SLIP 协议核心头文件
- * @details 定义烧录器协议状态机、SLIP 编解码、命令包构建及会话管理接口。
- *          对应 ESP32 ROM bootloader 的 UART 下载协议。
+ * @brief  烧录器协议抽象层头文件
+ * @details 定义协议类型枚举、ESP32 ROM Bootloader SLIP 协议状态机、
+ *          SLIP 编解码、命令包构建及会话管理接口。
  *
  * @copyright Copyright (c) 2026
  */
@@ -16,6 +16,19 @@ extern "C" {
 
 #include <stdint.h>
 #include <stdbool.h>
+
+/* ═══ 协议类型枚举（用于自动识别和多协议支持）═══ */
+
+typedef enum {
+    FLASHER_PROTO_AUTO = 0,   /**< 自动识别 */
+    FLASHER_PROTO_ESP32,      /**< ESP32 ROM Bootloader SLIP 协议 */
+    FLASHER_PROTO_STK500V1,   /**< STK500v1 (Arduino Optiboot) */
+    FLASHER_PROTO_COUNT
+} flasher_protocol_type_t;
+
+#define FLASHER_PROTO_DEFAULT FLASHER_PROTO_AUTO
+
+/* ═══ ESP32 SLIP 协议状态机 ═══ */
 
 typedef enum {
     FLASHER_STATE_IDLE = 0,

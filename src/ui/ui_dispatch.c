@@ -56,6 +56,9 @@ static void dispatch_enter_list(xerintosh_list_item_t *item)
         item->child_list_item[i]->y_list_item = 0;
     g_xerintosh_selector.selected_index = 0;
     g_xerintosh_selector.selected_item = item->child_list_item[0];
+    if (item->init_function) {
+        item->init_function(item->user_data);
+    }
 }
 
 /* ═══ 派发表 ═══ */

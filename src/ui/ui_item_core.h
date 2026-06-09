@@ -44,6 +44,7 @@ typedef struct xerintosh_list_item_t
   const uint8_t *bitmap_data;        /* XBM 位图数据指针 */
   uint8_t bitmap_w;                  /* 位图宽度（像素） */
   uint8_t bitmap_h;                  /* 位图高度（像素） */
+  xerintosh_cb_t init_function;      /* 进入子菜单时调用的初始化函数（可为 NULL） */
 } xerintosh_list_item_t;
 
 /* ═══ 派生类型 ═══ */

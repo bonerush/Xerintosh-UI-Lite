@@ -10,7 +10,8 @@
 #include "flasher_gpio.h"
 #include "app/storage/storage.h"
 
-/* 默认映射：G0=BOOT, G26=TX, G36=RX */
+/* 默认映射：G0=BOOT, G26=TX, G36=RX
+ * DTR 自动回退到 BOOT 引脚（一物两用） */
 flasher_pin_mapping_t g_flasher_pins[FLASHER_AVAILABLE_PINS] = {
     {0,  FLASHER_SIG_BOOT, true},
     {26, FLASHER_SIG_TX,   true},
@@ -51,6 +52,9 @@ void flasher_load_pin_config(void)
     for (int i = 0; i < FLASHER_AVAILABLE_PINS; i++) {
         uint8_t saved = storage_get_flasher_pin_role(g_flasher_pins[i].pin_num);
         if (saved < FLASHER_SIG_COUNT) {
+            /* DTR 不再作为独立配置角色，旧配置忽略 */
+            if (saved == FLASHER_SIG_DTR)
+                saved = FLASHER_SIG_NONE;
             flasher_set_pin_role(g_flasher_pins[i].pin_num, (flasher_signal_t)saved);
         }
     }
@@ -68,7 +72,7 @@ void flasher_save_pin_config(void)
 
 static HardwareSerial *s_flasher_uart = nullptr;
 
-void flasher_init_pins(void)
+void flasher_init_pins(uint32_t baud_rate)
 {
     uint8_t tx_pin = flasher_get_pin_for_signal(FLASHER_SIG_TX);
     uint8_t rx_pin = flasher_get_pin_for_signal(FLASHER_SIG_RX);
@@ -77,7 +81,7 @@ void flasher_init_pins(void)
     if (s_flasher_uart == nullptr) {
         s_flasher_uart = &Serial1;
     }
-    s_flasher_uart->begin(115200, SERIAL_8N1, rx_pin, tx_pin);
+    s_flasher_uart->begin(baud_rate, SERIAL_8N1, rx_pin, tx_pin);
 
     uint8_t dtr_pin = flasher_get_pin_for_signal(FLASHER_SIG_DTR);
     uint8_t rts_pin = flasher_get_pin_for_signal(FLASHER_SIG_RTS);
@@ -87,8 +91,17 @@ void flasher_init_pins(void)
     if (boot_pin != 255) { pinMode(boot_pin, OUTPUT); digitalWrite(boot_pin, HIGH); }
 }
 
+/**
+ * @brief 设置 DTR 信号电平
+ * @note  如果未配置专用 DTR 引脚，自动回退到 BOOT 引脚。
+ *        这让 G0 可以"一物两用"：ESP32 模式下是 BOOT，
+ *        Arduino/STK500 模式下自动充当 DTR（复位）。
+ */
 void flasher_set_dtr(bool active) {
     uint8_t pin = flasher_get_pin_for_signal(FLASHER_SIG_DTR);
+    if (pin == 255) {
+        pin = flasher_get_pin_for_signal(FLASHER_SIG_BOOT);
+    }
     if (pin != 255) digitalWrite(pin, active ? LOW : HIGH);
 }
 
@@ -132,7 +145,7 @@ int flasher_uart_read(uint8_t *buf, int max_len) {
 }
 
 #else /* NATIVE_TEST */
-void flasher_init_pins(void) {}
+void flasher_init_pins(uint32_t baud_rate) { (void)baud_rate; }
 void flasher_set_dtr(bool a) { (void)a; }
 void flasher_set_rts(bool a) { (void)a; }
 void flasher_set_boot(bool l) { (void)l; }

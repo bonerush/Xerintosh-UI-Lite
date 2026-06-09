@@ -66,9 +66,10 @@ void flasher_save_pin_config(void);
 
 /**
  * @brief  根据配置初始化 GPIO 引脚和 UART
- * @note   配置 TX/RX 引脚到 Serial1，设置 DTR/RTS/BOOT 为输出
+ * @param  baud_rate UART 波特率（如 115200, 57600）
+ * @note   配置 TX/RX 引脚到 Serial1，设置 DTR/RTS/BOOT 为输出高电平
  */
-void flasher_init_pins(void);
+void flasher_init_pins(uint32_t baud_rate);
 
 /**
  * @brief  设置 DTR 信号电平

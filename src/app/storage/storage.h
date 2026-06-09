@@ -178,6 +178,20 @@ uint8_t storage_get_flasher_pin_role(uint8_t pin);
  */
 void    storage_set_flasher_pin_role(uint8_t pin, uint8_t role);
 
+/* ═══ 烧录器模式 ═══ */
+
+/**
+ * @brief  从存储读取烧录器工作模式
+ * @return 0=离线烧录（默认），1=蓝牙-UART 透传
+ */
+uint8_t storage_get_flasher_mode(void);
+
+/**
+ * @brief  保存烧录器工作模式到存储
+ * @param  mode 0=离线烧录，1=透传模式
+ */
+void    storage_set_flasher_mode(uint8_t mode);
+
 #ifdef __cplusplus
 }
 #endif
