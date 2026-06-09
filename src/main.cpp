@@ -297,25 +297,6 @@ void loop()
 {
     deferred_kernel_init();
 
-    /* DBG: 每 200 次 loop 打印一次心跳 + 堆内存 */
-    static uint32_t s_loop_cnt = 0;
-    s_loop_cnt++;
-    /* DBG: 堆内存变化跟踪（每次显著变化打印） */
-    static uint32_t s_last_heap = 0;
-    uint32_t cur_heap = ESP.getFreeHeap();
-    if (s_last_heap == 0 || labs((long)(cur_heap - s_last_heap)) > 20000) {
-        Serial.printf("[LOOP-DBG] HEAP change: %u → %u (Δ=%+ld) ms=%lu wifi=%d bt=%d\n",
-                      s_last_heap, cur_heap, (long)(cur_heap - s_last_heap),
-                      (unsigned long)millis(), (int)wifi_mgr_is_enabled(), (int)bt_mgr_is_enabled());
-        Serial.flush();
-        s_last_heap = cur_heap;
-    }
-    if ((s_loop_cnt % 200) == 0) {
-        Serial.printf("[LOOP-DBG] heartbeat#%lu free_heap=%u ms=%lu\n",
-                      (unsigned long)s_loop_cnt, ESP.getFreeHeap(), (unsigned long)millis());
-        Serial.flush();
-    }
-
 
     dev_ttyS0_poll();
     serial_monitor_update();
@@ -333,11 +314,7 @@ void loop()
         if (now - last_bt_poll >= 50) {
             last_bt_poll = now;
             /* DBG: 堆内存过低时告警 */
-            uint32_t free_h = ESP.getFreeHeap();
-            if (free_h < 20000) {
-                Serial.printf("[LOOP-DBG] LOW HEAP before bt_uart_poll: %lu\n", (unsigned long)free_h);
-                Serial.flush();
-            }
+            /* LOOP-DBG 已禁用（调试 flasher 时干扰输出） */
             bt_uart_poll();
         }
     }

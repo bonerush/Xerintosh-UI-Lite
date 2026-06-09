@@ -173,7 +173,7 @@ void app_init_ui(void)
     xerintosh_list_item_t* sw_rot = xerintosh_new_switch_item(
         "横屏/竖屏", &g_is_landscape, NULL, on_screen_rotation_change_cb, default_icon);
     xerintosh_list_item_t* sw_flasher_mode = xerintosh_new_switch_item(
-        "烧录器透传", &g_flasher_pass_through, NULL, on_flasher_mode_change_cb, default_icon);
+        "有线桥接", &g_flasher_pass_through, NULL, on_flasher_mode_change_cb, default_icon);
 
     /* 波特率子菜单 */
     xerintosh_list_item_t* baud_menu = xerintosh_new_list_item("波特率", list_icon);
@@ -251,7 +251,7 @@ static void on_flasher_mode_change_cb(void *ud)
 {
     (void)ud;
     settings_set_flasher_mode(g_flasher_pass_through);
-    const char *msg = g_flasher_pass_through ? "透传模式已启用" : "离线烧录模式";
+    const char *msg = g_flasher_pass_through ? "有线桥接已启用" : "离线烧录模式";
     xerintosh_push_pop_up(msg, 800);
 }
 

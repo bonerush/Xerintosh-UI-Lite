@@ -199,8 +199,8 @@ uint16_t bt_uart_test_consume_tx(uint16_t len)
 #include "esp_bt.h"
 #include "esp_bt_main.h"
 
-/* ═══ 调试开关（定位 WDT 后移除） ═══ */
-#define BT_DBG_ENABLED 1
+/* ═══ 调试开关 ═══ */
+#define BT_DBG_ENABLED 0
 
 static BluetoothSerial g_bt_serial;
 static bool g_initialized    = false;
@@ -212,13 +212,16 @@ static QueueHandle_t g_rx_queue = NULL;
 
 bool bt_uart_service_init(void)
 {
-    if (g_initialized) return true;
+    if (g_initialized) {
+        Serial.println("[BT] bt_uart_service_init: already initialized");
+        return true;
+    }
 
     ringbuf_init(&g_tx_buf, BT_UART_TX_BUF_SIZE);
     ringbuf_init(&g_rx_buf, BT_UART_RX_BUF_SIZE);
     g_connected      = false;
     g_prev_connected = false;
-    /* 回调由调用方（如 serial_monitor）管理，不在 init 中清除。
+    /* 回调由调用方（如 serial_monitor/flasher）管理，不在 init 中清除。
      * 调用方应在 bt_mgr_request_enable() 之前注册回调，init 后将生效。 */
 
     /* 创建 RX 数据跨任务队列 */
@@ -226,19 +229,17 @@ bool bt_uart_service_init(void)
         g_rx_queue = xQueueCreate(BT_RX_QUEUE_SIZE, sizeof(uint8_t));
     }
 
-#if BT_DBG_ENABLED
-    uint32_t t0 = millis();
-    Serial.printf("[BT-DBG] begin() start free_heap=%u ms=%lu\n",
-                  ESP.getFreeHeap(), (unsigned long)t0);
+    Serial.printf("[BT-INIT] begin() start free_heap=%u ms=%lu\n",
+                  ESP.getFreeHeap(), (unsigned long)millis());
     Serial.flush();
-#endif
 
+    uint32_t t0 = millis();
     bool ok = g_bt_serial.begin("M5Stick-P1");
-#if BT_DBG_ENABLED
-    Serial.printf("[BT-DBG] begin()=%d took=%lums free_heap=%u\n",
-                  (int)ok, (unsigned long)(millis() - t0), ESP.getFreeHeap());
+    uint32_t elapsed = millis() - t0;
+
+    Serial.printf("[BT-INIT] begin()=%d took=%lums free_heap=%u\n",
+                  (int)ok, (unsigned long)elapsed, ESP.getFreeHeap());
     Serial.flush();
-#endif
 
     if (!ok) {
         Serial.println("[BT] BluetoothSerial.begin() failed");
@@ -246,6 +247,23 @@ bool bt_uart_service_init(void)
     }
 
     g_initialized = true;
+
+    /*
+     * ═══ 稳定延迟 ═══
+     * begin() 返回 true 后，Bluedroid 仍需时间完成 SPP 服务注册与
+     * BR/EDR inquiry scan 的启动。若立即返回，设备尚未进入可被发现状态，
+     * 导致 Mac 端搜索不到 "M5Stick-P1"。
+     *
+     * 500ms 延迟允许 Bluedroid 完成：
+     *   1. SPP RFCOMM 通道注册
+     *   2. BR/EDR 查询扫描 (inquiry scan) 启动
+     *   3. 寻呼扫描 (page scan) 启动
+     * （参考 ESP-IDF BT SPP initiator demo 中的 post-init delay） */
+    delay(500);
+    Serial.printf("[BT-INIT] post-begin delay done, ready. free_heap=%u\n",
+                  ESP.getFreeHeap());
+    Serial.flush();
+
     return true;
 }
 
@@ -262,14 +280,6 @@ void bt_uart_service_deinit(void)
      * 256 字节 + delay(0) yield，正常应在数毫秒内返回）。超出后继续
      * 清理 —— xQueueSend(timeout=0) 在队列被删除时安全返回失败。 */
     delay(100);
-
-
-
-#if BT_DBG_ENABLED
-    Serial.printf("[BT-DBG] deinit start free_heap=%u ms=%lu\n",
-                  ESP.getFreeHeap(), (unsigned long)millis());
-    Serial.flush();
-#endif
 
     g_bt_serial.end();
 
@@ -336,40 +346,31 @@ void bt_uart_poll(void)
 {
     if (!g_initialized) return;
 
-#if BT_DBG_ENABLED
-    uint32_t t0 = millis();
-    static uint32_t s_poll_seq = 0;
-    bool print_full = (++s_poll_seq % 20 == 0);  /* 每 20 次 poll 打印一次 */
-    if (print_full) {
-        Serial.printf("[BT-DBG] poll#%lu free_heap=%u ms=%lu\n",
-                      (unsigned long)s_poll_seq, ESP.getFreeHeap(), (unsigned long)t0);
-        Serial.flush();
-    }
-#endif
-
     /* ── 检查连接状态 ── */
-    uint32_t t_conn = millis();
     bool now_connected = g_bt_serial.connected();
 
-#if BT_DBG_ENABLED
-    uint32_t conn_elapsed = millis() - t_conn;
-    if (conn_elapsed > 50 || now_connected != g_prev_connected) {
-        Serial.printf("[BT-DBG] connected()=%d (%d→%d) took=%lums\n",
-                      (int)now_connected, (int)g_prev_connected,
-                      (int)now_connected, (unsigned long)conn_elapsed);
+    /* 打印连接状态变化或每 50 次 poll 打印一次 */
+    static uint32_t s_poll_cnt = 0;
+    s_poll_cnt++;
+    bool print_state = (now_connected != g_prev_connected) || (s_poll_cnt % 50 == 1);
+
+    if (print_state) {
+        Serial.printf("[BT-POLL] poll#%lu connected=%d initialized=%d free_heap=%u\n",
+                      (unsigned long)s_poll_cnt, (int)now_connected,
+                      (int)g_initialized, ESP.getFreeHeap());
         Serial.flush();
     }
-#endif
 
     if (now_connected != g_prev_connected) {
         g_connected = now_connected;
         g_prev_connected = now_connected;
         if (g_conn_cb) {
-#if BT_DBG_ENABLED
-            Serial.printf("[BT-DBG] firing connect_cb(%d)\n", (int)now_connected);
+            Serial.printf("[BT-POLL] firing connect_cb(%d)\n", (int)now_connected);
             Serial.flush();
-#endif
             g_conn_cb(now_connected);
+        } else {
+            Serial.printf("[BT-POLL] no connect_cb registered, skipping\n");
+            Serial.flush();
         }
     }
 
@@ -387,34 +388,19 @@ void bt_uart_poll(void)
             if (g_rx_queue) {
                 if (xQueueSend(g_rx_queue, &byte, 0) != pdTRUE) {
                     Serial.println("[BT] WARN: RX queue full, dropping byte");
-#if BT_DBG_ENABLED
                     Serial.flush();
-#endif
                 }
             }
         }
 
         /* 上限保护 + 每 32 字节 yield */
         if (rx_count >= RX_MAX_PER_POLL) {
-#if BT_DBG_ENABLED
-            Serial.printf("[BT-DBG] rx capped at %d bytes\n", rx_count);
-            Serial.flush();
-#endif
             break;
         }
         if ((rx_count & 0x1F) == 0) {
             delay(0);  /* taskYIELD — 给 FreeRTOS idle 喂狗机会 */
         }
     }
-
-#if BT_DBG_ENABLED
-    uint32_t total_ms = millis() - t0;
-    if (rx_count > 0 || total_ms > 20 || print_full) {
-        Serial.printf("[BT-DBG] poll#%lu done rx=%d total=%lums\n",
-                      (unsigned long)s_poll_seq, rx_count, (unsigned long)total_ms);
-        Serial.flush();
-    }
-#endif
 }
 
 /**

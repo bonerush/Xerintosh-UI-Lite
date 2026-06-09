@@ -13,6 +13,28 @@
  *          - bt_mgr_process_requests() 在 loop() 中执行实际操作。
  *          - 这避免了跨任务 Bluedroid 死锁 → TWDT 看门狗复位。
  *
+ *          ═══ BT/WiFi 共存模式（标准模板，后续开发者请遵循） ═══
+ *          由于 ESP32 的 BT (Bluedroid) 与 WiFi 共享同一射频和内存池，
+ *          同时开启两者会导致堆内存不足与射频冲突。本模块采用以下模式：
+ *
+ *          启用 BT 流程：
+ *              1. 检查当前堆内存 >= 70KB（BT 初始化约需 92KB）
+ *              2. 保存 WiFi 状态 (g_wifi_was_on)
+ *              3. 若 WiFi 开启 → wifi_mgr_disable() → delay(500ms)
+ *                 （等待 WiFi 栈完全释放 ~34KB 内存，esp_wifi_deinit 为异步操作）
+ *              4. bt_uart_service_init() 初始化 Bluedroid SPP
+ *              5. 成功后标记 g_bt_enabled = true
+ *
+ *          禁用 BT 流程：
+ *              1. bt_uart_service_deinit() 关闭 BT 栈
+ *              2. 若 g_wifi_was_on → wifi_mgr_enable() 恢复 WiFi
+ *              3. 标记 g_bt_enabled = false
+ *
+ *          任何需要 BT 的 App（串口监视器 BLE 模式、烧录器透传模式等）
+ *          都应通过 bt_mgr_request_enable() / bt_mgr_disable() 操作，而
+ *          不是手动调用 bt_uart_service_init/deinit。这些函数已统一处理
+ *          WiFi ↔ BT 互斥逻辑与线程安全。
+ *
  * @copyright Copyright (c) 2026
  */
 
@@ -32,6 +54,9 @@ void bt_mgr_update(void) {}
 void bt_mgr_on_switch_toggle(void *ud) { (void)ud; }
 
 #else
+
+/* bt_manager 调试开关 */
+#define BT_MGR_DBG_ENABLED 0
 
 #include <Arduino.h>
 #include "app/bluetooth/bt_manager.h"
@@ -62,8 +87,10 @@ void bt_mgr_init(void) {
 void bt_mgr_enable(void) {
     if (g_bt_enabled) return;
 
+#if BT_MGR_DBG_ENABLED
     Serial.printf("[BT-DBG] bt_mgr_enable() entry free_heap=%u ms=%lu\n",
                   ESP.getFreeHeap(), (unsigned long)millis()); Serial.flush();
+#endif
 
     /* ═══ 堆内存安全守卫 ═══
      * Bluedroid Classic BT SPP 初始化 + 连接建链约需 ~70KB。
@@ -77,10 +104,20 @@ void bt_mgr_enable(void) {
         return;
     }
 
-    /* BT/WiFi 互斥：启用 BT 前关闭 WiFi 以释放 ~34KB 内存 */
+    /*
+     * ═══ BT/WiFi 互斥模式 ═══
+     * 启用 BT 前必须关闭 WiFi 以释放 ~34KB 堆内存。
+     * g_wifi_was_on 记录原始状态，供 bt_mgr_disable() 恢复用。
+     *
+     * 关键：esp_wifi_deinit() 是异步操作，WiFi 内存不会立即释放。
+     * 需要 delay(500ms) 等待 FreeRTOS WiFi 任务完成清理，否则
+     * Bluedroid 初始化时堆内存不足，导致 SPP 连接失败。
+     * （参考串口监视器 sm_app_init 中 hal_delay_ms(500) 模式）
+     */
     g_wifi_was_on = wifi_mgr_is_enabled();
     if (g_wifi_was_on) {
         wifi_mgr_disable();
+        delay(500);  /* 等待 WiFi 栈内存完全释放 */
     }
 
     if (!bt_uart_service_init()) {
@@ -93,13 +130,17 @@ void bt_mgr_enable(void) {
     }
     g_bt_enabled = true;
     g_state = BT_MGR_ENABLED;
+#if BT_MGR_DBG_ENABLED
     Serial.printf("[BT-DBG] bt_mgr_enable() done free_heap=%u ms=%lu\n",
                   ESP.getFreeHeap(), (unsigned long)millis()); Serial.flush();
+#endif
 }
 
 void bt_mgr_disable(void) {
+#if BT_MGR_DBG_ENABLED
     Serial.printf("[BT-DBG] bt_mgr_disable() free_heap=%u ms=%lu\n",
                   ESP.getFreeHeap(), (unsigned long)millis()); Serial.flush();
+#endif
     bt_uart_service_deinit();
 
     g_bt_enabled = false;
@@ -116,16 +157,20 @@ void bt_mgr_disable(void) {
 
 void bt_mgr_request_enable(void)
 {
+#if BT_MGR_DBG_ENABLED
     Serial.printf("[BT-DBG] bt_mgr_request_enable() from core=%d ms=%lu\n",
                   (int)xPortGetCoreID(), (unsigned long)millis()); Serial.flush();
+#endif
     g_enable_requested = true;
     g_disable_requested = false;  /* 互斥：取消待处理的禁用请求 */
 }
 
 void bt_mgr_request_disable(void)
 {
+#if BT_MGR_DBG_ENABLED
     Serial.printf("[BT-DBG] bt_mgr_request_disable() from core=%d ms=%lu\n",
                   (int)xPortGetCoreID(), (unsigned long)millis()); Serial.flush();
+#endif
     g_disable_requested = true;
     g_enable_requested = false;   /* 互斥：取消待处理的启用请求 */
 }
@@ -138,16 +183,21 @@ void bt_mgr_request_disable(void)
 void bt_mgr_process_requests(void)
 {
     if (g_disable_requested) {
+#if BT_MGR_DBG_ENABLED
         Serial.printf("[BT-DBG] processing disable request free_heap=%u\n",
                       ESP.getFreeHeap()); Serial.flush();
+#endif
         g_disable_requested = false;
         if (g_bt_enabled) {
             bt_mgr_disable();
         }
     }
     if (g_enable_requested) {
+#if BT_MGR_DBG_ENABLED
         Serial.printf("[BT-DBG] processing enable request free_heap=%u ms=%lu\n",
-                      ESP.getFreeHeap(), (unsigned long)millis()); Serial.flush();
+                      ESP.getFreeHeap(), (unsigned long)millis());
+        Serial.flush();
+#endif
         g_enable_requested = false;
         if (!g_bt_enabled) {
             bt_mgr_enable();
