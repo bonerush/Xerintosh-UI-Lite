@@ -174,7 +174,7 @@ static void on_button_pressed(void *user_data) {
  * 安全做法：设标志位，由主循环的 app_input_process() 统一处理。
  * （如果在 UI 任务上下文中的回调则通常安全，但为一致性仍推荐延迟模式）
  */
-static volatile bool g_deferred_popup_pending = false;
+static bool g_deferred_popup_pending = false;
 
 static void on_button_pressed(void *user_data) {
     (void)user_data;
@@ -268,7 +268,7 @@ static void my_app_exit(void *user_data) {
 **用途**：在屏幕中部显示短暂消息。
 
 ```c
-#include "ui_widget.h"
+// 弹窗 API 通过 ui_item.h 提供（无需单独 include）
 
 /* 基本用法 — 显示 2 秒后自动消失 */
 xerintosh_push_pop_up("操作完成！", 2000);
@@ -297,7 +297,7 @@ xerintosh_dismiss_pop_up();                  // 动画退出（向上滑出）
 **用途**：控制 WiFi 开关、扫描连接网络。
 
 ```c
-#include "wifi_manager.h"
+#include "wifi/wifi_manager.h"
 
 /* —— 初始化（由 app_init 在启动时自动调用）—— */
 // wifi_mgr_init();
@@ -338,8 +338,8 @@ bool waiting = wifi_mgr_is_waiting_input();  // 是否在等待用户输入密�
 **用途**：控制 Classic Bluetooth SPP 串口连接。
 
 ```c
-#include "bt_manager.h"
-#include "bt_uart_service.h"
+#include "bluetooth/bt_manager.h"
+#include "bluetooth/bt_uart_service.h"
 
 /* —— 初始化（由 app_init 在启动时自动调用）—— */
 // bt_mgr_init();
@@ -414,7 +414,7 @@ bt_uart_drain_rx_queue();  // 从 FreeRTOS Queue 读取数据并触发 RX 回调
 **用途**：持久化保存配置到 NVS 闪存。
 
 ```c
-#include "storage.h"
+#include "storage/storage.h"
 
 /* —— 初始化（只需一次）—— */
 /* storage_init() 由 main.cpp 的 setup() 在系统启动时调用 */
@@ -467,7 +467,7 @@ storage_wifi_remove(0);                             // 按索引删除
 **用途**：通过串口获取用户文本输入（WiFi 密码等）。
 
 ```c
-#include "serial_input.h"
+#include "serial_input/serial_input.h"
 
 /* —— 请求输入 —— */
 serial_request_wifi_password("MyWiFiSSID");
@@ -613,7 +613,7 @@ hal_input_set_double_click_enabled(true);               // 启用/禁用双击�
 | **BtnA** | 下一项 | 确认进入 |
 | **BtnB** | 上一项 | 返回/取消 |
 
-> **注意**：BtnA 的"确认"（对 switch/slider 项的值操作）由框架在短按时内部触发，而 BtnA 长按执行"进入子菜单 / 进入 user_item"操作。
+> **注意**：所有 item 类型的"确认"（switch 值翻转、slider 进入编辑、button 触发回调、list 进入子菜单、user 进入 App）统一由 **BtnA 长按**触发（`jump_to_selected_item()` → `xerintosh_dispatch_enter()`）。BntA 短按仅做导航（`go_next_item()`）。
 
 **⚠️ 陷阱**：
 - `hal_input_get_event()` 是消费型调用：每个事件只返回一次，之后返回 `HAL_EVENT_NONE`
