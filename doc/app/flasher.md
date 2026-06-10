@@ -46,9 +46,14 @@ M5Stick-C 作为 USB↔UART 有线桥接器，将 PC 端的 USB 串口数据透�
 - 居中反色文字：进度条内部显示黑色，外部显示白色/绿色
 
 进度计算方式：
-- 解析 USB→UART 方向数据中的 STK500 PROG_PAGE 命令统计已写入页数
-- 解析 STK500 LOAD_ADDRESS 命令获取最大写入地址
-- 进度 = 已写入字节数 / 预估总大小 × 100
+- 解析 USB→UART 方向数据中的烧录命令统计进度：
+- STK500（avrdude）：解析 PROG_PAGE 命令统计已写入页数
+- - 解析 LOAD_ADDRESS 命令获取最大写入地址
+-   - 进度 = 已写入字节数 / 预估总大小 × 100
+- ESP32 SLIP（esptool）：解析 FLASH_BEGIN 获取总块数
+  - 解析 FLASH_DATA 统计已发送块数
+  - 进度 = 已发送块数 / 总块数 × 100
+- 协议自动识别：双解析器同时运行，谁先匹配就以谁为准
 
 ## RX 噪音过滤
 
@@ -61,7 +66,7 @@ UART→USB 方向的数据仅在最近 2 秒内有 USB→UART 转发时才回传
 
 - **波特率**：115200
 - **透传方向**：USB (PC) ↔ UART (目标板)
-- **协议**：STK500v1（由 avrdude 在 PC 端实现，M5Stick 仅做桥接）
+- **协议**：STK500v1 / ESP32 SLIP（由 avrdude/esptool 在 PC 端实现，M5Stick 仅做桥接）
 - **DTR 时序**：G0 LOW 50ms → HIGH，等待 500ms 后开始透传
 
 ## 文件结构
@@ -69,7 +74,7 @@ UART→USB 方向的数据仅在最近 2 秒内有 USB→UART 转发时才回传
 | 文件 | 职责 |
 |------|------|
 | `src/app/flasher/flasher.h` | 公共 App API（init/loop/exit） |
-| `src/app/flasher/flasher_app.cpp` | user_item 生命周期、USB↔UART 透传、STK500 进度解析 |
+| `src/app/flasher/flasher_app.cpp` | user_item 生命周期、USB↔UART 透传、STK500/ESP32 SLIP 协议自动识别与进度解析 |
 | `src/app/flasher/flasher_ui.cpp/h` | 全屏进度条 UI 渲染（反色文字、跑马灯） |
 | `src/app/flasher/flasher_gpio.cpp/h` | GPIO 引脚映射管理、UART 配置、DTR 时序 |
 
