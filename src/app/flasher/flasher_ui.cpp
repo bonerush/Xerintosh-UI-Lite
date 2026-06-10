@@ -2,6 +2,7 @@
  * @file   flasher_ui.cpp
  * @brief  烧录进度条 UI 实现
  * @details 全屏进度条，支持反色文字、跑马灯动画及成功/失败状态显示。
+ *          桥接模式下显示 "BRIDGE"（就绪）/ "FLASHING..."（烧录中）。
  *
  * @copyright Copyright (c) 2026
  */
@@ -36,7 +37,8 @@ static uint16_t flasher_ui_text_color(flasher_ui_status_t status)
         return COLOR_ACCENT;
     case FLASHER_UI_FAILED:
         return COLOR_RED;
-    case FLASHER_UI_LOADING:
+    case FLASHER_UI_BRIDGE:
+    case FLASHER_UI_FLASHING:
     default:
         return COLOR_FG;
     }
@@ -45,7 +47,7 @@ static uint16_t flasher_ui_text_color(flasher_ui_status_t status)
 void flasher_ui_init(flasher_ui_state_t *st)
 {
     if (!st) return;
-    st->status = FLASHER_UI_LOADING;
+    st->status = FLASHER_UI_BRIDGE;
     st->progress = 0;
     st->start_ms = hal_get_ticks();
 }
@@ -62,25 +64,27 @@ void flasher_ui_set_status(flasher_ui_state_t *st, flasher_ui_status_t status)
     st->status = status;
 }
 
-void flasher_ui_build_marquee(char *buf, size_t buf_size, uint32_t elapsed_ms)
+void flasher_ui_build_marquee(char *buf, size_t buf_size,
+                              uint32_t elapsed_ms, bool is_bridge)
 {
     if (!buf || buf_size == 0) return;
+    const char *base = is_bridge ? "BRIDGE" : "FLASHING";
     int dots = (int)((elapsed_ms % 1200) / 300);
     switch (dots) {
     case 0:
-        snprintf(buf, buf_size, "LOADING");
+        snprintf(buf, buf_size, "%s", base);
         break;
     case 1:
-        snprintf(buf, buf_size, "LOADING.");
+        snprintf(buf, buf_size, "%s.", base);
         break;
     case 2:
-        snprintf(buf, buf_size, "LOADING..");
+        snprintf(buf, buf_size, "%s..", base);
         break;
     case 3:
-        snprintf(buf, buf_size, "LOADING...");
+        snprintf(buf, buf_size, "%s...", base);
         break;
     default:
-        snprintf(buf, buf_size, "LOADING");
+        snprintf(buf, buf_size, "%s", base);
         break;
     }
 }
@@ -106,9 +110,10 @@ void flasher_ui_draw(const flasher_ui_state_t *st)
 
     /* 确定显示文字 */
     char text[32];
-    if (st->status == FLASHER_UI_LOADING) {
+    if (st->status == FLASHER_UI_BRIDGE || st->status == FLASHER_UI_FLASHING) {
         uint32_t elapsed_ms = hal_get_ticks() - st->start_ms;
-        flasher_ui_build_marquee(text, sizeof(text), elapsed_ms);
+        bool is_bridge = (st->status == FLASHER_UI_BRIDGE);
+        flasher_ui_build_marquee(text, sizeof(text), elapsed_ms, is_bridge);
     } else if (st->status == FLASHER_UI_SUCCESS) {
         strncpy(text, "SUCCESS!", sizeof(text) - 1);
         text[sizeof(text) - 1] = '\0';

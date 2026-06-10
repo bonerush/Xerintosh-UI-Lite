@@ -52,7 +52,6 @@ extern void on_serial_baud_change_cb(void *ud);
 /* 波特率选择回调（前向声明）*/
 static void on_baud_selected_cb(void *ud);
 static void on_flasher_role_selected_cb(void *ud);
-static void on_flasher_mode_change_cb(void *ud);
 static void on_enter_flasher_submenu(void *ud);
 static void on_g36_pressed_cb(void *ud);
 
@@ -136,19 +135,13 @@ static void update_flasher_pin_label(uint8_t pin)
  *        │   ├── 亮度（滑块 1-10）
  *        │   ├── 动画效果（开关）
  *        │   ├── 动画速度（滑块 1-10）
-       │   │   └── 波特率（子菜单）
-       │   │       ├── 9600（按钮）
-       │   │       └── ...
-       │   └── 烧录器引脚（子菜单）
-       │       ├── G0（按钮）
-       ├── 任务管理器（user_item）
-       ├── 串口监视器（user_item）
-       ├── Token Usage（user_item）
- *        │       ├── 115200（按钮）
- *        │       └── 230400（按钮）
+ *        │   ├── 横屏/竖屏（开关）
+ *        │   ├── 烧录器引脚（子菜单）
+ *        │   └── 波特率（子菜单）
  *        ├── 任务管理器（user_item）
  *        ├── 串口监视器（user_item）
  *        ├── Token Usage（user_item）
+ *        ├── 烧录器（user_item）
  *        └── 关于（user_item）
  */
 void app_init_ui(void)
@@ -179,8 +172,6 @@ void app_init_ui(void)
         NULL, on_anim_speed_change_cb, default_icon);
     xerintosh_list_item_t* sw_rot = xerintosh_new_switch_item(
         "横屏/竖屏", &g_is_landscape, NULL, on_screen_rotation_change_cb, default_icon);
-    xerintosh_list_item_t* sw_flasher_mode = xerintosh_new_switch_item(
-        "有线桥接", &g_flasher_pass_through, NULL, on_flasher_mode_change_cb, default_icon);
 
     /* 波特率子菜单 */
     xerintosh_list_item_t* baud_menu = xerintosh_new_list_item("波特率", list_icon);
@@ -236,7 +227,6 @@ void app_init_ui(void)
     xerintosh_push_item_to_list(item1, sw_anim);
     xerintosh_push_item_to_list(item1, sl_anim);
     xerintosh_push_item_to_list(item1, sw_rot);
-    xerintosh_push_item_to_list(item1, sw_flasher_mode);
     xerintosh_push_item_to_list(item1, flasher_pin_menu);
     xerintosh_push_item_to_list(item1, baud_menu);
 }
@@ -258,19 +248,6 @@ static void on_baud_selected_cb(void *ud)
 }
 
 /* ═══ 烧录器引脚选择回调 ═══ */
-
-/**
- * @brief 烧录器模式切换回调
- * @note  开关切换时自动修改 g_flasher_pass_through，
- *        此处仅负责持久化到 NVS。
- */
-static void on_flasher_mode_change_cb(void *ud)
-{
-    (void)ud;
-    settings_set_flasher_mode(g_flasher_pass_through);
-    const char *msg = g_flasher_pass_through ? "有线桥接已启用" : "离线烧录模式";
-    xerintosh_push_pop_up(msg, 800);
-}
 
 /**
  * @brief 进入烧录器端口号子菜单时的初始化回调
@@ -307,14 +284,10 @@ static void on_enter_flasher_submenu(void *ud)
  * @brief G36 按钮回调：提示用户该引脚不可更改
  * @note  不在回调中直接调用 xerintosh_push_pop_up，而是设置标志位，
  *        由 app_input_process 每帧检查并执行 push。
- *        原因：button_item 回调在输入派发链内触发，
- *        xerintosh_push_pop_up → hal_get_string_width → M5GFX textWidth
- *        在 ESP32 上会导致 FreeRTOS task timeout（cpu 1 ZOMBIE）。
  */
 static void on_g36_pressed_cb(void *ud)
 {
     (void)ud;
-
     g_deferred_popup_pending = true;
 }
 
@@ -414,7 +387,6 @@ void app_input_process(void)
     if (g_deferred_popup_pending) {
         g_deferred_popup_pending = false;
         xerintosh_push_pop_up("G36 为输入串口，不可更改", 1500);
-
     }
 
     /* 双键按住模式下，隔离所有正常按钮事件，防止 UI 抖动 */
@@ -482,7 +454,7 @@ void app_input_process(void)
                                          g_pin_label_bufs[pin_idx]);
                 }
                 g_flasher_sub_state = FLASHER_SUB_IDLE;
-                xerintosh_dismiss_pop_up();  /* 动画退出倒计时弹窗 */
+                xerintosh_dismiss_pop_up();
                 xerintosh_selector_exit_current_item();
                 xerintosh_push_pop_up("已强制解除并分配", 800);
             }

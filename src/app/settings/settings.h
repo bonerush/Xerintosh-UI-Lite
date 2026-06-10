@@ -37,7 +37,6 @@ extern int16_t g_anim_speed_level;       /* 动画速度等级 1-10 */
 extern int16_t g_screen_rotation_level;  /* 屏幕方向 1=竖屏, 2=横屏 */
 extern bool    g_is_landscape;           /* 横屏开关：true=横屏, false=竖屏 */
 extern int16_t g_serial_baud_rate;       /* 串口波特率等级 1-6 */
-extern bool    g_flasher_pass_through;   /* 烧录器透传模式开关 */
 
 /* ═══ Getter/Setter ═══ */
 
@@ -55,9 +54,6 @@ extern void    settings_set_landscape(bool landscape);
 
 extern int16_t settings_get_baud_rate(void);
 extern void    settings_set_baud_rate(int16_t level);
-
-extern bool    settings_get_flasher_mode(void);
-extern void    settings_set_flasher_mode(bool pass_through);
 
 /* ═══ 生命周期 ═══ */
 

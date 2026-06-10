@@ -15,7 +15,7 @@ App 层是用户应用代码所在。每个 App 在独立子目录中，通过 `
 | 任务管理器 | [taskmgr.md](taskmgr.md) | `src/app/taskmgr/` | 任务查看与终止（动画行列表 + 横屏3行布局） |
 | 串口监视器 | [serial-monitor.md](serial-monitor.md) | `src/app/serial_monitor/` | 串口监视器 App（入场滑入动画 + 按钮平滑过渡） |
 | 开机画面 | — | `src/app/boot/` | Macintosh 128K 风格开机动画 |
-| 烧录器 | [flasher.md](flasher.md) | `src/app/flasher/` | ESP32 离线烧录器（蓝牙固件传输 + GPIO 引脚映射 + SLIP 协议） |
+| 烧录器 | [flasher.md](flasher.md) | `src/app/flasher/` | USB↔UART 有线桥接器（STK500 透传 + GPIO 引脚映射 + 全屏进度条） |
 | 存储 | — | `src/app/storage.cpp/h` | NVS 持久化存储封装 |
 | WiFi 管理 | — | `src/app/wifi/wifi_manager.cpp/h` | WiFi 状态机（扫描/连接/密码输入） |
 | 蓝牙管理 | — | `src/app/bluetooth/bt_manager.cpp/h` | 蓝牙管理器（NimBLE 扫描/配对） |

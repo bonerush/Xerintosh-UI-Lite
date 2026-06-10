@@ -46,8 +46,6 @@ uint8_t storage_get_flasher_pin_role(uint8_t pin) {
 void storage_set_flasher_pin_role(uint8_t pin, uint8_t role) {
     (void)pin; (void)role;
 }
-uint8_t storage_get_flasher_mode(void) { return 0; }
-void    storage_set_flasher_mode(uint8_t mode) { (void)mode; }
 
 #else
 
@@ -420,21 +418,5 @@ void storage_set_flasher_pin_role(uint8_t pin, uint8_t role) {
     prefs.end();
 }
 
-/* ═══ 烧录器模式 ═══ */
-
-uint8_t storage_get_flasher_mode(void) {
-    Preferences prefs;
-    prefs.begin(NVS_NAMESPACE, true);
-    uint8_t val = prefs.getUChar("flasher_mode", 0);
-    prefs.end();
-    return val;
-}
-
-void storage_set_flasher_mode(uint8_t mode) {
-    Preferences prefs;
-    prefs.begin(NVS_NAMESPACE, false);
-    prefs.putUChar("flasher_mode", mode);
-    prefs.end();
-}
 
 #endif /* NATIVE_TEST */

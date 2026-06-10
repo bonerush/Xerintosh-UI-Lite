@@ -2,7 +2,8 @@
  * @file   flasher_gpio.h
  * @brief  烧录器 GPIO 引脚映射配置头文件
  * @details 定义烧录器可用引脚、信号角色枚举及引脚映射管理接口。
- *          负责将逻辑信号（TX/RX/DTR/RTS/BOOT）映射到物理 GPIO 引脚。
+ *          负责将逻辑信号（TX/RX/BOOT）映射到物理 GPIO 引脚。
+ *          BOOT 引脚同时充当 DTR（复位）功能。
  *
  * @copyright Copyright (c) 2026
  */
@@ -23,9 +24,7 @@ typedef enum {
     FLASHER_SIG_NONE = 0,
     FLASHER_SIG_TX   = 1,
     FLASHER_SIG_RX   = 2,
-    FLASHER_SIG_DTR  = 3,
-    FLASHER_SIG_RTS  = 4,
-    FLASHER_SIG_BOOT = 5,
+    FLASHER_SIG_BOOT = 5,  /**< BOOT/DTR 复用引脚 */
     FLASHER_SIG_COUNT = 6
 } flasher_signal_t;
 
@@ -67,21 +66,15 @@ void flasher_save_pin_config(void);
 /**
  * @brief  根据配置初始化 GPIO 引脚和 UART
  * @param  baud_rate UART 波特率（如 115200, 57600）
- * @note   配置 TX/RX 引脚到 Serial1，设置 DTR/RTS/BOOT 为输出高电平
+ * @note   配置 TX/RX 引脚到 Serial1，设置 BOOT 为输出高电平
  */
 void flasher_init_pins(uint32_t baud_rate);
 
 /**
- * @brief  设置 DTR 信号电平
+ * @brief  设置 DTR 信号电平（自动回退到 BOOT 引脚）
  * @param  active true=LOW（有效），false=HIGH（无效）
  */
 void flasher_set_dtr(bool active);
-
-/**
- * @brief  设置 RTS 信号电平
- * @param  active true=LOW（有效），false=HIGH（无效）
- */
-void flasher_set_rts(bool active);
 
 /**
  * @brief  设置 BOOT 引脚电平
@@ -91,14 +84,14 @@ void flasher_set_boot(bool low);
 
 /**
  * @brief  将目标 ESP32 进入下载模式
- * @note   时序：BOOT=LOW, RTS=LOW, delay(100), RTS=HIGH, delay(100)
- *         BOOT 保持 LOW 直到烧录完成
+ * @note   时序：BOOT=LOW, delay(100)
+ *         有线桥接模式通过 avrdude DTR 脉冲自动复位，此函数保留备用。
  */
 void flasher_enter_download_mode(void);
 
 /**
- * @brief  复位目标 ESP32（正常启动）
- * @note   时序：BOOT=HIGH, RTS=LOW, delay(100), RTS=HIGH
+ * @brief  复位目标设备（正常启动）
+ * @note   时序：BOOT=HIGH, delay(100)
  */
 void flasher_reset_target(void);
 

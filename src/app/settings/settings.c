@@ -19,7 +19,6 @@ int16_t g_anim_speed_level       = 5;                        /* 默认动画速�
 int16_t g_screen_rotation_level  = ORIENTATION_LANDSCAPE;    /* 默认横屏 */
 bool    g_is_landscape           = true;                     /* 默认横屏 */
 int16_t g_serial_baud_rate       = 5;                        /* 默认波特率等级 5 = 115200 */
-bool    g_flasher_pass_through   = false;                    /* 默认离线烧录模式 */
 
 /* ═══ 从存储加载 ═══ */
 
@@ -77,9 +76,6 @@ void settings_load_from_storage(void)
     } else {
         g_serial_baud_rate = 5; /* 默认 115200 */
     }
-
-    /* 烧录器模式（0=离线烧录，1=透传） */
-    g_flasher_pass_through = (storage_get_flasher_mode() != 0);
 }
 
 /* ═══ Getter/Setter ═══ */
@@ -115,12 +111,6 @@ void settings_set_baud_rate(int16_t level) {
     if (level < 1) level = 1;
     if (level > 6) level = 6;
     g_serial_baud_rate = level;
-}
-
-bool settings_get_flasher_mode(void) { return g_flasher_pass_through; }
-void settings_set_flasher_mode(bool pass_through) {
-    g_flasher_pass_through = pass_through;
-    storage_set_flasher_mode(pass_through ? 1 : 0);
 }
 
 /* ═══ 值转换 ═══ */
@@ -193,9 +183,7 @@ const char* settings_flasher_role_label(flasher_signal_t role)
         case FLASHER_SIG_NONE: return "未分配";
         case FLASHER_SIG_TX:   return "TX";
         case FLASHER_SIG_RX:   return "RX";
-        case FLASHER_SIG_DTR:  return "BOOT/DTR";  /* DTR 回退到 BOOT 引脚，UI 中不独立显示 */
-        case FLASHER_SIG_RTS:  return "RTS";
-        case FLASHER_SIG_BOOT: return "BOOT/DTR";  /* BOOT 与 DTR 共用为单一选项 */
+        case FLASHER_SIG_BOOT: return "BOOT/DTR";
         default: return "?";
     }
 }

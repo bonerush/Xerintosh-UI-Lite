@@ -8,18 +8,32 @@ extern "C" {
 }
 #endif
 
-TEST(FlasherUiTest, MarqueeDotsCycle) {
+TEST(FlasherUiTest, MarqueeDotsCycleBridge) {
     char buf[16];
-    flasher_ui_build_marquee(buf, sizeof(buf), 0);
-    EXPECT_STREQ(buf, "LOADING");
-    flasher_ui_build_marquee(buf, sizeof(buf), 300);
-    EXPECT_STREQ(buf, "LOADING.");
-    flasher_ui_build_marquee(buf, sizeof(buf), 600);
-    EXPECT_STREQ(buf, "LOADING..");
-    flasher_ui_build_marquee(buf, sizeof(buf), 900);
-    EXPECT_STREQ(buf, "LOADING...");
-    flasher_ui_build_marquee(buf, sizeof(buf), 1200);
-    EXPECT_STREQ(buf, "LOADING");
+    flasher_ui_build_marquee(buf, sizeof(buf), 0, true);
+    EXPECT_STREQ(buf, "BRIDGE");
+    flasher_ui_build_marquee(buf, sizeof(buf), 300, true);
+    EXPECT_STREQ(buf, "BRIDGE.");
+    flasher_ui_build_marquee(buf, sizeof(buf), 600, true);
+    EXPECT_STREQ(buf, "BRIDGE..");
+    flasher_ui_build_marquee(buf, sizeof(buf), 900, true);
+    EXPECT_STREQ(buf, "BRIDGE...");
+    flasher_ui_build_marquee(buf, sizeof(buf), 1200, true);
+    EXPECT_STREQ(buf, "BRIDGE");
+}
+
+TEST(FlasherUiTest, MarqueeDotsCycleFlashing) {
+    char buf[16];
+    flasher_ui_build_marquee(buf, sizeof(buf), 0, false);
+    EXPECT_STREQ(buf, "FLASHING");
+    flasher_ui_build_marquee(buf, sizeof(buf), 300, false);
+    EXPECT_STREQ(buf, "FLASHING.");
+    flasher_ui_build_marquee(buf, sizeof(buf), 600, false);
+    EXPECT_STREQ(buf, "FLASHING..");
+    flasher_ui_build_marquee(buf, sizeof(buf), 900, false);
+    EXPECT_STREQ(buf, "FLASHING...");
+    flasher_ui_build_marquee(buf, sizeof(buf), 1200, false);
+    EXPECT_STREQ(buf, "FLASHING");
 }
 
 TEST(FlasherUiTest, ProgressClamping) {
@@ -34,7 +48,7 @@ TEST(FlasherUiTest, ProgressClamping) {
 TEST(FlasherUiTest, StatusTransitions) {
     flasher_ui_state_t st;
     flasher_ui_init(&st);
-    EXPECT_EQ(st.status, FLASHER_UI_LOADING);
+    EXPECT_EQ(st.status, FLASHER_UI_BRIDGE);
     flasher_ui_set_status(&st, FLASHER_UI_SUCCESS);
     EXPECT_EQ(st.status, FLASHER_UI_SUCCESS);
 }

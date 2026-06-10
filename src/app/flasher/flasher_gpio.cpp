@@ -3,6 +3,7 @@
  * @brief  烧录器 GPIO 引脚映射配置实现
  * @details 管理烧录器物理 GPIO 引脚与逻辑信号角色之间的映射关系。
  *          支持从 NVS 持久化加载/保存配置，以及运行时角色冲突自动处理。
+ *          BOOT 引脚同时充当 DTR（复位）功能，DTR 信号自动回退至 BOOT。
  *
  * @copyright Copyright (c) 2026
  */
@@ -10,8 +11,7 @@
 #include "flasher_gpio.h"
 #include "app/storage/storage.h"
 
-/* 默认映射：G0=BOOT, G26=TX, G36=RX
- * DTR 自动回退到 BOOT 引脚（一物两用） */
+/* 默认映射：G0=BOOT, G26=TX, G36=RX */
 flasher_pin_mapping_t g_flasher_pins[FLASHER_AVAILABLE_PINS] = {
     {0,  FLASHER_SIG_BOOT, true},
     {26, FLASHER_SIG_TX,   true},
@@ -52,8 +52,8 @@ void flasher_load_pin_config(void)
     for (int i = 0; i < FLASHER_AVAILABLE_PINS; i++) {
         uint8_t saved = storage_get_flasher_pin_role(g_flasher_pins[i].pin_num);
         if (saved < FLASHER_SIG_COUNT) {
-            /* DTR 不再作为独立配置角色，旧配置忽略 */
-            if (saved == FLASHER_SIG_DTR)
+            /* 跳过已废弃的 DTR(3) 和 RTS(4) 角色 */
+            if (saved == 3 || saved == 4)
                 saved = FLASHER_SIG_NONE;
             flasher_set_pin_role(g_flasher_pins[i].pin_num, (flasher_signal_t)saved);
         }
@@ -83,30 +83,17 @@ void flasher_init_pins(uint32_t baud_rate)
     }
     s_flasher_uart->begin(baud_rate, SERIAL_8N1, rx_pin, tx_pin);
 
-    uint8_t dtr_pin = flasher_get_pin_for_signal(FLASHER_SIG_DTR);
-    uint8_t rts_pin = flasher_get_pin_for_signal(FLASHER_SIG_RTS);
     uint8_t boot_pin = flasher_get_pin_for_signal(FLASHER_SIG_BOOT);
-    if (dtr_pin != 255) { pinMode(dtr_pin, OUTPUT); digitalWrite(dtr_pin, HIGH); }
-    if (rts_pin != 255) { pinMode(rts_pin, OUTPUT); digitalWrite(rts_pin, HIGH); }
     if (boot_pin != 255) { pinMode(boot_pin, OUTPUT); digitalWrite(boot_pin, HIGH); }
 }
 
 /**
  * @brief 设置 DTR 信号电平
- * @note  如果未配置专用 DTR 引脚，自动回退到 BOOT 引脚。
- *        这让 G0 可以"一物两用"：ESP32 模式下是 BOOT，
- *        Arduino/STK500 模式下自动充当 DTR（复位）。
+ * @note  DTR 自动回退到 BOOT 引脚（复用）。
+ *        DTR active=LOW 触发目标板复位进入 bootloader。
  */
 void flasher_set_dtr(bool active) {
-    uint8_t pin = flasher_get_pin_for_signal(FLASHER_SIG_DTR);
-    if (pin == 255) {
-        pin = flasher_get_pin_for_signal(FLASHER_SIG_BOOT);
-    }
-    if (pin != 255) digitalWrite(pin, active ? LOW : HIGH);
-}
-
-void flasher_set_rts(bool active) {
-    uint8_t pin = flasher_get_pin_for_signal(FLASHER_SIG_RTS);
+    uint8_t pin = flasher_get_pin_for_signal(FLASHER_SIG_BOOT);
     if (pin != 255) digitalWrite(pin, active ? LOW : HIGH);
 }
 
@@ -117,17 +104,12 @@ void flasher_set_boot(bool low) {
 
 void flasher_enter_download_mode(void) {
     flasher_set_boot(true);  /* LOW */
-    flasher_set_rts(true);   /* LOW */
-    delay(100);
-    flasher_set_rts(false);  /* HIGH */
     delay(100);
 }
 
 void flasher_reset_target(void) {
     flasher_set_boot(false); /* HIGH */
-    flasher_set_rts(true);   /* LOW */
     delay(100);
-    flasher_set_rts(false);  /* HIGH */
 }
 
 int flasher_uart_write(const uint8_t *data, int len) {
@@ -147,7 +129,6 @@ int flasher_uart_read(uint8_t *buf, int max_len) {
 #else /* NATIVE_TEST */
 void flasher_init_pins(uint32_t baud_rate) { (void)baud_rate; }
 void flasher_set_dtr(bool a) { (void)a; }
-void flasher_set_rts(bool a) { (void)a; }
 void flasher_set_boot(bool l) { (void)l; }
 void flasher_enter_download_mode(void) {}
 void flasher_reset_target(void) {}
