@@ -10,7 +10,7 @@
 
 ## 任务主循环
 
-*📄 Source: [ui_task.c](../../src/app/ui_task.c#L36-L77)*
+*📄 Source: [ui_task.c](../../src/app/ui_task.c#L36-L85)*
 
 ```c
 void ui_task_main(void *arg)
@@ -46,6 +46,14 @@ void ui_task_main(void *arg)
         if (frame <= 5) {
             kern_log(KERN_LOG_INFO, "ui frame %d flush done, yielding", frame);
         }
+
+#ifndef NATIVE_TEST
+        /* 释放 1ms 给 FreeRTOS idle 任务（优先级 0），
+         * 确保 TG1 系统看门狗能被及时喂狗。
+         * 内核任务和 Arduino loop 都在优先级 1，
+         * 若无此让步则 idle 任务会被永久饿死。 */
+        delay(1);
+#endif
 
         /* 让出 CPU */
         kern_yield();
@@ -90,7 +98,10 @@ void ui_task_main(void *arg)
 
         if (前5帧) 记录日志: "第N帧刷新完成，准备让出"
 
-        // 第六步：让出CPU
+        // 第六步：喂狗延时（仅硬件）
+        延时(1ms)         // 确保 FreeRTOS idle 任务有机会喂看门狗
+
+        // 第七步：让出CPU
         内核让出()        // 切换到下一个内核任务
 
         if (前5帧) 记录日志: "第N帧恢复执行"
@@ -98,7 +109,7 @@ void ui_task_main(void *arg)
 }
 ```
 
-**核心思想**：UI 任务是一个永不退出的无限循环任务。每帧执行“输入→清屏→渲染→刷新→yield”五步，通过 `kern_yield()` 主动让出 CPU，使 WiFi/BT/Shell 等其他任务获得执行机会。
+**核心思想**：UI 任务是一个永不退出的无限循环任务。每帧执行“输入→清屏→渲染→刷新→delay(1)→yield”六步，通过 `kern_yield()` 主动让出 CPU，使 WiFi/BT/Shell 等其他任务获得执行机会。硬件环境下的 `delay(1)` 至关重要，可防止 FreeRTOS idle 任务饿死导致 TG1 看门狗复位。
 
 ---
 
@@ -112,7 +123,8 @@ void ui_task_main(void *arg)
 │ 4. xerintosh_ui_widget_core()           │  ← 信息栏/弹窗渲染
 │ 5. xerintosh_draw_long_press_hint()     │  ← 可选：长按进度条
 │ 6. hal_display_flush()                  │  ← pushSprite DMA 刷新
-│ 7. kern_yield()                         │  ← 让出 CPU
+│ 7. delay(1)   [硬件环境]                │  ← 喂狗避让
+│ 8. kern_yield()                         │  ← 让出 CPU
 └─────────────────────────────────────────┘
 ```
 
@@ -131,14 +143,11 @@ void ui_task_main(void *arg)
 
 ## 启动流程
 
-*📄 Source: [main.cpp](../../src/main.cpp#L150-L170)*
+UI 任务在 `main.cpp` 的 `setup()` 末尾通过 `kern_spawn()` 创建，栈大小 4096 字节：
 
 ```c
-/* main.cpp setup() 中 */
 kern_spawn("ui", ui_task_main, NULL, 4096);   /* 4KB 栈 */
 ```
-
-UI 任务在 `main.cpp` 的 `setup()` 末尾通过 `kern_spawn()` 创建，栈大小 4096 字节。
 
 ---
 
@@ -149,6 +158,8 @@ UI 任务在 `main.cpp` 的 `setup()` 末尾通过 `kern_spawn()` 创建，栈�
 2. **HAL 调用保持直接**：当前阶段 UI 任务仍直接调用 `hal_display_clear()` 和 `hal_display_flush()`，不经过 VFS 的 `/dev/fb0`。这是为了性能考虑，后续可能逐步迁移到 VFS 写入协议。
 
 3. **前5帧日志**：启动初期会打印详细的帧生命周期日志，帮助调试调度问题。5 帧后停止，避免日志洪水。
+
+4. **delay(1) 的必要性**：硬件环境中 `delay(1)` 释放 CPU 给 FreeRTOS idle 任务（优先级 0），确保 ESP32 的 TG1 系统看门狗能被及时喂狗。若无此延时，idle 任务会被永久饿死，约 1 秒后触发看门狗复位。
 
 ---
 

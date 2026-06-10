@@ -271,3 +271,16 @@ Agent 在隔离 worktree 内完成编码，**完成后必须执行自测**：
      4. ✅ 检查所有 App 层对抢占式调度器的调用（无需修改）
      5. ✅ 测试验证：native 338/338 PASSED, 硬件编译 SUCCESS
    - 原始意见：我想彻底移除掉协作式调度器也就是v1版本的任何内容，系统底层只走抢占式调度器，并且把对接的app和相关内容重新适配一下
+- [FEAT_AGENT_FINISH] 这是一个重构请求，在当前框架的开发过程中，我发现在调用系统的组件和一些进程或者任务处理，ai在撰写代码的时候会忽略固有的格式和规定，以至于项目的Bug频出。
+   请首先调查代码，探寻哪些部分是可以写成一个固定的调用模板，或者撰写例程或者详细的文档注释解释调用这个api需要做什么。首要关注的就是系统组件的调用模板化（选项，弹窗，带控件的选项等等），其次是查看一些服务的固定格式（网络，蓝牙以及别的一些玩意）
+   - 分支: `feature/api-template-docs`
+   - 提交1 (20ed513): 初始创建 api-templates.md (12模板) + 头文件注释增强
+   - 提交2 (92709fc): 交叉验证修正 (HAL函数签名重写等16处)
+   - 提交3 (4c7b885): 深度逐行审查修正 (按键映射/bt_uart位置等11处修正) + Token Usage缺陷修复
+   - 提交4 (本轮): 全文档重构与源码溯源 — 对 doc/ 下全部 40+ 文档逐文件逐API进行源码交叉验证
+     - 架构/教程: index.md, coding-style.md, developer-guide.md, api-templates.md, your-first-app.md
+     - UI Core: index.md, item.md, core.md, dispatch.md, drawer.md, draw-list.md, draw-anim.md, draw-widgets.md, draw-icons.md, context.md, ui-anim-row.md
+     - HAL/App: index.md×2, display.md, input.md, system.md, app-init.md, ui-task.md, settings.md, svc-mgr-helper.md, taskmgr.md, serial-monitor.md, flasher.md
+     - Kernel: index.md, kern-init.md, kern-port.md, kern-task.md, kern-mpu.md, kern-resource.md, kern-sync.md, kern-smp.md, kern-devfs.md, kern-devices.md, dev-ttys0.md, kern-shell.md, kern-shell-cmds.md, kern-sched-class.md, kern-sched-fifo.md, kern-sched-rr.md
+     - 关键修正: 色深 16-bit→8-bit RGB332, 蓝牙开关从设置菜单移除, svc_mgr_helper 标注已移除, shell 提示符 `[/]$ `, FIFO调度类实际未使用, `/dev/null` 不存在, 所有代码片段标注 `*📄 Source: [file#Ln]*`
+   - 验证: Native 348/348 PASSED, 硬件编译 SUCCESS (RAM 22.3%, Flash 88.0%)

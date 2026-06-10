@@ -92,7 +92,7 @@ kern_port.h (接口层)
 
 ## FreeRTOS 后端：双信号量令牌协议
 
-*📄 Source: [kern_port_freertos.c](../../src/kernel/kern_port_freertos.c#L164-L328)*
+*📄 Source: [kern_port_freertos.c](../../src/kernel/kern_port_freertos.c#L291-L344)*
 
 ```
 调度器（loop）                任务（wrapper）
@@ -137,7 +137,7 @@ kern_sched_tick()
 
 ## 抢占式定时器基础设施
 
-*📄 Source: [kern_port_freertos.c](../../src/kernel/kern_port_freertos.c#L103-L162)*
+*📄 Source: [kern_port_freertos.c](../../src/kernel/kern_port_freertos.c#L109-L157)*
 
 ESP32 抢占式调度通过硬件定时器（ESP32 `timer_group0/timer0`）驱动：
 

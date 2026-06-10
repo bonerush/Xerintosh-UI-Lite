@@ -127,17 +127,6 @@ int kern_devfs_register_device(kern_device_t *dev)
 | 设备查找 | 仅通过 VFS 路径 | 额外支持 `kern_device_find("name")` |
 | 迁移状态 | fb0/input0/ttyS0 仍使用 | pwrkey 已迁移 |
 
-### /dev/null 黑洞设备
-
-*📄 Source: [kern_devfs.c](../../src/kernel/kern_devfs.c#L38-L60)*（注：此设备在 `kern_devices_init()` 中通过旧版 API 注册，属于物理设备集合）
-
-| 操作 | 行为 | 说明 |
-|------|------|------|
-| `read` | 返回 0 (EOF) | 读取始终为空 |
-| `write` | 返回 `len`（吞掉数据） | 接受一切写入，丢弃数据 |
-| `ioctl` | `NULL`（不支持） | — |
-| `release` | 返回 `KERN_OK` | 无需清理 |
-
 ---
 
 ## 设备注册流程图

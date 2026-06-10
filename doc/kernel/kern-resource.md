@@ -53,7 +53,7 @@ typedef struct kern_resource {
 
 ### 资源链表在 TCB 中的位置
 
-*📄 Source: [kern_task.h](../../src/kernel/kern_task.h#L81-L85)*
+*📄 Source: [kern_task.h](../../src/kernel/kern_task.h#L82-L85)*
 
 ```c
 typedef struct kern_task {

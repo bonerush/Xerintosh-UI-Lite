@@ -106,13 +106,13 @@ typedef struct kern_task {
 | `cpu_id` | `uint8_t` | `KERN_CPU_ANY` (0xFF) | SMP 任务亲和性：指定运行在哪个 CPU，`KERN_CPU_ANY` 由调度器自动分配 |
 | `resource_head` | `kern_resource_t*` | `NULL` | 资源追踪链表头。`kern_kmalloc()` 等内核分配函数自动将分配挂载到此链表。`kern_exit()` 时自动释放 |
 | `mpu_config` | `kern_mpu_config_t*` | `NULL` | 每任务的 MPU 区域配置。上下文切换时 `kern_mpu_apply()` 加载此配置 |
-| `priority` | `uint8_t` | `0` | 优先级 0-255。RR 不使用此字段，FIFO 按优先级排序 |
+| `priority` | `uint8_t` | `128`（`kern_spawn` 中硬编码） | 优先级 0-255。RR 不使用此字段，FIFO 按优先级排序 |
 | `timeslice_remaining` | `uint8_t` | `SCHED_RR_DEFAULT_TIMESLICE` (10) | RR 时间片剩余 tick。每次 `sched_rr_tick()` 递减，归零时标记 `g_need_resched` |
-| `scheduler_class_id` | `int8_t` | `-1` | 指向 `g_sched_classes[]` 索引。虚任务和未分配任务为 `-1` |
+| `scheduler_class_id` | `int8_t` | `0`（`calloc` 默认，未显式初始化） | 指向 `g_sched_classes[]` 索引。当前代码中未在 `kern_spawn()` 中显式设置，依赖 `calloc` 清零 |
 
 ### 调度循环与 pick_next_ready
 
-*📄 Source: [kern_sched.c](../../src/kernel/kern_sched.c#L200-L324)*
+*📄 Source: [kern_sched.c](../../src/kernel/kern_sched.c#L220-L313)*
 
 调度 tick 的核心流程已在 [index.md](index.md#调度流程总览) 中图示。简言之，每个 tick 执行：
 
@@ -120,7 +120,8 @@ typedef struct kern_task {
 kern_sched_tick():
     ├─ tick 计数++
     ├─ 回收僵尸任务
-    ├─ [PREEMPT] 遍历 class->tick() / 检查 need_resched
+    ├─ 遍历 class->tick()（RR 时间片递减、FIFO 抢占检测）
+    ├─ 检查 need_resched（时间片用尽或更高优先级任务就绪）
     └─ pick_next_ready() → 上下文切换
 ```
 
@@ -131,7 +132,7 @@ kern_sched_tick():
 ```
 ESP32（FreeRTOS 令牌协议）：
     kern_port 层为每个 Xeros 任务创建一个 FreeRTOS 任务
-    上下文切换 = 释放互斥锁给下一个任务 → 当前任务等待锁
+    上下文切换 = 释放二值信号量令牌给下一个任务 → 当前任务等待令牌
 
 Native（POSIX ucontext）：
     使用 swapcontext() 完整寄存器保存/恢复
@@ -146,16 +147,16 @@ XEROS_NATIVE_SCHED（setjmp/longjmp）：
 
 | 策略 | ESP32 | Native | XEROS_NATIVE_SCHED |
 |------|-------|--------|---------------------|
-| 机制 | FreeRTOS 互斥锁令牌 | `swapcontext` (POSIX) | `setjmp/longjmp` |
+| 机制 | FreeRTOS 二值信号量令牌 | `swapcontext` (POSIX) | `setjmp/longjmp` |
 | 原因 | ESP32 的 FreeRTOS 上下文切换可线程安全 | 桌面环境 `ucontext` 更完整且易调试 | 无 ucontext 的 ESP32 本地调试 |
 | 切换开销 | 中等（FreeRTOS 调度） | 中等（寄存器 + 信号掩码） | 低（仅寄存器快照） |
 
 ### 动态栈管理
 
-*📄 Source: [kern_sched.c](../../src/kernel/kern_sched.c#L228-L234)*
+*📄 Source: [kern_sched.c](../../src/kernel/kern_sched.c#L234-L243)（Native 测试环境）*
 
 ```c
-/* tick 中每 500 tick 检查一次栈使用率 */
+/* tick 中每 500 tick 检查一次栈使用率（仅 Native 后端） */
 if (g_current_task != NULL && g_current_task != g_idle_task
     && (g_sched_ticks % 500) == 0) {
     size_t usage = kern_task_stack_usage(g_current_task);
@@ -167,6 +168,8 @@ if (g_current_task != NULL && g_current_task != g_idle_task
     }
 }
 ```
+
+> **注意**：ESP32 FreeRTOS 后端中栈由 FreeRTOS 自动管理，`kern_task_stack_usage()` 通过 `uxTaskGetStackHighWaterMark()` 查询（见 [kern_port_freertos.c](../../src/kernel/kern_port_freertos.c#L279-L287)），tick 中不做主动扫描。
 
 #### 中文伪代码拆解
 
@@ -181,13 +184,15 @@ if (g_current_task != NULL && g_current_task != g_idle_task
 }
 ```
 
-**栈安全的三层防线：**
+**栈安全防线（Native 后端）：**
 
 | 层级 | 检测机制 | 触发条件 | 行为 |
 |------|----------|----------|------|
-| 1 | 金丝雀 | `canary != 0xAD` | `kern_panic()` 立即终止 |
-| 2 | SP 使用率警告 | `usage > stack_size * 75%` | 输出警告日志 |
-| 3 | 上限拒绝 | `stack_size >= KERN_STACK_MAX (8KB)` | 拒绝扩展，任务继续运行 |
+| 1 | 金丝雀 | `canary != 0xDEADC0DE` | 输出警告日志（见 [kern_task_stack.c](../../src/kernel/kern_task_stack.c#L67-L92)） |
+| 2 | SP 使用率警告 | `usage > stack_size * 75%` | 输出警告日志（仅 Native tick 中检查） |
+| 3 | 上限限制 | `stack_size > KERN_STACK_MAX (8KB)` | `task_stack_init()` 截断到 8KB |
+
+> **注意**：ESP32 FreeRTOS 后端中栈由 FreeRTOS 自动管理，金丝雀和栈扫描机制不适用。`task_stack_init()` 和 `task_write_canary()` 在此后端中为空操作（见 [kern_task_stack.c](../../src/kernel/kern_task_stack.c#L48-L60)）。`kern_task_stack_usage()` 通过 `uxTaskGetStackHighWaterMark()` 查询（见 [kern_port_freertos.c](../../src/kernel/kern_port_freertos.c#L279-L287)）。
 
 ### 任务生命周期
 
@@ -195,24 +200,24 @@ if (g_current_task != NULL && g_current_task != g_idle_task
 任务生命周期（v2）：
 
 1. SPAWN 阶段
-   └→ kern_spawn("ui", ui_task_main, NULL, 0)
-       ├→ 分配 TCB（calloc）
-       ├→ 分配栈（KERN_STACK_MIN + 额外 + 256字节余量）
-       ├→ 设置金丝雀 = 0xAD
-       ├→ 设置 cpu_id = KERN_CPU_ANY（自动分配）
-       ├→ 设置 priority = 0
+   └→ kern_spawn("ui", ui_task_main, NULL, 4096)
+       ├→ 分配 TCB（calloc，所有字段默认清零）
+       ├→ 设置 priority = 128（默认值）
        ├→ 设置 timeslice_remaining = SCHED_RR_DEFAULT_TIMESLICE
-       ├→ 设置 scheduler_class_id = -1（待分配）
+       ├→ 设置 cpu_id = KERN_CPU_ANY（自动分配；SMP 模式下调用 kern_smp_migrate_assign()）
        ├→ PID 递增分配
-       ├→ 调用 class->enqueue() 加入调度链表
        ├→ 创建底层上下文（FreeRTOS线程 / ucontext / setjmp栈）
+       ├→ 插入 g_task_list 链表尾部
+       ├→ 调用 kern_mpu_setup_stack_guard() 配置栈守卫（Native 后端）
        └→ 状态设为 READY
+
+   *📄 Source: [kern_task_lifecycle.c](../../src/kernel/kern_task_lifecycle.c#L159-L232)（ESP32 FreeRTOS 后端）*
 
 2. RUNNING 阶段
    └→ pick_next_ready() 选中该任务后
        ├→ 状态设为 RUNNING
        ├→ kern_mpu_apply(task)  ← v2 新增：加载 MPU 区域
-       └→ 上下文切换（swapcontext / 互斥锁 / longjmp）
+       └→ 上下文切换（swapcontext / 二值信号量令牌 / longjmp）
 
 3. YIELD 阶段
    └→ 任务调用 kern_yield()
@@ -227,7 +232,7 @@ if (g_current_task != NULL && g_current_task != g_idle_task
 
 5. EXIT 阶段
    └→ 任务调用 kern_exit()
-       ├→ kern_resource_release_all(task->resource_head)  ← v2 新增
+       ├→ kern_resource_release_all(cur)  ← v2 新增：自动释放当前任务的所有追踪资源
        ├→ 状态设为 ZOMBIE
        └→ reap_zombies() 在下次 tick 中释放 TCB 和栈内存
 ```
@@ -260,17 +265,17 @@ kern_pid_t pid = kern_task_register_virtual("serial_monitor");
 kern_task_unregister_virtual(pid);
 ```
 
-虚任务在 `/proc/tasks` 中显示 `flags=V`，栈信息显示为 `n/a`。
+虚任务在 `/proc/tasks` 中显示为 `0/0` 栈使用（因 `stack_size=0`，见 [kern_procfs.c](../../src/kernel/kern_procfs.c#L81-L101)），`flags` 字段不在输出中。
 
 ---
 
 ## 与其他组件的关系
 
-- **kern_sched_class**：每个任务的 `scheduler_class_id` 指向所属调度类。任务创建时由 class 的 `enqueue()` 加入类队列
-- **kern_smp**：`cpu_id` 决定任务运行在哪个 CPU，`KERN_CPU_ANY` 表示自动分配
-- **kern_mpu**：`mpu_config` 在上下文切换时由 `kern_mpu_apply()` 加载
+- **kern_sched_class**：`scheduler_class_id` 字段预留用于指向所属调度类，但当前 `kern_spawn()` 中未显式初始化（依赖 `calloc` 清零为 0）。任务直接插入全局 `g_task_list` 链表，未通过 `class->enqueue()` 注册
+- **kern_smp**：`cpu_id` 决定任务运行在哪个 CPU，`KERN_CPU_ANY` 表示由 `kern_smp_migrate_assign()` 自动分配（SMP 模式下分配到任务数较少的核心）
+- **kern_mpu**：`mpu_config` 在上下文切换时由 `kern_mpu_apply()` 加载（当前为框架实现，尚未写入实际硬件寄存器）
 - **kern_resource**：`resource_head` 在任务退出时自动遍历释放
-- **kern_vfs**：每个 task 的 `fd_table` 引用 VFS 文件对象，任务退出时自动关闭所有 fd
+- **kern_vfs**：VFS 使用全局 `g_fd_table[]` 管理文件描述符，任务退出时由 `kern_resource_release_all()` 自动关闭关联的 FD
 - **kern_procfs**：`/proc/tasks` 遍历调度器链表显示任务信息
 
 ---

@@ -11,7 +11,7 @@ Xeros 是一个轻量级**抢占式微内核**，运行在 M5Stick-C (ESP32-PICO
 2. **SMP 双核**：ESP32 PRO_CPU + APP_CPU 并行调度，per-CPU 数据隔离，`CONFIG_SMP_ENABLED` 守卫零开销退化至单核
 3. **一切皆文件**：通过 VFS 将显示、按键、串口等硬件抽象为 `/dev/fb0`、`/dev/input0`、`/dev/ttyS0`
 4. **资源安全**：任务退出时自动释放所有内核资源（内存分配、文件描述符、设备句柄）
-5. **动态栈管理**：每个任务从 1KB 起始栈分配，按需扩展到上限 8KB，内置金丝雀溢出检测
+5. **动态栈管理**：Native 后端中每个任务从 1KB 起始栈分配，上限 8KB，内置金丝雀（`0xDEADC0DE`）溢出检测；ESP32 FreeRTOS 后端栈由 FreeRTOS 自动管理
 
 FreeRTOS 继续在底层为 WiFi/BT 协议栈服务，Xeros 运行在 Arduino `loop()` 的单一线程内（单核模式）或多 FreeRTOS 任务上（SMP 模式），不与底层冲突。
 
@@ -116,25 +116,34 @@ ESP32 Arduino 的 WiFi（`esp_wifi`）和蓝牙（NimBLE）协议栈深度依赖
 
 ## 初始化顺序
 
+*📄 Source: [main.cpp](../../src/main.cpp#L138-L288)*
+
 ```
 main.cpp setup():
     M5.begin()                    ← 硬件初始化
-    hal_display_init()            ← 显示驱动
-    hal_input_init()              ← 按键驱动
     storage_init()                ← NVS 存储
     settings_load_from_storage()  ← 恢复设置
+    hal_display_init()            ← 显示驱动
+    hal_input_init()              ← 按键驱动
+    app_init_ui()                 ← UI 菜单树构造
+    app_init_managers()           ← WiFi/BT 管理器初始化
+    xerintosh_init_core()         ← Xerintosh UI 核心初始化
 
+deferred_kernel_init()（loop() 第一帧触发）:
     kern_init()                   ← 内核日志系统
     kern_vfs_init()               ← VFS 根节点
     kern_devfs_init()             ← /dev 目录
-    kern_sched_init()             ← SMP 初始化 → 注册调度类 → spawn idle
-    kern_devices_init()           ← 注册 fb0/input0/ttyS0（使用设备驱动模型）
-    kern_sysfs_init()             ← /sys 虚拟文件
     kern_procfs_init()            ← /proc 虚拟文件
-
-    kern_shell_init()             ← 启动 Shell 任务
-    /* 后续: kern_spawn(ui_task) 等 */
+    kern_sysfs_init()             ← /sys 虚拟文件
+    kern_gpiofs_init()            ← /sys/gpio 引脚映射
+    kern_devices_init()           ← 注册 fb0/input0/ttyS0
+    kern_shell_init()             ← 启动 Shell 任务（内部调用 kern_spawn）
+    kern_spawn("ui", ...)         ← UI 任务
+    kern_spawn("wifi-mgr", ...)   ← WiFi 管理器任务
+    kern_spawn("bt-mgr", ...)     ← BT 管理器任务
 ```
+
+> **注意**：`kern_sched_init()` 不在 `main.cpp` 中显式调用，而是由首次 `kern_spawn()` 内部按需触发（见 [kern_task_lifecycle.c](../../src/kernel/kern_task_lifecycle.c#L167)）。`kern_port_init()` 同样由 `kern_sched_init()` 在 ESP32 FreeRTOS 后端中调用。
 
 ## 调度流程总览
 
@@ -163,8 +172,7 @@ kern_sched_tick() 每 tick:
 │   ├── fb0               ← 帧缓冲
 │   ├── input0            ← 按键事件
 │   ├── ttyS0             ← 串口
-│   ├── pwrkey            ← 电源键事件（v2 新设备模型）
-│   └── null              ← 黑洞设备
+│   └── pwrkey            ← 电源键事件（v2 新设备模型）
 ├── proc/
 │   ├── tasks             ← 任务列表（含 cpu_id/scheduler_class）
 │   ├── uptime            ← 内核运行时间

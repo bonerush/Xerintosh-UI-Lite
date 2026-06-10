@@ -36,15 +36,20 @@ UI 核心层是 Xerintosh 菜单框架的主体，纯 C 实现。它提供菜单
 
 ## 渲染管线（每帧顺序）
 
-1. `hal_display_clear()` — 清除后台缓冲区
-2. `xerintosh_ui_main_core()` → `xerintosh_ui_update_lifecycle()` — user_item 生命周期
-3. `xerintosh_ui_main_core()` → `xerintosh_ui_render_frame()` — 列表模式渲染
-   - `xerintosh_refresh_camera_position()` — 相机视口
-   - `xerintosh_refresh_list_item_position()` — 列表项 Y 坐标插值
-   - `xerintosh_refresh_selector_position()` — 选择器 Y/W/H 插值
-   - `xerintosh_draw_list()` — 列表外观 + 列表项 + 选择器高亮
-4. `xerintosh_draw_exit_animation()` — 退场遮罩（沙漏 + 扫描线）
-5. `xerintosh_ui_widget_core()` — Widget（信息栏 + 弹窗）叠加层
+*📄 Source: [ui_task.c](../../src/app/ui_task.c#L49-L64)*
+
+1. `app_input_process()` — 输入处理（按钮状态机、导航、派发）
+2. `hal_display_clear()` — 清除后台缓冲区
+3. `xerintosh_ui_main_core()` — UI 核心调度
+   - `xerintosh_ui_update_lifecycle()` — user_item 生命周期（init / loop / exit）
+   - `xerintosh_ui_render_frame()` — 列表模式渲染
+     - `xerintosh_refresh_camera_position()` — 相机视口
+     - `xerintosh_refresh_list_item_position()` — 列表项 Y 坐标插值
+     - `xerintosh_refresh_selector_position()` — 选择器 Y/W/H 插值
+     - `xerintosh_draw_list()` — 列表外观 + 列表项 + 选择器高亮
+   - `xerintosh_draw_exit_animation()` — 退场遮罩（沙漏 + 扫描线）
+4. `xerintosh_ui_widget_core()` — Widget（信息栏 + 弹窗）叠加层
+5. `xerintosh_draw_long_press_hint()` — 长按进度提示条
 6. `hal_display_flush()` — DMA `pushSprite` 刷新到屏幕
 
 ---

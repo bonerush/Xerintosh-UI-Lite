@@ -318,22 +318,25 @@ taskC.priority 从 50 提升到 150:
 ## 与 RR 类的协作
 
 ```
-调度类优先级链:
+调度类注册顺序:
 
    pick_next_ready() 按注册顺序查询:
    ┌─────────────────────────────────────┐
-   │ g_sched_classes[0] = sched_class_rr │  ← 兜底（先注册）
-   │ g_sched_classes[1] = sched_class_fifo│  ← 高优先级（后注册）
+   │ g_sched_classes[0] = sched_class_rr │  ← 先注册（兜底）
+   │ g_sched_classes[1] = sched_class_fifo│  ← 后注册
    └─────────────────────────────────────┘
 
    查询流程:
-   1. FIFO.pick_next() → 如果返回任务 → 直接使用
-   2. 如果 FIFO 返回 NULL → RR.pick_next() → 兜底
+   1. RR.pick_next() → 如果返回任务 → 直接使用
+   2. 如果 RR 返回 NULL → FIFO.pick_next() → 备选
 
    结果：
-   - 有高优先级就绪任务 → 总是选择它
-   - 高优先级任务全部睡眠/阻塞 → RR 循环调度低优先级任务
+   - RR 的 pick_next 遍历所有任务（含高优先级），几乎总会返回任务
+   - FIFO 仅在 RR 返回 NULL 时才有机会被查询
    - idle(priority=0) 作为最终兜底
+
+⚠️ 注意：当前实现中任务仅加入全局 g_task_list，RR 直接将其
+作为 task_list。FIFO 的 task_list 需显式入队才包含任务。
 ```
 
 ---
@@ -342,7 +345,7 @@ taskC.priority 从 50 提升到 150:
 
 - **kern_sched_class**：`sched_class_fifo` 是 `kern_sched_class_t` 接口的实例
 - **kern_sched**：`kern_sched_init()` 中总是注册此类
-- **kern_task**：每个任务通过 `scheduler_class_id = 1` 指向此类。任务的 `priority` 字段决定链表中的位置
+- **kern_task**：任务通过 `priority` 字段决定链表中的位置。当前实现中 `scheduler_class_id` 未在 spawn 时自动分配
 - **kern_sched_rr**：与 RR class 协作完成两级调度（FIFO 优先，RR 兜底）
 
 ---

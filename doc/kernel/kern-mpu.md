@@ -213,8 +213,6 @@ static uint32_t mpu_encode_size(size_t size)
 
 ## ESP32 8 个 MPU 区域规划
 
-*📄 Source: [kern_mpu.c](../../src/kernel/kern_mpu.c#L26-L43)*
-
 ```
 区域索引    类型                 权限         用途
 ─────────────────────────────────────────────────────
@@ -228,7 +226,7 @@ C6          PERIPHERAL          读写          外设寄存器映射
 C7          UNUSED              —            预留扩展
 ```
 
-C0-C1 在所有任务间**共享**（内核区域不变），在 `kern_mpu_init()` 时配置。C2-C5 是**每任务独立**的，在上下文切换时由 `kern_mpu_apply()` 动态写入。
+⚠️ **注意**：上表为设计规划，尚未在源码中硬编码。当前 `kern_mpu_init()` 仅输出日志（见 [kern_mpu.c](../../src/kernel/kern_mpu.c#L66-L80)），未实际配置 C0-C1 内核保护区。`kern_mpu_setup_stack_guard()` 动态配置 C2 区域（栈守卫），C3-C7 由用户代码通过 `kern_mpu_add_region()` 按需填充。
 
 ---
 
@@ -240,28 +238,36 @@ C0-C1 在所有任务间**共享**（内核区域不变），在 `kern_mpu_init(
 void kern_mpu_apply(struct kern_task *task)
 {
     if (task == NULL) return;
+
     kern_mpu_config_t *cfg = task->mpu_config;
     if (cfg == NULL) return;
 
-    /* 逐区域写入 MPU 寄存器 */
-    for (uint8_t i = 0; i < cfg->region_count; i++) {
-        kern_mpu_region_t *rgn = &cfg->regions[i];
-        if (!rgn->enabled) continue;
-
-        uint32_t reg_val =
-            ((uint32_t)(uintptr_t)rgn->base & 0x3FFF)           /* [13:0] 基址 */
-          | (mpu_encode_size(rgn->size) << 14)                   /* [20:14] 大小 */
-          | (mpu_encode_access(rgn->access) << 25);              /* [27:25] 权限 */
-
-        /* 写入对应核的寄存器 */
-        switch (kern_cpu_id()) {
-            case 0: DPORT_PRO_PMS_C(i) = reg_val; break;
-            case 1: DPORT_APP_PMS_C(i) = reg_val; break;
-        }
-    }
-    asm volatile("memw");  /* 刷新 MPU 状态 */
+    /*
+     * 逐区域写入 MPU 寄存器。
+     *
+     * 伪代码（ESP32 PRO_CPU）：
+     *   for (uint8_t i = 0; i < cfg->region_count; i++) {
+     *       kern_mpu_region_t *rgn = &cfg->regions[i];
+     *       if (!rgn->enabled) continue;
+     *
+     *       uint32_t reg_val = ((uint32_t)(uintptr_t)rgn->base & 0x3FFF)
+     *                        | (mpu_encode_size(rgn->size) << 14)
+     *                        | (mpu_encode_access(rgn->access) << 25);
+     *
+     *       // 写入对应核的 MPU 区域寄存器
+     *       switch (kern_cpu_id()) {
+     *           case 0: DPORT_PRO_PMS_C(i) = reg_val; break;
+     *           case 1: DPORT_APP_PMS_C(i) = reg_val; break;
+     *       }
+     *   }
+     *
+     *   // 刷新 MPU 状态（某些 ESP32 需要读取确认）
+     *   asm volatile("memw");
+     */
 }
 ```
+
+⚠️ **注意**：当前 `kern_mpu_apply()` 的实现仅为框架——函数体中的寄存器写入逻辑以注释形式存在，尚未实际写入 ESP32 DPORT 寄存器。Native 环境下此函数为空操作。MPU 区域的实际硬件生效需要在未来版本中补充具体的寄存器操作代码。
 
 #### 中文伪代码拆解
 
@@ -331,21 +337,30 @@ static inline int kern_mpu_add_region(struct kern_task *task,
 ## 初始化与集成点
 
 ```
-kern_sched_init()
-    ├── kern_mpu_init()          ← 配置内核保护区（C0-C1）
-    ├── kern_smp_init()          ← 初始化双核 per-CPU 数据
+kern_sched_init()（Native / ESP32 FreeRTOS 后端）
+    ├── kern_smp_init()          ← 初始化 per-CPU 数据
+    ├── kern_port_init()         ← 可移植层初始化（仅 ESP32 FreeRTOS）
     └── 创建 idle 任务
-            └── kern_spawn("idle", ...)
-                    └── kern_mpu_setup_stack_guard()  ← 为 idle 设置栈守卫
+            ├── task_stack_init()        ← 分配栈内存（Native 后端）
+            ├── task_write_canary()      ← 写入金丝雀（Native 后端）
+            └── FreeRTOS 自动管理栈（ESP32 FreeRTOS 后端，不调用上述函数）
 
-kern_spawn("my_task", ...)
+kern_spawn("my_task", ...)（Native 后端）
     ├── 创建 TCB + 分配栈
+    ├── task_write_canary()
     ├── kern_mpu_setup_stack_guard()   ← 为新任务设置栈守卫
-    └── 注册到调度器
+    └── 插入 g_task_list
+
+kern_spawn("my_task", ...)（ESP32 FreeRTOS 后端）
+    ├── 创建 TCB（FreeRTOS 自动管理栈）
+    ├── kern_mpu_setup_stack_guard()   ← 调用但 stack_base 为 NULL，实际无操作
+    └── 插入 g_task_list
 
 上下文切换（kern_sched_tick → switch_to）:
-    kern_mpu_apply(next_task)    ← 切换到新任务的 MPU 配置
+    kern_mpu_apply(next_task)    ← 切换到新任务的 MPU 配置（当前为框架实现）
 ```
+
+*📄 Source: [kern_sched.c](../../src/kernel/kern_sched.c#L57-L212)（三种后端的 `kern_sched_init`） + [kern_task_lifecycle.c](../../src/kernel/kern_task_lifecycle.c#L159-L232)（`kern_spawn`）*
 
 ---
 

@@ -14,22 +14,22 @@
 
 ### Shell 任务启动
 
-*📄 Source: [kern_shell.c](../../src/kernel/kern_shell.c#L734-L746)*
+*📄 Source: [kern_shell.c](../../src/kernel/kern_shell.c#L183-L186)*
 
 ```c
 void kern_shell_init(void)
 {
-    kern_spawn("shell", shell_task, NULL);
+    kern_spawn("shell", shell_task_main, NULL, 4096);
 }
 ```
 
-Shell 任务通过 `kern_spawn` 启动，作为第一个非 idle 任务运行。启动后显示 `Xeros> ` 提示符等待输入。
+Shell 任务通过 `kern_spawn` 启动，作为第一个非 idle 任务运行。启动后显示 `[cwd]$ ` 提示符（默认 `[/]$ `）等待输入。
 
 ### 命令集（完整列表）
 
-Shell 目前支持 **30+ 条命令**（Phase 3 从 18 条扩充至 33 条），按功能分为 6 大类：
+Shell 目前支持 **33 条命令**（含 alias），按功能分为 8 大类：
 
-#### 文件系统操作（8 条）
+#### 文件系统操作（9 条）
 
 | 命令 | 语法 | 说明 |
 |------|------|------|
@@ -37,12 +37,13 @@ Shell 目前支持 **30+ 条命令**（Phase 3 从 18 条扩充至 33 条），�
 | `cd` | `cd <dir>` | 切换当前目录 |
 | `pwd` | `pwd` | 打印当前路径 |
 | `cat` | `cat <file>` | 显示文件内容 |
-| `echo` | `echo <text>` | 输出文本（可重定向 `>` / `>>`） |
+| `echo` | `echo <text>` | 输出文本（支持 `>` 重定向） |
+| `cp` | `cp <src> <dst>` | 复制文件 |
 | `touch` | `touch <file>` | 创建空文件 |
 | `rm` | `rm <file>` | 删除文件 |
 | `mkdir` | `mkdir <dir>` | 创建目录 |
 
-#### 任务与内核信息（6 条）
+#### 任务与内核信息（7 条）
 
 | 命令 | 语法 | 说明 |
 |------|------|------|
@@ -50,15 +51,15 @@ Shell 目前支持 **30+ 条命令**（Phase 3 从 18 条扩充至 33 条），�
 | `top` | `top` | 实时任务监控（循环 `ps` + 2s 间隔，任意键退出） |
 | `free` | `free` | 堆内存统计 |
 | `mem` | `mem` | 堆内存统计（`free` 命令的别名） |
+| `kill` | `kill <pid>` | 终止指定 PID 的任务 |
 | `uname` | `uname` | 内核名称/版本 |
-| `stats` | `stats` | 内核统计信息 |
+| `df` | `df` | VFS 使用统计 |
 
-#### 调试诊断（4 条）
+#### 调试诊断（3 条）
 
 | 命令 | 语法 | 说明 |
 |------|------|------|
 | `log` | `log [level]` | 查看或设置日志级别（0-3） |
-| `debug` | `debug <on\|off> [module]` | 模块调试开关 |
 | `hexdump` | `hexdump <path>` | 十六进制文件转储 |
 | `history` | `history` | 显示命令历史（环形缓冲区，最多 16 条） |
 
@@ -105,18 +106,18 @@ Shell 目前支持 **30+ 条命令**（Phase 3 从 18 条扩充至 33 条），�
 
 ### 工作目录
 
-Shell 维护一个 `cwd` 变量（VFS 的工作目录 inode）。`cd` 命令通过 `kern_vfs_resolve(cwd, path)` 更新 cwd。所有相对路径（如 `ls dev`）相对于 cwd 解析。
+Shell 维护一个 `cwd` 字符数组（当前工作目录路径字符串）。`cd` 命令通过 `resolve_path(cwd, path)` 将相对路径解析为绝对路径，再经 `kern_path_resolve()` 验证目录存在后更新 `cwd`。所有相对路径（如 `ls dev`）相对于 cwd 解析。
 
 ### 命令解析流程
 
-*📄 Source: [kern_shell.c](../../src/kernel/kern_shell.c#L400-L500)*
+*📄 Source: [kern_shell.c](../../src/kernel/kern_shell.c#L77-L176)*
 
 ```
-读入一行 → 分词 (按空格分割)
-    ├─ 识别命令名 (第一个词)
-    ├─ 识别参数 (剩余词)
-    ├─ 识别特殊重定向 (>, >>)
-    └─ 分派命令
+读入一行 → 分词 (kern_shell_tokenize)
+    ├─ 识别命令名 (第一个 token)
+    ├─ 识别参数 (剩余 token)
+    ├─ 识别重定向 (>)
+    └─ 分派命令 (kern_shell_exec_cmd)
 ```
 
 #### 中文伪代码拆解
@@ -124,21 +125,25 @@ Shell 维护一个 `cwd` 变量（VFS 的工作目录 inode）。`cd` 命令通�
 ```
 Shell 主循环：
 
-while (正在运行) {
-    显示提示符 "Xeros> "
-    读取输入行 (调用 sys_read(fd_ttyS0, line_buf, ...))
+for (;;) {
+    显示提示符 "[/]$ "
+    kern_shell_scope_tick(tty)   // 非阻塞周期数据输出
 
-    跳过前导空白
-    提取命令名 (第一个空格前的词)
+    逐字符读取 (kern_read(tty, &ch, 1))
 
-    解析参数 (剩余空格分隔的词)
-    按命令名分派：
-        case "ls":    遍历目录调用 readdir
-        case "cat":   打开文件读取逐行输出
-        case "cd":    路径解析更新 cwd
-        case "ps":    遍历任务链表输出
-        case "top":   循环 ps + 2s 间隔
-        ...
+    if (字符是 ESC) {
+        解析 VT100 方向键 (↑↓)
+        浏览命令历史
+    } else if (字符是回车) {
+        将整行加入历史 (shell_history_add)
+        tokenize (kern_shell_tokenize)
+        执行命令 (kern_shell_exec_cmd)
+        显示新提示符
+    } else if (退格) {
+        删除最后一个字符
+    } else {
+        追加到输入缓冲区
+    }
 }
 ```
 
@@ -148,17 +153,21 @@ while (正在运行) {
 
 命令采用**表驱动**设计：
 
+*📄 Source: [kern_shell_cmds.h](../../src/kernel/kern_shell_cmds.h#L23-L43)*
+
 ```c
+typedef void (*kern_shell_cmd_handler_t)(kern_fd_t tty, int argc, char *argv[],
+                                    char *cwd, size_t cwd_size);
+
 typedef struct {
     const char           *name;      // 命令名（精确匹配）
-    shell_cmd_handler_t   handler;   // 处理函数
+    kern_shell_cmd_handler_t handler;// 处理函数
     const char           *help;      // 帮助文本（单行）
-} shell_cmd_t;
+} kern_shell_cmd_t;
 ```
 
 - **内置命令表**：`g_builtin_cmds[]` 静态数组，最多 48 条（`SHELL_MAX_BUILTIN_CMDS`）
-- **动态注册**：`kern_shell_register_cmd()` 支持运行时注册扩展命令（最多 8 条）
-- **查找优先级**：先查动态注册表，再查内置表
+- **查找**：`kern_shell_lookup_cmd()` 线性遍历内置命令表进行精确匹配
 
 ---
 
@@ -190,12 +199,12 @@ uint64_t    g_scope_last_tick;              // 上次采样时间戳
 
 ### 架构注入
 
-*📄 Source: [kern_shell.c](../../src/kernel/kern_shell.c#L88-L89)*
+*📄 Source: [kern_shell.c](../../src/kernel/kern_shell.c#L79)*
 
 ```c
 for (;;) {
     /* Phase 3: scope tick — 非阻塞周期数据输出 */
-    scope_tick(tty);
+    kern_shell_scope_tick(tty);
 
     char ch;
     ssize_t n = kern_read(tty, &ch, 1);
@@ -203,7 +212,7 @@ for (;;) {
 }
 ```
 
-`scope_tick()` 在 Shell 主循环的 `kern_read()` 阻塞之前执行，利用 `esp_timer_get_time()` 判断距上次采样是否已过 `period_ms`。非阻塞设计——当没有数据需要输出时立即返回，不影响 Shell 交互响应速度。
+`kern_shell_scope_tick()` 在 Shell 主循环的 `kern_read()` 之前执行，利用 `esp_timer_get_time()` 判断距上次采样是否已过 `period_ms`。非阻塞设计——当没有数据需要输出时立即返回，不影响 Shell 交互响应速度。
 
 ### 使用示例
 
@@ -227,8 +236,8 @@ scope stopped
 
 Shell 通过 `/dev/ttyS0` 设备文件读写串口：
 
-- `sys_read(fd_ttyS0, &ch, 1)` — 逐字符读取，阻塞直到有新字符（scope_tick 在每个阻塞周期之前插入）
-- `sys_write(fd_ttyS0, buf, len)` — 输出响应文本
+- `kern_read(tty, &ch, 1)` — 逐字符读取，非阻塞（若无数据立即返回 0）
+- `kern_write(tty, buf, len)` — 输出响应文本
 
 输出经过 ANSI 转义序列处理（`\033[2J` 清屏、光标定位等）。
 
@@ -281,7 +290,6 @@ static void cmd_factory(kern_fd_t tty, ...) {
 - **kern_vfs**：所有文件操作命令（ls/cat/cd/touch/rm/mkdir）全部通过 VFS API
 - **kern_task**：`ps`/`top` 命令遍历调度器任务链表
 - **kern_sysfs**：`param`/`log`/`mode`/`ctrl` 命令通过 sysfs 节点读写参数
-- **kern_init**：`stats` 命令查询内核统计信息
 - **kern_devices**：通过 `/dev/ttyS0` 读写串口
 - **kern_procfs**：`scope` 可监测任意 `/proc/` 和 `/sys/` 路径
 

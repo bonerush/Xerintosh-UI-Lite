@@ -12,7 +12,7 @@
 
 ### API 设计
 
-*📄 Source: [hal_system.h](../../src/hal/hal_system.h)*
+*📄 Source: [hal_system.h](../../src/hal/hal_system.h#L18-L37)*
 
 ```c
 extern void hal_system_init(void);
@@ -26,7 +26,7 @@ extern void hal_delay_ms(uint32_t ms);
 
 ### 真机实现（ESP32 Arduino）
 
-*📄 Source: [hal_system.cpp](../../src/hal/hal_system.cpp#L12-L16)*
+*📄 Source: [hal_system.cpp](../../src/hal/hal_system.cpp#L44-L68)*
 
 ```c
 #include <Arduino.h>
@@ -40,7 +40,7 @@ void hal_delay_ms(uint32_t ms) { delay(ms); }
 
 ### Native 测试实现
 
-*📄 Source: [hal_system.cpp](../../src/hal/hal_system.cpp#L2-L10)*
+*📄 Source: [hal_system.cpp](../../src/hal/hal_system.cpp#L13-L42)*
 
 ```c
 #include <chrono>
@@ -56,7 +56,9 @@ uint32_t hal_get_ticks(void) {
     return std::chrono::duration_cast<std::chrono::milliseconds>(now - g_start_time).count();
 }
 
-void hal_delay_ms(uint32_t ms) {}
+void hal_delay_ms(uint32_t ms) {
+    (void)ms;
+}
 ```
 
 #### 中文伪代码拆解
@@ -85,7 +87,7 @@ void hal_delay_ms(uint32_t ms) {}
 
 ## 与其他组件的关系
 
-- **hal_input**：`hal_input_update()` 每帧调用 `hal_get_ticks()` 计算按住时长
+- **hal_input**：`hal_input_get_event()` 内部使用 `millis()`（真机）或测试注入时间戳计算按住时长
 - **ui_core**：动画系统使用 `get_ticks()`（实际为宏映射到 `hal_get_ticks()`）计算弹窗超时
 - **native_main.cpp**：测试入口先调用 `hal_system_init()` 建立时间基准
 

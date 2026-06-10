@@ -62,7 +62,7 @@ xerintosh_push_item_to_list(parent, child);
 
 **特殊用法 — `init_function` 动态初始化子菜单**：
 
-*📄 Source: [app_init.c](../../src/app/app_init.c#L205)*
+*📄 Source: [app_init.c](../../src/app/app_init.c#L207)*
 ```c
 /* 进入子菜单时自动调用，常用于动态更新子项内容 */
 xerintosh_list_item_t *submenu = xerintosh_new_list_item("烧录器引脚", default_icon);
@@ -75,6 +75,7 @@ submenu->init_function = on_enter_flasher_submenu;
 
 **用途**：绑定一个 `bool` 变量，确认时翻转。
 
+*📄 Source: [ui_item_core.h](../../src/ui/ui_item_core.h#L179-L181)*
 ```c
 /* ★ 变量必须是 static 或全局的！*/
 static bool g_my_feature_enabled = false;
@@ -102,7 +103,7 @@ static void on_switch_changed(void *user_data) {
 
 **⚠️ 陷阱**：`value` 指针传入后框架只读写其指向的值，不管理指针生命周期。如果指向局部变量，出作用域后行为未定义。
 
-**⚠️ 框架缺陷**：`xerintosh_new_switch_item()` 内部不检查 `_value` 是否为 NULL（`src/ui/ui_item_base.c:121` 直接赋值）。传入 NULL 会在用户确认此项时导致空指针解引用崩溃。
+**⚠️ 框架缺陷**：`xerintosh_new_switch_item()` 内部不检查 `_value` 是否为 NULL（[ui_item_base.c:121](../../src/ui/ui_item_base.c#L121) 直接赋值）。传入 NULL 会在用户确认此项时导致空指针解引用崩溃。
 
 ---
 
@@ -110,6 +111,7 @@ static void on_switch_changed(void *user_data) {
 
 **用途**：绑定一个 `int16_t` 变量，两次确认修改数值。
 
+*📄 Source: [ui_item_core.h](../../src/ui/ui_item_core.h#L209-L212)*
 ```c
 /* ★ 变量必须是 static 或全局的！*/
 static int16_t g_my_slider_value = 5;
@@ -133,11 +135,13 @@ static void on_slider_changed(void *user_data) {
 ```
 
 **操作逻辑**：
-1. 选中 + 短按确认 → **进入编辑模式**（上下键变为增减数值）
-2. 再按确认 → **保存修改**，触发 `exit_function`
-3. 长按返回 → **取消修改**，恢复原值
+1. 选中 + **长按 A 确认** → **进入编辑模式**（上下键变为增减数值）
+2. 再按 **长按 A 确认** → **保存修改**，触发 `exit_function`
+3. **长按 B 返回** → **取消修改**，恢复原值
 
-**⚠️ 陷阱**：编辑模式下上下键不再是导航，而是增减数值。调用方不需要额外处理取消逻辑（框架自动恢复备份值）。
+*📄 Source: [app_init.c](../../src/app/app_init.c#L469-L494)*
+
+**⚠️ 陷阱**：编辑模式下上下键不再是导航，而是增减数值（A 增加，B 减少）。调用方不需要额外处理取消逻辑（框架自动恢复备份值）。
 
 **⚠️ 编辑模式下的并发风险**：编辑期间 `*value` 处于中间"脏"状态——每次按键都直接修改绑定的全局变量。如果另一段代码在此时读取该变量，会看到**未确认的中间值**。应仅在 `exit_function` 回调或确认后读取 slider 变量的值。
 
@@ -147,6 +151,7 @@ static void on_slider_changed(void *user_data) {
 
 **用途**：单次触发回调，无需绑定变量。
 
+*📄 Source: [ui_item_core.h](../../src/ui/ui_item_core.h#L192-L193)*
 ```c
 xerintosh_list_item_t *btn = xerintosh_new_button_item(
     "执行操作",         // 显示文本
@@ -196,6 +201,7 @@ void app_input_process(void) {
 
 **用途**：创建独立的交互式 App（任务管理器、串口监视器等）。
 
+*📄 Source: [ui_item_core.h](../../src/ui/ui_item_core.h#L226-L228)*
 ```c
 xerintosh_list_item_t *app = xerintosh_new_user_item(
     "我的 App",    // 显示文本
@@ -225,8 +231,8 @@ static void my_app_loop(void *user_data) {
 
     /* 3. 你的业务逻辑... */
 
-    /* 4. 渲染（框架会在你返回后统一 hal_display_clear + hal_display_flush）*/
-    hal_draw_string(5, 5, "Hello World!", 0xFFFF, 0x0000);
+    /* 4. 渲染（框架在调用 loop 前已自动 hal_display_clear）*/
+    hal_draw_string(5, 5, "Hello World!", COLOR_FG);
 }
 
 static void my_app_exit(void *user_data) {
@@ -238,14 +244,16 @@ static void my_app_exit(void *user_data) {
 
 **生命周期图示**：
 ```
-选中 → 短按确认 → init() 调用一次
+选中 → 长按 A 确认 → init() 调用一次
                 → loop() 每帧调用（直到退出）
                 → 长按 B → exit() 调用一次 → 回到菜单
 ```
 
+*📄 Source: [ui_core.c](../../src/ui/ui_core.c#L170-L211)*
+
 **⚠️ 陷阱**：
 
-1. **不要在 `loop()` 内调用 `hal_display_clear()`**：框架的 `ui_task` 会在每帧渲染前自动清屏。重复清屏不会出错，但不必要。
+1. **不要在 `loop()` 内调用 `hal_display_clear()`**：框架的 `ui_task` 会在每帧调用 `loop()` 之前自动清屏。重复清屏不会出错，但不必要。
 
 2. **`destroy_callback` 需要手动设置**：若 `user_data` 是动态分配的，必须设置 `destroy_callback` 才能正确释放：
    ```c
@@ -267,6 +275,7 @@ static void my_app_exit(void *user_data) {
 
 **用途**：在屏幕中部显示短暂消息。
 
+*📄 Source: [ui_widget.h](../../src/ui/ui_widget.h#L76)*
 ```c
 // 弹窗 API 通过 ui_item.h 提供（无需单独 include）
 
@@ -296,6 +305,7 @@ xerintosh_dismiss_pop_up();                  // 动画退出（向上滑出）
 
 **用途**：控制 WiFi 开关、扫描连接网络。
 
+*📄 Source: [wifi_manager.h](../../src/app/wifi/wifi_manager.h)*
 ```c
 #include "wifi/wifi_manager.h"
 
@@ -337,6 +347,7 @@ bool waiting = wifi_mgr_is_waiting_input();  // 是否在等待用户输入密�
 
 **用途**：控制 Classic Bluetooth SPP 串口连接。
 
+*📄 Source: [bt_manager.h](../../src/app/bluetooth/bt_manager.h) | [bt_uart_service.h](../../src/app/bluetooth/bt_uart_service.h)*
 ```c
 #include "bluetooth/bt_manager.h"
 #include "bluetooth/bt_uart_service.h"
@@ -413,6 +424,7 @@ bt_uart_drain_rx_queue();  // 从 FreeRTOS Queue 读取数据并触发 RX 回调
 
 **用途**：持久化保存配置到 NVS 闪存。
 
+*📄 Source: [storage.h](../../src/app/storage/storage.h)*
 ```c
 #include "storage/storage.h"
 
@@ -420,19 +432,19 @@ bt_uart_drain_rx_queue();  // 从 FreeRTOS Queue 读取数据并触发 RX 回调
 /* storage_init() 由 main.cpp 的 setup() 在系统启动时调用 */
 
 /* —— 读写整数值 —— */
-int16_t brightness = storage_get_brightness();    // 读取（未设置返回默认）
+int16_t brightness = storage_get_brightness();    // 读取（未设置返回 -1）
 storage_set_brightness(8);                        // 写入
 
-uint8_t speed = storage_get_anim_speed();
+uint8_t speed = storage_get_anim_speed();         // 默认 92
 storage_set_anim_speed(92);
 
 bool anim_on = storage_get_anim_enabled();        // 默认 true
 storage_set_anim_enabled(false);
 
 /* —— 系统设置 —— */
-uint8_t rot = storage_get_screen_rotation();      // 屏幕方向
+uint8_t rot = storage_get_screen_rotation();      // 屏幕方向（1=竖屏, 2=横屏）
 storage_set_screen_rotation(2);
-int16_t baud = storage_get_serial_baud_rate();     // 串口波特率等级
+int16_t baud = storage_get_serial_baud_rate();    // 串口波特率等级（默认 5=115200）
 storage_set_serial_baud_rate(5);
 
 /* —— 读写字符串 —— */
@@ -466,6 +478,7 @@ storage_wifi_remove(0);                             // 按索引删除
 
 **用途**：通过串口获取用户文本输入（WiFi 密码等）。
 
+*📄 Source: [serial_input.h](../../src/app/serial_input/serial_input.h)*
 ```c
 #include "serial_input/serial_input.h"
 
@@ -513,6 +526,7 @@ serial_cancel();
 
 **用途**：在屏幕上绘制文字和图形。
 
+*📄 Source: [hal_display.h](../../src/hal/hal_display.h)*
 ```c
 #include "hal_display.h"
 #include "hal_layout.h"
@@ -575,6 +589,7 @@ int16_t row_h = HAL_ROW_H();        // 标准行高（= 字体高度 + 2*小边�
 
 **用途**：读取按键事件。
 
+*📄 Source: [hal_input.h](../../src/hal/hal_input.h)*
 ```c
 #include "hal_input.h"
 
@@ -613,7 +628,7 @@ hal_input_set_double_click_enabled(true);               // 启用/禁用双击�
 | **BtnA** | 下一项 | 确认进入 |
 | **BtnB** | 上一项 | 返回/取消 |
 
-> **注意**：所有 item 类型的"确认"（switch 值翻转、slider 进入编辑、button 触发回调、list 进入子菜单、user 进入 App）统一由 **BtnA 长按**触发（`jump_to_selected_item()` → `xerintosh_dispatch_enter()`）。BntA 短按仅做导航（`go_next_item()`）。
+> **注意**：所有 item 类型的"确认"（switch 值翻转、slider 进入编辑、button 触发回调、list 进入子菜单、user 进入 App）统一由 **BtnA 长按**触发（`jump_to_selected_item()` → `xerintosh_dispatch_enter()`）。BtnA 短按仅做导航（`go_next_item()`）。
 
 **⚠️ 陷阱**：
 - `hal_input_get_event()` 是消费型调用：每个事件只返回一次，之后返回 `HAL_EVENT_NONE`
@@ -624,9 +639,11 @@ hal_input_set_double_click_enabled(true);               // 启用/禁用双击�
 
 ## 第三部分：内存管理速查表
 
+*📄 Source: [ui_item_base.c](../../src/ui/ui_item_base.c#L130-L159) | [ui_item_list.c](../../src/ui/ui_item_list.c#L78-L104)*
+
 | 资源 | 分配方 | 释放方 | 注意事项 |
 |------|--------|--------|----------|
-| item 结构体 | 创建函数（`malloc`） | `xerintosh_destroy_item_tree()` | 递归释放所有子项 |
+| item 结构体 | 创建函数（`malloc`） | `xerintosh_destroy_item_tree()` | 递归释放所有子项；仅对 user_item 调用 destroy_callback |
 | `content` 字符串 | `xerintosh_init_base_item`（`strdup`） | `xerintosh_destroy_item_tree`（`free`） | 自动管理 |
 | `switch/slider.value` 指针 | **调用方** | **调用方** | 框架只读写，不管生命周期 |
 | `user_data` | 调用方 | 调用方（`destroy_callback`） | 框架不自动释放；`destroy_callback` **仅对 `user_item` 类型有效**，其他类型不调用 |

@@ -4,46 +4,70 @@
 
 ## 概述
 
-`kern_shell_cmds` 是 Xeros Shell 的**命令实现层**，包含全部内置命令的处理函数和命令注册表。每条命令通过统一的 `kern_shell_cmd_t` 结构注册，支持动态添加扩展命令。
+`kern_shell_cmds` 是 Xeros Shell 的**命令实现层**，包含全部内置命令的处理函数和命令注册表。每条命令通过统一的 `kern_shell_cmd_t` 结构注册。当前实现为静态命令表，不支持运行时动态添加。
 
 ---
 
 ## 命令注册表
 
-*📄 Source: [kern_shell_cmds.c](../../src/kernel/kern_shell_cmds.c#L830-L880)*
+*📄 Source: [kern_shell_cmds.c](../../src/kernel/kern_shell_cmds.c#L883-L926)*
 
 ```c
 typedef struct {
-    const char *name;
-    cmd_handler_fn handler;
-    const char *help;
+    const char           *name;
+    kern_shell_cmd_handler_t handler;
+    const char           *help;
 } kern_shell_cmd_t;
 ```
 
-命令表是一个静态数组，启动时由 `kern_shell_init()` 遍历注册到哈希表中：
+命令表是一个静态数组，由 `kern_shell_lookup_cmd()` 线性遍历查找：
+
+*📄 Source: [kern_shell_cmds.c](../../src/kernel/kern_shell_cmds.c#L883-L926)*
 
 ```c
 static const kern_shell_cmd_t g_builtin_cmds[] = {
-    {"help",    cmd_help,    "显示帮助信息"},
-    {"ps",      cmd_ps,      "列出所有任务"},
-    {"top",     cmd_top,     "实时任务监控"},
-    {"kill",    cmd_kill,    "终止指定 PID 的任务"},
-    {"ls",      cmd_ls,      "列出目录内容"},
-    {"cat",     cmd_cat,     "显示文件内容"},
-    {"echo",    cmd_echo,    "回显文本"},
-    {"cd",      cmd_cd,      "切换工作目录"},
-    {"pwd",     cmd_pwd,     "显示当前目录"},
-    {"mkdir",   cmd_mkdir,   "创建目录"},
-    {"rm",      cmd_rm,      "删除文件或目录"},
-    {"touch",   cmd_touch,   "创建空文件"},
-    {"clear",   cmd_clear,   "清屏"},
-    {"history", cmd_history, "显示命令历史"},
-    {"scope",   cmd_scope,   "实时数据监测"},
-    {"param",   cmd_param,   "读取/写入系统参数"},
-    {"reboot",  cmd_reboot,  "重启系统"},
-    {"free",    cmd_free,    "显示内存使用情况"},
-    {"version", cmd_version, "显示版本信息"},
-    /* ... 更多命令 ... */
+    /* ── 文件系统命令 ── */
+    { "ls",      cmd_ls,       "list directory" },
+    { "cd",      cmd_cd,       "change directory" },
+    { "pwd",     cmd_pwd,      "print working directory" },
+    { "cat",     cmd_cat,      "read file" },
+    { "cp",      cmd_cp,       "copy file" },
+    { "rm",      cmd_rm,       "remove file/dir" },
+    { "mkdir",   cmd_mkdir,    "create directory" },
+    { "touch",   cmd_touch,    "create empty file" },
+    { "echo",    cmd_echo,     "print text (echo text > file to write)" },
+
+    /* ── 系统命令 ── */
+    { "ps",      cmd_ps,       "list tasks" },
+    { "reboot",  cmd_reboot,   "restart device" },
+    { "help",    cmd_help,     "this help" },
+
+    /* ── 新增命令 ── */
+    { "free",    cmd_free,     "show heap memory" },
+    { "kill",    cmd_kill,     "terminate task <pid>" },
+    { "uname",   cmd_uname,    "print system info" },
+    { "df",      cmd_df,       "show VFS usage" },
+    { "clear",   cmd_clear,    "clear screen" },
+    { "history", cmd_history,  "show command history" },
+    { "date",    cmd_date,     "show uptime" },
+    { "hexdump", cmd_hexdump,  "hex dump <path>" },
+
+    /* ── Phase 3 新增命令 ── */
+    { "top",       cmd_top,       "real-time task monitor" },
+    { "mem",       cmd_free,      "show heap memory (alias: free)" },
+    { "log",       cmd_log,       "view/set log level" },
+    { "param",     cmd_param,     "config parameters (list/get/set/save/load)" },
+    { "bootloader",cmd_bootloader,"enter OTA bootloader mode" },
+    { "factory",   cmd_factory,   "factory reset (DANGER!)" },
+    { "version",   cmd_version,   "firmware & hardware info" },
+    { "scope",     cmd_scope,     "real-time data scope (add/start/stop)" },
+    { "mode",      cmd_mode,      "view/set run mode" },
+    { "ctrl",      cmd_ctrl,      "control algorithm start/stop/reset" },
+    { "info",      cmd_info,      "device summary info" },
+    { "io",        cmd_io,        "GPIO debug (get/set <pin> [value])" },
+
+    /* ── App 配置命令 ── */
+    { "dskey",     cmd_dskey,     "set/view DeepSeek API key" },
 };
 ```
 
@@ -53,7 +77,7 @@ static const kern_shell_cmd_t g_builtin_cmds[] = {
 
 ### ps — 列出所有任务
 
-*📄 Source: [kern_shell_cmds.c](../../src/kernel/kern_shell_cmds.c#L119-L145)*
+*📄 Source: [kern_shell_cmds.c](../../src/kernel/kern_shell_cmds.c#L111-L137)*
 
 ```c
 static void cmd_ps(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_size)
@@ -77,8 +101,8 @@ static void cmd_ps(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_
         }
 
         snprintf(line, sizeof(line), "%-4d %s %-12s %zu/%zu",
-                 task->pid, state_str, task->name,
-                 task->stack_used, task->stack_size);
+                 (int)task->pid, state_str, task->name,
+                 kern_task_stack_usage(task), task->stack_size);
         kern_shell_println(tty, line);
 
         task = task->next;
@@ -112,30 +136,37 @@ static void cmd_ps(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_
 
 ### scope — 实时数据监测引擎
 
-*📄 Source: [kern_shell_cmds.c](../../src/kernel/kern_shell_cmds.c#L650-L720)*
+*📄 Source: [kern_shell_cmds.c](../../src/kernel/kern_shell_cmds.c#L756-L780)*
 
 ```c
 static void cmd_scope(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_size)
 {
     (void)cwd; (void)cwd_size;
+    if (argc < 2) { kern_shell_println(tty, "Usage: scope <add|start|stop> [args]"); return; }
 
-    if (argc < 2) {
-        kern_shell_println(tty, "Usage: scope <period_ms> [var1] [var2] ...");
-        return;
+    if (strcmp(argv[1], "add") == 0 && argc >= 3) {
+        if (g_scope_count >= SCOPE_MAX_VARS) {
+            kern_shell_println(tty, "scope: max variables reached"); return;
+        }
+        strncpy(g_scope_vars[g_scope_count].path, argv[2], KERN_PATH_MAX - 1);
+        g_scope_vars[g_scope_count].active = true;
+        g_scope_count++;
+        kern_shell_println(tty, "OK");
+    } else if (strcmp(argv[1], "start") == 0) {
+        if (argc >= 3) g_scope_period_ms = atoi(argv[2]);
+        g_scope_running = true;
+        g_scope_last_tick = 0;
+        kern_shell_println(tty, "scope started");
+    } else if (strcmp(argv[1], "stop") == 0) {
+        g_scope_running = false;
+        kern_shell_println(tty, "scope stopped");
+    } else {
+        kern_shell_println(tty, "scope: unknown sub-command");
     }
-
-    int period_ms = atoi(argv[1]);
-    if (period_ms <= 0) {
-        kern_shell_println(tty, "Invalid period");
-        return;
-    }
-
-    /* 启动周期性 CSV 输出 */
-    scope_start(tty, period_ms, argc - 2, (const char **)(argv + 2));
 }
 ```
 
-**功能**：以指定周期（毫秒）循环输出一组变量的 CSV 格式数据，直到用户按 Ctrl+C。常用于调试时观察内存、任务状态等实时变化。
+**功能**：注册 `/proc/` 或 `/sys/` 路径作为观测变量，按固定周期以 CSV 格式输出到串口。`scope add` 注册路径，`scope start [ms]` 启动周期输出，`scope stop` 停止。最多支持 8 个变量。`kern_shell_scope_tick()` 在 Shell 主循环中非阻塞执行实际采样。
 
 ---
 
@@ -211,18 +242,6 @@ void kern_shell_println(kern_fd_t tty, const char *msg)
 所有命令统一通过 `kern_shell_print`/`kern_shell_println` 输出，底层经过 VFS 的 `/dev/ttyS0` 写入串口。
 
 ---
-
-## 动态命令注册
-
-*📄 Source: [kern_shell_cmds_internal.h](../../src/kernel/kern_shell_cmds_internal.h)*
-
-```c
-int kern_shell_register_cmd(const char *name,
-                            cmd_handler_fn handler,
-                            const char *help);
-```
-
-通过 `kern_shell_register_cmd()` 可以在运行时动态添加新命令，无需修改 `kern_shell_cmds.c`。这为外设驱动或用户扩展提供了接口。
 
 ---
 

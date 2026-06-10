@@ -35,7 +35,7 @@
 
 ### 函数指针类型
 
-*📄 Source: [ui_dispatch.c](../../src/ui/ui_dispatch.c#L63)*
+*📄 Source: [ui_dispatch.c](../../src/ui/ui_dispatch.c#L68)*
 
 ```c
 typedef void (*enter_fn_t)(xerintosh_list_item_t *);
@@ -45,7 +45,7 @@ typedef void (*enter_fn_t)(xerintosh_list_item_t *);
 
 ### 派发表定义
 
-*📄 Source: [ui_dispatch.c](../../src/ui/ui_dispatch.c#L65-L71)*
+*📄 Source: [ui_dispatch.c](../../src/ui/ui_dispatch.c#L70-L76)*
 
 ```c
 static const enter_fn_t s_enter_dispatch[] = {
@@ -61,7 +61,7 @@ static const enter_fn_t s_enter_dispatch[] = {
 
 ### 公开派发函数
 
-*📄 Source: [ui_dispatch.c](../../src/ui/ui_dispatch.c#L75-L80)*
+*📄 Source: [ui_dispatch.c](../../src/ui/ui_dispatch.c#L80-L85)*
 
 ```c
 void xerintosh_dispatch_enter(xerintosh_list_item_t *item)
@@ -82,7 +82,7 @@ void xerintosh_dispatch_enter(xerintosh_list_item_t *item)
 
 ### dispatch_enter_list — 进入子菜单
 
-*📄 Source: [ui_dispatch.c](../../src/ui/ui_dispatch.c#L51-L59)*
+*📄 Source: [ui_dispatch.c](../../src/ui/ui_dispatch.c#L53-L64)*
 
 ```c
 static void dispatch_enter_list(xerintosh_list_item_t *item)
@@ -93,6 +93,9 @@ static void dispatch_enter_list(xerintosh_list_item_t *item)
         item->child_list_item[i]->y_list_item = 0;
     g_xerintosh_selector.selected_index = 0;
     g_xerintosh_selector.selected_item = item->child_list_item[0];
+    if (item->init_function) {
+        item->init_function(item->user_data);
+    }
 }
 ```
 
@@ -119,7 +122,7 @@ static void dispatch_enter_list(xerintosh_list_item_t *item)
 
 ### dispatch_enter_user — 进入全屏 App
 
-*📄 Source: [ui_dispatch.c](../../src/ui/ui_dispatch.c#L15-L24)*
+*📄 Source: [ui_dispatch.c](../../src/ui/ui_dispatch.c#L16-L25)*
 
 ```c
 static void dispatch_enter_user(xerintosh_list_item_t *item)
@@ -159,7 +162,7 @@ static void dispatch_enter_user(xerintosh_list_item_t *item)
 
 ### dispatch_enter_switch — 切换开关
 
-*📄 Source: [ui_dispatch.c](../../src/ui/ui_dispatch.c#L26-L31)*
+*📄 Source: [ui_dispatch.c](../../src/ui/ui_dispatch.c#L27-L32)*
 
 ```c
 static void dispatch_enter_switch(xerintosh_list_item_t *item)
@@ -174,7 +177,7 @@ static void dispatch_enter_switch(xerintosh_list_item_t *item)
 
 ### dispatch_enter_slider — 滑条确认/退出编辑
 
-*📄 Source: [ui_dispatch.c](../../src/ui/ui_dispatch.c#L39-L49)*
+*📄 Source: [ui_dispatch.c](../../src/ui/ui_dispatch.c#L41-L51)*
 
 ```c
 static void dispatch_enter_slider(xerintosh_list_item_t *item)
@@ -201,7 +204,7 @@ static void dispatch_enter_slider(xerintosh_list_item_t *item)
 
 ### dispatch_enter_button — 触发按钮回调
 
-*📄 Source: [ui_dispatch.c](../../src/ui/ui_dispatch.c#L33-L37)*
+*📄 Source: [ui_dispatch.c](../../src/ui/ui_dispatch.c#L34-L39)*
 
 ```c
 static void dispatch_enter_button(xerintosh_list_item_t *item)
@@ -248,7 +251,7 @@ void xerintosh_selector_jump_to_selected_item()
 
 ### 重构后：一行派发
 
-*📄 Source: [ui_item_selector.c](../../src/ui/ui_item_selector.c#L143-L148)*
+*📄 Source: [ui_item_selector.c](../../src/ui/ui_item_selector.c#L150-L154)*
 
 ```c
 void xerintosh_selector_jump_to_selected_item()

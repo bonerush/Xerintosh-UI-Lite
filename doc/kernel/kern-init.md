@@ -47,11 +47,13 @@ void kern_init(void)
 }
 ```
 
-**幂等性设计**：`kern_init()` 可被多次调用而不会有副作用。每个依赖内核初始化的子系统（VFS、devfs、sched、MPU）都会先调用 `kern_init()`，但实际初始化只执行一次。`g_init_count` 追踪调用次数，用于统计信息。
+**幂等性设计**：`kern_init()` 可被多次调用而不会有副作用。每个依赖内核初始化的子系统（VFS、devfs、sched 等）都会先调用 `kern_init()`，但实际初始化只执行一次。`g_init_count` 追踪调用次数，用于统计信息。
+
+⚠️ **注意**：`kern_init()` 仅标记初始化状态并输出日志，**不**实际初始化 VFS、调度器或其他子系统。各子系统的初始化由各自的 `*_init()` 函数负责（如 `kern_vfs_init()`、`kern_sched_init()` 等）。
 
 ### 分级日志系统（自旋锁保护）
 
-*📄 Source: [kern_init.c](../../src/kernel/kern_init.c#L70-L101)*
+*📄 Source: [kern_init.c](../../src/kernel/kern_init.c#L82-L102)*
 
 ```c
 void kern_vlog(kern_log_level_t level, const char *fmt, va_list args)
@@ -98,7 +100,7 @@ void kern_vlog(kern_log_level_t level, const char *fmt, va_list args)
 
 ### Panic 处理
 
-*📄 Source: [kern_init.c](../../src/kernel/kern_init.c#L106-L130)*
+*📄 Source: [kern_init.c](../../src/kernel/kern_init.c#L106-L124)*
 
 ```c
 void kern_panic(const char *msg)
@@ -146,48 +148,52 @@ void kern_panic(const char *msg)
 
 ## 内核完整初始化顺序
 
-*📄 Source: [kern_init.c](../../src/kernel/kern_init.c) + [kern_sched.c](../../src/kernel/kern_sched.c)*
+*📄 Source: [main.cpp](../../src/main.cpp#L138-L288) + [kern_task_lifecycle.c](../../src/kernel/kern_task_lifecycle.c#L159-L232)*
 
 ```
 main.cpp setup():
     M5.begin()                    ← 硬件初始化
-    hal_display_init()            ← 显示驱动
-    hal_input_init()              ← 按键驱动
     storage_init()                ← NVS 存储
     settings_load_from_storage()  ← 恢复设置
+    hal_display_init()            ← 显示驱动
+    hal_input_init()              ← 按键驱动
+    app_init_ui()                 ← UI 菜单树构造
+    app_init_managers()           ← WiFi/BT 管理器初始化
 
-    ─── 内核层初始化 ───
+    xerintosh_init_core()         ← Xerintosh UI 核心
+    /* 注意：setup() 不直接调用内核初始化，延迟到 loop() 第一帧 */
+
+deferred_kernel_init()（loop() 第一帧触发）:
     kern_init()                   ← 内核日志系统（幂等）
-    kern_port_init()              ← 可移植层（FreeRTOS 信号量等）
-    kern_mpu_init()               ← MPU 子系统（内核保护区 C0-C1）★ kernel-v2 新增
     kern_vfs_init()               ← VFS 根节点
     kern_devfs_init()             ← /dev 目录
-    kern_sched_init()             ← 调度器 + idle 任务
-        ├── kern_smp_init()       ★ kernel-v2 新增: 双核 per-CPU 数据初始化
-        └── kern_spawn("idle")    ← 创建 idle 任务（含栈守卫 MPU 配置）
-    kern_devices_init()           ← 注册 fb0/input0/ttyS0
-    kern_sysfs_init()             ← /sys 虚拟文件
     kern_procfs_init()            ← /proc 虚拟文件
-
-    kern_shell_init()             ← 启动 Shell 任务
-    /* 后续: kern_spawn(ui_task) 等 */
+    kern_sysfs_init()             ← /sys 虚拟文件
+    kern_gpiofs_init()            ← /sys/gpio 引脚映射
+    kern_devices_init()           ← 注册 fb0/input0/ttyS0
+    kern_shell_init()             ← 启动 Shell 任务（内部 kern_spawn）
+    kern_spawn("ui", ...)         ← UI 任务
+    kern_spawn("wifi-mgr", ...)   ← WiFi 管理器任务
+    kern_spawn("bt-mgr", ...)     ← BT 管理器任务
 ```
+
+**延迟初始化设计**：`setup()` 直接调用内核初始化会累积时间触发 TG1 看门狗（FreeRTOS idle 任务在 `setup()` 返回后才喂狗），因此所有内核子系统初始化被推迟到 `loop()` 第一帧。
+
+**调度器按需初始化**：`kern_sched_init()` 不在 `main.cpp` 中显式调用，而是由首次 `kern_spawn()` 内部触发（见 [kern_task_lifecycle.c](../../src/kernel/kern_task_lifecycle.c#L167)）。`kern_sched_init()` 随后调用 `kern_smp_init()` 和 `kern_port_init()`。
 
 **★ kernel-v2 新增步骤说明**：
 
-| 步骤 | 必须前置 | 作用 |
+| 步骤 | 触发位置 | 作用 |
 |------|---------|------|
-| `kern_mpu_init()` | `kern_init()` | 配置内核保护区（区域 C0-C1），为所有任务提供基础保护 |
-| `kern_smp_init()` | `kern_init()` | 初始化 `g_per_cpu[]` 数组，使 per-CPU 宏可用。在单核 ESP32 上为 no-op |
-
-`kern_mpu_init()` 必须在 `kern_sched_init()` 之前调用——因为调度器创建 idle 任务时会调用 `kern_mpu_setup_stack_guard()`，此时 MPU 子系统必须已初始化。
+| `kern_mpu_init()` | 未在 main.cpp 中显式调用（由使用方按需调用） | 配置 MPU 子系统。`kern_mpu_setup_stack_guard()` 由 `kern_spawn()` 在创建任务时调用（Native 后端），FreeRTOS 后端中栈由 FreeRTOS 管理、不调用 |
+| `kern_smp_init()` | `kern_sched_init()` 内部调用 | 初始化 `g_per_cpu[]` 数组，使 per-CPU 宏可用。单核模式下为 no-op |
 
 ---
 
 ## 与其他组件的关系
 
-- **kern_sched**：`kern_sched_init()` 内部调用 `kern_smp_init()` 和 `kern_mpu_setup_stack_guard()`；内存分配失败时调用 `kern_panic()`
-- **kern_mpu**：`kern_mpu_init()` 在初始化序列中由 `main.cpp` 显式调用，使用 `kern_log()` 输出区域配置信息
+- **kern_sched**：`kern_sched_init()` 内部调用 `kern_smp_init()` 和 `kern_port_init()`（ESP32 FreeRTOS 后端）；内存分配失败时调用 `kern_panic()`
+- **kern_mpu**：`kern_mpu_init()` 未在 `main.cpp` 中显式调用，当前为按需使用的框架函数。`kern_mpu_setup_stack_guard()` 由 `kern_spawn()` 在 Native 后端中调用
 - **kern_vfs**：VFS 初始化时输出 `kern_log()` 信息
 - **kern_shell**：可以通过 Shell 命令查询内核统计信息和设置日志级别
 

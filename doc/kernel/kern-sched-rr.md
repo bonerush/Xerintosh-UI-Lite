@@ -136,14 +136,17 @@ static void sched_rr_dequeue(kern_task_t *task)
 
 ### pick_next：两遍扫描 Round-Robin
 
-*📄 Source: [kern_sched_rr.c](../../src/kernel/kern_sched_rr.c#L67-L103)*
+*📄 Source: [kern_sched_rr.c](../../src/kernel/kern_sched_rr.c#L92-L143)*
 
-这是 RR 类的核心算法，实现两遍链表扫描。
+这是 RR 类的核心算法，实现两遍链表扫描 + CPU 亲和性检查。
 
 ```c
 static kern_task_t *sched_rr_pick_next(void)
 {
+    uint8_t cpu = KERN_THIS_CPU;
     uint32_t now = g_sched_ticks;
+
+    task_list_lock();
 
     /* ═══ 第一遍：唤醒所有到期 sleep 任务 ═══ */
     kern_task_t *t = sched_class_rr.task_list;
@@ -156,24 +159,39 @@ static kern_task_t *sched_rr_pick_next(void)
 
     /* ═══ 第二遍：Round-Robin 扫描 ═══ */
     kern_task_t *start = (g_last_picked != NULL && g_last_picked->next != NULL)
-                         ? g_last_picked->next       /* 从上一个的下一个开始 */
-                         : sched_class_rr.task_list;  /* 否则从头开始 */
+                         ? g_last_picked->next
+                         : sched_class_rr.task_list;
 
-    if (start == NULL) return NULL;  /* 任务列表为空 */
+    if (start == NULL) {
+        task_list_unlock();
+        return NULL;
+    }
 
     t = start;
+    kern_task_t *first_candidate = NULL;
     do {
         if (t->state == KERN_TASK_READY) {
-            g_last_picked = t;      /* 记录本轮选中 */
-            return t;
+            uint8_t tid = t->cpu_id;
+            /* CPU 亲和性检查：KERN_CPU_ANY 或匹配本核心 */
+            if (tid == KERN_CPU_ANY || tid == cpu) {
+                g_last_picked = t;
+                task_list_unlock();
+                return t;
+            }
+            if (first_candidate == NULL) {
+                first_candidate = t;
+            }
         }
         t = t->next;
         if (t == NULL) {
-            t = sched_class_rr.task_list;  /* 到达尾部 → 回到头部 */
+            t = sched_class_rr.task_list;
         }
-    } while (t != start);  /* 扫描一圈回到起点 = 没有就绪任务 */
+    } while (t != start);
 
-    return NULL;
+    task_list_unlock();
+
+    /* 无亲和性匹配任务时，返回 KERN_CPU_ANY 任务作为兜底 */
+    return first_candidate;
 }
 ```
 
@@ -203,10 +221,17 @@ static kern_task_t *sched_rr_pick_next(void)
 
     /* ──── 第二遍扫描：循环查找就绪任务 ──── */
     遍历指针 = 起点
+    首个候选 = NULL
     do {
         if (遍历指针.状态 == 就绪) {
-            上一次选中 = 遍历指针
-            return 遍历指针        /* 找到了！ */
+            /* CPU 亲和性检查 */
+            if (遍历指针.cpu_id == KERN_CPU_ANY || 遍历指针.cpu_id == 当前CPU) {
+                上一次选中 = 遍历指针
+                return 遍历指针        /* 找到了！ */
+            }
+            if (首个候选 == NULL) {
+                首个候选 = 遍历指针    /* 记录第一个就绪但不匹配亲和性的任务 */
+            }
         }
         遍历指针 = 遍历指针.next
         if (遍历指针 == NULL) {
@@ -214,14 +239,15 @@ static kern_task_t *sched_rr_pick_next(void)
         }
     } while (遍历指针 != 起点)      /* 扫描了完整一圈 */
 
-    return NULL  /* 所有任务都不可运行（全都睡眠/阻塞/僵尸） */
+    return 首个候选  /* 无亲和性匹配时返回候选任务 */
 }
 
 /* 核心巧思：
  * 1. 第一遍唤醒保证 sleep 任务到期即可被第二遍选中
  * 2. 从 g_last_picked->next 开始确保公平轮转
  * 3. 回绕机制在单圈找不到任务时回到头部继续
- * 4. 全部不可运行返回 NULL → idle 任务兜底
+ * 4. CPU 亲和性检查确保任务运行在正确核心上
+ * 5. 无亲和性匹配时返回首个候选，避免饿死
  */
 ```
 
@@ -335,8 +361,8 @@ RR 调度类完全不使用 `priority` 字段。这个回调仅在 FIFO class �
 ## 与其他组件的关系
 
 - **kern_sched_class**：`sched_class_rr` 是 `kern_sched_class_t` 接口的实例
-- **kern_sched**：`kern_sched_init()` 首先注册此 class，并设置 `sched_class_rr.task_list = g_task_list`
-- **kern_task**：每个任务通过 `scheduler_class_id = 0` 指向此 class
+- **kern_sched**：`kern_sched_init()` 首先注册此 class，并设置 `sched_class_rr.task_list = g_task_list`（Native / ESP32 均如此）
+- **kern_task**：RR 作为默认调度类，所有任务默认由其调度。`sched_class_rr.task_list` 直接指向全局 `g_task_list`
 - **g_last_picked**：跨 tick 的状态变量，记录上一轮选中的任务，实现真正的轮转
 
 ---

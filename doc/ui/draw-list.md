@@ -103,51 +103,65 @@ void xerintosh_draw_list_appearance()
 
 ## 列表项绘制
 
-*📄 Source: [ui_draw_list.c](../../src/ui/ui_draw_list.c#L193-L280)*
+*📄 Source: [ui_draw_list.c](../../src/ui/ui_draw_list.c#L198-L288)*
 
 ```c
-void xerintosh_draw_list_item()
+static void xerintosh_draw_list_item()
 {
-  for (unsigned char i = 0; i < parent->child_num; i++)
-  {
-    xerintosh_list_item_t *_item = parent->child_list_item[i];
-    int16_t _x = g_xerintosh_camera.x_camera + LIST_ITEM_LEFT_MARGIN;
-    int16_t _y = _item->y_list_item + g_xerintosh_camera.y_camera - hal_get_font_height()/2;
+  xerintosh_set_font(hal_get_cn_font());
+  int16_t _font_h = hal_get_font_height();
+  int16_t _font_h_2 = _font_h / 2;
 
+  for (unsigned char i = 0; i < g_xerintosh_selector.selected_item->parent->child_num; i++)
+  {
+    xerintosh_list_item_t *_item = g_xerintosh_selector.selected_item->parent->child_list_item[i];
+    int16_t _x_list_item = g_xerintosh_camera.x_camera + LIST_ITEM_LEFT_MARGIN;
+    int16_t _y_list_item = _item->y_list_item + g_xerintosh_camera.y_camera - _font_h_2;
+
+    /* 根据类型分发到对应的绘制函数 */
     g_xerintosh_draw_color = COLOR_FG;
     switch (_item->type)
     {
       case list_item:
       case button_item:
       case user_item:
-        draw_list_item_icon_only(_item, _x, _y);
+        draw_list_item_icon_only(_item, _x_list_item, _y_list_item);
         break;
       case switch_item:
-        draw_list_item_switch(xerintosh_to_switch_item(_item), _x, _y);
+        draw_list_item_switch(xerintosh_to_switch_item(_item), _x_list_item, _y_list_item);
         break;
       case slider_item:
-        draw_list_item_slider(xerintosh_to_slider_item(_item), _x, _y);
+        draw_list_item_slider(xerintosh_to_slider_item(_item), _x_list_item, _y_list_item);
+        break;
+      default:
+        draw_list_item_icon_only(_item, _x_list_item, _y_list_item);
         break;
     }
 
-    /* 自定义位图图标 */
+    /* 自定义位图图标补充绘制 */
     if (_item->icon == custom_icon && _item->bitmap_data != NULL) {
-      xerintosh_draw_item_bitmap(_item, _x, _y);
+      xerintosh_draw_item_bitmap(_item, _x_list_item, _y_list_item);
     }
 
-    /* 文字滚动效果 */
-    xerintosh_set_font(hal_get_cn_font());
-    if (_y + hal_get_font_height() / 2 > LIST_INFO_BAR_HEIGHT &&
-        _y + hal_get_font_height() / 2 < SCREEN_HEIGHT)
+    /* ═══ 文字绘制与滚动效果 ═══ */
+    if (_y_list_item + _font_h_2 > LIST_INFO_BAR_HEIGHT &&
+        _y_list_item + _font_h_2 < SCREEN_HEIGHT)
     {
       int16_t _text_width = hal_get_string_width(_item->content);
       bool _has_right_control = (_item->type == switch_item || _item->type == slider_item);
       int16_t _right_margin = _has_right_control ? LIST_ITEM_RIGHT_MARGIN : 4;
       int16_t _avail_width = SCREEN_WIDTH - LIST_ITEM_LEFT_MARGIN - 10 - _right_margin;
 
+      /* switch/slider 额外占用右侧控件空间 */
+      if (_item->type == switch_item)
+        _avail_width -= 11;
+      else if (_item->type == slider_item)
+        _avail_width -= 11;
+
       bool _is_selected = (_item == g_xerintosh_selector.selected_item);
       float _scroll_x = 0.0f;
 
+      /* 计算文字循环滚动偏移 */
       if (_is_selected && _text_width > _avail_width) {
         if (!_item->is_scrolling) {
           _item->is_scrolling = true;
@@ -159,22 +173,25 @@ void xerintosh_draw_list_item()
         _item->is_scrolling = false;
       }
 
-      /* 设置裁剪区域 */
+      /* 设置裁剪区域：限制文字只在 icon 右侧到控件左侧之间显示 */
       int16_t _clip_x = LIST_ITEM_LEFT_MARGIN + 10;
-      int16_t _clip_y = _y - hal_get_font_height() / 2 - 2;
-      int16_t _clip_h = hal_get_font_height() + 4;
+      int16_t _clip_y = _y_list_item - _font_h_2 - 2;
+      int16_t _clip_h = _font_h + 4;
       hal_set_clip_rect(_clip_x, _clip_y, _avail_width, _clip_h);
 
       int16_t _cycle_dist = _text_width + _avail_width;
       int16_t _draw_x = _clip_x - (int16_t)_scroll_x;
 
       /* 绘制两份相同文字，形成无缝循环跑马灯 */
-      hal_draw_string(_draw_x, _y + hal_get_font_height() / 2, _item->content, ...);
-      hal_draw_string(_draw_x + _cycle_dist, _y + hal_get_font_height() / 2, _item->content, ...);
+      hal_draw_string(_draw_x, _y_list_item + _font_h_2, _item->content, g_xerintosh_draw_color);
+      hal_draw_string(_draw_x + _cycle_dist, _y_list_item + _font_h_2, _item->content, g_xerintosh_draw_color);
 
       hal_clear_clip_rect();
+      /* ═══════════════════════ */
     }
   }
+
+  g_xerintosh_refresh_list_value = false;
 }
 ```
 
@@ -182,16 +199,21 @@ void xerintosh_draw_list_item()
 
 ```
 函数 绘制列表项() {
+    设置字体(中文字体)
+    字体高度 = hal_get_font_height()
+    字体半高 = 字体高度 / 2
+
     for (遍历当前菜单的所有子项) {
-        项 = 子项数组[i]
+        项 = 选择器.选中项.父项.子项数组[i]
         屏幕X = 相机X + 左边距4
-        屏幕Y = 项.当前Y + 相机Y - 字体高度/2
+        屏幕Y = 项.当前Y + 相机Y - 字体半高
 
         // 根据类型分发绘制
         switch (项的类型) {
             case 普通列表项/按钮/用户页: 仅绘制图标
             case 开关项: 绘制图标 + 右侧开关控件
             case 滑条项: 绘制图标 + 右侧数值
+            default: 仅绘制图标
         }
 
         // 自定义位图
@@ -200,6 +222,7 @@ void xerintosh_draw_list_item()
         // 文字绘制（含跑马灯滚动）
         if (文本在可视区内) {
             计算可用宽度（右侧控件会占用空间）
+            // switch/slider 额外再减11px控件宽度
 
             if (当前项被选中 且 文本宽度 > 可用宽度) {
                 // 启动/继续跑马灯滚动
@@ -222,6 +245,8 @@ void xerintosh_draw_list_item()
             清除裁剪区域
         }
     }
+
+    清除列表值刷新标记 = false
 }
 ```
 
@@ -234,7 +259,7 @@ void xerintosh_draw_list_item()
 
 ## 选择器高亮
 
-*📄 Source: [ui_draw_list.c](../../src/ui/ui_draw_list.c#L287-L309)*
+*📄 Source: [ui_draw_list.c](../../src/ui/ui_draw_list.c#L295-L317)*
 
 ```c
 void xerintosh_draw_selector()
@@ -303,7 +328,7 @@ static void xerintosh_draw_slider_overlays(void)
 
 ## 文字滚动偏移计算
 
-*📄 Source: [ui_draw_list.c](../../src/ui/ui_draw_list.c#L356-L369)*
+*📄 Source: [ui_draw_list.c](../../src/ui/ui_draw_list.c#L364-L377)*
 
 ```c
 float xerintosh_compute_scroll_offset(int16_t text_width, int16_t avail_width,
@@ -328,7 +353,7 @@ float xerintosh_compute_scroll_offset(int16_t text_width, int16_t avail_width,
 
 ## 长按提示
 
-*📄 Source: [ui_draw_list.c](../../src/ui/ui_draw_list.c#L318-L331)*
+*📄 Source: [ui_draw_list.c](../../src/ui/ui_draw_list.c#L326-L339)*
 
 ```c
 void xerintosh_draw_long_press_hint(uint32_t duration_ms, uint32_t threshold_ms)

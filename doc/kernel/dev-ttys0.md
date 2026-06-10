@@ -197,11 +197,12 @@ void dev_ttyS0_poll(void)
     /*
      * RX: 从硬件串口读取数据，写入环形缓冲区供任务消费。
      *
-     * 在以下两种情况下跳过 RX，将字符留在硬件 Serial 缓冲区:
+     * 在以下三种情况下跳过 RX，将字符留在硬件 Serial 缓冲区:
      * 1. serial_input 正在等待密码/配对码（由 serial_poll() 直接消费）
      * 2. 串口监视器正在运行（由 serial_monitor_update() 直接消费）
+     * 3. 烧录器有线桥接激活（由 flasher_app 的 flasher_loop 直接消费）
      * 否则 Serial 字节会被此处消耗并进入 ring buffer，
-     * Shell 和 serial_input/serial_monitor 会竞争同一份数据。
+     * Shell 和 serial_input/serial_monitor/flasher 会竞争同一份数据。
      */
     int rx_limit = 32;
     if (!serial_input_is_waiting() && !serial_monitor_is_active()) {
@@ -232,10 +233,10 @@ void dev_ttyS0_poll(void)
 ```
 函数 串口轮询() {
     // 第一步：RX — 硬件串口 → RX 缓冲区
-    // 关键：如果 serial_input 或 serial_monitor 正在活跃使用串口，
+    // 关键：如果 serial_input、serial_monitor 或 flasher 正在活跃使用串口，
     //       则跳过，避免数据竞争
     RX上限 = 32
-    if (serial_input没在等输入 且 串口监视器没运行) {
+    if (serial_input没在等输入 且 串口监视器没运行 且 烧录器桥接未激活) {
         while (还有RX上限 且 Serial有数据 且 RX缓冲区未满) {
             从Serial读取一个字节
             存入RX缓冲区

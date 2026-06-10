@@ -40,9 +40,6 @@ ui_core.h/c          ← 动画引擎与主循环调度
 ui_drawer.h/c        ← 渲染管线：列表、选择器、弹窗、信息栏
     │
     ▼
-ui_draw_driver.h/c   ← 宏桥接：oled_* → hal_*
-    │
-    ▼
 hal_display.h/cpp    ← 显示抽象（M5Canvas / 内存帧缓冲）
 hal_input.h/cpp      ← 按键输入抽象
 hal_system.h/cpp     ← 系统时钟与延时
@@ -62,6 +59,8 @@ hal_system.h/cpp     ← 系统时钟与延时
 - **子节点**：挂载在父节点下的菜单项，最多 10 个
 - **层级（layer）**：根节点为 0，每向下一层 +1，最大 10 层
 
+*📄 Source: [ui_types.h](../src/ui/ui_types.h#L84-L85)*
+
 ### 2.2 构建菜单树
 
 所有菜单项通过 `xerintosh_push_item_to_list(parent, child)` 挂载到树上。该函数会自动：
@@ -69,6 +68,8 @@ hal_system.h/cpp     ← 系统时钟与延时
 1. 设置子节点的 `layer = parent->layer + 1`
 2. 计算子节点的纵向目标坐标 `y_list_item_trg`
 3. 如果是根节点的第一个子项，自动绑定到选择器和相机
+
+*📄 Source: [ui_item_list.c](../src/ui/ui_item_list.c#L43-L68)*
 
 ```c
 #include "ui/ui_item.h"
@@ -126,6 +127,8 @@ xerintosh_push_item_to_list(root, about);
 | `button_item` | `xerintosh_button_item_t` | 单次触发按钮 | 执行回调函数 |
 | `user_item` | `xerintosh_user_item_t` | **自定义 App/全屏界面** | 进入自定义界面 |
 
+*📄 Source: [ui_types.h](../src/ui/ui_types.h#L58-L65)*
+
 ### 3.1 list_item
 
 用于组织子菜单，本身不携带额外数据。
@@ -137,6 +140,8 @@ xerintosh_list_item_t* item = xerintosh_new_list_item("菜单名", list_icon);
 ### 3.2 switch_item
 
 绑定一个 `bool*` 指针，界面上会显示一个开关图形。
+
+*📄 Source: [ui_item_core.h](../src/ui/ui_item_core.h#L66-L72)*
 
 ```c
 static bool wifi_on = false;
@@ -156,6 +161,8 @@ xerintosh_list_item_t* sw = xerintosh_new_switch_item(
 
 绑定一个 `int16_t*` 指针，支持步进、最小值、最大值。
 
+*📄 Source: [ui_item_core.h](../src/ui/ui_item_core.h#L92-L103)*
+
 ```c
 static int16_t brightness = 50;
 
@@ -172,18 +179,23 @@ xerintosh_list_item_t* sl = xerintosh_new_slider_item(
 ```
 
 **交互流程**：
-1. 首次长按 **B（确认）**：进入编辑模式，备份原值，选择器宽度变窄
-2. 短按 **A/B**：在编辑模式下增减数值
-3. 再次长按 **B（确认）**：确认修改，退出编辑模式
-4. 长按 **A（返回）**：取消修改，恢复原值，退出编辑模式
+1. 首次长按 **A（确认）**：进入编辑模式，备份原值，选择器宽度变窄
+2. 短按 **A/B**：在编辑模式下增减数值（A 增加，B 减少）
+3. 再次长按 **A（确认）**：确认修改，退出编辑模式
+4. 长按 **B（返回）**：取消修改，恢复原值，退出编辑模式
+
+*📄 Source: [app_init.c](../src/app/app_init.c#L469-L494)*
 
 ### 3.4 button_item
 
 没有状态存储，仅用于触发一次动作。
 
+*📄 Source: [ui_item_core.h](../src/ui/ui_item_core.h#L80-L84)*
+
 ```c
-void on_reboot()
+static void on_reboot(void *user_data)
 {
+    (void)user_data;
     xerintosh_push_pop_up("正在重启...", 2000);
     delay(1000);
     ESP.restart();
@@ -195,6 +207,8 @@ xerintosh_list_item_t* btn = xerintosh_new_button_item("重启", on_reboot, powe
 ### 3.5 user_item（自定义 App）
 
 这是开发自定义界面的核心类型。它有三个生命周期回调：
+
+*📄 Source: [ui_item_core.h](../src/ui/ui_item_core.h#L112-L123)*
 
 ```c
 xerintosh_list_item_t* app = xerintosh_new_user_item(
@@ -209,7 +223,7 @@ xerintosh_list_item_t* app = xerintosh_new_user_item(
 **生命周期时序**：
 
 ```
-用户长按 B（确认）
+用户长按 A（确认）
     │
     ▼
 播放进入动画（exit_animation）
@@ -224,7 +238,7 @@ xerintosh_list_item_t* app = xerintosh_new_user_item(
 每帧调用 loop_function()   ← 约 60fps
     │
     ▼
-用户长按 A（返回）
+用户长按 B（返回）
     │
     ▼
 播放退出动画
@@ -236,30 +250,38 @@ xerintosh_list_item_t* app = xerintosh_new_user_item(
 设置 in_user_item = false，返回菜单列表
 ```
 
+*📄 Source: [ui_core.c](../src/ui/ui_core.c#L170-L211)*
+
 ---
 
 ## 4. 自定义 App（user_item）
 
 ### 4.1 基本实现模板
 
+*📄 Source: [ui_core.c](../src/ui/ui_core.c#L188-L189)*
+
 ```c
 #include "hal/hal_display.h"
 #include "hal/hal_system.h"
+#include "hal/hal_input.h"
+#include "ui/ui_item.h"
 
 static uint32_t start_time = 0;
 
-void my_app_init(void)
+void my_app_init(void *user_data)
 {
+    (void)user_data;
     // 一次性初始化：分配资源、重置状态
+    hal_input_reset_events();  // ★ 必须：清除进入前的残留按键事件
     start_time = hal_get_ticks();
 }
 
-void my_app_loop(void)
+void my_app_loop(void *user_data)
 {
+    (void)user_data;
     // 每帧执行：完全控制屏幕绘制
     // 框架不会绘制菜单列表、选择器等任何 UI 元素
-
-    hal_display_clear();
+    // 注意：框架已在调用 loop 前自动 hal_display_clear()
 
     uint32_t elapsed = (hal_get_ticks() - start_time) / 1000;
     char buf[32];
@@ -272,13 +294,16 @@ void my_app_loop(void)
 
     hal_draw_string(x, y, buf, COLOR_FG);
 
-    // 提示返回方式
-    hal_draw_utf8(4, SCREEN_HEIGHT - 10, "长按 B 返回", COLOR_FG);
+    // ★ 标准退出检查（必须在所有 App 输入处理之后）
+    hal_event_t event_b = hal_input_get_event(HAL_BTN_B);
+    if (ui_user_item_try_exit(event_b)) return;
 }
 
-void my_app_exit(void)
+void my_app_exit(void *user_data)
 {
+    (void)user_data;
     // 清理资源：释放内存、关闭外设、保存状态等
+    hal_input_reset_events();  // ★ 必须：清除退出时的残留事件
     start_time = 0;
 }
 ```
@@ -299,20 +324,23 @@ xerintosh_push_pop_up("已保存", 1000);
 
 如果你需要在 `loop_function` 中自定义按键行为（例如游戏），可以直接读取 HAL 输入状态：
 
-```cpp
+```c
 #include "hal/hal_input.h"
 
-void my_game_loop()
+void my_game_loop(void *user_data)
 {
-    hal_input_update();  // 刷新按键状态
-
-    if (hal_input_is_pressed(HAL_BTN_A)) {
-        // A 键正被按住
-    }
+    (void)user_data;
 
     hal_event_t ev = hal_input_get_event(HAL_BTN_B);
     if (ev == HAL_EVENT_SHORT_PRESS) {
         // B 键短按事件（每帧调用会消费事件，注意时序）
+    }
+
+    // ★ 标准退出检查
+    if (ui_user_item_try_exit(ev)) return;
+
+    if (hal_input_is_pressed(HAL_BTN_A)) {
+        // A 键正被按住
     }
 
     // ... 绘制游戏画面
@@ -320,7 +348,7 @@ void my_game_loop()
 ```
 
 **注意**：
-- `app_init.c` 的 `app_input_process()` 仍然在每帧运行，长按 A 仍会触发退出逻辑
+- `app_init.c` 的 `app_input_process()` 在每帧运行时会先调用 `hal_input_update()`，但若处于 `user_item` 内部会立即返回，不处理框架导航
 - 如果你需要完全接管按键（例如 A 键在游戏中也有用），建议在 `init_function` 中设置一个全局标志，在 `app_init.c` 的 `app_input_process()` 中判断该标志以跳过框架导航
 
 ---
@@ -328,6 +356,8 @@ void my_game_loop()
 ## 5. 输入交互映射
 
 框架默认的按键映射（定义在 `app_init.c` 的 `app_input_process()`）：
+
+*📄 Source: [app_init.c](../src/app/app_init.c#L469-L494)*
 
 | 按键 | 短按 | 长按 |
 |------|------|------|
@@ -408,26 +438,34 @@ src/
 #include "ui/ui_item.h"
 #include "hal/hal_system.h"
 #include "hal/hal_display.h"
+#include "hal/hal_input.h"
 
 static uint32_t g_start_time = 0;
 
-void app_clock_init(void)
+void app_clock_init(void *user_data)
 {
+    (void)user_data;
+    hal_input_reset_events();
     g_start_time = hal_get_ticks();
 }
 
-void app_clock_loop(void)
+void app_clock_loop(void *user_data)
 {
+    (void)user_data;
     uint32_t elapsed = (hal_get_ticks() - g_start_time) / 1000;
     char buf[32];
     snprintf(buf, sizeof(buf), "%02lu:%02lu", elapsed / 60, elapsed % 60);
 
-    hal_display_clear();
     hal_draw_utf8(10, 30, buf, COLOR_FG);
+
+    hal_event_t ev_b = hal_input_get_event(HAL_BTN_B);
+    if (ui_user_item_try_exit(ev_b)) return;
 }
 
-void app_clock_exit(void)
+void app_clock_exit(void *user_data)
 {
+    (void)user_data;
+    hal_input_reset_events();
     g_start_time = 0;
 }
 ```
@@ -478,36 +516,39 @@ static int16_t volume   = 30;
 static int16_t contrast = 50;
 
 // ========== 按钮回调 ==========
-void on_factory_reset()
+static void on_factory_reset(void *user_data)
 {
+    (void)user_data;
     xerintosh_push_pop_up("已恢复出厂设置", 2000);
 }
 
-void on_about_exit()
-{
-    // About 页面退出时的清理
-}
-
 // ========== 自定义 App 回调 ==========
-void sensor_app_init()
+static void sensor_app_init(void *user_data)
 {
+    (void)user_data;
+    hal_input_reset_events();
     // 初始化传感器
 }
 
-void sensor_app_loop(void)
+static void sensor_app_loop(void *user_data)
 {
-    hal_display_clear();
+    (void)user_data;
     hal_draw_utf8(10, 30, "Sensor Data", COLOR_FG);
     // ... 读取并显示传感器数据
+
+    hal_event_t ev_b = hal_input_get_event(HAL_BTN_B);
+    if (ui_user_item_try_exit(ev_b)) return;
 }
 
-void sensor_app_exit()
+static void sensor_app_exit(void *user_data)
 {
+    (void)user_data;
+    hal_input_reset_events();
     // 关闭传感器
 }
 
 // ========== 构建菜单 ==========
-void build_main_menu()
+void build_main_menu(void)
 {
     xerintosh_list_item_t* root = xerintosh_get_root_list();
 
@@ -547,7 +588,7 @@ static bool wifi_on = false;
 xerintosh_new_switch_item("WiFi", &wifi_on, ...);
 
 // ❌ 错误：局部变量，函数返回后指针悬空
-void bad_example() {
+void bad_example(void) {
     bool wifi = false;
     xerintosh_new_switch_item("WiFi", &wifi, ...);  // 危险！
 }
@@ -564,23 +605,30 @@ void bad_example() {
 | `MAX_LIST_CHILD_NUM` | 10 | 每个父节点最多 10 个子项 |
 | `MAX_LIST_LAYER` | 10 | 菜单树最大深度 10 层 |
 
+*📄 Source: [ui_types.h](../src/ui/ui_types.h#L84-L85)*
+
 超过限制时 `xerintosh_push_item_to_list()` 返回 `false`。
+
+*📄 Source: [ui_item_list.c](../src/ui/ui_item_list.c#L43-L68)*
 
 ### 8.4 user_item 中的导航
 
 在 `user_item` 的 `loop_function` 中：
 - 不要调用 `xerintosh_selector_go_next_item()`、`xerintosh_selector_go_prev_item()` 等导航函数，这会破坏菜单状态
 - 如果需要自定义按键行为，参考第 4.3 节，通过全局标志让 `input_process()` 跳过框架导航
+- 必须调用 `ui_user_item_try_exit(event_b)` 处理标准退出逻辑
 
 ### 8.5 屏幕方向与分辨率
 
 当前框架针对 **M5Stick-C（80x160 TFT）** 设计，在 `main.cpp` 中设置了 `setRotation(1)`（横屏）。如果你更换设备或方向，需检查以下常量：
 
-- `SCREEN_WIDTH`、`SCREEN_HEIGHT`（定义在 `ui_draw_driver.h` 或 `hal_display.h`）
+- `SCREEN_WIDTH`、`SCREEN_HEIGHT`（定义在 `hal_display.h`）
 - 列表项间距 `LIST_ITEM_SPACING`
 - 选择器高度、字体大小等
 
 ### 8.6 图标选择
+
+*📄 Source: [ui_types.h](../src/ui/ui_types.h#L70-L80)*
 
 ```c
 default_icon    // 自动根据类型选择默认图标
@@ -591,6 +639,7 @@ user_icon       // 用户/应用
 slider_icon     // 滑块
 flag_icon       // 标记/关于
 power_icon      // 电源/系统
+custom_icon     // 自定义位图图标，需配合 bitmap_data 使用
 ```
 
 ---
@@ -617,6 +666,7 @@ power_icon      // 电源/系统
 | `xerintosh_selector_go_prev_item()` | 选择器上移 |
 | `xerintosh_selector_jump_to_selected_item()` | 确认/进入当前项 |
 | `xerintosh_selector_exit_current_item()` | 返回/退出当前项 |
+| `ui_user_item_try_exit(event_b)` | user_item 通用退出检测 |
 
 ### 通知
 
@@ -627,7 +677,7 @@ power_icon      // 电源/系统
 
 ### 状态查询
 
-| 函数 | 说明 |
-|------|------|
+| 函数/宏 | 说明 |
+|---------|------|
 | `xerintosh_is_in_user_item()` | 当前是否在某个 user_item 内部 |
-| `in_xerintosh` | 全局布尔：UI 是否激活 |
+| `g_in_xerintosh` | 全局宏：UI 是否激活（来自 ui_context.h） |

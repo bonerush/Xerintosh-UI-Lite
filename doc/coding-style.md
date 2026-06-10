@@ -21,6 +21,7 @@
 | WiFi 管理 | `wifi_mgr_` | `wifi_mgr_enable()` |
 | 蓝牙管理 | `bt_mgr_` | `bt_mgr_init()` |
 | 存储 | `storage_` | `storage_get_brightness()` |
+| 内核 | `kern_` | `kern_task_spawn()` |
 
 ### 1.2 命名规则
 
@@ -37,7 +38,7 @@ typedef struct { ... } hal_display_t;
 typedef enum { ... } xerintosh_list_item_type_t;
 
 /* 回调类型：模块前缀 + _cb_t */
-typedef void (*xerintosh_item_cb_t)(void *user_data);
+typedef void (*xerintosh_cb_t)(void *user_data);
 
 /* 全局变量（模块内部）：g_ 前缀 */
 static int16_t g_brightness_level = 5;
@@ -49,6 +50,8 @@ static int16_t g_brightness_level = 5;
 /* 参数：前导下划线（本项目沿用 convention） */
 void xerintosh_animation(float *_pos, float _pos_trg, float _speed);
 ```
+
+*📄 Source: [ui_types.h](../src/ui/ui_types.h#L51)*
 
 ---
 
@@ -122,6 +125,8 @@ extern "C" {
 
 基类结构体包含所有派生类共享的字段，**第一个字段必须是类型标签**。
 
+*📄 Source: [ui_types.h](../src/ui/ui_types.h#L58-L65)*
+
 ```c
 typedef enum {
     list_item,
@@ -143,13 +148,14 @@ typedef struct xerintosh_list_item_t {
 
 派生结构体**必须把基类作为第一个成员**，这是 C 标准保证的内存布局兼容。
 
+*📄 Source: [ui_item_core.h](../src/ui/ui_item_core.h#L66-L72)*
+
 ```c
 typedef struct xerintosh_switch_item_t {
     xerintosh_list_item_t base_item;   /* 必须放第一位！ */
     bool *value;
-    void (*init_cb)(void *user_data);
-    void (*exit_cb)(void *user_data);
-    void *user_data;
+    xerintosh_cb_t init_function;      /* 进入该项时调用的初始化函数 */
+    xerintosh_cb_t exit_function;      /* 值改变后调用的退出函数 */
 } xerintosh_switch_item_t;
 ```
 
@@ -157,13 +163,15 @@ typedef struct xerintosh_switch_item_t {
 
 永远不要直接强制转换，必须通过类型标签检查。
 
+*📄 Source: [ui_item_base.c](../src/ui/ui_item_base.c#L23-L29)*
+
 ```c
 static xerintosh_list_item_t *xerintosh_safe_cast(xerintosh_list_item_t *_item,
                                           xerintosh_list_item_type_t _expected)
 {
     if (_item != NULL && _item->type == _expected)
         return _item;
-    return xerintosh_get_root_list();  /* 降级到 root，避免空指针崩溃 */
+    return NULL;  /* 类型不匹配时返回 NULL */
 }
 
 xerintosh_switch_item_t *xerintosh_to_switch_item(xerintosh_list_item_t *_item) {
@@ -181,16 +189,18 @@ xerintosh_switch_item_t *xerintosh_to_switch_item(xerintosh_list_item_t *_item) 
 
 所有回调统一使用 `void (*)(void *user_data)` 签名，并附带 `user_data` 上下文指针。
 
+*📄 Source: [ui_types.h](../src/ui/ui_types.h#L51)*
+
 ```c
-typedef void (*xerintosh_callback_t)(void *user_data);
+typedef void (*xerintosh_cb_t)(void *user_data);
 
 /* 在结构体中 */
 struct xerintosh_user_item_t {
     xerintosh_list_item_t base_item;
-    xerintosh_callback_t init_cb;
-    xerintosh_callback_t loop_cb;
-    xerintosh_callback_t exit_cb;
-    void *user_data;  /* 回调上下文 */
+    xerintosh_cb_t init_function;   /* 进入时调用 */
+    xerintosh_cb_t loop_function;   /* 每帧调用 */
+    xerintosh_cb_t exit_function;   /* 退出时调用 */
+    void *user_data;                /* 回调上下文 */
 };
 ```
 
@@ -200,17 +210,19 @@ struct xerintosh_user_item_t {
 /* 注册回调时传递上下文 */
 xerintosh_list_item_t *item = xerintosh_new_user_item(
     "我的页面",
-    my_init,      /* xerintosh_callback_t */
+    my_init,      /* xerintosh_cb_t */
     my_loop,
     my_exit,
     &my_context   /* void *user_data */
 );
 
 /* 调用时传递上下文 */
-if (_item->init_cb != NULL) {
-    _item->init_cb(_item->user_data);
+if (_item->init_function != NULL) {
+    _item->init_function(_item->user_data);
 }
 ```
+
+*📄 Source: [ui_core.c](../src/ui/ui_core.c#L181-L189)*
 
 ---
 

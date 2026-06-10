@@ -12,71 +12,76 @@
 
 ### 类型层次（继承体系）
 
-*📄 Source: [ui_item.h](../../src/ui/ui_item.h#L124-L148)*
+*📄 Source: [ui_item_core.h](../../src/ui/ui_item_core.h#L35-L57)*
 
 ```c
-typedef enum {
-    list_item,    // 普通列表项（可展开子菜单）
-    switch_item,  // 开关项
-    slider_item,  // 滑条项
-    user_item,    // 用户自定义页面
-    button_item,  // 按钮项
+typedef enum
+{
+  list_item,    // 普通列表项（可展开子菜单）
+  switch_item,  // 开关项
+  slider_item,  // 滑条项
+  user_item,    // 用户自定义页面
+  button_item,  // 按钮项
 } xerintosh_list_item_type_t;
 
 // 基类
-typedef struct xerintosh_list_item_t {
-    xerintosh_list_item_type_t type;
-    xerintosh_list_item_icon_t icon;
-    const char *content;
-    uint8_t layer;
-    float y_list_item, y_list_item_trg;   // 当前Y / 目标Y（动画用）
-    uint8_t child_num;
-    struct xerintosh_list_item_t *child_list_item[MAX_LIST_CHILD_NUM];
-    struct xerintosh_list_item_t *parent;
-    void *user_data;
-    float content_scroll_offset;
-    uint32_t scroll_start_time;
-    bool is_scrolling;
-    const uint8_t *bitmap_data;
-    uint8_t bitmap_w;
-    uint8_t bitmap_h;
+typedef struct xerintosh_list_item_t
+{
+  xerintosh_list_item_type_t type;
+  xerintosh_list_item_icon_t icon;
+  const char *content;
+  uint8_t layer;
+  float y_list_item, y_list_item_trg;   // 当前Y / 目标Y（动画用）
+  uint8_t child_num;
+  struct xerintosh_list_item_t *child_list_item[MAX_LIST_CHILD_NUM];
+  struct xerintosh_list_item_t *parent;
+  void *user_data;
+  uint32_t scroll_start_time;
+  bool is_scrolling;
+  const uint8_t *bitmap_data;
+  uint8_t bitmap_w;
+  uint8_t bitmap_h;
+  xerintosh_cb_t init_function;
 } xerintosh_list_item_t;
 ```
 
 所有派生类都把 `xerintosh_list_item_t` 作为**第一个成员**：
 
-*📄 Source: [ui_item.h](../../src/ui/ui_item.h#L180-L230)*
+*📄 Source: [ui_item_core.h](../../src/ui/ui_item_core.h#L66-L123)*
 
 ```c
-typedef struct xerintosh_switch_item_t {
-    xerintosh_list_item_t base_item;   // 必须放在第一个位置
-    bool *value;
-    void (*init_function)();
-    void (*exit_function)();
+typedef struct xerintosh_switch_item_t
+{
+  xerintosh_list_item_t base_item;   // 必须放在第一个位置
+  bool *value;
+  xerintosh_cb_t init_function;      // 进入该项时调用的初始化函数
+  xerintosh_cb_t exit_function;      // 值改变后调用的退出函数
 } xerintosh_switch_item_t;
 
-typedef struct xerintosh_slider_item_t {
-    xerintosh_list_item_t base_item;
-    int16_t *value;
-    int16_t value_backup;   // 进入编辑时备份原始值
-    bool is_confirmed;      // 是否处于编辑状态
-    uint8_t value_step;
-    int16_t value_max;
-    int16_t value_min;
-    void (*init_function)();
-    void (*exit_function)();
+typedef struct xerintosh_slider_item_t
+{
+  xerintosh_list_item_t base_item;
+  int16_t *value;
+  int16_t value_backup;              // 进入编辑时备份原始值
+  bool is_confirmed;                 // 是否处于编辑状态
+  uint8_t value_step;
+  int16_t value_max;
+  int16_t value_min;
+  xerintosh_cb_t init_function;      // 进入该项时调用的初始化函数
+  xerintosh_cb_t exit_function;      // 值改变后调用的退出函数
 } xerintosh_slider_item_t;
 
-typedef struct xerintosh_user_item_t {
-    xerintosh_list_item_t base_item;
-    bool in_user_item;        // 是否已进入用户页面
-    bool entering_user_item;  // 是否正在播放进入动画
-    bool exiting_user_item;   // 是否正在播放退出动画
-    void (*init_function)();
-    void (*loop_function)();  // 用户页面的每帧回调
-    void (*exit_function)();
-    bool user_item_inited;
-    bool user_item_looping;
+typedef struct xerintosh_user_item_t
+{
+  xerintosh_list_item_t base_item;
+  bool in_user_item;                 // 是否已处于 user_item 运行态
+  bool entering_user_item;           // 是否正在进入
+  bool exiting_user_item;            // 是否正在退出
+  xerintosh_cb_t init_function;      // 进入时调用一次
+  xerintosh_cb_t loop_function;      // 每帧调用
+  xerintosh_cb_t exit_function;      // 退出时调用一次
+  xerintosh_cb_t destroy_callback;   // 销毁时调用，供 App 清理 user_data
+  kern_pid_t kernel_pid;             // 内核虚任务 PID（-1=未注册）
 } xerintosh_user_item_t;
 ```
 
@@ -93,19 +98,19 @@ typedef struct xerintosh_user_item_t {
     子项指针数组[最大10个]
     父项指针
     用户自定义数据指针
-    文字滚动偏移
     滚动开始时间
     是否正在滚动
     自定义位图数据指针
     位图宽度
     位图高度
+    初始化回调（进入子菜单时调用）
 }
 
 结构体 开关项 {
     基类列表项    // 放在第一个位置，这样 (列表项指针) 和 (开关项指针) 可以安全互转
     布尔值指针    // 指向外部变量
-    初始化回调
-    退出回调
+    初始化回调（进入该项时调用）
+    退出回调（值改变后调用）
 }
 
 结构体 滑条项 {
@@ -115,8 +120,20 @@ typedef struct xerintosh_user_item_t {
     是否已确认    // 短按进入编辑，再短按确认
     步进值
     最大值, 最小值
-    初始化回调
-    退出回调
+    初始化回调（进入该项时调用）
+    退出回调（值改变后调用）
+}
+
+结构体 用户自定义项 {
+    基类列表项
+    是否已进入运行态
+    是否正在进入
+    是否正在退出
+    初始化回调（进入时调用一次）
+    循环回调（每帧调用）
+    退出回调（退出时调用一次）
+    销毁回调（释放时清理 user_data）
+    内核虚任务 PID
 }
 ```
 
@@ -133,23 +150,19 @@ xerintosh_switch_item_t *xerintosh_to_switch_item(xerintosh_list_item_t *_xerint
 }
 ```
 
-每个派生类都有一个安全转换函数。如果类型不匹配，返回 root 作为降级处理，避免空指针崩溃。
+每个派生类都有一个安全转换函数。内部通过 `xerintosh_safe_cast()` 实现类型检查：如果类型不匹配或参数为 NULL，返回 `NULL`，避免空指针崩溃。
 
 ### 构造与挂载
 
 *📄 Source: [ui_item_base.c](../../src/ui/ui_item_base.c#L97-L103)*
 
 ```c
-xerintosh_list_item_t *xerintosh_new_list_item(char *_content, xerintosh_list_item_icon_t icon) {
-    xerintosh_list_item_t *_item = malloc(sizeof(xerintosh_list_item_t));
-    memset(_item, 0, sizeof(xerintosh_list_item_t));
-    _item->type = list_item;
-    _item->content = _content;
-    if(icon == default_icon)
-        _item->icon = list_icon;
-    else
-        _item->icon = icon;
-    return _item;
+xerintosh_list_item_t *xerintosh_new_list_item(const char *_content, xerintosh_list_item_icon_t icon)
+{
+  xerintosh_list_item_t *_item = (xerintosh_list_item_t*)malloc(sizeof(xerintosh_list_item_t));
+  if (_item == NULL) return NULL;
+  xerintosh_init_base_item(_item, list_item, _content, icon, list_icon);
+  return _item;
 }
 ```
 
@@ -158,47 +171,46 @@ xerintosh_list_item_t *xerintosh_new_list_item(char *_content, xerintosh_list_it
 ```
 函数 新建列表项(文本, 图标) {
     分配内存
-    清零结构体        // ESP32 上未初始化变量是随机值，必须清零
-    设置类型为列表项
-    设置文本
-    if (图标是默认图标) {
-        使用列表图标
-    } else {
-        使用指定图标
-    }
+    if (分配失败) return NULL
+    调用基类初始化(项, 类型=list_item, 文本, 图标, 默认图标=list_icon)
+    // 基类初始化内部：清零结构体、strdup 复制文本、设置类型和图标
     return 新项
 }
 ```
 
+**关键细节**：`content` 通过 `strdup()` 动态复制，后续由 `xerintosh_destroy_item_tree()` 负责 `free`。如果传入局部变量的字符串指针，复制后的堆内存仍然安全。所有创建函数（`xerintosh_new_switch_item`、`xerintosh_new_slider_item` 等）都遵循相同的模式：先 `malloc` 派生结构体，再调用 `xerintosh_init_base_item()` 初始化基类字段。
+
 ### 挂载到树（Push）
 
-*📄 Source: [ui_item_list.c](../../src/ui/ui_item_list.c#L25-L60)*
+*📄 Source: [ui_item_list.c](../../src/ui/ui_item_list.c#L43-L68)*
 
 ```c
-bool xerintosh_push_item_to_list(xerintosh_list_item_t *_parent, xerintosh_list_item_t *_child) {
-    if (_parent == NULL) return false;
-    if (_child == NULL) return false;
-    if (_parent->child_num >= MAX_LIST_CHILD_NUM) return false;
-    if (_parent->layer >= MAX_LIST_LAYER) return false;
+bool xerintosh_push_item_to_list(xerintosh_list_item_t *_parent, xerintosh_list_item_t *_child)
+{
+  if (_parent == NULL) return false;
+  if (_child == NULL) return false;
+  if (_parent->child_num >= MAX_LIST_CHILD_NUM) return false;
+  if (_parent->layer >= MAX_LIST_LAYER) return false;
 
-    _child->layer = _parent->layer + 1;
-    _child->child_num = 0;
+  _child->layer = _parent->layer + 1;
 
-    xerintosh_set_font(NULL);
-    if (_parent->child_num == 0)
-        _child->y_list_item_trg = oled_get_str_height() + LIST_FONT_TOP_MARGIN - 1;
-    else
-        _child->y_list_item_trg = _parent->child_list_item[_parent->child_num - 1]->y_list_item_trg
-                                   + LIST_ITEM_SPACING;
+  xerintosh_set_font(hal_get_cn_font());
+  if (_parent->child_num == 0)
+    _child->y_list_item_trg = hal_get_font_height() + LIST_FONT_TOP_MARGIN - 1;
+  else
+    _child->y_list_item_trg = _parent->child_list_item[_parent->child_num - 1]->y_list_item_trg
+                               + LIST_ITEM_SPACING;
 
-    if (_parent->layer == 0 && _parent->child_num == 0) {
-        xerintosh_bind_item_to_selector(_child);
-        xerintosh_bind_selector_to_camera(&xerintosh_selector);
-    }
+  if (_parent->layer == 0 && _parent->child_num == 0)
+  {
+    xerintosh_bind_item_to_selector(_child);  /* 初始化并绑定 selector */
+    xerintosh_bind_selector_to_camera(&g_xerintosh_selector);  /* 初始化并绑定 camera */
+  }
 
-    _parent->child_list_item[_parent->child_num++] = _child;
-    _child->parent = _parent;
-    return true;
+  _parent->child_list_item[_parent->child_num++] = _child;
+  _child->parent = _parent;
+
+  return true;
 }
 ```
 
@@ -212,9 +224,9 @@ bool xerintosh_push_item_to_list(xerintosh_list_item_t *_parent, xerintosh_list_
     if (父项层级 >= 最大层级10) return 失败
 
     子项.层级 = 父项.层级 + 1
-    子项.子项数 = 0
 
     // 计算子项在列表中的目标Y坐标
+    设置字体(中文字体)
     if (父项还没有任何子项) {
         子项.目标Y = 字体高度 + 顶部边距 - 1
     } else {
@@ -236,15 +248,14 @@ bool xerintosh_push_item_to_list(xerintosh_list_item_t *_parent, xerintosh_list_
 
 ### 选择器（Selector）
 
-*📄 Source: [ui_item.h](../../src/ui/ui_item.h#L369-L375)*
+*📄 Source: [ui_selector.h](../../src/ui/ui_selector.h#L24-L29)*
 
 ```c
-typedef struct xerintosh_selector_t {
-    float y_selector, y_selector_trg;
-    float w_selector, w_selector_trg;
-    float h_selector, h_selector_trg;
-    uint8_t selected_index;
-    xerintosh_list_item_t *selected_item;
+typedef struct xerintosh_selector_t
+{
+  float y_selector, y_selector_trg, w_selector, w_selector_trg, h_selector, h_selector_trg;
+  uint8_t selected_index;
+  xerintosh_list_item_t *selected_item;
 } xerintosh_selector_t;
 ```
 
@@ -252,27 +263,35 @@ typedef struct xerintosh_selector_t {
 
 ### 导航函数
 
-*📄 Source: [ui_item_selector.c](../../src/ui/ui_item_selector.c#L71-L104)*
+*📄 Source: [ui_item_selector.c](../../src/ui/ui_item_selector.c#L65-L91)*
 
 ```c
-void xerintosh_selector_go_next_item() {
-    // 如果当前是滑条且处于编辑模式，改变值而不是移动
-    if (xerintosh_selector.selected_item->type == slider_item
-        && xerintosh_to_slider_item(xerintosh_selector.selected_item)->is_confirmed) {
-        *_selected_slider_item->value += _selected_slider_item->value_step;
-        if (*_selected_slider_item->value >= _selected_slider_item->value_max)
-            *_selected_slider_item->value = _selected_slider_item->value_max;
-        return;
-    }
+void xerintosh_selector_go_next_item()
+{
+  if (g_xerintosh_selector.selected_item->type == slider_item
+      && xerintosh_to_slider_item(g_xerintosh_selector.selected_item)->is_confirmed)
+  {
+    xerintosh_slider_item_t* _selected_slider_item = xerintosh_to_slider_item(g_xerintosh_selector.selected_item);
+    *_selected_slider_item->value += _selected_slider_item->value_step;
+    if (*_selected_slider_item->value >= _selected_slider_item->value_max)
+      *_selected_slider_item->value = _selected_slider_item->value_max;
+    return;
+  }
 
-    // 到达末尾时回环到第一个
-    if (xerintosh_selector.selected_index == xerintosh_selector.selected_item->parent->child_num - 1) {
-        xerintosh_selector.selected_item = xerintosh_selector.selected_item->parent->child_list_item[0];
-        xerintosh_selector.selected_index = 0;
-        return;
-    }
+  if (g_xerintosh_selector.selected_item->type == user_item
+      && xerintosh_to_user_item(g_xerintosh_selector.selected_item)->in_user_item) return;
 
-    xerintosh_selector.selected_item = xerintosh_selector.selected_item->parent->child_list_item[++xerintosh_selector.selected_index];
+  g_xerintosh_refresh_list_value = true;
+
+  /* 到达最末端 */
+  if (g_xerintosh_selector.selected_index == g_xerintosh_selector.selected_item->parent->child_num - 1)
+  {
+    g_xerintosh_selector.selected_item = g_xerintosh_selector.selected_item->parent->child_list_item[0];
+    g_xerintosh_selector.selected_index = 0;
+    return;
+  }
+
+  g_xerintosh_selector.selected_item = g_xerintosh_selector.selected_item->parent->child_list_item[++g_xerintosh_selector.selected_index];
 }
 ```
 
@@ -285,6 +304,12 @@ void xerintosh_selector_go_next_item() {
         if (值超过最大值) 值 = 最大值
         return
     }
+
+    if (当前项是用户App 且 已进入运行态) {
+        return   // 不导航，由 App 自行处理输入
+    }
+
+    标记需要刷新列表值 = true
 
     if (已到达当前菜单末尾) {
         选中第一项      // 循环回绕
@@ -325,29 +350,41 @@ void xerintosh_selector_jump_to_selected_item()
 
 ### 回退操作
 
-*📄 Source: [ui_item_selector.c](../../src/ui/ui_item_selector.c#L167-L192)*
+*📄 Source: [ui_item_selector.c](../../src/ui/ui_item_selector.c#L164-L196)*
 
 ```c
-void xerintosh_selector_go_back_item()
+void xerintosh_selector_exit_current_item()
 {
-    if (!g_in_xerintosh) return;
-    // 如果是 user_item，触发退出
-    if (g_xerintosh_selector.selected_item->type == user_item) {
-        handle_user_item_exit(xerintosh_to_user_item(g_xerintosh_selector.selected_item));
-        return;
-    }
-    // 如果是滑条编辑模式，恢复备份值
-    if (g_xerintosh_selector.selected_item->type == slider_item
-        && xerintosh_to_slider_item(g_xerintosh_selector.selected_item)->is_confirmed) {
-        *_slider->value = _slider->value_backup;
-        _slider->is_confirmed = false;
-        return;
-    }
-    // 切换到父项
-    if (g_xerintosh_selector.selected_item->parent != NULL) {
-        g_xerintosh_selector.selected_item = g_xerintosh_selector.selected_item->parent;
-        g_xerintosh_selector.selected_index = 0;
-    }
+  if (g_xerintosh_selector.selected_item->type == slider_item
+      && xerintosh_to_slider_item(g_xerintosh_selector.selected_item)->is_confirmed)
+  {
+    xerintosh_slider_item_t* _selected_slider_item = xerintosh_to_slider_item(g_xerintosh_selector.selected_item);
+    _selected_slider_item->is_confirmed = false;
+    *_selected_slider_item->value = _selected_slider_item->value_backup;
+    return;
+  }
+
+  if (g_xerintosh_selector.selected_item->type == user_item
+      && xerintosh_to_user_item(g_xerintosh_selector.selected_item)->in_user_item)
+  {
+    handle_user_item_exit(xerintosh_to_user_item(g_xerintosh_selector.selected_item));
+    return;
+  }
+
+  g_xerintosh_refresh_list_value = true;
+
+  if (g_xerintosh_selector.selected_item->parent->layer == 0 && g_in_xerintosh)
+  {
+    return;  /* 主菜单没有上一级，不允许退出 */
+  }
+
+  /* 给选择的 item 的父 item 的父 item 的所有子 item 坐标清零，做动画 */
+  for (uint8_t i = 0; i < g_xerintosh_selector.selected_item->parent->parent->child_num; i++)
+      g_xerintosh_selector.selected_item->parent->parent->child_list_item[i]->y_list_item = 0;
+
+  g_xerintosh_selector.selected_index = find_item_index(
+    g_xerintosh_selector.selected_item->parent->parent, g_xerintosh_selector.selected_item->parent);
+  g_xerintosh_selector.selected_item = g_xerintosh_selector.selected_item->parent;
 }
 ```
 
@@ -355,20 +392,21 @@ void xerintosh_selector_go_back_item()
 
 重构中将挂载和移除项时重复的坐标计算逻辑提取为独立函数，消除代码重复。
 
-*📄 Source: [ui_item_list.c](../../src/ui/ui_item_list.c#L16-L28)*
+*📄 Source: [ui_item_list.c](../../src/ui/ui_item_list.c#L20-L32)*
 
 ```c
 static void recalc_child_y_positions(xerintosh_list_item_t *_parent)
 {
-    if (_parent == NULL) return;
-    xerintosh_set_font(hal_get_cn_font());
-    for (uint8_t i = 0; i < _parent->child_num; i++)
-    {
-        if (i == 0)
-            _parent->child_list_item[i]->y_list_item_trg = hal_get_font_height() + LIST_FONT_TOP_MARGIN - 1;
-        else
-            _parent->child_list_item[i]->y_list_item_trg = _parent->child_list_item[i - 1]->y_list_item_trg + LIST_ITEM_SPACING;
-    }
+  if (_parent == NULL) return;
+
+  xerintosh_set_font(hal_get_cn_font());
+  for (uint8_t i = 0; i < _parent->child_num; i++)
+  {
+    if (i == 0)
+      _parent->child_list_item[i]->y_list_item_trg = hal_get_font_height() + LIST_FONT_TOP_MARGIN - 1;
+    else
+      _parent->child_list_item[i]->y_list_item_trg = _parent->child_list_item[i - 1]->y_list_item_trg + LIST_ITEM_SPACING;
+  }
 }
 ```
 
@@ -447,13 +485,13 @@ void xerintosh_set_font(const void *_font)
 
 ### 相机（Camera / Viewport）
 
-*📄 Source: [ui_item.h](../../src/ui/ui_item.h#L424-L432)*
+*📄 Source: [ui_camera.h](../../src/ui/ui_camera.h#L24-L28)*
 
 ```c
-typedef struct xerintosh_camera_t {
-    float x_camera, x_camera_trg;
-    float y_camera, y_camera_trg;
-    xerintosh_selector_t *selector;
+typedef struct xerintosh_camera_t
+{
+  float x_camera, x_camera_trg, y_camera, y_camera_trg;
+  xerintosh_selector_t *selector;
 } xerintosh_camera_t;
 ```
 

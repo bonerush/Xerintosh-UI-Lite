@@ -102,13 +102,13 @@ SMP 模式:
 
 ### 互斥锁（mutex_t）
 
-*📄 Source: [kern_sync.h](../../src/kernel/kern_sync.h#L54-L86)*
+*📄 Source: [kern_sync.h](../../src/kernel/kern_sync.h#L54-L58)*
 
 ```c
 typedef struct {
     spinlock_t    lock;        /* 内部自旋锁 */
     kern_task_t  *owner;       /* 当前持有者 */
-    kern_task_t  *wait_queue;  /* 等待队列头（预留） */
+    kern_task_t  *wait_queue;  /* 等待队列头 */
 } mutex_t;
 ```
 

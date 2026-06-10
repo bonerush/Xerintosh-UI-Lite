@@ -14,7 +14,7 @@
 
 ### Per-CPU 数据结构
 
-*📄 Source: [kern_smp.h](../../src/kernel/kern_smp.h#L29-L39)*
+*📄 Source: [kern_smp.h](../../src/kernel/kern_smp.h#L30-L38)*
 
 ```c
 #define KERN_MAX_CPUS  2     /* ESP32: PRO_CPU=0, APP_CPU=1 */
@@ -26,6 +26,8 @@ typedef struct kern_per_cpu {
     struct kern_task  *idle_task;        /* 此 CPU 的 idle 任务 */
     uint32_t      sched_ticks;      /* 调度 tick 计数 */
     volatile bool need_resched;     /* 抢占请求标志（可被 ISR 设置） */
+    struct kern_task  *last_picked;     /* RR 扫描起点（每核独立） */
+    uint8_t       task_count;       /* 此 CPU 管理的任务数 */
 } kern_per_cpu_t;
 
 /** 全局 per-CPU 数组（总是存在，SMP 禁用时仅使用 [0]） */
@@ -45,6 +47,8 @@ g_per_cpu[KERN_MAX_CPUS]
  │ │ idle_task: → idle0    │ │ │ idle_task: → idle1    │       │
  │ │ sched_ticks: 123456   │ │ │ sched_ticks: 123455   │       │
  │ │ need_resched: false   │ │ │ need_resched: true    │       │
+ │ │ last_picked: → idle0  │ │ │ last_picked: → idle1  │       │
+ │ │ task_count: 3         │ │ │ task_count: 2         │       │
  │ └───────────────────────┘ │ └───────────────────────┘       │
  │       PRO_CPU             │         APP_CPU                  │
  └─────────────────────────────────────────────────────────────┘
@@ -54,15 +58,17 @@ g_per_cpu[KERN_MAX_CPUS]
 
 ### Per-CPU 访问宏：零开销的关键
 
-*📄 Source: [kern_smp.h](../../src/kernel/kern_smp.h#L67-L75)*
+*📄 Source: [kern_smp.h](../../src/kernel/kern_smp.h#L74-L82)*
 
 ```c
-#define g_current_task   (g_per_cpu[KERN_THIS_CPU].current_task)
-#define g_idle_task      (g_per_cpu[KERN_THIS_CPU].idle_task)
-#define g_sched_ticks    (g_per_cpu[KERN_THIS_CPU].sched_ticks)
+#define g_current_task       (g_per_cpu[KERN_THIS_CPU].current_task)
+#define g_idle_task          (g_per_cpu[KERN_THIS_CPU].idle_task)
+#define g_sched_ticks        (g_per_cpu[KERN_THIS_CPU].sched_ticks)
+#define g_last_picked        (g_per_cpu[KERN_THIS_CPU].last_picked)
+#define g_percpu_task_count  (g_per_cpu[KERN_THIS_CPU].task_count)
 
 #ifdef CONFIG_PREEMPT_ENABLED
-#define g_need_resched   (g_per_cpu[KERN_THIS_CPU].need_resched)
+#define g_need_resched       (g_per_cpu[KERN_THIS_CPU].need_resched)
 #endif
 ```
 
@@ -108,7 +114,7 @@ SMP 模式 (CONFIG_SMP_ENABLED):
 
 ### CONFIG_SMP_ENABLED 两种模式对比
 
-*📄 Source: [kern_smp.h](../../src/kernel/kern_smp.h#L43-L65)*
+*📄 Source: [kern_smp.h](../../src/kernel/kern_smp.h#L45-L70)*
 
 ```c
 #ifdef CONFIG_SMP_ENABLED
@@ -116,9 +122,17 @@ SMP 模式 (CONFIG_SMP_ENABLED):
 
 #define KERN_THIS_CPU  ((uint8_t)(kern_cpu_id()))
 
-uint8_t kern_cpu_id(void);            /* xPortGetCoreID() */
-void kern_smp_init(void);             /* 初始化 per-CPU 数组，启动 APP_CPU */
-void kern_smp_start_core(uint8_t, void (*entry)(void *arg));
+/** 返回当前 CPU ID（ESP32: xPortGetCoreID，native: 0） */
+uint8_t kern_cpu_id(void);
+
+/** 初始化 SMP 子系统（per-CPU 数组、APP_CPU 调度器） */
+void kern_smp_init(void);
+
+/** 在指定 CPU 上启动调度器循环 */
+void kern_smp_start_core(uint8_t cpu_id, void (*entry)(void *arg));
+
+/** 为 KERN_CPU_ANY 任务分配 CPU（负载最低的核心） */
+uint8_t kern_smp_migrate_assign(void);
 
 #else
 /* ============ 单核模式 ============ */
@@ -128,6 +142,8 @@ void kern_smp_start_core(uint8_t, void (*entry)(void *arg));
 static inline uint8_t kern_cpu_id(void) { return 0; }
 #define kern_smp_init()                 do {} while (0)
 #define kern_smp_start_core(c, e)       do { (void)(c); (void)(e); } while (0)
+static inline uint8_t kern_smp_migrate_assign(void) { return 0; }
+
 #endif
 ```
 
@@ -135,14 +151,15 @@ static inline uint8_t kern_cpu_id(void) { return 0; }
 |------|------|------|
 | `KERN_THIS_CPU` | `kern_cpu_id()` → `xPortGetCoreID()`（硬件 ID） | `0`（编译期常量） |
 | `kern_cpu_id()` | `xPortGetCoreID()` → 实际 CPU 号 | `return 0`（内联为常量） |
-| `kern_smp_init()` | 遍历初始化 `g_per_cpu[0..1]`，启动 APP_CPU | `do {} while(0)`（空操作） |
+| `kern_smp_init()` | 遍历初始化 `g_per_cpu[0..1]` | `do {} while(0)`（空操作） |
 | `kern_smp_start_core()` | `xTaskCreatePinnedToCore()` 创建 FreeRTOS 任务 | 空操作（抑制参数未使用警告） |
+| `kern_smp_migrate_assign()` | 分配到任务数较少的 CPU（负载均衡） | 返回 0 |
 | 代码体积 | +~2KB | 0 bytes |
 | 运行时开销 | per-CPU 间接寻址 | 直接寻址 |
 
 ### SMP 初始化流程
 
-*📄 Source: [kern_smp.c](../../src/kernel/kern_smp.c#L34-L44)*
+*📄 Source: [kern_smp.c](../../src/kernel/kern_smp.c#L34-L46)*
 
 ```c
 void kern_smp_init(void)
@@ -153,6 +170,8 @@ void kern_smp_init(void)
         g_per_cpu[i].idle_task    = NULL;
         g_per_cpu[i].sched_ticks  = 0;
         g_per_cpu[i].need_resched = false;
+        g_per_cpu[i].last_picked  = NULL;
+        g_per_cpu[i].task_count   = 0;
     }
     kern_log(KERN_LOG_INFO, "SMP: %d CPUs initialized", KERN_MAX_CPUS);
 }
@@ -168,6 +187,8 @@ void kern_smp_init(void)
         per-CPU[i].空闲任务 = 空
         per-CPU[i].调度tick = 0
         per-CPU[i].需重调度 = 否
+        per-CPU[i].上次选中 = 空
+        per-CPU[i].任务计数 = 0
 
     输出日志 "SMP: 2 CPUs initialized"
 }
@@ -241,7 +262,7 @@ kern_spawn("wifi", entry, NULL, 0)
     ├─ cpu_id == KERN_CPU_ANY (0xFF)
     │   → 分配策略：
     │      - 单核模式：始终分配到 CPU 0
-    │      - SMP 模式：分配到 kern_cpu_id()（当前 CPU）
+    │      - SMP 模式：调用 kern_smp_migrate_assign()，分配到任务数较少的 CPU
     │
     └─ cpu_id == 1 (APP_CPU)
         → 任务始终运行在 CPU 1 上
@@ -255,7 +276,7 @@ kern_spawn("wifi", entry, NULL, 0)
 - **kern_sync**：spinlock 和 mutex 依赖 `KERN_THIS_CPU` 和 `g_current_task` per-CPU 宏实现正确的所有者跟踪
 - **kern_sched**：调度器使用 `g_current_task`（per-CPU 宏）而不是直接的全局变量。`kern_sched_init()` 调用 `kern_smp_init()`
 - **kern_task**：TCB 的 `cpu_id` 字段决定任务运行在哪个 CPU
-- **kern_mpu**：MPU 上下文切换时使用 `KERN_THIS_CPU` 确定当前核心
+- **kern_mpu**：`kern_mpu_apply()` 的注释伪代码中使用 `kern_cpu_id()` 确定当前核心，但实际函数体尚未实现寄存器写入（见 [kern_mpu.c](../../src/kernel/kern_mpu.c#L195-L224)）
 
 ---
 

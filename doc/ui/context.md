@@ -59,7 +59,7 @@ typedef struct xerintosh_context_t
 
 | 字段 | 类型 | 初始值 | 说明 |
 |------|------|--------|------|
-| `in_xerintosh` | `bool` | `true` | 全局 UI 激活标志，设为 false 后主循环退出 |
+| `in_xerintosh` | `bool` | `false` | 全局 UI 激活标志，设为 false 后主循环退出 |
 | `anim_enabled` | `bool` | `true` | 全局动画开关，关闭后所有位置直接跳变 |
 | `exit_requested` | `bool` | `false` | 外部组件请求退出当前 user_item 的信号 |
 | `exit_animation_status` | `uint8_t` | `0` | 退场动画状态机：0=展开中, 1=到达底部, 2=回缩中 |
@@ -76,12 +76,14 @@ typedef struct xerintosh_context_t
 
 ### 单例模式
 
-*📄 Source: [ui_context.c](../../src/ui/ui_context.c#L24-L35)*
+*📄 Source: [ui_context.c](../../src/ui/ui_context.c#L21-L40)*
 
 ```c
 static xerintosh_context_t g_ui_ctx = {
-  .in_xerintosh = true,
+  .in_xerintosh = false,
   .anim_enabled = true,
+  .exit_requested = false,
+  .exit_animation_status = 0,
   .exit_animation_finished = true,
   .refresh_list_value = true,
   .draw_color = 0xFFFF,
@@ -112,18 +114,38 @@ xerintosh_context_t *xerintosh_get_context(void)
 
 ### 初始化函数
 
-*📄 Source: [ui_context.c](../../src/ui/ui_context.c#L47-L68)*
+*📄 Source: [ui_context.c](../../src/ui/ui_context.c#L47-L76)*
 
 ```c
 void xerintosh_context_init(void)
 {
-    g_ui_ctx.in_xerintosh = true;
-    g_ui_ctx.anim_enabled = true;
-    // ... 重置所有字段 ...
-    s_selector = (xerintosh_selector_t){};
-    s_camera = (xerintosh_camera_t){};
-    s_info_bar = (xerintosh_info_bar_t){};
-    s_pop_up = (xerintosh_pop_up_t){};
+  /* 重置标量状态 */
+  g_ui_ctx.in_xerintosh = false;
+  g_ui_ctx.anim_enabled = true;
+  g_ui_ctx.exit_requested = false;
+  g_ui_ctx.exit_animation_status = 0;
+  g_ui_ctx.exit_animation_finished = true;
+  g_ui_ctx.refresh_list_value = true;
+  g_ui_ctx.draw_color = 0xFFFF;
+  g_ui_ctx.anim_speed = 92;
+  g_ui_ctx.cached_selector_content = NULL;
+  g_ui_ctx.cached_selector_text_width = 0;
+  g_ui_ctx.exit_anim_temp_h = -8;
+  g_ui_ctx.exit_anim_temp_h_trg = -999;
+  g_ui_ctx.exit_anim_last_finished = true;
+  g_ui_ctx.exit_anim_prev_screen_h = -1;
+
+  /* 重置子系统状态 */
+  s_selector = (xerintosh_selector_t){};
+  s_camera = (xerintosh_camera_t){0, 0, 0, 0, &s_selector};
+  s_info_bar = (xerintosh_info_bar_t){0, 1, 0 - 2 * 15, 0 - 2 * 15, 80, 80, false, 0, 1};
+  s_pop_up = (xerintosh_pop_up_t){0, 1, 0 - 2 * 48, 0 - 2 * 48, 80, 80, false, 0, 1, {NULL, NULL, NULL}, 0};
+
+  /* 重新连接指针 */
+  g_ui_ctx.selector = &s_selector;
+  g_ui_ctx.camera = &s_camera;
+  g_ui_ctx.info_bar = &s_info_bar;
+  g_ui_ctx.pop_up = &s_pop_up;
 }
 ```
 
@@ -131,7 +153,7 @@ void xerintosh_context_init(void)
 1. **测试隔离**：每个测试用例开始前重置上下文
 2. **UI 热重启**：从 user_item 异常退出后重新初始化
 
-区别于静态初始化，`xerintosh_context_init()` 还会将子系统状态（selector、camera 等）通过 `= {}` 清零。
+区别于静态初始化，`xerintosh_context_init()` 还会将子系统状态（selector、camera 等）清零并重新连接指针。
 
 ### 向后兼容宏
 
@@ -217,7 +239,7 @@ void xerintosh_draw_exit_animation()
 
 ### 屏幕方向切换防护
 
-*📄 Source: [ui_draw_anim.c](../../src/ui/ui_draw_anim.c#L31-L37)*
+*📄 Source: [ui_draw_anim.c](../../src/ui/ui_draw_anim.c#L33-L39)*
 
 ```c
 if (g_xerintosh_exit_anim_prev_screen_h != SCREEN_HEIGHT)
@@ -237,7 +259,7 @@ if (g_xerintosh_exit_anim_prev_screen_h != SCREEN_HEIGHT)
 
 ### 选择器宽度缓存
 
-*📄 Source: [ui_core.c](../../src/ui/ui_core.c#L137-L143)*
+*📄 Source: [ui_core.c](../../src/ui/ui_core.c#L140-L145)*
 
 ```c
 if (g_xerintosh_cached_selector_content != g_xerintosh_selector.selected_item->content) {

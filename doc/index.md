@@ -46,7 +46,7 @@ Project Root
 │   ├── settings/           ← 亮度/动画/方向设置 + 旋转兼容转换
 │   ├── storage/            ← NVS 持久化存储
 │   ├── wifi/               ← WiFi 状态机（扫描/连接/密码输入）
-│   ├── bluetooth/          ← 蓝牙管理器（NimBLE 扫描/配对）
+│   ├── bluetooth/          ← 蓝牙管理器（Classic BT SPP）
 │   ├── serial_input/       ← 串口 CLI 输入（WiFi 密码/蓝牙配对码）
 │   ├── serial_monitor/     ← 串口监视器 App（缓冲区/状态机/界面）
 │   ├── taskmgr/             ← 任务管理器 App（进程列表/终止/保护）

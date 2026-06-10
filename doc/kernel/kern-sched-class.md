@@ -69,12 +69,12 @@ extern uint8_t g_sched_class_count;
 
    g_sched_class_count = 2
 
-   优先级规则：先注册的 class 先被 pick_next_ready 查询。
+   查询规则：先注册的 class 先被 pick_next_ready 查询。
    这意味着：
-   - RR 先注册 → RR 作为兜底调度类
-   - FIFO 后注册 → 但 FIFO 的 pick_next 返回高优先级任务
-                   如果 FIFO 返回了任务，RR 不会被查询
-                   如果 FIFO 返回 NULL，RR 提供兜底
+   - RR 先注册 → 优先被查询
+   - FIFO 后注册 → 仅在 RR 返回 NULL 时被查询
+   - 若 RR 的 pick_next 返回就绪任务（包括高优先级任务），
+     FIFO 不会被查询到
 */
 ```
 
@@ -100,13 +100,13 @@ void kern_sched_class_register(kern_sched_class_t *cls)
     当前计数++
 }
 
-/* 注册顺序决定优先级：
+/* 注册顺序决定查询优先级：
  * 1. kern_sched_init() 中先 register(&sched_class_rr)
- * 2. 再 register(&sched_class_fifo)
+ * 2. 再 register(&sched_class_fifo) [仅 ESP32]
  *
  * pick_next_ready() 会按顺序查询：
- *   g_sched_classes[0] → RR class → 如果没有就绪任务，返回 NULL
- *   g_sched_classes[1] → FIFO class → 返回最高优先级任务（如果有）
+ *   g_sched_classes[0] → RR class → 返回第一个就绪任务（几乎总是有）
+ *   g_sched_classes[1] → FIFO class → 仅在 RR 返回 NULL 时被查询
  */
 ```
 
@@ -147,28 +147,30 @@ struct kern_task *pick_next_ready(void)
 }
 
 /* 关键设计：
- * - 先注册的类优先查询（RR 先注册 → 作为兜底）
+ * - 先注册的类优先查询（RR 先注册 → 优先被查询）
  * - 返回第一个非 NULL 结果（短路求值）
  * - 每个类的 pick_next 负责自己的选择逻辑
  *   RR：两遍扫描，Round-Robin 轮转
  *   FIFO：按优先级链表顺序返回就绪任务
+ * - 若 RR 返回非 NULL，FIFO 不会被查询
  */
 ```
 
 ### 调度 tick 中的 class 遍历
 
-*📄 Source: [kern_sched.c](../../src/kernel/kern_sched.c#L206-L211)*
+*📄 Source: [kern_sched.c](../../src/kernel/kern_sched.c#L227-L231) (Native) / L294-L298 (ESP32)*
 
 ```c
-    /* 遍历所有 class 的 tick 回调 */
+    /* 遍历所有调度类的 tick 回调（时间片递减、抢占标记） */
     for (int i = 0; i < g_sched_class_count; i++) {
         if (g_sched_classes[i] && g_sched_classes[i]->tick) {
             g_sched_classes[i]->tick(g_current_task);
         }
     }
-    /* 如果任何 class 设置了 g_need_resched → 立即上下文切换 */
-    if (g_need_resched) {
-        /* ... 抢占调度 ... */
+
+    /* 检查是否需要重新调度（时间片到期 或 任务状态变更） */
+    if (g_need_resched || (g_current_task && g_current_task->state != KERN_TASK_RUNNING)) {
+        /* ... 上下文切换 ... */
     }
 ```
 
@@ -217,21 +219,26 @@ struct kern_task *pick_next_ready(void)
 
     注册 sched_class_rr (index=0)
         │
-        ├─ 注册 sched_class_fifo (index=1)
+        ├─ 注册 sched_class_fifo (index=1)   [仅 ESP32]
         │
         └─ 创建 idle 任务
-           idle->scheduler_class_id = 0  (指向 RR class)
+           插入全局任务链表 g_task_list
+
+    sched_class_rr.task_list = g_task_list;
 
 任务创建阶段 (kern_spawn):
 
     分配 TCB
-    task->scheduler_class_id = -1   (待分配)
+    task->state = KERN_TASK_READY
+    task->priority = 128
+    task->timeslice_remaining = SCHED_RR_DEFAULT_TIMESLICE
     │
-    ├─ task->scheduler_class_id = 1  (指向 FIFO class)
-    │   调用 sched_class_fifo.enqueue(task)  (按优先级插入)
-    │
-    └─ 调用 sched_class_rr.enqueue(task)  (追加到链表尾)
-        调用 sched_class_rr.enqueue(task)  (追加到尾部)
+    └─ 插入全局任务链表 g_task_list
+
+⚠️ 注意：当前实现中 kern_spawn 未自动将任务加入各调度类的 task_list，
+也未设置 scheduler_class_id。RR class 直接使用 g_task_list 作为其
+任务链表（sched_class_rr.task_list = g_task_list），因此新任务
+自动对 RR 可见。FIFO class 的 task_list 保持独立，需显式入队才生效。
 ```
 
 ---

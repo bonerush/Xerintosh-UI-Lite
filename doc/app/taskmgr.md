@@ -31,23 +31,23 @@
 
 ```
 ╔══════════════════════╗
-║  Task Manager        ║  ← 标题栏（反色）
+║  Task Manager        ║  ← 标题栏
 ╠══════════════════════╣
-║ 0  idle      RUN    ║  ← 受保护任务（不可终止）
-║ 1  shell     RUN    ║
-║ 2  ui        RUN    ║
-║ 3  wifi-mgr  SLEEP  ║  ← 普通任务（可终止）
-║ 4  bt-mgr    SLEEP  ║
-║ 5  taskmgr   RUN    ║
+║ *0  idle      RUN    ║  ← 受保护任务（* 前缀标识，不可终止）
+║ *1  shell     RUN    ║
+║ *2  ui        RUN    ║
+║  3  wifi-mgr  SLEEP  ║  ← 普通任务（可终止）
+║  4  bt-mgr    SLEEP  ║
+║ *5  taskmgr   RUN    ║
 ╠══════════════════════╣
 ║ PID:3 wifi-mgr ...   ║  ← 底部信息栏
 ╚══════════════════════╝
 ```
 
-- **受保护任务**: 反色高亮（白底黑字），长按 A 无响应
-- **选中行**: 反色高亮（与受保护任务视觉一致）
+- **受保护任务**: 以 `*` 前缀标识，长按 A 无响应，会弹出 "Protected" 提示
+- **选中行**: 反色高亮（白底黑字）
 - **虚任务**: stack 字段显示 `n/a`
-- **横屏 3 行布局**：header/footer 间距从 6px 缩减到 2px，使 80px 高度下可显示 3 行
+- **横屏 3 行布局**：header/footer 间距基于 `HAL_ROW_H()` 动态计算，80px 高度下可显示 3 行
 
 ---
 
@@ -55,7 +55,7 @@
 
 ### 架构
 
-*📄 Source: [taskmgr.h](../../src/app/taskmgr/taskmgr.h), [taskmgr_app.c](../../src/app/taskmgr/taskmgr_app.c)*
+*📄 Source: [taskmgr.h](../../src/app/taskmgr/taskmgr.h#L18-L22), [taskmgr_app.c](../../src/app/taskmgr/taskmgr_app.c#L42-L52)*
 
 任务管理器使用 `ui_anim_row` 公共动画工具：
 
@@ -64,28 +64,38 @@
 
 // 状态结构体中嵌入动画上下文
 typedef struct {
-    int       selected;
-    int       scroll;
-    int       count;
-    bool      confirming;
+    int          selected;
+    int          scroll;
+    int          count;
+    kern_task_t *tasks[KERN_MAX_TASKS];  /* 本帧任务指针快照 */
+    bool         confirming;
+    uint32_t     confirm_tick;
     xerintosh_anim_row_list_t anim_list;  // ← 动画上下文
+    int          prev_selected;
+    int          prev_scroll;
 } taskmgr_state_t;
 ```
 
 ### 动画生命周期
 
-```
+*📄 Source: [taskmgr_app.c](../../src/app/taskmgr/taskmgr_app.c#L101-L119)*
+
+```c
 taskmgr_init()
-  └─ xerintosh_anim_row_list_init(&anim_list, visible, row_h, list_top)
+  └─ xerintosh_anim_row_list_init(&anim_list, visible, TASKMGR_ROW_H, list_top)
        → 所有行 Y = SCREEN_HEIGHT（底部起点）
        → 高亮框 Y = SCREEN_HEIGHT
+```
 
+*📄 Source: [taskmgr_app.c](../../src/app/taskmgr/taskmgr_app.c#L165-L258)*
+
+```c
 taskmgr_loop() — 每帧
   ├─ 输入处理（更新 selected/scroll）
   ├─ 如果 selected 或 scroll 变化:
   │    xerintosh_anim_row_list_refresh(&anim_list, ...)
   │    → 重新计算所有 trg 值
-  └─ xerintosh_anim_row_list_update(&anim_list, ANIM_SPEED_SELECTOR)
+  └─ xerintosh_anim_row_list_update(&anim_list, (float)ANIM_SPEED_SELECTOR)
        → 驱动当前值向目标值缓动
 
 taskmgr_draw() → draw_list()
@@ -95,22 +105,38 @@ taskmgr_draw() → draw_list()
 
 ### 动画效果
 
-- **入场动画**：所有行从屏幕底部（`SCREEN_HEIGHT = 160` 或横屏 `80`）滑入到最终行位置，约 300ms
+- **入场动画**：所有行从屏幕底部（`SCREEN_HEIGHT`）滑入到最终行位置，约 300ms
 - **选中切换**：高亮框从旧行位置平滑滑到新行位置，约 150ms
 - **滚动平滑**：`scroll_offset` 浮点插值消除整数滚动的跳动感
 
-### 横屏 3 行布局
+### 横屏布局
 
-为在横屏 `SCREEN_HEIGHT=80` 下显示 3 行（而非仅 2 行），优化了 header/footer 间距：
+*📄 Source: [taskmgr.h](../../src/app/taskmgr/taskmgr.h#L18-L22)*
 
 ```c
-// 旧: header_h = HEADER_Y + fh + 6 = 20, footer_h = fh + 6 = 18
-//     avail = 80 - 20 - 18 = 42 → 42 / 16 = 2 行
-// 新: header_h = HEADER_Y + fh + 2 = 16, footer_h = fh + 2 = 14
-//     avail = 80 - 16 - 14 = 50 → 50 / 16 = 3 行 ✓
+#define TASKMGR_LEFT_MARGIN  HAL_LEFT_X()         /* 标准左缩进 = 4 */
+#define TASKMGR_HEADER_H     HAL_ROW_H()           /* 标题栏高度 = font_h + 4 */
+#define TASKMGR_FOOTER_H     HAL_ROW_H()           /* 底部信息栏高度 = font_h + 4 */
+#define TASKMGR_ROW_H        HAL_ROW_H()           /* 列表行高 = font_h + 4 */
 ```
 
-竖屏 160px 下不受影响，仍可显示 ≥7 行。
+*📄 Source: [taskmgr_app.c](../../src/app/taskmgr/taskmgr_app.c#L127-L137)*
+
+```c
+int taskmgr_visible_lines(void)
+{
+    int16_t header_h = TASKMGR_HEADER_H;
+    int16_t footer_h = TASKMGR_FOOTER_H;
+    int16_t avail = SCREEN_HEIGHT - header_h - footer_h;
+    int16_t row_h = TASKMGR_ROW_H;
+    int visible = avail / row_h;
+    if (visible > TASKMGR_VISIBLE_MAX) visible = TASKMGR_VISIBLE_MAX;
+    if (visible < 1) visible = 1;
+    return visible;
+}
+```
+
+竖屏 160px 下不受影响，仍可显示 ≥7 行。横屏 80px 下 `HAL_ROW_H() ≈ 16`，可用 `80 - 16 - 16 = 48`，`48 / 16 = 3` 行。
 
 ---
 
@@ -128,7 +154,23 @@ taskmgr_draw() → draw_list()
 保护逻辑：
 1. `kern_task_is_protected()` 检查任务名是否在保护列表中
 2. Shell `kill` 和任务管理器均调用此检查
-3. 匹配时拒绝操作并提示 "cannot kill system task"
+3. 匹配时拒绝操作并提示 "Protected"
+
+*📄 Source: [taskmgr_app.c](../../src/app/taskmgr/taskmgr_app.c#L172-L198)*
+
+```c
+if (event_a == HAL_EVENT_LONG_PRESS) {
+    if (g_tm.selected >= 0 && g_tm.selected < g_tm.count) {
+        kern_task_t *t = g_tm.tasks[g_tm.selected];
+        if (t != NULL && !kern_task_is_protected(t)) {
+            g_tm.confirming = true;
+            g_tm.confirm_tick = hal_get_ticks();
+        } else {
+            xerintosh_push_pop_up("Protected", 1500);
+        }
+    }
+}
+```
 
 ## 虚任务支持
 
@@ -140,7 +182,8 @@ taskmgr_draw() → draw_list()
 
 ## 注册到菜单
 
-在 `app_init.c` 中：
+*📄 Source: [app_init.c](../../src/app/app_init.c#L152-L153)*
+
 ```c
 xerintosh_list_item_t* item2 = xerintosh_new_user_item(
     "任务管理器", taskmgr_init, taskmgr_loop, taskmgr_exit, user_icon);

@@ -91,37 +91,48 @@ void xerintosh_draw_list_appearance()
 
 ### 列表项绘制
 
-*📄 Source: [ui_draw_list.c](../../src/ui/ui_draw_list.c#L193-L278)*
+*📄 Source: [ui_draw_list.c](../../src/ui/ui_draw_list.c#L198-L288)*
 
 ```c
-void xerintosh_draw_list_item()
+static void xerintosh_draw_list_item()
 {
-  for (unsigned char i = 0; i < xerintosh_selector.selected_item->parent->child_num; i++)
+  xerintosh_set_font(hal_get_cn_font());
+  int16_t _font_h = hal_get_font_height();
+  int16_t _font_h_2 = _font_h / 2;
+
+  for (unsigned char i = 0; i < g_xerintosh_selector.selected_item->parent->child_num; i++)
   {
-    int16_t _x_list_item = xerintosh_camera.x_camera + LIST_ITEM_LEFT_MARGIN;
-    int16_t _y_list_item = xerintosh_selector.selected_item->parent->child_list_item[i]->y_list_item
-                           + xerintosh_camera.y_camera - oled_get_str_height()/2;
+    xerintosh_list_item_t *_item = g_xerintosh_selector.selected_item->parent->child_list_item[i];
+    int16_t _x_list_item = g_xerintosh_camera.x_camera + LIST_ITEM_LEFT_MARGIN;
+    int16_t _y_list_item = _item->y_list_item + g_xerintosh_camera.y_camera - _font_h_2;
 
-    oled_set_draw_color(1);
+    g_xerintosh_draw_color = COLOR_FG;
+    switch (_item->type)
+    {
+      case list_item:
+      case button_item:
+      case user_item:
+        draw_list_item_icon_only(_item, _x_list_item, _y_list_item);
+        break;
+      case switch_item:
+        draw_list_item_switch(xerintosh_to_switch_item(_item), _x_list_item, _y_list_item);
+        break;
+      case slider_item:
+        draw_list_item_slider(xerintosh_to_slider_item(_item), _x_list_item, _y_list_item);
+        break;
+      default:
+        draw_list_item_icon_only(_item, _x_list_item, _y_list_item);
+        break;
+    }
 
-    if (xerintosh_selector.selected_item->parent->child_list_item[i]->type == list_item) {
-      if (_y_list_item + 2 > LIST_INFO_BAR_HEIGHT && _y_list_item - 2 < SCREEN_HEIGHT) {
-        xerintosh_draw_list_icon(...);
-      }
-    }
-    else if (...) {
-      // switch_item: 绘制外框 + 滑块
-      // slider_item: 绘制数值（编辑时闪烁背景）
-      // button_item: 仅绘制图标
+    if (_item->icon == custom_icon && _item->bitmap_data != NULL) {
+      xerintosh_draw_item_bitmap(_item, _x_list_item, _y_list_item);
     }
 
-    xerintosh_set_font(NULL);
-    if (_y_list_item + oled_get_str_height() / 2 > LIST_INFO_BAR_HEIGHT &&
-        _y_list_item + oled_get_str_height() / 2 < SCREEN_HEIGHT) {
-      oled_draw_UTF8(10 + _x_list_item, _y_list_item + oled_get_str_height() / 2,
-                   xerintosh_selector.selected_item->parent->child_list_item[i]->content);
-    }
+    /* 文字绘制与滚动效果... */
   }
+
+  g_xerintosh_refresh_list_value = false;
 }
 ```
 
@@ -129,53 +140,31 @@ void xerintosh_draw_list_item()
 
 ```
 函数 绘制列表项() {
+    设置字体(中文字体)
+    字体半高 = hal_get_font_height() / 2
+
     for (遍历当前菜单的所有子项) {
-        项 = 子项数组[i]
-
-        // 计算屏幕坐标 = 列表坐标 + 相机偏移
+        项 = 选择器.选中项.父项.子项数组[i]
         屏幕X = 相机X + 左边距4
-        屏幕Y = 项.当前Y + 相机Y - 字体高度/2
+        屏幕Y = 项.当前Y + 相机Y - 字体半高
 
-        // 裁剪：只绘制在可视区内的项
-        if (屏幕Y 在有效范围内) {
-            switch (项的类型) {
-                case 普通列表项:
-                    绘制图标(项的图标, 屏幕X, 屏幕Y)
-                    break
-
-                case 开关项:
-                    绘制图标(...)
-                    绘制外框(屏幕右侧, 屏幕Y, 宽11, 高7)
-                    if (值为真) {
-                        绘制滑块在右侧
-                    } else {
-                        绘制滑块在左侧
-                    }
-                    break
-
-                case 滑条项:
-                    绘制图标(...)
-                    格式化数值为字符串
-                    if (处于编辑状态) {
-                        // 闪烁效果：每1秒切换背景可见性
-                        if (背景可见) 绘制圆角背景
-                        用反色绘制数值字符串
-                    } else {
-                        正常绘制数值字符串
-                    }
-                    break
-            }
+        switch (项的类型) {
+            case 普通列表项/按钮/用户页: 仅绘制图标
+            case 开关项: 绘制图标 + 右侧开关控件（外框+滑块）
+            case 滑条项: 绘制图标 + 右侧数值
+            default: 仅绘制图标
         }
 
-        // 绘制文本标签（统一在图标右侧）
-        if (文本中心在可视区) {
-            绘制UTF8(屏幕X+10, 屏幕Y+字高/2, 项的文本)
-        }
+        if (项有自定义位图) 绘制位图图标
+
+        // 文字绘制（含跑马灯滚动，详见 draw-list.md）
     }
+
+    清除列表值刷新标记
 }
 ```
 
-**裁剪逻辑**：`SCREEN_HEIGHT`（竖屏 160 / 横屏 80），`LIST_INFO_BAR_HEIGHT = 3`。所有项只在大于 3px 且小于屏幕高度的 Y 范围内绘制，避免越界和无效绘制。
+**裁剪逻辑**：所有项通过 `xerintosh_is_item_visible()` 判断是否处于 `LIST_INFO_BAR_HEIGHT = 3` 到 `SCREEN_HEIGHT`（竖屏 160 / 横屏 80）的有效范围内，避免越界和无效绘制。
 
 **滚动条长度缓存**：`_cached_child_num` 记录了上次计算时的 `child_num`。如果子项数量未改变（绝大多数帧），跳过 `ceilf()` 除法运算。`ceilf()` 是浮点运算中较昂贵的操作，在 ESP32 上每帧避免一次除法可节省几十微秒。
 
@@ -197,25 +186,29 @@ bool xerintosh_is_item_visible(int16_t _y_item)
 
 ### 选择器高亮（XOR 反色）
 
-*📄 Source: [ui_draw_list.c](../../src/ui/ui_draw_list.c#L287-L309)*
+*📄 Source: [ui_draw_list.c](../../src/ui/ui_draw_list.c#L295-L317)*
 
 ```c
-void xerintosh_draw_selector()
+static void xerintosh_draw_selector()
 {
-  int16_t _x_selector = xerintosh_camera.x_camera + LIST_ITEM_LEFT_MARGIN;
-  int16_t _y_selector = xerintosh_selector.y_selector + xerintosh_camera.y_camera;
+  int16_t _x_selector = g_xerintosh_camera.x_camera + LIST_ITEM_LEFT_MARGIN;
+  int16_t _y_selector = g_xerintosh_selector.y_selector + g_xerintosh_camera.y_camera;
 
-  hal_draw_xor_rect(_x_selector, _y_selector, xerintosh_selector.w_selector, xerintosh_selector.h_selector);
+  /* XOR 反色矩形 */
+  hal_draw_xor_rect(_x_selector, _y_selector, g_xerintosh_selector.w_selector, g_xerintosh_selector.h_selector);
 
-  oled_set_draw_color(1);
-  for (int16_t i = xerintosh_selector.w_selector + _x_selector;
-       i <= xerintosh_selector.w_selector + _x_selector + 7; i += 2) {
+  /* 右侧虚线装饰 */
+  g_xerintosh_draw_color = COLOR_FG;
+  for (int16_t i = g_xerintosh_selector.w_selector + _x_selector;
+       i <= g_xerintosh_selector.w_selector + _x_selector + 7; i += 2)
+  {
     for (int16_t j = _y_selector;
-         j <= _y_selector + xerintosh_selector.h_selector - 1; j++) {
+         j <= _y_selector + g_xerintosh_selector.h_selector - 1; j++)
+    {
       if (j % 2 == 0)
-        oled_draw_pixel(i + 1, j);
+        hal_draw_pixel(i + 1, j, g_xerintosh_draw_color);
       if (j % 2 == 1)
-        oled_draw_pixel(i, j);
+        hal_draw_pixel(i, j, g_xerintosh_draw_color);
     }
   }
 }
@@ -247,35 +240,59 @@ void xerintosh_draw_selector()
 
 ### 弹窗（Pop-up）
 
-*📄 Source: [ui_draw_widgets.c](../../src/ui/ui_draw_widgets.c#L74-L126)*
+*📄 Source: [ui_draw_widgets.c](../../src/ui/ui_draw_widgets.c#L92-L157)*
 
 ```c
 void xerintosh_draw_pop_up()
 {
-  if (!xerintosh_pop_up.is_running) return;
+  if (!g_xerintosh_pop_up.is_running) return;
 
-  if (xerintosh_pop_up.y_pop_up == xerintosh_pop_up.y_pop_up_trg)
-    xerintosh_pop_up.time = get_ticks();
+  /* 到达目标位置后记录时间戳 */
+  if (g_xerintosh_pop_up.y_pop_up == g_xerintosh_pop_up.y_pop_up_trg)
+    g_xerintosh_pop_up.time = hal_get_ticks();
 
-  if (xerintosh_pop_up.time - xerintosh_pop_up.time_start >= xerintosh_pop_up.span) {
-    xerintosh_pop_up.y_pop_up_trg = 0 - 2 * POP_UP_HEIGHT;
-    if (xerintosh_pop_up.y_pop_up == xerintosh_pop_up.y_pop_up_trg)
-      xerintosh_pop_up.is_running = false;
+  /* 超时后向上移出 */
+  if (g_xerintosh_pop_up.time - g_xerintosh_pop_up.time_start >= g_xerintosh_pop_up.span)
+  {
+    g_xerintosh_pop_up.y_pop_up_trg = 0 - 2 * POP_UP_HEIGHT;
+    if (g_xerintosh_pop_up.y_pop_up == g_xerintosh_pop_up.y_pop_up_trg)
+      g_xerintosh_pop_up.is_running = false;
   }
 
-  // 绘制三层嵌套圆角矩形，营造"浮雕"边框效果
-  oled_set_draw_color(1);
-  oled_draw_R_box(_x_pop_up + 1, (int16_t)xerintosh_pop_up.y_pop_up + 3, ...);   // 外层阴影
+  /* 优先使用缓存高度，避免每帧重算 */
+  int16_t pop_h = g_xerintosh_pop_up.cached_pop_h;
+  int16_t content_h = g_xerintosh_pop_up.cached_content_h;
+  if (pop_h == 0) {
+    pop_h = popup_compute_height(g_xerintosh_pop_up.wrap_line_count);
+    /* ... fallback 重算 ... */
+  }
 
-  oled_set_draw_color(0);
-  oled_draw_R_box((int16_t)(SCREEN_WIDTH/2 - (xerintosh_pop_up.w_pop_up + 4)/2 - 2), ...); // 中层底色
+  int16_t _x_pop_up = SCREEN_WIDTH/2 - g_xerintosh_pop_up.w_pop_up/2;
+  int16_t _y_pop_up = g_xerintosh_pop_up.y_pop_up + pop_h;
 
-  oled_set_draw_color(1);
-  oled_draw_R_box(_x_pop_up - 2, (int16_t)xerintosh_pop_up.y_pop_up, ...);       // 内层主体
+  xerintosh_set_font(hal_get_cn_font());
 
-  oled_draw_UTF8(_x_pop_up + 3,
-                 (int16_t)(xerintosh_pop_up.y_pop_up + oled_get_str_height() + 1),
-                 xerintosh_pop_up.content);
+  /* 外框 */
+  g_xerintosh_draw_color = COLOR_BG;
+  hal_draw_fill_round_rect((int16_t)(SCREEN_WIDTH/2 - (g_xerintosh_pop_up.w_pop_up + 4)/2 - 2),
+                  (int16_t)(g_xerintosh_pop_up.y_pop_up - 2),
+                  (int16_t)(g_xerintosh_pop_up.w_pop_up + 8), pop_h + 4, 5, g_xerintosh_draw_color);
+
+  /* 内框 */
+  g_xerintosh_draw_color = COLOR_FG;
+  hal_draw_fill_round_rect(_x_pop_up - 2, (int16_t)g_xerintosh_pop_up.y_pop_up,
+                  (int16_t)(g_xerintosh_pop_up.w_pop_up + 4), pop_h, 3, g_xerintosh_draw_color);
+
+  /* 多行文字渲染 */
+  {
+    int16_t y_text = (int16_t)(g_xerintosh_pop_up.y_pop_up + (pop_h - content_h) / 2 + fh - 2);
+    for (uint8_t i = 0; i < n; i++)
+    {
+      hal_draw_string(_x_pop_up + 3, y_text,
+                      g_xerintosh_pop_up.wrap_lines[i], g_xerintosh_draw_color);
+      y_text += fh + 2;
+    }
+  }
 }
 ```
 
@@ -285,7 +302,7 @@ void xerintosh_draw_pop_up()
 函数 绘制弹窗() {
     if (弹窗未运行) return
 
-    // 第一步：到达目标位置后，开始计时
+    // 第一步：到达目标位置后，记录时间戳
     if (弹窗Y == 弹窗目标Y) {
         弹窗.当前时间 = 获取Tick()
     }
@@ -299,22 +316,31 @@ void xerintosh_draw_pop_up()
         }
     }
 
-    // 第三步：三层嵌套绘制，营造立体边框
-    颜色 = 白
-    绘制圆角实心矩形(偏移+1, y+3, ...)     // 最外层：白色阴影
+    // 第三步：使用缓存高度计算布局
+    弹窗高度 = 缓存高度（push时已计算）
+    内容高度 = 缓存内容高度
+    弹窗X = 屏幕居中
+    弹窗Y = 当前Y + 弹窗高度
 
-    颜色 = 黑
-    绘制圆角实心矩形(居中, y-2, ...)       // 中层：黑色边框
+    // 第四步：绘制两层圆角矩形
+    颜色 = 黑（背景）
+    绘制圆角实心矩形(外框, 圆角半径5)
 
-    颜色 = 白
-    绘制圆角实心矩形(偏移-2, y, ...)       // 内层：白色主体
+    颜色 = 白（前景）
+    绘制圆角实心矩形(内框, 圆角半径3)
 
-    // 第四步：绘制文字
-    绘制UTF8(居中X+3, 弹窗Y+字高+1, 弹窗内容)
+    // 第五步：多行文字渲染
+    文字起始Y = 弹窗Y + (弹窗高 - 内容高)/2 + 字高 - 2
+    for (每行文字) {
+        绘制字符串(居中X+3, 文字Y, 当前行)
+        文字Y += 字高 + 2
+    }
 }
 ```
 
 **自动消失机制**：弹窗到达展开位置后记录当前时间，超过 `span` 毫秒后自动将目标位置设为屏幕外。`xerintosh_animation()` 负责平滑收回。
+
+**多行支持**：弹窗支持自动换行（最多 `POP_UP_WRAP_LINES = 3` 行），由 `xerintosh_push_pop_up()` 在推送时计算断行点和每行宽度。
 
 ### 信息栏（Info Bar）
 

@@ -4,107 +4,76 @@
 
 ## 概述
 
-`svc_mgr_helper` 是一个轻量级的共享工具模块，为 WiFi 和蓝牙管理器提供通用的**开关切换抽象**。当用户通过 UI 开关启用或禁用某项服务时，`svc_mgr_handle_switch_toggle()` 统一处理状态判断并调用对应的 enable/disable 函数，避免在两个管理器中重复编写相同的 if-else 逻辑。
+⚠️ **该模块已移除**。原 `svc_mgr_helper.c/h` 中的 `svc_mgr_handle_switch_toggle()` 工具函数已被内联到各管理器中。WiFi 和蓝牙管理器现在各自独立处理开关切换逻辑。
 
 ---
 
-## 核心 API
+## 当前实现
 
-*📄 Source: [svc_mgr_helper.c](../../src/app/svc_mgr_helper.c#L10-L21)*
+### WiFi 开关切换
 
-```c
-void svc_mgr_handle_switch_toggle(bool *flag_ptr,
-                                   svc_mgr_action_fn enable,
-                                   svc_mgr_action_fn disable,
-                                   void *ud);
-```
-
-### 参数
-
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| `flag_ptr` | `bool *` | 开关状态的布尔值指针 |
-| `enable` | `svc_mgr_action_fn` | 当 `*flag_ptr == true` 时调用的启用函数 |
-| `disable` | `svc_mgr_action_fn` | 当 `*flag_ptr == false` 时调用的禁用函数 |
-| `ud` | `void *` | 用户数据（当前未使用） |
-
-### 类型定义
-
-*📄 Source: [svc_mgr_helper.h](../../src/app/svc_mgr_helper.h)*
+*📄 Source: [wifi_manager.cpp](../../src/app/wifi/wifi_manager.cpp#L288-L296)*
 
 ```c
-typedef void (*svc_mgr_action_fn)(void);
-```
-
----
-
-### 中文伪代码拆解
-
-```
-函数 服务管理器_处理开关切换(开关指针, 启用函数, 禁用函数, 用户数据) {
-    if (*开关指针 == true) {
-        调用启用函数()
+void wifi_mgr_on_switch_toggle(void *ud) {
+    (void)ud;
+    if (g_wifi_on) {
+        wifi_mgr_enable();
     } else {
-        调用禁用函数()
+        wifi_mgr_disable();
     }
 }
 ```
 
-**核心思想**：将 "根据布尔值二选一调用函数" 这个常见模式提取为可复用工具，使 WiFi 和蓝牙管理器的开关回调保持一行调用。
+### 蓝牙开关切换
 
----
-
-## 使用示例
-
-*📄 Source: [wifi_manager.cpp](../../src/app/wifi/wifi_manager.cpp)*
-
-```c
-void wifi_mgr_on_switch_toggle(void *ud) {
-    svc_mgr_handle_switch_toggle(&g_wifi_on,
-                                  wifi_mgr_enable,
-                                  wifi_mgr_disable,
-                                  ud);
-}
-```
-
-*📄 Source: [bt_manager.cpp](../../src/app/bluetooth/bt_manager.cpp)*
+*📄 Source: [bt_manager.cpp](../../src/app/bluetooth/bt_manager.cpp#L235-L242)*
 
 ```c
 void bt_mgr_on_switch_toggle(void *ud) {
-    svc_mgr_handle_switch_toggle(&g_bt_on,
-                                  bt_mgr_enable,
-                                  bt_mgr_disable,
-                                  ud);
+    (void)ud;
+    if (g_bt_on) {
+        bt_mgr_request_enable();
+    } else {
+        bt_mgr_request_disable();
+    }
 }
 ```
 
 ---
 
-## 为什么需要这个模块？
+## 设计说明
 
-在重构前，WiFi 和蓝牙管理器各自包含以下重复代码：
+各服务管理器直接根据全局开关标志 `g_wifi_on` / `g_bt_on` 调用自身的 enable/disable 函数：
+
+- **WiFi**：`wifi_mgr_enable()` / `wifi_mgr_disable()` 是同步阻塞调用，直接控制 WiFi 状态机
+- **蓝牙**：`bt_mgr_request_enable()` / `bt_mgr_request_disable()` 是异步请求，由 `bt_mgr_update()` 在独立任务循环中处理状态转换
+
+两者均通过 `xerintosh_new_switch_item()` 在 `app_init.c` 中注册为 switch_item 的回调：
+
+*📄 Source: [app_init.c](../../src/app/app_init.c#L163-L164)*
 
 ```c
-// 重构前（重复模式）
-if (g_wifi_on) wifi_mgr_enable();
-else           wifi_mgr_disable();
-
-if (g_bt_on)   bt_mgr_enable();
-else           bt_mgr_disable();
+xerintosh_list_item_t* sw1 = xerintosh_new_switch_item(
+    "WiFi", &g_wifi_on, NULL, wifi_mgr_on_switch_toggle, default_icon);
 ```
 
-提取为 `svc_mgr_helper` 后：
-- **消除重复**：相同的 if-else 逻辑只写一次
-- **一致性**：所有服务的开关行为遵循同一模式
-- **可扩展**：新增服务（如 GPS、NFC）时可直接复用
+*📄 Source: [app_init.c](../../src/app/app_init.c#L345-L356)*
 
----
+```c
+void app_init_managers(void)
+{
+    bt_mgr_init();
+    wifi_mgr_init();
+    power_key_popup_init();
 
-## 设计约束
+    /* BT 初始化已移至 deferred_kernel_init()（内核任务 spawn 之后），
+       避免在 setup() 中过早消耗内存导致 FreeRTOS 任务创建失败。 */
+    if (g_wifi_on) wifi_mgr_enable();
+}
+```
 
-1. **函数签名限制**：`enable` 和 `disable` 必须是 `void (*)(void)` 类型，不接受参数。这是因为 UI 开关回调通过 `xerintosh_new_switch_item()` 注册时，只允许一个 `void *ud` 参数，而 `svc_mgr_handle_switch_toggle` 本身已经占用了这个参数通道。
-
-2. **同步执行**：`svc_mgr_handle_switch_toggle()` 是同步阻塞调用。如果 `enable()` 内部有长时间操作（如 WiFi 连接），会阻塞当前任务直到完成。这是嵌入式场景下的常见取舍。
+注意：`app_init_managers()` 中不再在初始化时自动启用蓝牙（`g_bt_on` 不触发 `bt_mgr_enable()`），因为蓝牙初始化已延迟到 `deferred_kernel_init()` 中执行。
 
 ---
 

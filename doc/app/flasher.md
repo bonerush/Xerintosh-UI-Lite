@@ -2,11 +2,33 @@
 
 ## 功能概述
 
-M5Stick-C 作为 USB↔UART 有线桥接器，将 PC 端的 USB 串口数据透传到目标板（Arduino/AVR）的 UART。
+M5Stick-C 作为 USB↔UART 有线桥接器，将 PC 端的 USB 串口数据透传到目标板（Arduino/AVR/ESP32）的 UART。
 
-进入烧录器 App 后，自动激活桥接模式，PC 端运行 avrdude 即可烧录目标板。
+进入烧录器 App 后，自动激活桥接模式，PC 端运行 avrdude / esptool 即可烧录目标板。
 
 ## 引脚映射
+
+*📄 Source: [flasher_gpio.h](../../src/app/flasher/flasher_gpio.h#L23-L38)*
+
+```c
+typedef enum {
+    FLASHER_SIG_NONE = 0,
+    FLASHER_SIG_TX   = 1,
+    FLASHER_SIG_RX   = 2,
+    FLASHER_SIG_BOOT = 5,  /**< BOOT/DTR 复用引脚 */
+    FLASHER_SIG_COUNT = 6
+} flasher_signal_t;
+```
+
+*📄 Source: [flasher_gpio.cpp](../../src/app/flasher/flasher_gpio.cpp#L15-L19)*
+
+```c
+flasher_pin_mapping_t g_flasher_pins[FLASHER_AVAILABLE_PINS] = {
+    {0,  FLASHER_SIG_BOOT, true},
+    {26, FLASHER_SIG_TX,   true},
+    {36, FLASHER_SIG_RX,   false}
+};
+```
 
 在 **设置 -> 烧录器引脚** 中配置可用引脚的角色：
 
@@ -23,15 +45,15 @@ M5Stick-C 作为 USB↔UART 有线桥接器，将 PC 端的 USB 串口数据透�
 
 ## 使用流程
 
-1. **连接目标板**：将 M5Stick-C 的 G0/G26/G36 引脚连接到目标 Arduino/AVR 板的对应引脚
-   - G0 → DTR/RESET
-   - G26 → RX (目标板 TX)
-   - G36 → TX (目标板 RX)
+1. **连接目标板**：将 M5Stick-C 的 G0/G26/G36 引脚连接到目标板的对应引脚
+   - G0 (BOOT/DTR) → 目标板 RESET/DTR
+   - G26 (TX) → 目标板 RX
+   - G36 (RX) → 目标板 TX
 2. **进入烧录器 App**：在主菜单选择 **烧录器**
 3. **桥接激活**：App 启动后自动进入桥接模式，屏幕显示全屏进度条，文字 "BRIDGE..."
-4. **运行 avrdude**：在 PC 端运行 avrdude 烧录命令
+4. **运行 avrdude/esptool**：在 PC 端运行烧录命令
 5. **自动复位**：首次 USB 数据到达时自动触发 DTR 脉冲（G0 LOW 50ms）复位目标板进入 bootloader
-6. **观察进度**：全屏进度条实时显示 STK500 烧录进度
+6. **观察进度**：全屏进度条实时显示烧录进度
    - BRIDGE...：桥接就绪，等待 PC 端开始烧录
    - FLASHING...：正在烧录（跑马灯动画）
    - SUCCESS!：烧录完成（绿色）
@@ -47,27 +69,45 @@ M5Stick-C 作为 USB↔UART 有线桥接器，将 PC 端的 USB 串口数据透�
 
 进度计算方式：
 - 解析 USB→UART 方向数据中的烧录命令统计进度：
-- STK500（avrdude）：解析 PROG_PAGE 命令统计已写入页数
-- - 解析 LOAD_ADDRESS 命令获取最大写入地址
--   - 进度 = 已写入字节数 / 预估总大小 × 100
-- ESP32 SLIP（esptool）：解析 FLASH_BEGIN 获取总块数
-  - 解析 FLASH_DATA 统计已发送块数
+- STK500（avrdude）：解析 `STK_LOAD_ADDR_CMD(0x55)` 和 `STK_PROG_PAGE_CMD(0x64)` 统计已写入页数
+  - 解析 LOAD_ADDRESS 命令获取最大写入地址
+  - 进度 = 已写入字节数 / 预估总大小 × 100
+- ESP32 SLIP（esptool）：解析 `FLASH_BEGIN(0x02)` 获取总块数
+  - 解析 `FLASH_DATA(0x03)` 统计已发送块数
   - 进度 = 已发送块数 / 总块数 × 100
 - 协议自动识别：双解析器同时运行，谁先匹配就以谁为准
 
 ## RX 噪音过滤
 
-UART→USB 方向的数据仅在最近 2 秒内有 USB→UART 转发时才回传给 PC，
-避免 Serial1 RX 悬空噪声被误认为目标板响应。
+*📄 Source: [flasher_app.cpp](../../src/app/flasher/flasher_app.cpp#L490-L501)*
 
-进度计算只解析 USB→UART 方向的 STK500 命令，不受 UART RX 噪音影响。
+```c
+/* ── UART (目标板) → USB (PC) ── */
+{
+    uint8_t uart_buf[64];
+    int uart_len = flasher_uart_read(uart_buf, sizeof(uart_buf));
+    if (uart_len > 0) {
+        if (hal_get_ticks() - s_pt_last_tx_ms < 2000) {
+            Serial.write(uart_buf, uart_len);
+            Serial.flush();
+        }
+        s_pt_rx_bytes += (uint32_t)uart_len;
+    }
+}
+```
+
+UART→USB 方向的数据仅在最近 **2 秒** 内有 USB→UART 转发时才回传给 PC，避免 Serial1 RX 悬空噪声被误认为目标板响应。
+
+进度计算只解析 USB→UART 方向的 STK500/SLIP 命令，不受 UART RX 噪音影响。
 
 ## 透传协议
 
-- **波特率**：115200
+*📄 Source: [flasher_app.cpp](../../src/app/flasher/flasher_app.cpp#L354-L369, L405-L457)*
+
+- **波特率**：115200（`flasher_init_pins(115200U)`）
 - **透传方向**：USB (PC) ↔ UART (目标板)
 - **协议**：STK500v1 / ESP32 SLIP（由 avrdude/esptool 在 PC 端实现，M5Stick 仅做桥接）
-- **DTR 时序**：G0 LOW 50ms → HIGH，等待 500ms 后开始透传
+- **DTR 时序**：首次 USB 数据到达 → 设置 `PT_PHASE_DTR_WAIT` → 1ms 后 G0 LOW 50ms → HIGH → 等待 500ms bootloader 初始化 → 进入 IDLE 透传
 
 ## 文件结构
 

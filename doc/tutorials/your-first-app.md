@@ -70,7 +70,7 @@ root（隐式根节点，不显示）
 
 在 `src/app/` 目录下新建 `my_stopwatch.h`：
 
-*📄 Source: [my_stopwatch.h](../../src/app/my_stopwatch.h)*
+*📄 Source: [ui_item_core.h](../../src/ui/ui_item_core.h#L215-L228)*
 
 ```c
 #ifndef MY_STOPWATCH_H
@@ -84,19 +84,19 @@ extern "C" {
  * @brief 秒表 App 初始化函数
  * @note  进入 App 时调用一次，用于重置状态
  */
-void my_stopwatch_init(void);
+void my_stopwatch_init(void *user_data);
 
 /**
  * @brief 秒表 App 主循环函数
  * @note  进入 App 后每帧调用（约 60fps），负责绘制整个屏幕
  */
-void my_stopwatch_loop(void);
+void my_stopwatch_loop(void *user_data);
 
 /**
  * @brief 秒表 App 退出函数
  * @note  退出 App 时调用一次，用于清理资源
  */
-void my_stopwatch_exit(void);
+void my_stopwatch_exit(void *user_data);
 
 #ifdef __cplusplus
 }
@@ -111,7 +111,7 @@ void my_stopwatch_exit(void);
 
 在 `src/app/` 目录下新建 `my_stopwatch.c`：
 
-*📄 Source: [my_stopwatch.c](../../src/app/my_stopwatch.c)*
+*📄 Source: [ui_core.c](../../src/ui/ui_core.c#L170-L211) 生命周期调度*
 
 ```c
 #include "my_stopwatch.h"
@@ -119,41 +119,45 @@ void my_stopwatch_exit(void);
 #include "hal/hal_display.h"
 #include "hal/hal_system.h"
 #include "hal/hal_input.h"
+#include "ui/ui_item.h"
 #include <stdio.h>
 
 /* ═══ 状态变量 ═══ */
 
 static uint32_t g_start_ms = 0;   /* 计时起始时刻 */
 static bool     g_running = false;/* 是否正在计时 */
+static uint32_t g_elapsed_at_pause = 0; /* 暂停时已累计时间 */
 
 /* ═══ 生命周期回调 ═══ */
 
-void my_stopwatch_init(void)
+void my_stopwatch_init(void *user_data)
 {
+    (void)user_data;
     g_start_ms = 0;
     g_running = false;
+    g_elapsed_at_pause = 0;
+    hal_input_reset_events();  /* ★ 必须：清除进入前的残留按键事件 */
 }
 
-void my_stopwatch_loop(void)
+void my_stopwatch_loop(void *user_data)
 {
-    /* ── 1. 清屏（必须每帧都做）── */
-    hal_display_clear();
+    (void)user_data;
 
-    /* ── 2. 计算已过去的时间 ── */
-    uint32_t elapsed = 0;
+    /* ── 1. 计算已过去的时间 ── */
+    uint32_t elapsed = g_elapsed_at_pause;
     if (g_running) {
-        elapsed = hal_get_ticks() - g_start_ms;
+        elapsed = g_elapsed_at_pause + (hal_get_ticks() - g_start_ms);
     }
 
     uint32_t seconds = elapsed / 1000;
     uint32_t ms      = elapsed % 1000;
 
-    /* ── 3. 格式化时间字符串 ── */
+    /* ── 2. 格式化时间字符串 ── */
     char buf[32];
     snprintf(buf, sizeof(buf), "%02lu:%02lu.%03lu",
              seconds / 60, seconds % 60, ms);
 
-    /* ── 4. 计算居中位置并绘制 ── */
+    /* ── 3. 计算居中位置并绘制 ── */
     int16_t text_w = hal_get_string_width(buf);
     int16_t text_h = hal_get_font_height();
 
@@ -162,28 +166,32 @@ void my_stopwatch_loop(void)
 
     hal_draw_string(x, y, buf, COLOR_FG);
 
-    /* ── 5. 绘制操作提示 ── */
+    /* ── 4. 绘制操作提示 ── */
     if (g_running) {
         hal_draw_utf8(4, SCREEN_HEIGHT - 10, "B:暂停  A:复位", COLOR_FG);
     } else {
-        if (g_start_ms == 0) {
-            hal_draw_utf8(4, SCREEN_HEIGHT - 10, "长按B:开始", COLOR_FG);
+        if (g_elapsed_at_pause == 0 && g_start_ms == 0) {
+            hal_draw_utf8(4, SCREEN_HEIGHT - 10, "短按B:开始", COLOR_FG);
         } else {
             hal_draw_utf8(4, SCREEN_HEIGHT - 10, "B:继续  A:复位", COLOR_FG);
         }
     }
 
-    /* ── 6. 读取按键输入 ── */
+    /* ── 5. 读取按键输入 ── */
     hal_event_t ev_b = hal_input_get_event(HAL_BTN_B);
     hal_event_t ev_a = hal_input_get_event(HAL_BTN_A);
+
+    /* ── 6. ★ 标准退出检查（必须在所有 App 输入处理之后）── */
+    if (ui_user_item_try_exit(ev_b)) return;
 
     if (ev_b == HAL_EVENT_SHORT_PRESS) {
         if (!g_running) {
             /* 从未启动过，或暂停后继续 */
-            g_start_ms = hal_get_ticks() - elapsed;
+            g_start_ms = hal_get_ticks();
             g_running = true;
         } else {
             /* 暂停 */
+            g_elapsed_at_pause += hal_get_ticks() - g_start_ms;
             g_running = false;
         }
     }
@@ -192,57 +200,70 @@ void my_stopwatch_loop(void)
         /* 复位 */
         g_running = false;
         g_start_ms = 0;
+        g_elapsed_at_pause = 0;
     }
 }
 
-void my_stopwatch_exit(void)
+void my_stopwatch_exit(void *user_data)
 {
+    (void)user_data;
     g_running = false;
     g_start_ms = 0;
+    g_elapsed_at_pause = 0;
+    hal_input_reset_events();  /* ★ 必须：清除退出时的残留事件 */
 }
 ```
+
+**注意**：
+- 框架在调用 `loop()` **之前**已经执行了 `hal_display_clear()`，所以你**不需要**在 `loop()` 中手动清屏
+- 回调函数必须带有 `void *user_data` 参数（框架会传入 `item->user_data`）
+- `hal_input_reset_events()` 在 `init()` 和 `exit()` 中必须调用，否则残留按键会导致意外行为
+- `ui_user_item_try_exit(ev_b)` 是标准退出检查，缺少它用户将无法退出 App
 
 ### 中文伪代码拆解
 
 ```
 变量 起始毫秒 = 0
+变量 累计毫秒 = 0
 变量 正在运行 = false
 
-函数 初始化() {
+函数 初始化(user_data) {
     起始毫秒 = 0
+    累计毫秒 = 0
     正在运行 = false
+    清除按键残留事件()
 }
 
-函数 每帧循环() {
-    // 第一步：清屏（擦除上一帧内容）
-    清空屏幕()
-
-    // 第二步：计算已用时间
+函数 每帧循环(user_data) {
+    // 第一步：计算已用时间
     if (正在运行) {
-        已过时间 = 当前毫秒() - 起始毫秒
+        已过时间 = 累计毫秒 + (当前毫秒() - 起始毫秒)
     } else {
-        已过时间 = 0
+        已过时间 = 累计毫秒
     }
 
-    // 第三步：将毫秒转换为 分:秒.毫秒 格式
+    // 第二步：将毫秒转换为 分:秒.毫秒 格式
     分 = 已过时间 / 60000
     秒 = (已过时间 / 1000) % 60
     毫秒 = 已过时间 % 1000
 
-    // 第四步：在屏幕正中央显示时间
+    // 第三步：在屏幕正中央显示时间
     文字宽度 = 获取文字宽度(格式化后的字符串)
     x = (屏幕宽 - 文字宽度) / 2
     y = (屏幕高 - 字体高) / 2
     绘制字符串(x, y, 字符串, 白色)
 
-    // 第五步：在底部绘制操作提示
+    // 第四步：在底部绘制操作提示
     if (正在运行) 提示 "B:暂停  A:复位"
-    else if (从未启动过) 提示 "长按B:开始"
+    else if (从未启动过) 提示 "短按B:开始"
     else 提示 "B:继续  A:复位"
 
-    // 第六步：检查按键
+    // 第五步：检查按键
     B键事件 = 获取按键事件(B键)
     A键事件 = 获取按键事件(A键)
+
+    // 第六步：标准退出检查
+    if (尝试退出(B键事件)) return
 
     if (B键短按) {
         if (没在运行) { 开始计时 }
@@ -254,13 +275,15 @@ void my_stopwatch_exit(void)
     }
 }
 
-函数 退出() {
+函数 退出(user_data) {
     正在运行 = false
     起始毫秒 = 0
+    累计毫秒 = 0
+    清除按键残留事件()
 }
 ```
 
-**核心思想**：`loop` 函数每帧做六件事——清屏、计算、格式化、绘制、提示、读按键。只要理解了这个循环模式，任何 App 都可以按这个模板写。
+**核心思想**：`loop` 函数每帧做六件事——计算、格式化、绘制、提示、读按键、检查退出。只要理解了这个循环模式，任何 App 都可以按这个模板写。
 
 ---
 
@@ -279,6 +302,8 @@ void my_stopwatch_exit(void)
 ### 3.2 在菜单树中创建入口
 
 在 `app_init_ui()` 函数中，添加以下代码：
+
+*📄 Source: [app_init.c](../../src/app/app_init.c#L147-L232)*
 
 ```c
 void app_init_ui(void)
@@ -328,7 +353,7 @@ pio run --target upload
 用户在菜单中选中"秒表"
         │
         ▼
-长按 B 键（确认）
+长按 A 键（确认）
         │
         ▼
 框架播放进入动画（约 300ms）
@@ -342,10 +367,10 @@ pio run --target upload
     │ 调用 my_stopwatch_loop() │ ←── 每帧调用，约 60 次/秒
     │       │                │
     │       ▼                │
-    │   清屏 → 绘制 → 刷新   │
+    │   绘制 → 刷新           │
     │       │                │
     │       ▼                │
-    │   用户长按 A 键？       │
+    │   用户长按 B 键？       │
     │   否 → 继续循环        │
     │   是 → 退出循环        │
     └─────────────────────┘
@@ -364,6 +389,8 @@ pio run --target upload
 - `init`：**进入 App 时调用一次**，用于初始化变量、分配资源
 - `loop`：**每帧调用**，用于绘制和交互；频率约 60fps
 - `exit`：**退出 App 时调用一次**，用于清理资源、保存状态
+
+*📄 Source: [ui_core.c](../../src/ui/ui_core.c#L170-L211)*
 
 ---
 
@@ -391,12 +418,12 @@ hal_draw_circle(40, 80, 20, COLOR_FG);         /* 空心圆，圆心 (40,80)，�
 
 ### 文字
 
-```c
-/* 绘制英文/数字 */
-hal_draw_string(10, 20, "Hello", COLOR_FG);
+*📄 Source: [hal_display.h](../../src/hal/hal_display.h#L164-L170)*
 
-/* 绘制中文 */
-hal_draw_utf8(10, 40, "你好", COLOR_FG);
+```c
+/* 绘制英文/数字/中文 */
+hal_draw_string(10, 20, "Hello", COLOR_FG);
+hal_draw_utf8(10, 40, "你好", COLOR_FG);       /* hal_draw_utf8 是 hal_draw_string 的宏别名 */
 
 /* 设置字体（如需使用自定义字体） */
 hal_set_font(hal_get_cn_font());   /* 使用内置中文字体 */
@@ -409,7 +436,7 @@ int16_t h = hal_get_font_height();
 ### 屏幕操作
 
 ```c
-hal_display_clear();     /* 清屏（填充黑色）—— 每帧 loop 的第一件事 */
+/* 框架每帧已自动调用 hal_display_clear()，你不需要手动调用 */
 hal_display_flush();     /* 刷新到屏幕 —— 框架会自动调用，你不需要手动调用 */
 ```
 
@@ -420,6 +447,8 @@ hal_display_flush();     /* 刷新到屏幕 —— 框架会自动调用，你�
 | `COLOR_BG` | `0x0000` | 黑色 |
 | `COLOR_FG` | `0xFFFF` | 白色 |
 | `COLOR_ACCENT` | `0x07E0` | 绿色 |
+
+*📄 Source: [hal_display.h](../../src/hal/hal_display.h#L31-L34)*
 
 你也可以使用任意 RGB565 颜色值，例如 `0xF800` 是红色，`0x001F` 是蓝色。
 
@@ -442,6 +471,8 @@ M5Stick-C 有两个按键：
 | **Btn A** | 侧面小按钮 | 菜单中：下移一项 | 确认/进入 |
 | **Btn B** | 正面大按钮 | 菜单中：上移一项 | 返回/退出 |
 
+*📄 Source: [app_init.c](../../src/app/app_init.c#L469-L494)*
+
 在 `user_item` 的 `loop` 函数中，框架**不再自动处理**按键导航，你需要自己读取按键事件。
 
 ### 读取事件（推荐方式）
@@ -449,12 +480,15 @@ M5Stick-C 有两个按键：
 ```c
 #include "hal/hal_input.h"
 
-void my_app_loop(void)
+void my_app_loop(void *user_data)
 {
-    hal_input_update();   /* 刷新按键状态（每帧必须先调用） */
+    (void)user_data;
 
     hal_event_t ev_a = hal_input_get_event(HAL_BTN_A);
     hal_event_t ev_b = hal_input_get_event(HAL_BTN_B);
+
+    /* ★ 标准退出检查（必须在所有 App 输入处理之后）*/
+    if (ui_user_item_try_exit(ev_b)) return;
 
     if (ev_a == HAL_EVENT_SHORT_PRESS) {
         /* A 键短按 */
@@ -466,14 +500,11 @@ void my_app_loop(void)
     if (ev_b == HAL_EVENT_SHORT_PRESS) {
         /* B 键短按 */
     }
-    if (ev_b == HAL_EVENT_LONG_PRESS) {
-        /* B 键长按 —— 注意：框架也会用长按 B 来退出 App！ */
-    }
 }
 ```
 
-**⚠️ 重要**：在 `app_init.c` 的 `app_input_process()` 中，框架每帧都会检查按键。如果用户长按 **B 键**，框架会调用 `xerintosh_selector_exit_current_item()` 来退出你的 App。这意味着：
-- **长按 B 键 = 退出 App** 是框架的默认行为，你无法在 App 内拦截
+**⚠️ 重要**：在 `app_init.c` 的 `app_input_process()` 中，框架每帧都会调用 `hal_input_update()`，但当处于 `user_item` 内部时会立即返回，不处理框架导航。你的 App 需要通过 `ui_user_item_try_exit()` 来响应长按 B 的退出请求。这意味着：
+- **长按 B 键 = 退出 App** 是框架的默认行为
 - 短按 A/B、长按 A 可以自由使用
 - 如果你的 App 需要用到长按 B（比如游戏中的"射击"），你需要在 `app_init.c` 中添加一个全局标志来临时禁用框架导航
 
@@ -520,9 +551,9 @@ xerintosh_push_pop_up("计时结束！", 2000); /* 显示 2 秒 */
 extern "C" {
 #endif
 
-void my_stopwatch_init(void);
-void my_stopwatch_loop(void);
-void my_stopwatch_exit(void);
+void my_stopwatch_init(void *user_data);
+void my_stopwatch_loop(void *user_data);
+void my_stopwatch_exit(void *user_data);
 
 #ifdef __cplusplus
 }
@@ -545,21 +576,23 @@ static uint32_t g_start_ms = 0;
 static bool     g_running = false;
 static uint32_t g_elapsed_at_pause = 0;
 
-void my_stopwatch_init(void)
+void my_stopwatch_init(void *user_data)
 {
+    (void)user_data;
     g_start_ms = 0;
     g_running = false;
     g_elapsed_at_pause = 0;
+    hal_input_reset_events();
 }
 
-void my_stopwatch_loop(void)
+void my_stopwatch_loop(void *user_data)
 {
-    hal_display_clear();
+    (void)user_data;
 
     /* 计算已用时间 */
     uint32_t elapsed = g_elapsed_at_pause;
     if (g_running) {
-        elapsed = hal_get_ticks() - g_start_ms;
+        elapsed = g_elapsed_at_pause + (hal_get_ticks() - g_start_ms);
     }
 
     uint32_t minutes = elapsed / 60000;
@@ -600,12 +633,15 @@ void my_stopwatch_loop(void)
     hal_event_t ev_b = hal_input_get_event(HAL_BTN_B);
     hal_event_t ev_a = hal_input_get_event(HAL_BTN_A);
 
+    /* 标准退出检查 */
+    if (ui_user_item_try_exit(ev_b)) return;
+
     if (ev_b == HAL_EVENT_SHORT_PRESS) {
         if (!g_running) {
-            g_start_ms = hal_get_ticks() - g_elapsed_at_pause;
+            g_start_ms = hal_get_ticks();
             g_running = true;
         } else {
-            g_elapsed_at_pause = hal_get_ticks() - g_start_ms;
+            g_elapsed_at_pause += hal_get_ticks() - g_start_ms;
             g_running = false;
         }
     }
@@ -617,11 +653,13 @@ void my_stopwatch_loop(void)
     }
 }
 
-void my_stopwatch_exit(void)
+void my_stopwatch_exit(void *user_data)
 {
+    (void)user_data;
     g_running = false;
     g_start_ms = 0;
     g_elapsed_at_pause = 0;
+    hal_input_reset_events();
 }
 ```
 
@@ -660,23 +698,27 @@ void app_init_ui(void)
 
 ### Q2：进入 App 后屏幕是黑的，什么显示都没有
 
-**原因**：没有在 `loop` 函数中调用 `hal_display_clear()` 和绘制函数。
+**原因**：没有在 `loop` 函数中调用绘制函数。
 
-**解决**：确保 `loop` 函数的第一行是 `hal_display_clear()`，后面有绘制代码。框架不会帮你清屏。
+**解决**：确保 `loop` 函数中有绘制代码。注意：**框架已在调用 `loop()` 前自动执行了 `hal_display_clear()`**，你不需要自己清屏，只需要绘制内容即可。
 
 ### Q3：文字显示为乱码
 
-**原因**：使用了 `hal_draw_string()` 来显示中文。
+**原因**：使用了不支持中文的字体，或字符串编码不正确。
 
-**解决**：中文必须使用 `hal_draw_utf8()`。`hal_draw_string()` 只支持 ASCII 字符。
+**解决**：中文必须使用 `hal_draw_utf8()`（实际上是 `hal_draw_string()` 的宏别名）。确保源文件保存为 UTF-8 编码。
 
 ### Q4：按键没有反应
 
-**原因 1**：没有调用 `hal_input_update()`。
+**原因 1**：没有读取按键事件。
 
-**解决**：在 `loop` 函数中，读取按键事件之前先调用 `hal_input_update()`。
+**解决**：在 `loop` 函数中调用 `hal_input_get_event(HAL_BTN_X)` 读取事件。
 
-**原因 2**：框架的长按 B 退出逻辑和你的按键处理冲突了。
+**原因 2**：没有调用 `ui_user_item_try_exit()`，但 App 也无法退出。这不是"没反应"，而是输入处理逻辑有问题。
+
+**解决**：检查你的按键处理逻辑是否正确。
+
+**原因 3**：框架的长按 B 退出逻辑和你的按键处理冲突了。
 
 **解决**：短按 A/B 和长按 A 可以自由使用。长按 B 默认是退出 App，如果你需要用到长按 B，参考 [开发者指南](../developer-guide.md) 第 4.3 节，通过全局标志让 `app_input_process()` 跳过导航。
 
