@@ -29,6 +29,9 @@ void token_usage_init(void *ud)
     tu_data_init(&g_tu_data);
     g_last_refresh  = 0;
     g_needs_refresh = true;
+#ifndef NATIVE_TEST
+    hal_input_reset_events();
+#endif
 }
 
 void token_usage_loop(void *ud)
@@ -69,5 +72,8 @@ void token_usage_loop(void *ud)
 void token_usage_exit(void *ud)
 {
     (void)ud;
+#ifndef NATIVE_TEST
+    hal_input_reset_events();
+#endif
     /* 当前无需清理资源 */
 }

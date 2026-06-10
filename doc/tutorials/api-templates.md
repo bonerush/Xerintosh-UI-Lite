@@ -102,6 +102,8 @@ static void on_switch_changed(void *user_data) {
 
 **⚠️ 陷阱**：`value` 指针传入后框架只读写其指向的值，不管理指针生命周期。如果指向局部变量，出作用域后行为未定义。
 
+**⚠️ 框架缺陷**：`xerintosh_new_switch_item()` 内部不检查 `_value` 是否为 NULL（`src/ui/ui_item_base.c:121` 直接赋值）。传入 NULL 会在用户确认此项时导致空指针解引用崩溃。
+
 ---
 
 ### 模板 3：`slider_item` — 滑块项
@@ -137,6 +139,8 @@ static void on_slider_changed(void *user_data) {
 
 **⚠️ 陷阱**：编辑模式下上下键不再是导航，而是增减数值。调用方不需要额外处理取消逻辑（框架自动恢复备份值）。
 
+**⚠️ 编辑模式下的并发风险**：编辑期间 `*value` 处于中间"脏"状态——每次按键都直接修改绑定的全局变量。如果另一段代码在此时读取该变量，会看到**未确认的中间值**。应仅在 `exit_function` 回调或确认后读取 slider 变量的值。
+
 ---
 
 ### 模板 4：`button_item` — 按钮项
@@ -159,14 +163,16 @@ static void on_button_pressed(void *user_data) {
 }
 ```
 
-**⚠️ 陷阱 — 按钮回调中不能直接创建弹窗**：
+**⚠️ 陷阱 — 按钮回调中创建弹窗的安全做法**：
 
 *📄 Source: [app_init.c](../../src/app/app_init.c#L90-L93)*
 ```c
 /*
- * 按钮回调中不能直接调用 xerintosh_push_pop_up()！
- * M5GFX textWidth 在中断/调度上下文中会触发 FreeRTOS task timeout。
- * 正确做法：设置标志位，由每帧的 app_input_process() 统一 push。
+ * 按钮回调中不宜直接调用 xerintosh_push_pop_up() 或 M5GFX 绘制函数：
+ * 如果回调在 Xeros 内核调度上下文中执行，M5GFX 的 FreeRTOS 信号量
+ * 可能不可用，触发 task timeout。
+ * 安全做法：设标志位，由主循环的 app_input_process() 统一处理。
+ * （如果在 UI 任务上下文中的回调则通常安全，但为一致性仍推荐延迟模式）
  */
 static volatile bool g_deferred_popup_pending = false;
 
@@ -279,6 +285,7 @@ xerintosh_dismiss_pop_up();                  // 动画退出（向上滑出）
 
 - **不能每帧 dismiss**：`xerintosh_dismiss_pop_up()` 只在确定要关闭时调用一次。每帧调用会误杀其他模块创建的弹窗。
 - **弹窗是全局单例**：同一时间只有一个弹窗。新的弹窗会覆盖旧的。
+- **每帧 push 保持弹窗常驻**：`duration=0` 的弹窗不会自动消失。如需跨帧保持显示（如 WiFi 模块在独立任务中维持弹窗），需每帧调用 `xerintosh_push_pop_up()` 重置计时器。这是有意为之的设计模式，由各模块自行管理超时。
 - **按钮回调中不能创建弹窗**：见模板 4 的陷阱说明。
 
 ---
@@ -321,7 +328,7 @@ bool waiting = wifi_mgr_is_waiting_input();  // 是否在等待用户输入密�
 ```
 
 **⚠️ 陷阱**：
-- `wifi_mgr_disable()` 会完全释放约 38KB WiFi 驱动内存，下次 `enable` 需要重新初始化
+- `wifi_mgr_disable()` 会完全释放约 34-38KB WiFi 驱动内存（取决于 ESP-IDF 版本），下次 `enable` 需要重新初始化
 - WiFi 弹窗刷新在 UI 任务的 `app_input_process()` 中执行
 
 ---
@@ -375,6 +382,10 @@ bt_uart_send(buf, sizeof(buf));
 
 /* —— RX 队列消费（在 UI 任务中每帧调用）—— */
 bt_uart_drain_rx_queue();  // 从 FreeRTOS Queue 读取数据并触发 RX 回调
+
+/* —— 注意：bt_uart_poll() 在 Arduino loop() 中每 50ms 调用 —— */
+// 因为 BluetoothSerial.read()/connected() 必须与 begin() 在同一任务上下文
+// bt_uart_poll() 不在 bt_mgr_task_main 内核任务中，而在 main.cpp loop() 内
 ```
 
 **⚠️ 关键架构约束**：
@@ -406,7 +417,7 @@ bt_uart_drain_rx_queue();  // 从 FreeRTOS Queue 读取数据并触发 RX 回调
 #include "storage.h"
 
 /* —— 初始化（只需一次）—— */
-/* storage_init() 由 app_init.c 在系统启动时自动调用 */
+/* storage_init() 由 main.cpp 的 setup() 在系统启动时调用 */
 
 /* —— 读写整数值 —— */
 int16_t brightness = storage_get_brightness();    // 读取（未设置返回默认）
@@ -595,10 +606,14 @@ hal_input_set_double_click_enabled(true);               // 启用/禁用双击�
 
 **默认按键映射**：
 
+*📄 Source: [app_init.c](../../src/app/app_init.c#L469-L494)*
+
 | 按键 | 短按 | 长按 |
 |------|------|------|
-| **BtnA** | 下一项/确认 | 确认进入 |
+| **BtnA** | 下一项 | 确认进入 |
 | **BtnB** | 上一项 | 返回/取消 |
+
+> **注意**：BtnA 的"确认"（对 switch/slider 项的值操作）由框架在短按时内部触发，而 BtnA 长按执行"进入子菜单 / 进入 user_item"操作。
 
 **⚠️ 陷阱**：
 - `hal_input_get_event()` 是消费型调用：每个事件只返回一次，之后返回 `HAL_EVENT_NONE`
@@ -614,19 +629,19 @@ hal_input_set_double_click_enabled(true);               // 启用/禁用双击�
 | item 结构体 | 创建函数（`malloc`） | `xerintosh_destroy_item_tree()` | 递归释放所有子项 |
 | `content` 字符串 | `xerintosh_init_base_item`（`strdup`） | `xerintosh_destroy_item_tree`（`free`） | 自动管理 |
 | `switch/slider.value` 指针 | **调用方** | **调用方** | 框架只读写，不管生命周期 |
-| `user_data` | 调用方 | 调用方（`destroy_callback`） | 框架不自动释放 |
+| `user_data` | 调用方 | 调用方（`destroy_callback`） | 框架不自动释放；`destroy_callback` **仅对 `user_item` 类型有效**，其他类型不调用 |
 | `bitmap_data` | 调用方（常为 `static const`） | 调用方 | 框架只读 |
 
 ---
 
 ## 第四部分：回调中不能做的事
 
-| 禁止操作 | 原因 | 正确做法 |
+| 禁止/不推荐操作 | 原因 | 正确做法 |
 |----------|------|----------|
-| 在按钮回调中调用 `xerintosh_push_pop_up()` | M5GFX 文字测量触发 FreeRTOS task timeout | 设标志位，主循环检查 |
-| 在按钮回调中调用 M5GFX 绘制函数 | 同上，底层依赖 FreeRTOS 信号量 | 延迟到下一帧渲染 |
+| 在按钮回调中直接调用 `xerintosh_push_pop_up()` | 回调可能在 Xeros 内核调度上下文中执行，M5GFX FreeRTOS 信号量可能不可用 | 设标志位，`app_input_process()` 统一处理（一致性推荐） |
 | 在回调中 `free()` item 自身 | item 可能在回调返回后被框架访问 | 用 `xerintosh_remove_item_from_list()` |
-| 在中断上下文中调用 BT/WiFi API | `BluetoothSerial` 非线程安全 | 通过异步请求 API |
+| 在中断上下文中调用 BT/WiFi API | `BluetoothSerial` 非线程安全 | 通过异步请求 API（如 `bt_mgr_request_enable()`） |
+| 在编辑模式下读取 slider 绑定变量的值 | 编辑模式中变量处于中间"脏"状态，取消前值未确认 | 仅在 `exit_function` 回调中读取确认后的值 |
 
 ---
 
