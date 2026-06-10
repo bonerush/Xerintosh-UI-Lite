@@ -1,6 +1,39 @@
 #!/usr/bin/env python3
-"""U8G2 中文字库子集化工具 — 从 efontCN_12 提取仅源码中使用的汉字"""
+"""U8G2 中文字库子集化工具 — 从 efontCN_12 提取仅源码中使用的汉字及标点"""
 import os, sys, glob
+
+# ── CJK character range detection ──
+#   U+4E00-9FFF   CJK Unified Ideographs
+#   U+3400-4DBF   CJK Extension A
+#   U+3000-303F   CJK Symbols and Punctuation (。、 「」 etc.)
+#   U+FF01-FF5E   Fullwidth Forms (！，：；？ etc.)
+#   U+2018-201D   General Punctuation (quotation marks)
+#   U+FE10-FE19   Vertical Forms
+
+def _is_cjk_or_punct(cp):
+    """Check if codepoint is CJK ideograph OR common CJK punctuation."""
+    if 0x4E00 <= cp <= 0x9FFF or 0x3400 <= cp <= 0x4DBF:
+        return True
+    if 0x3000 <= cp <= 0x303F:
+        return True
+    if 0xFF01 <= cp <= 0xFF5E:
+        return True
+    if 0x2018 <= cp <= 0x201D:
+        return True
+    if 0xFE10 <= cp <= 0xFE19:
+        return True
+    return False
+
+# Essential CJK punctuation to always include (even if not found in source)
+ALWAYS_INCLUDE_PUNCT = {
+    0x3002,  # 。ideographic full stop
+    0xFF0C,  # ，fullwidth comma
+    0x3001,  # 、ideographic enumeration comma
+    0xFF1B,  # ；fullwidth semicolon
+    0xFF1A,  # ：fullwidth colon
+    0xFF01,  # ！fullwidth exclamation mark
+    0xFF1F,  # ？fullwidth question mark
+}
 
 def extract_used_chars(src_dir="src"):
     chars = set()
@@ -10,7 +43,7 @@ def extract_used_chars(src_dir="src"):
                 with open(f, 'r', encoding='utf-8', errors='ignore') as fh:
                     for ch in fh.read():
                         cp = ord(ch)
-                        if 0x4E00 <= cp <= 0x9FFF or 0x3400 <= cp <= 0x4DBF:
+                        if _is_cjk_or_punct(cp):
                             chars.add(cp)
             except: pass
     return chars
@@ -32,7 +65,9 @@ def main():
 
     needed = extract_used_chars("src")
     needed.add(0x20)  # Always include space
-    print(f"Needed Chinese chars: {len(needed)}")
+    for cp in ALWAYS_INCLUDE_PUNCT:
+        needed.add(cp)  # Always include essential punctuation
+    print(f"Needed chars (CJK + punct): {len(needed)}")
 
     hdr = data[:23]
     unicode_start = (hdr[21] << 8) | hdr[22]
@@ -99,6 +134,16 @@ def main():
         [(cp, off, sz) for cp, off, sz in unicode_glyphs if cp in needed],
         key=lambda x: x[0]
     )
+    
+    # Report which ALWAYS_INCLUDE_PUNCT were found vs missing in font
+    found_punct = {cp for cp, _, _ in kept}
+    missing_punct = ALWAYS_INCLUDE_PUNCT - found_punct
+    if missing_punct:
+        missing_chars = ', '.join(chr(cp) for cp in sorted(missing_punct))
+        print(f"WARNING: Punctuation not found in efontCN_12: {missing_chars}")
+    else:
+        print("All essential punctuation found in font ✓")
+    
     print(f"Kept: {len(kept)}/{len(unicode_glyphs)} Unicode glyphs")
 
     # ── Build new Unicode glyph data ──

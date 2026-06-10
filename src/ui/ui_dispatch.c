@@ -6,6 +6,7 @@
  * @copyright Copyright (c) 2026
  */
 
+
 #include "ui_item.h"
 #include "ui_core.h"
 #include "kernel/kern_task.h"
@@ -32,6 +33,7 @@ static void dispatch_enter_switch(xerintosh_list_item_t *item)
 
 static void dispatch_enter_button(xerintosh_list_item_t *item)
 {
+
     xerintosh_button_item_t *btn = xerintosh_to_button_item(item);
     if (btn->exit_function) btn->exit_function(item->user_data);
 }

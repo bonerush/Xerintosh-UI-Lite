@@ -84,15 +84,14 @@ void power_key_popup_update(void)
     }
     else
     {
-        /* 松开任一键，触发动画退出弹窗并退出双键模式 */
+        /* 仅在刚退出双键模式时触发一次动画退出，而非每帧 dismiss，
+           否则会错误地杀死其他模块（如 G36、强制解除）推送的弹窗 */
         if (g_dual_active)
         {
-            /* 刚从双键状态退出：启动冷却期并重置输入状态机，
-               防止按钮释放边沿在下一帧被判定为短按/长按 */
             g_dual_cooldown_end_ms = hal_get_ticks() + DUAL_RELEASE_COOLDOWN_MS;
             hal_input_reset_events();
+            xerintosh_dismiss_pop_up();
         }
-        xerintosh_dismiss_pop_up();
         g_dual_active = false;
         g_dual_shutdown_triggered = false;
         g_dual_start_ms = 0;

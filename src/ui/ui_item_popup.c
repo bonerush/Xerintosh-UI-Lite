@@ -6,6 +6,7 @@
  * @copyright Copyright (c) 2026
  */
 
+
 #include "ui_item.h"
 #include "ui_core.h"
 #include "hal/hal_system.h"
@@ -130,24 +131,35 @@ void xerintosh_push_info_bar(const char *_content, const uint16_t _span)
  */
 void xerintosh_push_pop_up(const char *_content, const uint16_t _span)
 {
+
   xerintosh_set_font(hal_get_cn_font());
 
   /* ── 自动换行：当文字超出可用宽度时拆为多行 ── */
   {
     int16_t max_w = SCREEN_WIDTH - 12;   /* 弹窗宽度上限（为边框留 12px） */
     int16_t avail = max_w - POP_UP_OFFSET;  /* 文字可用宽度 */
-    int16_t text_w = hal_get_string_width(_content);
 
     if (avail < 20) avail = 20;
 
     /* 默认单行 */
+	  {
+	    size_t l0 = strlen(_content);
+	    if (l0 >= sizeof(g_wrap_line0)) l0 = sizeof(g_wrap_line0) - 1;
+	    memcpy(g_wrap_line0, _content, l0);
+	    g_wrap_line0[l0] = '\0';
+	  }
     g_xerintosh_pop_up.wrap_line_count = 1;
-    g_xerintosh_pop_up.wrap_lines[0] = _content;
-    g_xerintosh_pop_up.w_pop_up_trg = hal_get_string_width(_content) + POP_UP_OFFSET;
+	  g_xerintosh_pop_up.wrap_lines[0] = g_wrap_line0;
+	  g_xerintosh_pop_up.w_pop_up_trg = hal_get_string_width(g_wrap_line0) + POP_UP_OFFSET;
     if ((int16_t)g_xerintosh_pop_up.w_pop_up_trg > max_w)
       g_xerintosh_pop_up.w_pop_up_trg = max_w;
 
-    if (text_w > avail && POP_UP_WRAP_LINES >= 2)
+    /* 用已测得的文字宽度判断是否需要换行（与上面 hal_get_string_width(g_wrap_line0)
+       复用同一结果，避免 ESP32 上 _content 原始指针与 g_wrap_line0 的 width 不一致
+       导致换行被错误跳过 → w=146 → 渲染溢出 → FreeRTOS task timeout */
+    int16_t content_w = (int16_t)g_xerintosh_pop_up.w_pop_up_trg - POP_UP_OFFSET;
+
+    if (content_w > avail && POP_UP_WRAP_LINES >= 2)
     {
       size_t len = strlen(_content);
       size_t best1 = find_wrap_break(_content, len, avail);
@@ -213,14 +225,16 @@ void xerintosh_push_pop_up(const char *_content, const uint16_t _span)
   }
 
 calc_height:
-  /* 根据内容行数计算动态高度：文字高度 + 上下各 4px padding */
+  /* 根据内容行数计算并缓存动态高度：文字高度 + 上下各 4px padding */
   {
-    int16_t pop_h = popup_compute_height(g_xerintosh_pop_up.wrap_line_count);
-    int16_t fh = hal_get_font_height();
     uint8_t n = g_xerintosh_pop_up.wrap_line_count;
     if (n < 1) n = 1;
     if (n > POP_UP_WRAP_LINES) n = POP_UP_WRAP_LINES;
-    int16_t content_h = (int16_t)(n * fh + (n - 1) * 2);
+    int16_t pop_h = popup_compute_height(g_xerintosh_pop_up.wrap_line_count);
+    int16_t fh = hal_get_font_height();
+    int16_t content_h = (int16_t)((int)n * fh + ((int)n - 1) * 2);
+    g_xerintosh_pop_up.cached_pop_h = pop_h;
+    g_xerintosh_pop_up.cached_content_h = content_h;
 
     /* 仅当指针不同且内容相同时才跳过重算
        （指针相同说明调用方复用了缓冲区，内容可能已变） */
@@ -234,6 +248,7 @@ calc_height:
     }
 
     g_xerintosh_pop_up.y_pop_up_trg = (SCREEN_HEIGHT - pop_h) / 2;
+    /* cache already valid from above */
   }
 
   g_xerintosh_pop_up.time = hal_get_ticks();
@@ -245,6 +260,13 @@ calc_height:
   g_xerintosh_pop_up.time = hal_get_ticks();  /* 重置 time，防止旧弹窗残留的时间戳导致新弹窗立即超时 */
   g_xerintosh_pop_up.time_start = hal_get_ticks();
   g_xerintosh_pop_up.is_running = true;
+
+  /* 防御性钳位：无论换行成功与否，弹窗宽度不得超出最大可用宽度 */
+  int16_t max_w = SCREEN_WIDTH - 12;
+  if ((int16_t)g_xerintosh_pop_up.w_pop_up_trg > max_w)
+    g_xerintosh_pop_up.w_pop_up_trg = max_w;
+  /* cached_pop_h and cached_content_h remain valid */
+
 }
 
 /**

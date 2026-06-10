@@ -62,6 +62,8 @@ typedef struct xerintosh_pop_up_t
   uint32_t time;             /* 最近一次更新的时间戳 */
   const char *wrap_lines[POP_UP_WRAP_LINES];  /* 换行后的各行指针 */
   uint8_t wrap_line_count;   /* 实际行数 */
+  int16_t cached_pop_h;      /* 缓存弹窗高度（避免每帧重算） */
+  int16_t cached_content_h;  /* 缓存内容区高度 */
 } xerintosh_pop_up_t;
 
 /* 全局弹窗实例由 ui_context.h 的向后兼容宏 g_xerintosh_pop_up 提供 */
