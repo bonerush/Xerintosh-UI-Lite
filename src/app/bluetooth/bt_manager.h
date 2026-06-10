@@ -12,6 +12,8 @@
  *            BluetoothSerial 操作。这避免了跨任务调用导致的 Bluedroid
  *            内部死锁 → TWDT 看门狗复位。
  *
+ *          使用模板请参阅 doc/tutorials/api-templates.md 模板 8。
+ *
  * @copyright Copyright (c) 2026
  */
 

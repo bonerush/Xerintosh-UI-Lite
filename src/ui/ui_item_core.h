@@ -4,6 +4,15 @@
  * @details 定义五种菜单项类型（list/switch/slider/button/user）的
  *          数据结构，以及创建、挂载、移除、类型转换等核心 API。
  *
+ * ## 使用模板请参阅
+ * - `doc/tutorials/api-templates.md` — 完整 API 调用模板与常见陷阱
+ *
+ * ## 核心规则
+ * 1. 传给框架的指针必须永久有效 — `switch_item.value`、`slider_item.value`
+ *    必须指向 `static` 或全局变量，严禁指向局部变量。
+ * 2. `user_data` 的动态内存由调用方自行管理 — 若指向 `malloc` 内存，
+ *    必须在 `user_item` 上设置 `destroy_callback` 释放。
+ *
  * @copyright Copyright (c) 2026
  */
 
@@ -51,6 +60,8 @@ typedef struct xerintosh_list_item_t
 
 /**
  * @brief 开关项（绑定一个 bool* 指针）
+ * @warning value 指针必须指向 static 或全局变量，框架不管理其生命周期。
+ *          指向局部变量会导致悬空指针（use-after-free）。
  */
 typedef struct xerintosh_switch_item_t
 {
@@ -62,6 +73,9 @@ typedef struct xerintosh_switch_item_t
 
 /**
  * @brief 按钮项（单次触发回调）
+ * @warning 按钮回调中不能直接调用 xerintosh_push_pop_up() 或 M5GFX 绘制函数，
+ *          因其底层依赖 FreeRTOS 信号量，在调度上下文中会触发 task timeout。
+ *          正确做法：设标志位，由主循环的 app_input_process() 统一处理。
  */
 typedef struct xerintosh_button_item_t
 {
@@ -71,6 +85,9 @@ typedef struct xerintosh_button_item_t
 
 /**
  * @brief 滑块项（绑定一个 int16_t* 指针，支持步进、最小值、最大值）
+ * @warning value 指针必须指向 static 或全局变量，框架不管理其生命周期。
+ * @note  操作逻辑：第1次确认→进入编辑模式（上下键改为增减数值），
+ *        第2次确认→保存并退出，长按返回→取消并恢复备份值。
  */
 typedef struct xerintosh_slider_item_t
 {
@@ -87,6 +104,10 @@ typedef struct xerintosh_slider_item_t
 
 /**
  * @brief 用户自定义项（全屏 App 入口）
+ * @note  生命周期：init()→loop()每帧→exit()。退出检查用 ui_user_item_try_exit()。
+ *        若 user_data 是动态分配的，必须设置 destroy_callback 释放。
+ *        init() 和 exit() 中必须调用 hal_input_reset_events() 清除残留按键。
+ *        loop() 中不需要调用 hal_display_clear() — 框架统一处理。
  */
 typedef struct xerintosh_user_item_t
 {
@@ -148,11 +169,12 @@ extern xerintosh_list_item_t *xerintosh_new_list_item(const char *_content, xeri
 /**
  * @brief  创建开关项
  * @param  _content       显示文本
- * @param  _value         绑定的布尔值指针
+ * @param  _value         绑定的布尔值指针（必须指向 static/全局变量！）
  * @param  _init_function 进入该项时调用的初始化函数（可为 NULL）
  * @param  _exit_function 值改变后调用的退出函数（可为 NULL）
  * @param  icon           图标类型
  * @return 新创建的列表项指针；内存分配失败时返回 NULL
+ * @warning _value 指针的生命周期必须长于菜单生命周期，严禁传入局部变量地址。
  */
 extern xerintosh_list_item_t *xerintosh_new_switch_item(const char *_content, bool *_value,
                                                  xerintosh_cb_t _init_function, xerintosh_cb_t _exit_function,
@@ -164,6 +186,8 @@ extern xerintosh_list_item_t *xerintosh_new_switch_item(const char *_content, bo
  * @param  _exit_function 按下时触发的回调函数
  * @param  icon           图标类型
  * @return 新创建的列表项指针；内存分配失败时返回 NULL
+ * @warning 回调中禁止调用 xerintosh_push_pop_up() / M5GFX 绘制函数，
+ *          应设标志位由主循环 app_input_process() 统一处理。
  */
 extern xerintosh_list_item_t *xerintosh_new_button_item(const char *_content, xerintosh_cb_t _exit_function,
                                                  xerintosh_list_item_icon_t icon);
@@ -171,7 +195,7 @@ extern xerintosh_list_item_t *xerintosh_new_button_item(const char *_content, xe
 /**
  * @brief  创建滑块项
  * @param  _content       显示文本
- * @param  _value         绑定的数值指针
+ * @param  _value         绑定的数值指针（必须指向 static/全局变量！）
  * @param  _step          步进值
  * @param  _min           最小值
  * @param  _max           最大值
@@ -179,6 +203,8 @@ extern xerintosh_list_item_t *xerintosh_new_button_item(const char *_content, xe
  * @param  _exit_function 值改变后调用的退出函数（可为 NULL）
  * @param  icon           图标类型
  * @return 新创建的列表项指针；内存分配失败时返回 NULL
+ * @warning _value 指针的生命周期必须长于菜单生命周期，严禁传入局部变量地址。
+ * @note   编辑模式下上下键切换为增减数值而非导航菜单项。
  */
 extern xerintosh_list_item_t *xerintosh_new_slider_item(const char *_content, int16_t *_value, uint8_t _step,
                                                  int16_t _min, int16_t _max,
@@ -193,6 +219,9 @@ extern xerintosh_list_item_t *xerintosh_new_slider_item(const char *_content, in
  * @param  _exit_function 退出时调用一次的清理函数（可为 NULL）
  * @param  icon           图标类型
  * @return 新创建的列表项指针；内存分配失败时返回 NULL
+ * @note   destroy_callback 创建时默认为 NULL，需调用方手动设置以清理 user_data。
+ * @note   loop() 中应调用 ui_user_item_try_exit(event_b) 检查退出请求。
+ * @note   init() / exit() 中必须调用 hal_input_reset_events() 清除残留按键。
  */
 extern xerintosh_list_item_t *xerintosh_new_user_item(const char *_content, xerintosh_cb_t _init_function,
                                                xerintosh_cb_t _loop_function, xerintosh_cb_t _exit_function,
@@ -227,7 +256,9 @@ extern void xerintosh_clear_children_of_list(xerintosh_list_item_t *_parent);
  * @brief  递归释放菜单项及其所有子节点
  * @param  _item 要释放的菜单项指针
  * @note   会调用 item 的 destroy_callback（如果存在）
- * @note   此函数不负责从父项的 child_list_item 数组中移除指针
+ * @warning 此函数不负责从父项的 child_list_item[] 数组中移除指针。
+ *          应先调用 xerintosh_remove_item_from_list() 再销毁，
+ *          或用 xerintosh_clear_children_of_list() 一次性清理。
  */
 extern void xerintosh_destroy_item_tree(xerintosh_list_item_t *_item);
 

@@ -3,6 +3,8 @@
  * @brief  WiFi 管理器头文件
  * @details 提供 WiFi 状态机、启用/禁用、扫描、连接及 UI 菜单动态构建接口。
  *
+ *          使用模板请参阅 doc/tutorials/api-templates.md 模板 7。
+ *
  * @copyright Copyright (c) 2026
  */
 

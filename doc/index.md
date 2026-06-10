@@ -155,6 +155,7 @@ FreeRTOS 继续在底层为 WiFi/BT 协议栈服务。SMP 模式下 Xeros 在每
 
 ### 入门教程
 - **[从零开始创建 App](tutorials/your-first-app.md)** — 面向初学者的完整教程，手把手教你创建第一个 `user_item` App
+- **[API 调用模板](tutorials/api-templates.md)** — 12 个可直接复制的 API 调用模板，涵盖 UI 组件、服务模块、HAL 层与常见陷阱
 
 ### HAL 层
 - **[显示驱动](hal/display.md)** — TFT/Native 双实现、绘制原语、XOR 矩形
