@@ -65,7 +65,7 @@ xerintosh_push_item_to_list(parent, child);
 *📄 Source: [app_init.c](../../src/app/app_init.c#L205)*
 ```c
 /* 进入子菜单时自动调用，常用于动态更新子项内容 */
-xerintosh_list_item_t *submenu = xerintosh_new_list_item("烧录器引脚", list_icon);
+xerintosh_list_item_t *submenu = xerintosh_new_list_item("烧录器引脚", default_icon);
 submenu->init_function = on_enter_flasher_submenu;
 ```
 
@@ -253,23 +253,26 @@ static void my_app_exit(void *user_data) {
 
 3. **`init()` 中必须调用 `hal_input_reset_events()`**：否则确认进入 App 的长按事件会被 `loop()` 的第一帧消费，导致意外行为。
 
+4. **`ui_user_item_try_exit()` 内部有防重复 guard**：除了检查 `HAL_EVENT_LONG_PRESS`，还检查 `!exiting_user_item` 防止重复触发退出流程。
+
 ---
 
 ### 模板 6：弹窗（Pop-up）
 
-**用途**：在屏幕底部显示短暂消息。
+**用途**：在屏幕中部显示短暂消息。
 
 ```c
 #include "ui_widget.h"
 
 /* 基本用法 — 显示 2 秒后自动消失 */
-xerintosh_push_pop_up_auto("操作完成！", 2000);
+xerintosh_push_pop_up("操作完成！", 2000);
 
 /* 手动控制生命周期 */
-xerintosh_push_pop_up("正在处理...", 0);     // duration=0 表示手动管理
+xerintosh_push_pop_up("正在处理...", 0);     // duration=0 表示不自动消失
 // ... 做一些事情 ...
-xerintosh_update_pop_up("处理完成！");         // 更新文本
-xerintosh_dismiss_pop_up();                   // 手动关闭
+xerintosh_push_pop_up("处理完成！", 2000);    // 新的弹窗会覆盖旧的
+xerintosh_hide_pop_up();                     // 立即隐藏（无动画）
+xerintosh_dismiss_pop_up();                  // 动画退出（向上滑出）
 ```
 
 **⚠️ 陷阱**：
@@ -289,6 +292,9 @@ xerintosh_dismiss_pop_up();                   // 手动关闭
 ```c
 #include "wifi_manager.h"
 
+/* —— 初始化（由 app_init 在启动时自动调用）—— */
+// wifi_mgr_init();
+
 /* —— 开关控制模式 —— */
 /* 1. 通过菜单开关控制（推荐）*/
 // 在 app_init.c 中创建 switch_item：
@@ -304,8 +310,10 @@ bool waiting = wifi_mgr_is_waiting_input();  // 是否在等待用户输入密�
 
 /* —— 连接流程 —— */
 /*
- * 1. wifi_mgr_enable() → 进入 WARMUP → SCANNING → SCAN_DONE
- * 2. 用户在串口输入密码 →serial_input 模块接收 → CONNECTING → CONNECTED/FAILED
+ * 1. wifi_mgr_init() → 系统启动时调用一次
+ * 2. wifi_mgr_enable() → 进入 WARMUP → SCANNING → SCAN_DONE
+ * 3. wifi_mgr_update() → 由独立内核任务每 50ms 轮询（wifi_mgr_task_main）
+ * 4. 用户在串口输入密码 → serial_input 模块接收 → CONNECTING → CONNECTED/FAILED
  *
  * 注意：WiFi 扫描和连接在独立内核任务中异步进行，
  * UI 不会被阻塞。密码输入通过串口 CLI 处理。
@@ -313,7 +321,7 @@ bool waiting = wifi_mgr_is_waiting_input();  // 是否在等待用户输入密�
 ```
 
 **⚠️ 陷阱**：
-- `wifi_mgr_disable()` 会完全释放 ~34KB WiFi 驱动内存，下次 `enable` 需要重新初始化
+- `wifi_mgr_disable()` 会完全释放约 38KB WiFi 驱动内存，下次 `enable` 需要重新初始化
 - WiFi 弹窗刷新在 UI 任务的 `app_input_process()` 中执行
 
 ---
@@ -324,18 +332,29 @@ bool waiting = wifi_mgr_is_waiting_input();  // 是否在等待用户输入密�
 
 ```c
 #include "bt_manager.h"
+#include "bt_uart_service.h"
+
+/* —— 初始化（由 app_init 在启动时自动调用）—— */
+// bt_mgr_init();
 
 /* —— 开关控制模式 —— */
 /* 1. 通过菜单开关控制（推荐）*/
 xerintosh_new_switch_item("蓝牙", &g_bt_on, NULL, bt_mgr_on_switch_toggle, default_icon);
 
-/* 2. 程序化控制 */
-bt_mgr_request_enable();   // ★ 异步请求（可从任意任务调用）
-bt_mgr_request_disable();  // ★ 异步请求（可从任意任务调用）
+/* 2. 程序化控制（异步 API，可从任意任务安全调用）*/
+bt_mgr_request_enable();   // ★ 设置 volatile 标志，实际启用由 bt_mgr_process_requests() 执行
+bt_mgr_request_disable();  // ★ 同上
+
+/* 3. 必须循环调用（在 Arduino loop() 中）*/
+bt_mgr_process_requests();  // 处理待处理请求，执行实际的 BluetoothSerial 操作
 
 /* —— 状态查询 —— */
-bool is_on   = bt_mgr_is_enabled();
-bool waiting = bt_mgr_is_waiting_input();
+bool is_on      = bt_mgr_is_enabled();
+bool connected  = bt_uart_is_connected();
+bool waiting    = bt_mgr_is_waiting_input();
+
+/* —— 状态机更新（由独立内核任务每 50ms 轮询）—— */
+// bt_mgr_update() → 检测 bt_uart_is_connected() 状态变化，更新 bt_mgr_state_t
 
 /* —— RX 数据回调 —— */
 void my_bt_rx_handler(const uint8_t *data, uint16_t len) {
@@ -343,10 +362,19 @@ void my_bt_rx_handler(const uint8_t *data, uint16_t len) {
 }
 bt_uart_set_rx_callback(my_bt_rx_handler);
 
-/* —— 发送数据 —— */
+/* —— 连接状态回调 —— */
+void my_bt_connect_handler(bool connected) {
+    // 连接/断开通知...
+}
+bt_uart_set_connect_callback(my_bt_connect_handler);
+
+/* —— 数据收发 —— */
 bt_uart_send_string("Hello from M5Stick!\r\n");
 uint8_t buf[] = {0x01, 0x02, 0x03};
 bt_uart_send(buf, sizeof(buf));
+
+/* —— RX 队列消费（在 UI 任务中每帧调用）—— */
+bt_uart_drain_rx_queue();  // 从 FreeRTOS Queue 读取数据并触发 RX 回调
 ```
 
 **⚠️ 关键架构约束**：
@@ -364,9 +392,9 @@ bt_uart_send(buf, sizeof(buf));
 - 从 **BT 任务** 调用 UI 相关操作也需要异步
 
 **⚠️ WiFi/BT 互斥**：
-- 启用 BT 前会自动关闭 WiFi（`wifi_mgr_disable()` + `delay(500)`）
+- 启用 BT 前会自动关闭 WiFi（`wifi_mgr_disable()` + `delay(500)` 等待内存释放）
 - 禁用 BT 后会自动恢复此前关闭的 WiFi
-- 堆内存需求：WiFi ~40KB，BT ~70KB
+- 堆内存需求：BT 最小堆要求 70KB，实际初始化约需 92KB
 
 ---
 
@@ -390,6 +418,12 @@ storage_set_anim_speed(92);
 bool anim_on = storage_get_anim_enabled();        // 默认 true
 storage_set_anim_enabled(false);
 
+/* —— 系统设置 —— */
+uint8_t rot = storage_get_screen_rotation();      // 屏幕方向
+storage_set_screen_rotation(2);
+int16_t baud = storage_get_serial_baud_rate();     // 串口波特率等级
+storage_set_serial_baud_rate(5);
+
 /* —— 读写字符串 —— */
 char api_key[128];
 if (storage_get_deepseek_key(api_key, sizeof(api_key))) {
@@ -406,7 +440,8 @@ for (int i = 0; i < count; i++) {
     }
 }
 storage_wifi_add("MyNetwork", "password123");
-storage_wifi_remove(0);  // 按索引删除
+int idx = storage_wifi_find("MyNetwork");           // 按 SSID 查找索引
+storage_wifi_remove(0);                             // 按索引删除
 ```
 
 **⚠️ 陷阱**：
@@ -425,6 +460,11 @@ storage_wifi_remove(0);  // 按索引删除
 
 /* —— 请求输入 —— */
 serial_request_wifi_password("MyWiFiSSID");
+
+/* —— 检查是否在等待输入（用于 dev_ttyS0_poll 判断串口字符归属）—— */
+if (serial_input_is_waiting()) {
+    // 串口字符被 serial_input 接管，不转发给 shell
+}
 
 /* —— 轮询状态（在 UI 任务中每帧调用）—— */
 serial_state_t state = serial_poll();
@@ -467,32 +507,56 @@ serial_cancel();
 #include "hal_layout.h"
 
 /* —— 文字绘制 —— */
-hal_set_font(HAL_FONT_MEDIUM);                    // 设置字体
-hal_draw_string(5, 10, "Hello", 0xFFFF, 0x0000);  // x, y, text, fg_color, bg_color
-hal_draw_string_centered("Title", 0xFFFF, 0x0000); // 居中绘制
-uint16_t tw = hal_get_text_width("Hello");        // 获取文字宽度（像素）
+hal_set_font(hal_get_cn_font());                     // 设置中文字体
+hal_draw_string(5, 10, "Hello", COLOR_FG);            // x, y, text, color（4参数）
+hal_draw_utf8(5, 10, "你好", COLOR_FG);               // UTF-8 别名（同 hal_draw_string）
+int16_t tw = hal_get_string_width("Hello");           // 获取字符串宽度（像素）
+int16_t fh = hal_get_font_height();                   // 获取当前字体高度
 
 /* —— 基本图形 —— */
-hal_draw_pixel(10, 20, 0xFFFF);
-hal_draw_line(0, 0, 80, 160, 0xFFFF);
-hal_draw_rect(5, 5, 70, 150, 0xFFFF, false);     // 空心矩形
-hal_draw_rect(5, 5, 70, 150, 0xFFFF, true);      // 实心矩形
+hal_draw_pixel(10, 20, COLOR_FG);
+hal_draw_line(0, 0, 80, 160, COLOR_FG);
+hal_draw_rect(5, 5, 70, 150, COLOR_FG);              // 空心矩形
+hal_draw_fill_rect(5, 5, 70, 150, COLOR_ACCENT);     // 实心矩形
+hal_draw_round_rect(3, 3, 74, 154, 4, COLOR_FG);     // 空心圆角矩形（r=圆角半径）
+hal_draw_fill_round_rect(3, 3, 74, 154, 4, COLOR_FG); // 实心圆角矩形
+hal_draw_circle(40, 80, 10, COLOR_RED);              // 空心圆（cx, cy, r, color）
+hal_draw_h_line(5, 100, 70, COLOR_FG);               // 水平线段
+hal_draw_v_line(40, 50, 60, COLOR_FG);               // 垂直线段
+hal_draw_xor_rect(5, 5, 70, 20);                     // XOR 反色矩形（选择器高亮）
 
 /* —— 图标绘制（XBM 位图）—— */
-extern const uint8_t my_icon_bits[];
-hal_draw_xbitmap(10, 20, my_icon_bits, 16, 16, 0xFFFF, 0x0000);
+extern const uint8_t my_icon_bits[];                   // XBM 格式位图数据
+hal_draw_xbitmap(10, 20, 16, 16, my_icon_bits);       // x, y, w, h, bitmap
 
-/* —— 屏幕布局常量（hal_layout.h）—— */
-int16_t w = HAL_LCD_WIDTH;    // 屏幕宽度（横屏=160, 竖屏=80）
-int16_t h = HAL_LCD_HEIGHT;   // 屏幕高度
-int16_t m = HAL_LCD_MARGIN;   // 页边距（4px）
-int16_t fh = HAL_LCD_FONT_H;  // 字体高度
+/* —— 裁剪区域 —— */
+hal_set_clip_rect(5, 5, 70, 150);                     // 后续绘制仅限于此矩形
+hal_clear_clip_rect();                                // 恢复全屏绘制
+
+/* —— 颜色常量（RGB565）—— */
+// COLOR_BG      = 0x0000  黑色（背景色）
+// COLOR_FG      = 0xFFFF  白色（前景色）
+// COLOR_ACCENT  = 0x07E0  绿色（强调色）
+// COLOR_RED     = 0xF800  红色
+
+/* —— 布局工具宏（hal_layout.h）—— */
+int16_t w  = SCREEN_WIDTH;          // 屏幕宽度（横屏=160, 竖屏=80）
+int16_t h  = SCREEN_HEIGHT;         // 屏幕高度
+int16_t x  = HAL_CENTER_X(tw);      // 使宽度为 tw 的元素水平居中
+int16_t y  = HAL_CENTER_Y(fh);      // 使高度为 fh 的元素垂直居中
+int16_t lx = HAL_LEFT_X();          // 左对齐坐标（= HAL_MARGIN_MD）
+int16_t bl = HAL_TEXT_BASELINE(row_top); // 文字基线（在行顶部 y 处）
+int16_t row_h = HAL_ROW_H();        // 标准行高（= 字体高度 + 2*小边距）
+
+// 原始边距常量：HAL_MARGIN_SM(2), HAL_MARGIN_MD(4), HAL_MARGIN_LG(8)
 ```
 
 **⚠️ 陷阱**：
-- `hal_set_font(NULL)` 重置字体，切换后应恢复
-- 文字颜色格式为 RGB565（`0xFFFF`=白色, `0x0000`=黑色, `0xF800`=红色）
+- `hal_draw_string()` 只有 4 个参数（`x, y, str, color`），无背景色参数
+- `hal_draw_xbitmap()` 只有 5 个参数（`x, y, w, h, bitmap`），无颜色参数
+- `hal_set_font(NULL)` 重置字体为默认，App 退出前应恢复
 - 框架每帧自动 `hal_display_clear()` + `hal_display_flush()`，App 的 `loop()` 中不需要手动调用
+- `hal_draw_rect` 和 `hal_draw_fill_rect` 是两个独立函数（非 fill 参数模式）
 
 ---
 
@@ -523,8 +587,10 @@ default:
     break;
 }
 
-/* —— 重置事件（进入/退出 App 时调用）—— */
-hal_input_reset_events();
+/* —— 其他辅助 API —— */
+bool pressed = hal_input_is_pressed(HAL_BTN_A);       // 查询按键是否按下（实时状态）
+uint32_t dur = hal_input_get_press_duration(HAL_BTN_A); // 获取按压时长（毫秒）
+hal_input_set_double_click_enabled(true);               // 启用/禁用双击检测
 ```
 
 **默认按键映射**：
