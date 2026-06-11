@@ -1,5 +1,9 @@
 # 烧录器 (USB Wired Bridge Flasher)
 
+> **Parent:** [App 层索引](index.md) | **Related:** [串口监视器](serial-monitor.md), [设置](settings.md)
+>
+> 本文档介绍烧录器 App 的引脚映射、桥接逻辑和使用方法。
+
 ## 功能概述
 
 M5Stick-C 作为 USB↔UART 有线桥接器，将 PC 端的 USB 串口数据透传到目标板（Arduino/AVR/ESP32）的 UART。

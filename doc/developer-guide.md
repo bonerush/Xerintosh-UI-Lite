@@ -1,5 +1,7 @@
 # Xerintosh UI Lite 开发者指南
 
+> **Parent:** [知识地图](../index.md) | **Related:** [编码风格规范](../coding-style.md), [API 调用模板](../tutorials/api-templates.md), [从零开始创建 App](../tutorials/your-first-app.md)
+>
 > 本文档介绍如何基于 Xerintosh UI Lite 框架设计菜单结构、创建自定义 App，以及推荐的项目组织方式。
 >
 > 关于各模块内部实现，请参考同目录下的 `core.md`、`item.md`、`drawer.md` 及 `hal/` 下的文档。
