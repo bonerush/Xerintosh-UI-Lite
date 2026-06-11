@@ -143,6 +143,13 @@ static void on_slider_changed(void *user_data) {
 
 **⚠️ 陷阱**：编辑模式下上下键不再是导航，而是增减数值（A 增加，B 减少）。调用方不需要额外处理取消逻辑（框架自动恢复备份值）。
 
+**⚠️ 框架缺陷**：`xerintosh_new_slider_item()` 在创建时立即解引用 `_value` 以备份初始值（[ui_item_base.c:168](../../src/ui/ui_item_base.c#L168)）。传入 NULL 会在**创建瞬间**崩溃（比 switch_item 更早暴露）。
+
+**⚠️ 边界条件**：
+- `step` 的类型为 `uint8_t`，**不能为负数或零**（零会导致编辑时数值不变化）
+- `min`/`max` 为 `int16_t`，可以为负数，但框架**不检查** `min <= max`；如果写反了，编辑时的 clamp 行为会异常
+- 创建时 `*_value` 的初始值**不会被 clamp**到 `[min, max]` 范围内，仅在用户进入编辑模式后按上下键才会被限制
+
 **⚠️ 编辑模式下的并发风险**：编辑期间 `*value` 处于中间"脏"状态——每次按键都直接修改绑定的全局变量。如果另一段代码在此时读取该变量，会看到**未确认的中间值**。应仅在 `exit_function` 回调或确认后读取 slider 变量的值。
 
 ---
@@ -255,7 +262,9 @@ static void my_app_exit(void *user_data) {
 
 1. **不要在 `loop()` 内调用 `hal_display_clear()`**：框架的 `ui_task` 会在每帧调用 `loop()` 之前自动清屏。重复清屏不会出错，但不必要。
 
-2. **`destroy_callback` 需要手动设置**：若 `user_data` 是动态分配的，必须设置 `destroy_callback` 才能正确释放：
+2. **所有 `xerintosh_new_*_item()` 在内存分配失败时返回 NULL**：框架使用 `malloc` 分配节点内存，ESP32 内存不足时会返回 NULL。生产代码应检查返回值后再使用。
+
+3. **`destroy_callback` 需要手动设置**：若 `user_data` 是动态分配的，必须设置 `destroy_callback` 才能正确释放：
    ```c
    my_app->user_data = malloc(sizeof(my_state_t));
    ((xerintosh_user_item_t*)my_app)->destroy_callback = my_app_destroy;
@@ -265,9 +274,9 @@ static void my_app_exit(void *user_data) {
    }
    ```
 
-3. **`init()` 中必须调用 `hal_input_reset_events()`**：否则确认进入 App 的长按事件会被 `loop()` 的第一帧消费，导致意外行为。
+4. **`init()` 中必须调用 `hal_input_reset_events()`**：否则确认进入 App 的长按事件会被 `loop()` 的第一帧消费，导致意外行为。
 
-4. **`ui_user_item_try_exit()` 内部有防重复 guard**：除了检查 `HAL_EVENT_LONG_PRESS`，还检查 `!exiting_user_item` 防止重复触发退出流程。
+5. **`ui_user_item_try_exit()` 内部有防重复 guard**：除了检查 `HAL_EVENT_LONG_PRESS`，还检查 `!exiting_user_item` 防止重复触发退出流程。
 
 ---
 
@@ -282,12 +291,12 @@ static void my_app_exit(void *user_data) {
 /* 基本用法 — 显示 2 秒后自动消失 */
 xerintosh_push_pop_up("操作完成！", 2000);
 
-/* 手动控制生命周期 */
+/* 手动控制生命周期（以下操作互斥，按场景选择其一） */
 xerintosh_push_pop_up("正在处理...", 0);     // duration=0 表示不自动消失
 // ... 做一些事情 ...
 xerintosh_push_pop_up("处理完成！", 2000);    // 新的弹窗会覆盖旧的
-xerintosh_hide_pop_up();                     // 立即隐藏（无动画）
-xerintosh_dismiss_pop_up();                  // 动画退出（向上滑出）
+// xerintosh_hide_pop_up();                  // 如需立即隐藏（无动画）
+// xerintosh_dismiss_pop_up();               // 如需动画退出（向上滑出）
 ```
 
 **⚠️ 陷阱**：
@@ -643,11 +652,12 @@ hal_input_set_double_click_enabled(true);               // 启用/禁用双击�
 
 | 资源 | 分配方 | 释放方 | 注意事项 |
 |------|--------|--------|----------|
-| item 结构体 | 创建函数（`malloc`） | `xerintosh_destroy_item_tree()` | 递归释放所有子项；仅对 user_item 调用 destroy_callback |
-| `content` 字符串 | `xerintosh_init_base_item`（`strdup`） | `xerintosh_destroy_item_tree`（`free`） | 自动管理 |
-| `switch/slider.value` 指针 | **调用方** | **调用方** | 框架只读写，不管生命周期 |
+| item 结构体 | 创建函数（`malloc`） | `xerintosh_destroy_item_tree()` | 递归释放所有子项；仅对 user_item 调用 destroy_callback；**内存分配失败时创建函数返回 NULL** |
+| `content` 字符串 | `xerintosh_init_base_item`（`strdup`） | `xerintosh_destroy_item_tree`（`free`） | 自动管理；但 **传入 NULL 会导致后续渲染崩溃**（`hal_get_string_width(NULL)`） |
+| `switch/slider.value` 指针 | **调用方** | **调用方** | 框架只读写，不管生命周期；**传入 NULL 会导致崩溃**（switch 在确认时崩溃，slider 在创建时崩溃） |
 | `user_data` | 调用方 | 调用方（`destroy_callback`） | 框架不自动释放；`destroy_callback` **仅对 `user_item` 类型有效**，其他类型不调用 |
 | `bitmap_data` | 调用方（常为 `static const`） | 调用方 | 框架只读 |
+| `push_item_to_list` 结果 | — | — | **参数为 NULL 或子项已满时返回 `false`**；建议检查返回值，避免内存泄漏（创建后未挂载的 item 无法被释放） |
 
 ---
 

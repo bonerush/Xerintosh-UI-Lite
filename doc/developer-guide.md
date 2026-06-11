@@ -1,6 +1,6 @@
 # Xerintosh UI Lite 开发者指南
 
-> **Parent:** [知识地图](../index.md) | **Related:** [编码风格规范](../coding-style.md), [API 调用模板](../tutorials/api-templates.md), [从零开始创建 App](../tutorials/your-first-app.md)
+> **Parent:** [知识地图](index.md) | **Related:** [编码风格规范](coding-style.md), [API 调用模板](tutorials/api-templates.md), [从零开始创建 App](tutorials/your-first-app.md)
 >
 > 本文档介绍如何基于 Xerintosh UI Lite 框架设计菜单结构、创建自定义 App，以及推荐的项目组织方式。
 >
@@ -195,16 +195,22 @@ xerintosh_list_item_t* sl = xerintosh_new_slider_item(
 *📄 Source: [ui_item_core.h](../src/ui/ui_item_core.h#L80-L84)*
 
 ```c
+#include <esp_system.h>  /* for esp_restart() */
+
 static void on_reboot(void *user_data)
 {
     (void)user_data;
     xerintosh_push_pop_up("正在重启...", 2000);
-    delay(1000);
-    ESP.restart();
+    hal_delay_ms(1000);
+    esp_restart();  /* C 语言等价于 Arduino C++ 的 ESP.restart() */
 }
 
 xerintosh_list_item_t* btn = xerintosh_new_button_item("重启", on_reboot, power_icon);
 ```
+
+> **注意**：`delay()` 和 `ESP.restart()` 是 Arduino C++ API，在 `.c` 文件中不可用。请使用 HAL 层的 `hal_delay_ms()` 和 ESP-IDF 的 `esp_restart()`。
+>
+> ⚠️ **回调中创建弹窗的安全问题**：上面的示例直接在回调中调用 `xerintosh_push_pop_up()` 仅作演示。生产代码中，若回调可能在 Xeros 内核调度上下文中执行，M5GFX 的 FreeRTOS 信号量可能不可用，导致 task timeout。正确做法请参考 [api-templates.md 模板 4](tutorials/api-templates.md#模板-4button_item--按钮项) 的延迟弹窗模式。
 
 ### 3.5 user_item（自定义 App）
 
@@ -267,6 +273,7 @@ xerintosh_list_item_t* app = xerintosh_new_user_item(
 #include "hal/hal_system.h"
 #include "hal/hal_input.h"
 #include "ui/ui_item.h"
+#include <stdio.h>   /* for snprintf */
 
 static uint32_t start_time = 0;
 
@@ -383,6 +390,9 @@ void app_input_process(void)
 {
     hal_input_update();
 
+    /* 处于 user_item 内部时，框架导航应跳过，由 App 自行处理输入 */
+    if (xerintosh_is_in_user_item()) return;
+
     hal_event_t event_a = hal_input_get_event(HAL_BTN_A);
     hal_event_t event_b = hal_input_get_event(HAL_BTN_B);
 
@@ -403,7 +413,7 @@ void app_input_process(void)
 
 ## 6. 代码组织建议
 
-本项目采用分层架构，各层职责已在 [知识地图](../index.md) 中说明。新增功能时，遵循以下原则：
+本项目采用分层架构，各层职责已在 [知识地图](index.md) 中说明。新增功能时，遵循以下原则：
 
 ### 6.1 不要修改框架层
 
@@ -441,6 +451,7 @@ src/
 #include "hal/hal_system.h"
 #include "hal/hal_display.h"
 #include "hal/hal_input.h"
+#include <stdio.h>   /* for snprintf */
 
 static uint32_t g_start_time = 0;
 
@@ -521,6 +532,8 @@ static int16_t contrast = 50;
 static void on_factory_reset(void *user_data)
 {
     (void)user_data;
+    /* 简化示例：生产代码应避免在按钮回调中直接创建弹窗，
+       正确做法见 api-templates.md 模板 4（设标志位 + 主循环延迟处理） */
     xerintosh_push_pop_up("已恢复出厂设置", 2000);
 }
 
@@ -609,9 +622,15 @@ void bad_example(void) {
 
 *📄 Source: [ui_types.h](../src/ui/ui_types.h#L84-L85)*
 
-超过限制时 `xerintosh_push_item_to_list()` 返回 `false`。
+超过限制、层级超限或 **参数为 NULL** 时 `xerintosh_push_item_to_list()` 返回 `false`。
 
-*📄 Source: [ui_item_list.c](../src/ui/ui_item_list.c#L43-L68)*
+**边界条件**：
+- 所有 `xerintosh_new_*_item()` 在 `malloc`/`strdup` 失败时返回 **NULL**
+- `xerintosh_get_root_list()` 在首次调用时分配内存，失败时也返回 **NULL**
+- 根节点为空（未添加任何子项）时调用 `xerintosh_init_core()` 会导致框架内部越界读取，**务必在初始化前至少添加一个子项到根节点**
+- 所有 item 的 `content` 传入 NULL 时创建不会失败，但后续渲染会崩溃（`hal_get_string_width(NULL)`）
+
+*📄 Source: [ui_item_list.c](../src/ui/ui_item_list.c#L43-L68) | [ui_item_base.c](../src/ui/ui_item_base.c#L79-L89)*
 
 ### 8.4 user_item 中的导航
 

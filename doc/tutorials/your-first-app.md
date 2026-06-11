@@ -739,9 +739,12 @@ void app_init_ui(void)
 ```c
 void draw_progress_bar(int16_t x, int16_t y, int16_t w, int16_t h, int16_t percent)
 {
+    if (w <= 2 || h <= 2) return;  /* 尺寸不足时无法绘制内边距 */
     /* 外框 */
     hal_draw_rect(x, y, w, h, COLOR_FG);
-    /* 填充 */
+    /* 填充（裁剪 percent 到 0~100，避免越界绘制） */
+    if (percent < 0) percent = 0;
+    if (percent > 100) percent = 100;
     int16_t fill_w = (w - 2) * percent / 100;
     if (fill_w > 0) {
         hal_draw_fill_rect(x + 1, y + 1, fill_w, h - 2, COLOR_FG);

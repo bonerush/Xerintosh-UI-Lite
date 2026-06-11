@@ -1,6 +1,6 @@
 # /dev/ttyS0 串口设备
 
-> **Parent:** [内核子系统总览](index.md) | **Related:** [物理设备驱动](kern-devices.md), [串口输入](../../app/serial-input.md), [串口监视器](../../app/serial-monitor.md)
+> **Parent:** [内核子系统总览](index.md) | **Related:** [物理设备驱动](kern-devices.md), 串口输入, [串口监视器](../app/serial-monitor.md)
 
 ## 概述
 
@@ -292,4 +292,4 @@ static kern_file_ops_t g_dev_ttyS0_fops = {
 
 ---
 
-> **See Also:** [物理设备驱动](kern-devices.md) | [串口输入](../../app/serial-input.md) | [串口监视器](../../app/serial-monitor.md) | [VFS 核心](kern-vfs.md)
+> **See Also:** [物理设备驱动](kern-devices.md) | 串口输入 | [串口监视器](../app/serial-monitor.md) | [VFS 核心](kern-vfs.md)
