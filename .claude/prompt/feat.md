@@ -292,3 +292,10 @@ Agent 在隔离 worktree 内完成编码，**完成后必须执行自测**：
      - kern-shell-parser.md: 修正非法C语法 case '\': → case '\\':
      - kern-sched-class/fifo.md: FIFO 仅 ESP32 注册, Native 未注册
      - 验证: Native 348/348 PASSED, 硬件编译 SUCCESS (RAM 22.3%, Flash 88.0%)
+   - 提交6 (364adee): 第三轮深度审查 — 格式统一性 + 垃圾文件清理
+     - 删除 doc/.DS_Store 垃圾文件
+     - flasher.md / developer-guide.md: 补全 Parent/Related 导航元数据
+     - 检查所有 53 个 .md 文件的格式统一性、链接有效性、图片一致性
+     - 验证所有代码片段可编译性、跨文档一致性
+     - 未发现实质性内容错误（前两轮已充分修正）
+     - 验证: Native 348/348 PASSED, 硬件编译 SUCCESS
