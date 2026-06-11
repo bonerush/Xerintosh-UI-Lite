@@ -303,4 +303,4 @@ Agent 在隔离 worktree 内完成编码，**完成后必须执行自测**：
      - api-templates.md: slider NULL value 缺陷, step/min/max 边界, malloc 失败, 内存表补充
      - your-first-app.md: 进度条 percent clamp 和尺寸守卫
      - dev-ttys0.md: 删除指向不存在 serial-input.md 的失效链接
-     - 验证: Native 348/348 PASSED
+     - 验证: Native 348/348 PASSED, 硬件编译 SUCCESS (RAM 22.3%, Flash 88.0%)
