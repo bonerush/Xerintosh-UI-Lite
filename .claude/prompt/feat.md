@@ -283,4 +283,12 @@ Agent 在隔离 worktree 内完成编码，**完成后必须执行自测**：
      - HAL/App: index.md×2, display.md, input.md, system.md, app-init.md, ui-task.md, settings.md, svc-mgr-helper.md, taskmgr.md, serial-monitor.md, flasher.md
      - Kernel: index.md, kern-init.md, kern-port.md, kern-task.md, kern-mpu.md, kern-resource.md, kern-sync.md, kern-smp.md, kern-devfs.md, kern-devices.md, dev-ttys0.md, kern-shell.md, kern-shell-cmds.md, kern-sched-class.md, kern-sched-fifo.md, kern-sched-rr.md
      - 关键修正: 色深 16-bit→8-bit RGB332, 蓝牙开关从设置菜单移除, svc_mgr_helper 标注已移除, shell 提示符 `[/]$ `, FIFO调度类实际未使用, `/dev/null` 不存在, 所有代码片段标注 `*📄 Source: [file#Ln]*`
-   - 验证: Native 348/348 PASSED, 硬件编译 SUCCESS (RAM 22.3%, Flash 88.0%)
+   - 提交5 (4d4fbd0): 第二轮深度复查 — 修正17处文档错误
+     - 复查已修改文档质量 + 重新验证上轮标记为无需修改的文档 + 审查遗漏文档(CLAUDE.md, tools/)
+     - CLAUDE.md: 色深修正, 架构图 Sched coop→preempt, 补全遗漏模块
+     - developer-guide.md: slider_item 编辑模式表格修正 (A=+step, B=-step)
+     - core.md: 删除动画公式中不存在的 /1.0f
+     - draw-list.md: 补全滚动条缓存逻辑
+     - kern-shell-parser.md: 修正非法C语法 case '\': → case '\\':
+     - kern-sched-class/fifo.md: FIFO 仅 ESP32 注册, Native 未注册
+     - 验证: Native 348/348 PASSED, 硬件编译 SUCCESS (RAM 22.3%, Flash 88.0%)
