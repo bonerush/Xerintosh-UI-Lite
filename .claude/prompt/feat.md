@@ -297,5 +297,10 @@ Agent 在隔离 worktree 内完成编码，**完成后必须执行自测**：
      - flasher.md / developer-guide.md: 补全 Parent/Related 导航元数据
      - 检查所有 53 个 .md 文件的格式统一性、链接有效性、图片一致性
      - 验证所有代码片段可编译性、跨文档一致性
-     - 未发现实质性内容错误（前两轮已充分修正）
      - 验证: Native 348/348 PASSED, 硬件编译 SUCCESS
+   - 提交7 (68e8b64): 第三轮深度复查（实际修正）— 跨文档一致性 + 边界条件
+     - developer-guide.md: 修正相对路径, 按钮回调改为 C 兼容 API, 添加 #include, 边界条件段落
+     - api-templates.md: slider NULL value 缺陷, step/min/max 边界, malloc 失败, 内存表补充
+     - your-first-app.md: 进度条 percent clamp 和尺寸守卫
+     - dev-ttys0.md: 删除指向不存在 serial-input.md 的失效链接
+     - 验证: Native 348/348 PASSED
