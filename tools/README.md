@@ -21,7 +21,7 @@ python tools/icon_converter.py -i my_icon.png
 ### 2. 指定尺寸和名称
 
 ```bash
-python tools/icon_converter.py -i wifi.png -w 16 -h 16 -n wifi_icon -o icons/wifi_icon.h
+python tools/icon_converter.py -i wifi.png -w 16 --height 16 -n wifi_icon -o icons/wifi_icon.h
 ```
 
 ### 3. 预览效果

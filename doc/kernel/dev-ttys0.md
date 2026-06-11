@@ -32,7 +32,7 @@ Arduino Serial  /  std::cin (Native)
 
 ## 数据缓冲区
 
-*📄 Source: [dev_ttyS0.cpp](../../src/kernel/devices/dev_ttyS0.cpp#L17-L39)*
+*📄 Source: [dev_ttyS0.cpp](../../src/kernel/devices/dev_ttyS0.cpp#L20-L42)*
 
 ### 硬件环境（ESP32）
 
@@ -68,7 +68,7 @@ static int   g_tty_count = 0;
 
 ## read 接口
 
-*📄 Source: [dev_ttyS0.cpp](../../src/kernel/devices/dev_ttyS0.cpp#L43-L65)*
+*📄 Source: [dev_ttyS0.cpp](../../src/kernel/devices/dev_ttyS0.cpp#L46-L68)*
 
 ```c
 static ssize_t dev_ttyS0_read(kern_file_t *f, char *buf, size_t len)
@@ -129,7 +129,7 @@ static ssize_t dev_ttyS0_read(kern_file_t *f, char *buf, size_t len)
 
 ## write 接口
 
-*📄 Source: [dev_ttyS0.cpp](../../src/kernel/devices/dev_ttyS0.cpp#L69-L92)*
+*📄 Source: [dev_ttyS0.cpp](../../src/kernel/devices/dev_ttyS0.cpp#L72-L95)*
 
 ```c
 static ssize_t dev_ttyS0_write(kern_file_t *f, const char *buf, size_t len)
@@ -189,7 +189,7 @@ static ssize_t dev_ttyS0_write(kern_file_t *f, const char *buf, size_t len)
 
 ## 轮询函数
 
-*📄 Source: [dev_ttyS0.cpp](../../src/kernel/devices/dev_ttyS0.cpp#L119-L152)*
+*📄 Source: [dev_ttyS0.cpp](../../src/kernel/devices/dev_ttyS0.cpp#L122-L156)*
 
 ```c
 void dev_ttyS0_poll(void)
@@ -200,12 +200,12 @@ void dev_ttyS0_poll(void)
      * 在以下三种情况下跳过 RX，将字符留在硬件 Serial 缓冲区:
      * 1. serial_input 正在等待密码/配对码（由 serial_poll() 直接消费）
      * 2. 串口监视器正在运行（由 serial_monitor_update() 直接消费）
-     * 3. 烧录器有线桥接激活（由 flasher_app 的 flasher_loop 直接消费）
+     * 3. 烧录器有线桥接激活（由 g_flasher_bridge_active 标志控制）
      * 否则 Serial 字节会被此处消耗并进入 ring buffer，
      * Shell 和 serial_input/serial_monitor/flasher 会竞争同一份数据。
      */
     int rx_limit = 32;
-    if (!serial_input_is_waiting() && !serial_monitor_is_active()) {
+    if (!serial_input_is_waiting() && !serial_monitor_is_active() && !g_flasher_bridge_active) {
         while (rx_limit > 0 && Serial.available() > 0 && g_rx_count < TTY_RX_BUF_SIZE) {
             g_rx_buf[g_rx_head] = (char)Serial.read();
             g_rx_head = (g_rx_head + 1) % TTY_RX_BUF_SIZE;
@@ -264,7 +264,7 @@ void dev_ttyS0_poll(void)
 
 ## 文件操作表
 
-*📄 Source: [dev_ttyS0.cpp](../../src/kernel/devices/dev_ttyS0.cpp#L104-L114)*
+*📄 Source: [dev_ttyS0.cpp](../../src/kernel/devices/dev_ttyS0.cpp#L107-L117)*
 
 ```c
 static kern_file_ops_t g_dev_ttyS0_fops = {

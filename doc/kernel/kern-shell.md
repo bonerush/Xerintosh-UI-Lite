@@ -153,7 +153,7 @@ for (;;) {
 
 命令采用**表驱动**设计：
 
-*📄 Source: [kern_shell_cmds.h](../../src/kernel/kern_shell_cmds.h#L23-L43)*
+*📄 Source: [kern_shell_cmds.h](../../src/kernel/kern_shell_cmds.h#L39-L43)*
 
 ```c
 typedef void (*kern_shell_cmd_handler_t)(kern_fd_t tty, int argc, char *argv[],

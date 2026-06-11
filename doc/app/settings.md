@@ -62,7 +62,7 @@ int16_t g_serial_baud_rate       = 5;                        /* 默认波特率�
 
 /* 全局变量定义（settings.c 中） */
 亮度档位 = 5      /* 默认值 50% */
-动画速度档位 = 5  /* 默认值 70 */
+动画速度档位 = 5  /* 默认值 65 (40 + 5*5) */
 动画开关 = true   /* 由 ui_context.h 提供 */
 横屏开关 = true   /* 默认横屏 */
 波特率档位 = 5    /* 默认值 115200 */
@@ -101,11 +101,11 @@ void settings_load_from_storage(void);
 
 ### 值转换
 
-*📄 Source: [settings.c](../../src/app/settings/settings.c#L118-L135)*
+*📄 Source: [settings.c](../../src/app/settings/settings.c#L118-L164)*
 
 ```c
 int16_t settings_brightness_hw_value(void);      /* 亮度档位 → 0-255 硬件值 */
-int16_t settings_anim_speed_value(void);         /* 速度档位 → 45-90 实际速度 */
+int16_t settings_anim_speed_value(void);         /* 速度档位 → 45-95 实际速度 */
 int32_t settings_serial_baud_hw_value(int16_t);  /* 波特率档位 → 实际波特率数值 */
 ```
 

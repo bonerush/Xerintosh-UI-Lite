@@ -528,8 +528,8 @@ serial_cancel();
 
 *📄 Source: [hal_display.h](../../src/hal/hal_display.h)*
 ```c
-#include "hal_display.h"
-#include "hal_layout.h"
+#include "hal/hal_display.h"
+#include "hal/hal_layout.h"
 
 /* —— 文字绘制 —— */
 hal_set_font(hal_get_cn_font());                     // 设置中文字体
@@ -591,7 +591,7 @@ int16_t row_h = HAL_ROW_H();        // 标准行高（= 字体高度 + 2*小边�
 
 *📄 Source: [hal_input.h](../../src/hal/hal_input.h)*
 ```c
-#include "hal_input.h"
+#include "hal/hal_input.h"
 
 /* —— 读取事件（在 loop() 中每帧调用）—— */
 hal_event_t event_a = hal_input_get_event(HAL_BTN_A);

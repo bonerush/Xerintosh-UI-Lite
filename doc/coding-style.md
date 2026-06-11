@@ -193,15 +193,20 @@ xerintosh_switch_item_t *xerintosh_to_switch_item(xerintosh_list_item_t *_item) 
 
 ```c
 typedef void (*xerintosh_cb_t)(void *user_data);
+```
 
+*📄 Source: [ui_item_core.h](../src/ui/ui_item_core.h#L112-L123)*
+
+```c
 /* 在结构体中 */
-struct xerintosh_user_item_t {
+typedef struct xerintosh_user_item_t {
     xerintosh_list_item_t base_item;
     xerintosh_cb_t init_function;   /* 进入时调用 */
     xerintosh_cb_t loop_function;   /* 每帧调用 */
     xerintosh_cb_t exit_function;   /* 退出时调用 */
+    xerintosh_cb_t destroy_callback;/* 销毁时调用 */
     void *user_data;                /* 回调上下文 */
-};
+} xerintosh_user_item_t;
 ```
 
 ### 4.2 使用方式

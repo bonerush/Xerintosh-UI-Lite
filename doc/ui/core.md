@@ -277,7 +277,7 @@ void xerintosh_animation(float *_pos, float _pos_trg, float _speed)
     }
     if (_speed >= 99.0f) _speed = 99.0f;
     if (fabsf(*_pos - _pos_trg) <= 1.0f) *_pos = _pos_trg;
-    else *_pos += (_pos_trg - *_pos) / (100.0f - _speed) / 1.0f;
+    else *_pos += (_pos_trg - *_pos) / (100.0f - _speed);
   }
 }
 ```

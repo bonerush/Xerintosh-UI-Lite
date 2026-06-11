@@ -102,7 +102,7 @@ void kern_sched_class_register(kern_sched_class_t *cls)
 
 /* 注册顺序决定查询优先级：
  * 1. kern_sched_init() 中先 register(&sched_class_rr)
- * 2. 再 register(&sched_class_fifo) [仅 ESP32]
+ * 2. 再 register(&sched_class_fifo) [仅 ESP32；Native 环境未注册 FIFO]
  *
  * pick_next_ready() 会按顺序查询：
  *   g_sched_classes[0] → RR class → 返回第一个就绪任务（几乎总是有）
@@ -281,7 +281,7 @@ struct kern_task *pick_next_ready(void)
 - **kern_sched**：调度器主循环调用 `pick_next_ready()` 和各 class 的 `tick()` 回调
 - **kern_task**：任务的 `scheduler_class_id` 指向所属 class 在 `g_sched_classes[]` 中的索引
 - **kern_sched_rr**：默认兜底调度类，总是第一个注册
-- **kern_sched_fifo**：抢占调度类，总是随内核初始化注册
+- **kern_sched_fifo**：抢占调度类，仅在 ESP32 环境下随内核初始化注册（Native 环境未注册）
 
 ---
 

@@ -259,7 +259,7 @@ if (g_xerintosh_exit_anim_prev_screen_h != SCREEN_HEIGHT)
 
 ### 选择器宽度缓存
 
-*📄 Source: [ui_core.c](../../src/ui/ui_core.c#L140-L145)*
+*📄 Source: [ui_core.c](../../src/ui/ui_core.c#L141-L145)*
 
 ```c
 if (g_xerintosh_cached_selector_content != g_xerintosh_selector.selected_item->content) {

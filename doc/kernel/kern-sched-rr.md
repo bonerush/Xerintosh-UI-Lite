@@ -30,7 +30,7 @@ kern_sched_class_t sched_class_rr = {
 
 ### enqueue：追加到链表尾部
 
-*📄 Source: [kern_sched_rr.c](../../src/kernel/kern_sched_rr.c#L24-L39)*
+*📄 Source: [kern_sched_rr.c](../../src/kernel/kern_sched_rr.c#L39-L59)*
 
 ```c
 static void sched_rr_enqueue(kern_task_t *task)
@@ -77,7 +77,7 @@ static void sched_rr_enqueue(kern_task_t *task)
 
 ### dequeue：从链表中移除
 
-*📄 Source: [kern_sched_rr.c](../../src/kernel/kern_sched_rr.c#L43-L63)*
+*📄 Source: [kern_sched_rr.c](../../src/kernel/kern_sched_rr.c#L63-L88)*
 
 ```c
 static void sched_rr_dequeue(kern_task_t *task)
@@ -281,7 +281,7 @@ static kern_task_t *sched_rr_pick_next(void)
 
 ### tick：时间片递减 + 抢占标记
 
-*📄 Source: [kern_sched_rr.c](../../src/kernel/kern_sched_rr.c#L107-L123)*
+*📄 Source: [kern_sched_rr.c](../../src/kernel/kern_sched_rr.c#L147-L159)*
 
 ```c
 static void sched_rr_tick(kern_task_t *current)
@@ -329,7 +329,7 @@ static void sched_rr_tick(kern_task_t *current)
 
 ### prio_changed：RR 的空实现
 
-*📄 Source: [kern_sched_rr.c](../../src/kernel/kern_sched_rr.c#L127-L132)*
+*📄 Source: [kern_sched_rr.c](../../src/kernel/kern_sched_rr.c#L163-L168)*
 
 ```c
 static void sched_rr_prio_changed(kern_task_t *task, uint8_t old_prio)

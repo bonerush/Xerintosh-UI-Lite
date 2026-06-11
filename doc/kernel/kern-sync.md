@@ -108,9 +108,11 @@ SMP 模式:
 typedef struct {
     spinlock_t    lock;        /* 内部自旋锁 */
     kern_task_t  *owner;       /* 当前持有者 */
-    kern_task_t  *wait_queue;  /* 等待队列头 */
+    kern_task_t  *wait_queue;  /* 等待队列头（预留，当前实现为简单自旋） */
 } mutex_t;
 ```
+
+> **注意**：`wait_queue` 字段为未来阻塞式互斥锁预留，当前 SMP 实现采用**简单自旋**策略——锁被占用时循环检测 `owner` 状态，不操作等待队列。
 
 #### SMP 模式实现
 
@@ -207,9 +209,10 @@ void mutex_unlock(mutex_t *m)
            │
            ├── 任务B 调用 mutex_lock()  →  自旋等待
            │    ┌──────────────────────────────┐
-           │    │ 任务B 循环:                    │
-           │    │   lock内部锁 → 检查owner → 则用│
-           │    │   unlock内部锁 → nop          │
+           │    │ 任务B 自旋循环:                │
+           │    │   lock内部锁 → 检查owner       │
+           │    │   若仍被占: unlock内部锁 → nop │
+           │    │   若已释放: 获取锁 → return    │
            │    └──────────────────────────────┘
            │
            └── 任务A 调用 mutex_unlock()
@@ -264,7 +267,7 @@ static inline void mutex_unlock(mutex_t *m)
 
 | 特性 | spinlock_t | mutex_t |
 |------|------------|---------|
-| 内部结构 | `volatile bool locked` | `spinlock_t + owner指针 + 等待队列` |
+| 内部结构 | `volatile bool locked` | `spinlock_t + owner指针 + 等待队列(预留)` |
 | 持有者追踪 | 无 | 有（`owner` 字段） |
 | 递归获取 | 不支持（死锁） | 允许（警告） |
 | 等待行为 | 忙等（自旋） | 忙等（自旋 + 内部锁） |

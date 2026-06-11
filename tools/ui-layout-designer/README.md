@@ -19,7 +19,7 @@ open tools/ui-layout-designer/index.html
 | 像素级画板 | 按目标设备分辨率生成画布（默认 80×160），支持 1× ~ 16× 缩放 |
 | 网格辅助 | 每 8 像素显示加粗网格线，方便对齐 |
 | 绘制工具 | 空心/实心矩形、圆角矩形、圆形、直线段 |
-| 文字工具 | 支持 ASCII 和中文输入，字体大小可选（6/8/12/16px） |
+| 文字工具 | 支持 ASCII 和中文输入，字体大小可选（4~24px） |
 | 图标库 | 预设 8 种常用图标（WiFi、蓝牙、电池等），拖拽放置 |
 | 控件占位符 | list/switch/slider/button/user 五种控件占位符 |
 | 属性编辑 | 精确调整坐标、尺寸、颜色、图层 |
@@ -150,6 +150,7 @@ tools/ui-layout-designer/
 ├── canvas.js     # 画布引擎
 ├── elements.js   # 元素模型与渲染
 ├── exporter.js   # 导出/导入/LLM Prompt
+├── test.html     # 单元测试页面
 └── README.md     # 本文档
 ```
 

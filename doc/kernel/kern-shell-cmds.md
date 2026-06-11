@@ -172,7 +172,7 @@ static void cmd_scope(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t c
 
 ## 命令历史
 
-*📄 Source: [kern_shell_cmds.c](../../src/kernel/kern_shell_cmds.c#L72-L115)*
+*📄 Source: [kern_shell_cmds.c](../../src/kernel/kern_shell_cmds.c#L72-L94)*
 
 ```c
 #define HISTORY_SIZE 16
@@ -222,7 +222,7 @@ void shell_history_add(const char *cmd)
 
 ## 输出辅助函数
 
-*📄 Source: [kern_shell_cmds.c](../../src/kernel/kern_shell_cmds.c#L39-L52)*
+*📄 Source: [kern_shell_cmds.c](../../src/kernel/kern_shell_cmds.c#L41-L52)*
 
 ```c
 void kern_shell_print(kern_fd_t tty, const char *msg)

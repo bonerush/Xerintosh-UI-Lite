@@ -100,7 +100,7 @@ static int shell_parse_escape(const char *src, char *dst)
     switch (*src) {
     case 'n':  *dst = '\n'; return 1;
     case 't':  *dst = '\t'; return 1;
-    case '\': *dst = '\\'; return 1;
+    case '\\': *dst = '\\'; return 1;
     case '"':  *dst = '"';  return 1;
     case 'r':  *dst = '\r'; return 1;
     case 'x': {

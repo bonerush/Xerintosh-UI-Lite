@@ -344,7 +344,7 @@ taskC.priority 从 50 提升到 150:
 ## 与其他组件的关系
 
 - **kern_sched_class**：`sched_class_fifo` 是 `kern_sched_class_t` 接口的实例
-- **kern_sched**：`kern_sched_init()` 中总是注册此类
+- **kern_sched**：`kern_sched_init()` 中仅在 ESP32 环境下注册此类（Native 环境未注册）
 - **kern_task**：任务通过 `priority` 字段决定链表中的位置。当前实现中 `scheduler_class_id` 未在 spawn 时自动分配
 - **kern_sched_rr**：与 RR class 协作完成两级调度（FIFO 优先，RR 兜底）
 

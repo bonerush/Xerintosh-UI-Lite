@@ -326,7 +326,7 @@ void xerintosh_selector_go_next_item()
 
 确认操作在重构后已大幅简化。原来的 ~60 行内联 `if/else if` 链被替换为一行派发调用：
 
-*📄 Source: [ui_item_selector.c](../../src/ui/ui_item_selector.c#L147-L151)*
+*📄 Source: [ui_item_selector.c](../../src/ui/ui_item_selector.c#L150-L153)*
 
 ```c
 void xerintosh_selector_jump_to_selected_item()

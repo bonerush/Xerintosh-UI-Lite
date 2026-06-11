@@ -88,6 +88,16 @@ App Layer (src/app/) — Each app in its own subdirectory
 │   └── taskmgr_ui.c/h        — Task manager UI rendering (animated row list)
 ├── about/
 │   └── about.c/h             — About page (version/Logo/developer info)
+├── token_usage/
+│   ├── token_usage.h         — Token usage app public API
+│   ├── tu_api.cpp/h          — DeepSeek API client
+│   ├── tu_app.cpp/h          — Token usage user_item lifecycle
+│   └── tu_ui.cpp/h           — Token usage UI rendering
+├── flasher/
+│   ├── flasher.h             — Flasher app public API
+│   ├── flasher_app.cpp       — Wired flashing bridge state machine
+│   ├── flasher_gpio.cpp/h    — GPIO bit-banging for flasher signals
+│   └── flasher_ui.cpp/h      — Flasher UI rendering
 └── shutdown/
     ├── shutdown_screen.c/h   — Shutdown screen
     └── power_key_popup.c/h   — Power key long-press popup
@@ -95,8 +105,18 @@ App Layer (src/app/) — Each app in its own subdirectory
 Kernel Layer (src/kernel/) — Xeros preemptive microkernel ("everything is a file")
 ├── kern_types.h              — Error codes, constants, logging macros
 ├── kern_task.c/h             — 抢占式调度器 + 动态栈
+├── kern_task_lifecycle.c     — Task spawn/exit/zombie handling
+├── kern_task_stack.c         — Stack allocation and canary checks
+├── kern_task_virtual.c       — Virtual task registration for user_item Apps
+├── kern_sched_class.c/h      — Pluggable scheduler class framework
+├── kern_sched_rr.c/h         — Round-Robin scheduler class
+├── kern_sched_fifo.c/h       — Priority FIFO scheduler class (ESP32 only)
+├── kern_smp.c/h              — SMP multi-core support
+├── kern_mpu.c/h              — Memory Protection Unit management
+├── kern_resource.c/h         — FD / resource tracking per task
 ├── kern_vfs.c/h              — Virtual File System (inode/dentry/file)
 ├── kern_devfs.c/h            — /dev/ device registration
+├── kern_device.c/h           — Unified device driver model (v2)
 ├── kern_procfs.c/h           — /proc virtual filesystem
 ├── kern_sysfs.c/h            — /sys virtual filesystem
 ├── kern_gpiofs.c/h           — /sys/gpio pin state mapping
@@ -164,7 +184,7 @@ Entry Points
 │ Xeros Kernel Layer                          │
 │  ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐      │
 │  │Sched  │ │ VFS  │ │devfs │ │procfs│      │  Preemptive microkernel
-│  │coop   │ │(vrtl)│ │(dev) │ │(/proc)│     │
+│  │preempt│ │(vrtl)│ │(dev) │ │(/proc)│     │
 │  └──────┘ └──────┘ └──────┘ └──────┘      │
 │  ┌──────┐ ┌──────┐ ┌──────┐               │
 │  │sysfs  │ │Shell │ │gpiofs│               │  "Everything is a file"
@@ -192,7 +212,7 @@ Full-frame redraw, target 60fps.
 
 - **C-style OOP**: Base struct `xerintosh_list_item_t` must be the **first member** of every derived struct. Safe cast via type tag check.
 - **Animation easing**: `current += (target - current) / (100.0f - speed)`.
-- **TFT double-buffering**: `M5Canvas` sprite must have `setColorDepth(16)` **before** `createSprite()`.
+- **TFT double-buffering**: `M5Canvas` sprite uses `setColorDepth(8)` (RGB332) **before** `createSprite()` to save memory.
 - **XOR highlight**: TFT lacks OLED's `draw_color(2)`, so selector uses pixel-by-pixel `color ^ 0xFFFF`.
 - **Type dispatch**: `ui_dispatch.c` uses function pointer arrays for O(1) type routing (replaces inline switch).
 - **抢占式微内核**：可插拔调度类 + 动态栈管理 + VFS"一切皆文件"
@@ -233,7 +253,7 @@ Defined in `app_init.c` (`app_input_process()`):
 
 ## Known Pitfalls
 
-- **Color depth order**: In `hal_display.cpp`, `setColorDepth(16)` must be called **before** `createSprite()`. Otherwise alpha=0 makes all draws invisible (black screen).
+- **Color depth order**: In `hal_display.cpp`, `setColorDepth(8)` must be called **before** `createSprite()`. `createSprite()` without a prior color-depth call defaults to alpha=0 and renders black.
 - **Backlight**: `M5.begin()` does not always set max brightness. Explicitly call `M5.Display.setBrightness(...)`.
 - **M5.update()**: Must be called in `loop()` before reading button state. Without it, all buttons read as false.
 - **build_src_filter is unreliable**: The project uses `#ifdef NATIVE_TEST` to exclude `main.cpp` in native builds, not `build_src_filter`.
@@ -253,7 +273,7 @@ All technical docs live under `doc/` and are written in **Chinese**. They mirror
 - `doc/index.md` — Central knowledge map (must be kept in sync).
 - `doc/coding-style.md` — C OOP naming, encapsulation, inheritance rules.
 - `doc/developer-guide.md` — How to build menus, create `user_item` apps, and organize code.
-- `doc/kernel/` — Xeros kernel subsystem docs (types, task, VFS, devfs, procfs, sysfs, GPIO, shell, devices, portability).
+- `doc/kernel/` — Xeros kernel subsystem docs (types, task, schedulers, VFS, devfs, device-model, procfs, sysfs, gpiofs, shell, devices, portability).
 - `doc/ui/` — UI core layer docs (item, core, context, dispatch, drawer, draw-icons, draw-anim, draw-list, draw-widgets, anim-row).
 - `doc/app/` — App layer docs (app-init, settings, taskmgr, serial-monitor, ui-task, svc-mgr-helper).
 - `doc/hal/` — HAL layer docs (display, input, system).

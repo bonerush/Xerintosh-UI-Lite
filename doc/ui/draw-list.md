@@ -51,15 +51,20 @@ void xerintosh_draw_list_appearance()
   hal_draw_v_line(SCREEN_WIDTH - 5, 0, SCREEN_HEIGHT, g_xerintosh_draw_color);
   hal_draw_v_line(SCREEN_WIDTH - 1, 0, SCREEN_HEIGHT, g_xerintosh_draw_color);
 
-  /* 滚动条 */
-  static float _length_each_part = 0;
-  _length_each_part = ceilf((SCREEN_HEIGHT - 10.0f) / (float) child_num);
-  hal_draw_fill_rect(SCREEN_WIDTH - 4, 5 + selected_index * _length_each_part,
+  /* 滚动条（含缓存优化） */
+  static uint8_t _cached_child_num = 0;
+  static float _cached_length = 0;
+  if (_cached_child_num != g_xerintosh_selector.selected_item->parent->child_num) {
+    _cached_child_num = g_xerintosh_selector.selected_item->parent->child_num;
+    _cached_length = ceilf((SCREEN_HEIGHT - 10.0f) / (float)_cached_child_num);
+  }
+  float _length_each_part = _cached_length;
+  hal_draw_fill_rect(SCREEN_WIDTH - 4, 5 + g_xerintosh_selector.selected_index * _length_each_part,
                      3, _length_each_part, g_xerintosh_draw_color);
 
   /* 滚动条内部高光线 */
   g_xerintosh_draw_color = COLOR_BG;
-  hal_draw_h_line(SCREEN_WIDTH - 4, _length_each_part + selected_index * _length_each_part, 3, ...);
+  hal_draw_h_line(SCREEN_WIDTH - 4, _length_each_part + (float)g_xerintosh_selector.selected_index * _length_each_part, 3, ...);
 
   /* 滚动条上下端点 */
   g_xerintosh_draw_color = COLOR_FG;
