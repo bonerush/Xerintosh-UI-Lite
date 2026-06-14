@@ -28,10 +28,8 @@
 #include "flasher_gpio.h"
 #include "flasher_ui.h"
 #include <string.h>
-#include "app/settings/settings.h"
-#include "hal/hal_display.h"
+#include "app/ui_service.h"
 #include "hal/hal_input.h"
-#include "hal/hal_screen.h"
 #include "hal/hal_system.h"
 #include "ui/ui_core.h"
 #include "ui/ui_selector.h"
@@ -89,7 +87,6 @@ static pt_phase_t              s_pt_phase = PT_PHASE_IDLE;
 static uint32_t                s_pt_phase_until_ms = 0;
 static bool                    s_pt_first_data = false;
 static bool                    s_running = false;
-static bool                    s_prev_landscape = true;
 static float                   s_entry_offset = 0.0f;
 
 /* STK500 进度解析器 */
@@ -369,14 +366,7 @@ void flasher_init(void *ud)
     flasher_init_pins(115200U);
 
 #ifndef NATIVE_TEST
-    s_prev_landscape = g_is_landscape;
-    if (!g_is_landscape) {
-        g_is_landscape = true;
-        g_screen_rotation_level = ORIENTATION_LANDSCAPE;
-        hal_display_set_rotation(1);
-        hal_screen_get_size(&g_screen_width, &g_screen_height);
-        hal_display_init();
-    }
+    ui_service_enter_landscape();
     hal_input_reset_events();
     hal_input_set_double_click_enabled(false);
 
@@ -527,13 +517,7 @@ void flasher_exit(void *ud)
     g_flasher_bridge_active = false;
 
 #ifndef NATIVE_TEST
-    if (!s_prev_landscape) {
-        g_is_landscape = false;
-        g_screen_rotation_level = ORIENTATION_PORTRAIT;
-        hal_display_set_rotation(0);
-        hal_screen_get_size(&g_screen_width, &g_screen_height);
-        hal_display_init();
-    }
+    ui_service_exit_landscape();
     hal_input_set_double_click_enabled(false);
     hal_input_reset_events();
 #endif

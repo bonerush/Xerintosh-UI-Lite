@@ -10,13 +10,11 @@
 #include "sm_app.h"
 #include "serial_monitor.h"
 #include "sm_ui.h"
-#include "app/settings/settings.h"
 #include "app/serial_input/serial_input.h"
 #include "app/bluetooth/bt_manager.h"
 #include "app/bluetooth/bt_uart_service.h"
-#include "hal/hal_display.h"
+#include "app/ui_service.h"
 #include "hal/hal_input.h"
-#include "hal/hal_screen.h"
 #include "hal/hal_system.h"
 #include "ui/ui_core.h"
 #include "ui/ui_item.h"
@@ -40,7 +38,6 @@ float       sm_btn_alpha_1 = 0.0f;
 #include <Arduino.h>
 static char        sm_rx_buf[SM_TERM_LINE_LEN];
 static uint8_t     sm_rx_len = 0;
-static bool        s_prev_landscape = true; /* 保存进入前的屏幕方向 */
 
 /* BT RX 行组装缓冲区（迁移自 ble_serial.cpp） */
 static char     sm_bt_rx_buf[SM_TERM_LINE_LEN];
@@ -110,15 +107,7 @@ void serial_monitor_init(void *ud)
     sm_rx_len = 0;
     sm_bt_rx_len = 0;
     sm_bt_lazy_inited = false;
-    s_prev_landscape = g_is_landscape;
-    if (!g_is_landscape) {
-        /* 从竖屏菜单进入时临时切换到横屏 */
-        g_is_landscape = true;
-        g_screen_rotation_level = ORIENTATION_LANDSCAPE;
-        hal_display_set_rotation(1);
-        hal_screen_get_size(&g_screen_width, &g_screen_height);
-        hal_display_init();
-    }
+    ui_service_enter_landscape();
     hal_input_reset_events();
     hal_input_set_double_click_enabled(true);
 
@@ -263,14 +252,7 @@ void serial_monitor_exit(void *ud)
         sm_bt_lazy_inited = false;
     }
 
-    if (!s_prev_landscape) {
-        /* 恢复之前的竖屏方向 */
-        g_is_landscape = false;
-        g_screen_rotation_level = ORIENTATION_PORTRAIT;
-        hal_display_set_rotation(0);
-        hal_screen_get_size(&g_screen_width, &g_screen_height);
-        hal_display_init();
-    }
+    ui_service_exit_landscape();
     hal_input_set_double_click_enabled(false);
     hal_input_reset_events();
 #endif

@@ -37,6 +37,18 @@ bool ui_service_user_item_loop(hal_event_t event_b);
  */
 void ui_service_user_item_exit(void);
 
+/**
+ * @brief 进入全屏 App 时临时切换到横屏
+ * @note  保存进入前的屏幕方向；若当前不是横屏，则切换为横屏并重新初始化显示
+ */
+void ui_service_enter_landscape(void);
+
+/**
+ * @brief 退出全屏 App 时恢复之前的屏幕方向
+ * @note  仅当进入前不是横屏时才恢复为竖屏
+ */
+void ui_service_exit_landscape(void);
+
 #ifdef __cplusplus
 }
 #endif
