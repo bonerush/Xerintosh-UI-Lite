@@ -42,16 +42,23 @@
 
 #include "app/bluetooth/bt_manager.h"
 
-void bt_mgr_init(void) {}
-void bt_mgr_enable(void) {}
-void bt_mgr_disable(void) {}
-void bt_mgr_request_enable(void) {}
-void bt_mgr_request_disable(void) {}
+static bool g_bt_enabled_test = false;
+
+void bt_mgr_init(void) { g_bt_enabled_test = false; }
+void bt_mgr_enable(void) { g_bt_enabled_test = true; }
+void bt_mgr_disable(void) { g_bt_enabled_test = false; }
+void bt_mgr_request_enable(void) { g_bt_enabled_test = true; }
+void bt_mgr_request_disable(void) { g_bt_enabled_test = false; }
 void bt_mgr_process_requests(void) {}
 bool bt_mgr_is_waiting_input(void) { return false; }
-bool bt_mgr_is_enabled(void) { return false; }
+bool bt_mgr_is_enabled(void) { return g_bt_enabled_test; }
 void bt_mgr_update(void) {}
 void bt_mgr_on_switch_toggle(void *ud) { (void)ud; }
+
+void bt_mgr_test_set_enabled(bool enabled)
+{
+    g_bt_enabled_test = enabled;
+}
 
 #else
 

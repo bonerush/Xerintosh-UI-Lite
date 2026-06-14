@@ -114,6 +114,15 @@ bool bt_mgr_is_enabled(void);
  */
 void bt_mgr_on_switch_toggle(void *ud);
 
+#ifdef NATIVE_TEST
+/**
+ * @brief 测试接缝：设置 bt_mgr_is_enabled() 的返回值
+ * @param enabled 期望返回的启用状态
+ * @note  仅在 NATIVE_TEST 构建中可用，用于单元测试。
+ */
+void bt_mgr_test_set_enabled(bool enabled);
+#endif
+
 #ifdef __cplusplus
 }
 #endif

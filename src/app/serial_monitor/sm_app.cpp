@@ -13,6 +13,7 @@
 #include "app/serial_input/serial_input.h"
 #include "app/bluetooth/bt_manager.h"
 #include "app/bluetooth/bt_uart_service.h"
+#include "app/svc_mgr_helper.h"
 #include "app/ui_service.h"
 #include "hal/hal_input.h"
 #include "hal/hal_system.h"
@@ -147,10 +148,7 @@ void serial_monitor_loop(void *ud)
                 Serial.flush();
 #endif
 
-                if (!bt_mgr_is_enabled()) {
-                    bt_mgr_request_enable();
-                    sm_bt_lazy_inited = true;
-                }
+                svc_mgr_bt_request_enable(&sm_bt_lazy_inited);
                 sm_source = SM_SOURCE_BLE;
                 sm_bt_connected = bt_uart_is_connected();
 #ifndef NATIVE_TEST
@@ -247,10 +245,7 @@ void serial_monitor_exit(void *ud)
     bt_uart_set_connect_callback(NULL);
 
     /* 如果 BT 是由串口监视器懒加载的，退出时释放以归还内存给 WiFi */
-    if (sm_bt_lazy_inited && bt_mgr_is_enabled()) {
-        bt_mgr_disable();
-        sm_bt_lazy_inited = false;
-    }
+    svc_mgr_bt_request_disable(&sm_bt_lazy_inited);
 
     ui_service_exit_landscape();
     hal_input_set_double_click_enabled(false);
