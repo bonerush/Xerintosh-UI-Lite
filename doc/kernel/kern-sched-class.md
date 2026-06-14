@@ -19,6 +19,7 @@
 ```c
 typedef struct kern_sched_class {
     const char *name;                                  /* 类名称（调试用） */
+    int8_t              class_id;                      /* 在全局注册表中的索引，-1 表示未注册 */
 
     void (*enqueue)(struct kern_task *task);           /* 将任务加入本 class */
     void (*dequeue)(struct kern_task *task);           /* 将任务从本 class 移除 */
@@ -80,29 +81,41 @@ extern uint8_t g_sched_class_count;
 
 ### 注册流程
 
-*📄 Source: [kern_sched_class.c](../../src/kernel/kern_sched_class.c#L14-L21)*
+*📄 Source: [kern_sched_class.c](../../src/kernel/kern_sched_class.c#L17-L28)*
 
 ```c
 kern_sched_class_t *g_sched_classes[KERN_SCHED_MAX_CLASSES] = { NULL };
 uint8_t g_sched_class_count = 0;
 
-void kern_sched_class_register(kern_sched_class_t *cls)
+kern_err_t kern_sched_class_register(kern_sched_class_t *cls)
 {
-    if (cls == NULL || g_sched_class_count >= KERN_SCHED_MAX_CLASSES) return;
+    if (cls == NULL) {
+        return KERN_EINVAL;
+    }
+    if (g_sched_class_count >= KERN_SCHED_MAX_CLASSES) {
+        return KERN_ENOSPC;
+    }
+    cls->class_id = (int8_t)g_sched_class_count;
     g_sched_classes[g_sched_class_count++] = cls;
+    return KERN_OK;
 }
 ```
 
 ```
 函数 注册调度类(类指针) {
-    if (指针为空 或 已满8个) 返回
+    if (指针为空) return KERN_EINVAL
+    if (已满8个) return KERN_ENOSPC
+    类指针.class_id = 当前计数
     类数组[当前计数] = 类指针
     当前计数++
+    return KERN_OK
 }
 
 /* 注册顺序决定查询优先级：
  * 1. kern_sched_init() 中先 register(&sched_class_rr)
+ *    → class_id = 0 → KERN_SCHED_CLASS_RR_ID
  * 2. 再 register(&sched_class_fifo) [仅 ESP32；Native 环境未注册 FIFO]
+ *    → class_id = 1
  *
  * pick_next_ready() 会按顺序查询：
  *   g_sched_classes[0] → RR class → 返回第一个就绪任务（几乎总是有）
@@ -112,7 +125,7 @@ void kern_sched_class_register(kern_sched_class_t *cls)
 
 ### pick_next_ready：核心选择逻辑
 
-*📄 Source: [kern_sched_class.c](../../src/kernel/kern_sched_class.c#L23-L32)*
+*📄 Source: [kern_sched_class.c](../../src/kernel/kern_sched_class.c#L30-L39)*
 
 ```c
 struct kern_task *pick_next_ready(void)
@@ -235,10 +248,12 @@ struct kern_task *pick_next_ready(void)
     │
     └─ 插入全局任务链表 g_task_list
 
-⚠️ 注意：当前实现中 kern_spawn 未自动将任务加入各调度类的 task_list，
-也未设置 scheduler_class_id。RR class 直接使用 g_task_list 作为其
-任务链表（sched_class_rr.task_list = g_task_list），因此新任务
-自动对 RR 可见。FIFO class 的 task_list 保持独立，需显式入队才生效。
+✅ 注意：`kern_spawn()` 会先将 `task->scheduler_class_id` 初始化为 `-1`，
+随后默认设为 `KERN_SCHED_CLASS_RR_ID`。各调度类的 `enqueue()` / `dequeue()`
+在维护任务链表时会同步更新 `task->scheduler_class_id`：入队时设为该 class 的
+`class_id`，出队时重置为 `-1`。RR class 直接使用 `g_task_list` 作为其
+任务链表（`sched_class_rr.task_list = g_task_list`），因此新任务
+自动对 RR 可见。FIFO class 的 `task_list` 保持独立，需显式入队才生效。
 ```
 
 ---
@@ -279,8 +294,8 @@ struct kern_task *pick_next_ready(void)
 ## 与其他组件的关系
 
 - **kern_sched**：调度器主循环调用 `pick_next_ready()` 和各 class 的 `tick()` 回调
-- **kern_task**：任务的 `scheduler_class_id` 指向所属 class 在 `g_sched_classes[]` 中的索引
-- **kern_sched_rr**：默认兜底调度类，总是第一个注册
+- **kern_task**：任务的 `scheduler_class_id` 指向所属 class 在 `g_sched_classes[]` 中的索引；`kern_spawn()` 默认设为 `KERN_SCHED_CLASS_RR_ID`，调度类的 `enqueue()` / `dequeue()` 负责同步维护该字段
+- **kern_sched_rr**：默认兜底调度类，总是第一个注册，`class_id == KERN_SCHED_CLASS_RR_ID` (0)
 - **kern_sched_fifo**：抢占调度类，仅在 ESP32 环境下随内核初始化注册（Native 环境未注册）
 
 ---

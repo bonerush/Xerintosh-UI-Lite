@@ -1,124 +1,77 @@
-# 2.3 UI 核心层重构报告
+# UI 核心层重构报告
 
-> **状态**：`DONE`
-> **日期**：2026-06-14
-> **分支**：`refactor/2026-06-14-kernel-ui`
+## 范围
 
----
+- 处理诊断问题：H-P2-02、H-P2-03
+- 延后问题：H-P2-04
 
-## 目标
+## 变更摘要
 
-1. 消灭 UI 源码中所有 item 类型处理的内联 switch/if 链，全部通过 `ui_dispatch.c` 派发表路由。
-2. 增强空根节点、NULL 选择器等边界场景的安全防护。
-3. 补充 native 回归测试，覆盖空根节点与派发表全生命周期行为。
+| 变更类型 | 数量 | 说明 |
+|----------|------|------|
+| 修改文件 | 2 | UI 头文件与测试 |
+| 新增文件 | 1 | `ui-popup-deferred.md` |
+| 接口修复 | 1 | `ui_item.h` 添加 `extern "C"` 保护 |
+| 回归加固 | 1 | 绘制派发审计与测试 |
+| 新增测试 | 3 | C++ 链接、绘制派发、列表绘制 |
 
----
+## 详细变更
 
-## 变更文件
+### 1. T1：为 `ui_item.h` 添加 `extern "C"` 保护（H-P2-02）
+**原因**：H-P2-02  
+**实现**：
+- 在 `src/ui/ui_item.h` 中添加 `extern "C"` 包裹，使其成为 C/C++ 兼容聚合头。
+- 更新头注释说明聚合头身份。
+- 在 `test/test_native/test_ui_dispatch.cpp` 中新增 C++ 链接回归测试。
+**影响接口**：无 public API 变化。  
+**文档更新**：头注释已更新，阶段 2.5 同步 `doc/ui/item.md`。
 
-| 文件 | 变更类型 | 说明 |
-|------|----------|------|
-| `src/ui/ui_core.c` | 修改 | 空选择器防护；init_core 空根处理；refresh_* 系列函数 NULL/父项保护；measure 走派发表 |
-| `src/ui/ui_item_selector.c` | 修改 | 导航/退出函数通过 `xerintosh_dispatch_input_*` 路由；移除内联 slider/user 类型判断；移除已迁移的 `handle_user_item_exit` |
-| `src/ui/ui_draw_list.c` | 修改 | 移除本地 draw switch/slider/icon-only 实现；绘制与覆盖层走派发表；文字布局宽度通过 `xerintosh_dispatch_has_right_control()` 判断 |
-| `src/ui/ui_item_list.c` | 修改 | `xerintosh_destroy_item_tree()` 使用 `xerintosh_dispatch_destroy()` 调用 user_item destroy_callback |
-| `src/ui/ui_dispatch.c` | 重写 | 扩展为完整 lifecycle vtable：enter / input_next / input_prev / input_exit / measure / draw / draw_overlay / destroy / has_right_control |
-| `src/ui/ui_item_core.h` | 修改 | 新增 8 个公开派发 API 声明 |
-| `test/test_native/test_ui_empty_root.cpp` | 新增 | 空根节点回归测试 |
-| `test/test_native/test_ui_dispatch.cpp` | 新增 | 派发表 enter/input/measure/destroy/right-control 行为测试 |
-| `doc/ui/dispatch.md` | 待更新 | 派发表文档需同步扩展后的 vtable |
+### 2. T2：审计列表绘制派发（H-P2-03）
+**原因**：H-P2-03  
+**实现**：
+- 审计 `src/ui/ui_draw_list.c`，确认无按 `item->type` 的内联 switch 残留。
+- 列表项绘制通过 `xerintosh_dispatch_draw()` 路由。
+- 右侧控件判断通过 `xerintosh_dispatch_has_right_control()`。
+- 滑块覆盖层通过 `xerintosh_dispatch_draw_overlay()`。
+- 新增回归测试覆盖绘制派发。
+**影响接口**：无 public API 变化。  
+**文档更新**：阶段 2.5 同步 `doc/ui/draw-list.md`。
 
----
+### 3. T3：Pop-up 拆分延后记录（H-P2-04）
+**原因**：H-P2-04  
+**处理**：未改动源码，在 `doc/refactor/02-refactor/ui-popup-deferred.md` 中记录问题、拆分方案和依赖测试，供后续专门轮次处理。
 
-## 设计决策
+## 测试
 
-### 1. 全生命周期派发表
+- 新增/修改测试：
+  - `test/test_native/test_ui_dispatch.cpp`：
+    - `UiDispatchTest.CppCanIncludeUiItemHeader`
+    - `UiDispatchTest.DrawDoesNotSwitchOnType`
+    - `UiDispatchTest.ListDrawUsesDispatch`
+- 验证结果：
+  - `pio test -e native`：✅ PASS（415 个测试用例，1 个 skipped，414 个 succeeded）
+  - `pio run -e m5stick-c`：✅ PASS（Flash 88.0%，RAM 22.3%）
 
-原先 `ui_dispatch.c` 仅处理 `enter`。重构后将所有“按类型不同”的行为集中到一张 vtable：
+## 检查清单
 
-```c
-typedef struct {
-    void (*enter)(xerintosh_list_item_t *);
-    bool (*input_next)(xerintosh_list_item_t *);
-    bool (*input_prev)(xerintosh_list_item_t *);
-    bool (*input_exit)(xerintosh_list_item_t *);
-    int16_t (*measure)(xerintosh_list_item_t *);
-    void (*draw)(xerintosh_list_item_t *, int16_t, int16_t);
-    void (*draw_overlay)(xerintosh_list_item_t *);
-    void (*destroy)(xerintosh_list_item_t *);
-    bool (*has_right_control)(xerintosh_list_item_t *);
-} xerintosh_dispatch_vtable_t;
-```
+- [x] 所有导出函数有模块前缀
+- [x] 头文件有 `extern "C"` 保护
+- [x] 头文件有 include guard
+- [x] 结构体继承时基类放第一位（无新增继承）
+- [x] 类型转换有安全检查
+- [x] 回调统一带 `user_data`（无新增回调）
+- [x] 没有 `nullptr`、`&` 引用出现在 C 接口中
+- [ ] 文档已同步更新（阶段 2.5 统一处理）
+- [x] 新增/修改代码有 native 测试覆盖
+- [x] 硬件构建无新增警告
 
-输入类函数返回 `bool`：
-- `true` 表示输入已被类型特定逻辑消费（如 slider 编辑模式增减值、user_item 运行态忽略导航）。
-- `false` 表示未消费，调用方执行默认导航。
+## 回滚点
 
-### 2. 空根节点安全
+- 每个子任务均为独立 commit，可单独 `git revert <commit>`。
+- 统一回滚到阶段 2.4 开始前：`git reset --hard 42d7ec3`（HAL T2 提交）。
 
-- `xerintosh_init_core()` 在根节点无子项时不再尝试绑定 selector 到 root（root 无 parent，绑定会失败）。
-- `xerintosh_ui_main_core()` 在选择器未选中任何项时直接返回，避免后续生命周期/渲染函数解引用 NULL。
-- 选择器导航函数（next/prev/jump/exit）均增加 NULL 检查。
-- 位置刷新函数增加 `selected_item` 与 `parent` 空指针防护。
+## 遗留问题
 
-### 3. 行为保持
-
-- `xerintosh_selector_go_next_item` / `go_prev_item` 的 slider 编辑模式增减值逻辑原样迁移到 `dispatch_input_next_slider` / `dispatch_input_prev_slider`。
-- `xerintosh_selector_exit_current_item` 的 slider 取消编辑、user_item 触发退出逻辑迁移到 `dispatch_input_exit_slider` / `dispatch_input_exit_user`。
-- `handle_user_item_exit` 从 `ui_item_selector.c` 迁移到 `ui_dispatch.c` 内部，作为 `dispatch_input_exit_user` 的实现细节。
-- `ui_draw_list.c` 的 switch/slider 绘制与覆盖层绘制原样迁移到 `dispatch_draw_switch` / `dispatch_draw_slider` / `dispatch_draw_overlay_slider`。
-- `xerintosh_destroy_item_tree` 的 user_item destroy_callback 调用逻辑迁移到 `dispatch_destroy_user`。
-
----
-
-## 验证结果
-
-### Native 测试
-
-```bash
-$ pio test -e native
-================ 366 test cases: 366 succeeded ================
-```
-
-新增测试：
-- `UiEmptyRootTest.CoreMainLoopHandlesEmptyRoot`
-- `UiEmptyRootTest.SelectorNavigationHandlesEmptyRoot`
-- `UiDispatchTest.SwitchEnterTogglesValueAndFiresCallback`
-- `UiDispatchTest.ButtonEnterFiresCallback`
-- `UiDispatchTest.SliderInputNextInEditModeIncrementsValue`
-- `UiDispatchTest.SliderInputNextInNormalModeDoesNotConsume`
-- `UiDispatchTest.SliderInputExitRestoresBackupValue`
-- `UiDispatchTest.MeasureReturnsFullWidthForSwitchAndSlider`
-- `UiDispatchTest.HasRightControlOnlyForSwitchAndSlider`
-- `UiDispatchTest.DestroyCallsUserItemDestroyCallback`
-
-### 硬件构建
-
-```bash
-$ pio run -e m5stick-c
-RAM:   [==        ]  22.3% (used 73216 bytes from 327680 bytes)
-Flash: [========= ]  88.0% (used 1845241 bytes from 2097152 bytes)
-========================= [SUCCESS] =========================
-```
-
-无新增编译警告。
-
----
-
-## 已知遗留
-
-- `doc/ui/dispatch.md` 仍只描述旧的 `enter` 派发表，需在阶段 2.5 文档同步中更新为完整 vtable。
-- `xerintosh_is_in_user_item()` 在 `ui_core.c` 中仍使用 `xerintosh_to_user_item()` 判断类型，未纳入 vtable；因其为纯状态查询且逻辑极简，保留为可接受例外。
-
----
-
-## 回滚策略
-
-所有变更均通过 `git revert` 可回滚：
-- `ui_dispatch.c` 重写为单一 commit。
-- 各调用方修改分散在对应文件的 commit 中。
-- 测试文件为独立新增，可单独移除。
-
----
-
-> **验收标准**：native 测试 366/366 通过，硬件构建成功，无新增警告，源码中不再存在 item 类型内联 switch。
+| ID | 问题 | 后续处理 |
+|----|------|----------|
+| H-P2-04 | `xerintosh_push_pop_up()` 约 140 行，含 `goto`，需拆分 | 延后到专门 pop-up 轮次，已记录拆分方案 |

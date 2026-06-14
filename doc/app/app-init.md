@@ -36,7 +36,7 @@ void app_init_ui(void)
 }
 ```
 
-薄封装，实际菜单构建逻辑在 `app_menu.c` 中。
+薄封装，实际菜单构建逻辑在 `app_menu.c` 中。菜单构建时使用 `app_menu_push_checked()` 对根节点进行 NULL 检查，防止 `xerintosh_get_root_list()` 返回 NULL 或子项挂载失败时产生未定义行为。
 
 ### app_init_managers()
 

@@ -17,22 +17,23 @@ VFS（Virtual File System）是 Xeros "一切皆文件"哲学的核心实现层�
 ```
 用户调用:  fd = kern_open("/dev/fb0", O_WRONLY);
            ↓
-文件描述符表 (g_fd_table)          ← 每个打开的文件一个 kern_file_t 槽位
+文件描述符表 (task->fd_table[])    ← 每任务独立的 kern_file_t 槽位
            ↓
 目录树 (kern_dentry_t 树状结构)   ← 将路径 "/dev/fb0" 映射到 inode
            ↓
-索引节点 (kern_inode_t)            ← 绑定具体文件操作表 (kern_file_ops_t)
+索引节点 (kern_inode_t)            ← 绑定具体文件操作表 (kern_file_ops_t) 与引用计数
 ```
 
 ### 第 1 层：inode —— 索引节点
 
-*📄 Source: [kern_vfs.h](../../src/kernel/kern_vfs.h#L51-L55)*
+*📄 Source: [kern_vfs.h](../../src/kernel/kern_vfs.h#L51-L56)*
 
 ```c
 typedef struct kern_inode {
     kern_file_type_t type;           /* KERN_FILE_REGULAR / DIR / CHRDEV / FIFO */
     kern_file_ops_t *fops;           /* 指向操作函数表（多态核心） */
     void *private_data;              /* 文件系统/设备私有数据 */
+    uint32_t ref_count;              /* 引用计数（dentry + 打开 FD） */
 } kern_inode_t;
 ```
 
@@ -79,7 +80,7 @@ dentry 形成树状命名空间。每个路径分量（如 `/dev/fb0` 中的 `de
 
 ### 第 3 层：file —— 打开文件实例
 
-*📄 Source: [kern_vfs.h](../../src/kernel/kern_vfs.h#L73-L81)*
+*📄 Source: [kern_vfs.h](../../src/kernel/kern_vfs.h#L74-L82)*
 
 ```c
 typedef struct kern_file {
@@ -93,7 +94,7 @@ typedef struct kern_file {
 } kern_file_t;
 ```
 
-每次 `kern_open()` 创建一个 `kern_file_t` 实例并放入全局 `g_fd_table[]`。`f_pos` 由 VFS 层自动维护 —— 每次成功的 read/write 后递增实际传输的字节数。`private_data` 允许设备在单次打开会话中保存临时状态。
+每次 `kern_open()` 创建一个 `kern_file_t` 实例并放入**当前任务**的 `task->fd_table[]` 槽位。`f_pos` 由 VFS 层自动维护 —— 每次成功的 read/write 后递增实际传输的字节数。`private_data` 允许设备在单次打开会话中保存临时状态。
 
 ### 文件操作函数表（v2 签名）
 
@@ -120,7 +121,7 @@ v2 较旧版的关键变化：
 
 ### open() 完整流程
 
-*📄 Source: [kern_vfs.c](../../src/kernel/kern_vfs.c#L312-L355)*
+*📄 Source: [kern_vfs.c](../../src/kernel/kern_vfs.c#L410-L464)*
 
 ```
 kern_open("/dev/fb0", KERN_O_WRONLY):
@@ -130,21 +131,25 @@ kern_open("/dev/fb0", KERN_O_WRONLY):
   │     └→ 返回 fb0 对应的 dentry（其 inode->fops 指向帧缓冲操作表）
   │
   ├─[2] 分配 FD: fd_alloc()
-  │     └→ 在全局 g_fd_table[] 中找第一个 in_use==false 的槽位
+  │     └→ 在当前任务 task->fd_table[] 中找第一个空槽位
+  │     └→ 分配 kern_file_t 并设置 in_use = true
   │
   ├─[3] 填充 kern_file_t:
   │     └→ fops = inode->fops（缓存操作表）
   │     └→ f_pos = 0, flags = 传入标志
   │
-  ├─[4] 调用设备 open（如果存在）:
-  │     └→ f->fops->open(f, flags)
-  │     └→ 若返回非零 → 清空槽位 → 返回错误码
+  ├─[4] 递增 inode 引用计数:
+  │     └→ kern_inode_ref(inode)  ← dentry 持有 1 份引用，每个打开 FD 再持 1 份
   │
-  ├─[5] 追踪 FD 资源（v2 新增）:
-  │     └→ kern_resource_track(cur_task, fd, KERN_RES_FD, fd_release)
+  ├─[5] 调用设备 open（如果存在）:
+  │     └→ f->fops->open(f, flags)
+  │     └→ 若返回非零 → 递减 inode 引用、回收 file 结构与 FD 槽位 → 返回错误码
+  │
+  ├─[6] 追踪 FD 资源（v2 新增）:
+  │     └→ kern_resource_track(cur_task, (void *)(intptr_t)(fd + 1), KERN_RES_FD, fd_release)
   │     └→ 任务退出时自动 kern_close(fd)
   │
-  └─[6] 返回 fd (0 ~ KERN_MAX_FD_PER_TASK-1)
+  └─[7] 返回 fd (0 ~ KERN_MAX_FD_PER_TASK-1)
 ```
 
 #### 中文伪代码拆解
@@ -155,21 +160,28 @@ kern_open("/dev/fb0", KERN_O_WRONLY):
     if (目录项 == NULL) return KERN_ENOENT
     if (目录项.索引节点 == NULL) return KERN_EISDIR  // 打开了目录而不是文件
 
-    文件描述符 = 分配文件描述符槽位()  // 在全局表 g_fd_table 中找空位
-    if (文件描述符 < 0) return 文件描述符  // 返回 KERN_EMFILE
+    文件描述符 = 分配文件描述符槽位()  // 在当前任务 task->fd_table[] 中找空位
+    if (文件描述符 < 0) return 文件描述符  // 返回 KERN_EMFILE / KERN_ENOMEM / KERN_EBADF
 
-    文件 = &g_fd_table[文件描述符]
+    文件 = task->fd_table[文件描述符]
     文件.索引节点 = 目录项.索引节点
     文件.操作表   = 目录项.索引节点.操作表
+
+    // 打开 FD 对 inode 增加一份引用
+    inode引用递增(文件.索引节点)
 
     // 调用设备初始化回调
     if (文件.操作表.打开 != NULL) {
         结果 = 文件.操作表.打开(文件, 标志)
-        if (结果 != KERN_OK) { 清空槽位; return 结果 }
+        if (结果 != KERN_OK) {
+            inode引用递减(文件.索引节点)
+            回收 file 结构与 FD 槽位
+            return 结果
+        }
     }
 
-    // 将 FD 登记到当前任务的资源追踪列表
-    资源追踪(当前任务, 文件描述符, FD类型, fd释放回调)
+    // 将 FD 登记到当前任务的资源追踪列表（存储 fd+1，避免 fd==0 时 ptr 为 NULL）
+    资源追踪(当前任务, (void *)(intptr_t)(文件描述符 + 1), FD类型, fd释放回调)
 
     return 文件描述符
 }
@@ -177,11 +189,11 @@ kern_open("/dev/fb0", KERN_O_WRONLY):
 
 ### read() / write() 流程
 
-*📄 Source: [kern_vfs.c](../../src/kernel/kern_vfs.c#L379-L422)*
+*📄 Source: [kern_vfs.c](../../src/kernel/kern_vfs.c#L486-L516)*
 
 ```
 kern_read(fd, buf, len):
-  [1] fd_get(fd) → 查表获取 kern_file_t*
+  [1] fd_get(fd) → 查当前任务 task->fd_table[fd] 获取 kern_file_t*
   [2] 检查 fops->read 非空 → 否则 KERN_EINVAL
   [3] 调用 fops->read(f, buf, len) → 实际传输字节数
   [4] 返回传输字节数（VFS 不管理 f_pos，由设备自行维护）
@@ -196,18 +208,58 @@ kern_write(fd, buf, len):
 
 ### close() 与资源回收（v2 新增）
 
-*📄 Source: [kern_vfs.c](../../src/kernel/kern_vfs.c#L357-L377)*
+*📄 Source: [kern_vfs.c](../../src/kernel/kern_vfs.c#L467-L484)*
 
 ```
 kern_close(fd):
-  [1] fd_get(fd) → 查表
-  [2] kern_resource_untrack(cur_task, fd) → 从资源追踪链表移除
+  [1] fd_get(fd) → 查当前任务 task->fd_table[fd]
+  [2] kern_resource_untrack(cur_task, (void *)(intptr_t)(fd + 1)) → 从资源追踪链表移除
   [3] fops->release(f) → 设备清理回调
-  [4] memset(f, 0, ...) → 清空槽位
-  [5] return KERN_OK
+  [4] 将 task->fd_table[fd] 置 NULL，释放 file 结构
+  [5] kern_inode_unref(inode) → 递减 inode 引用计数
+  [6] return KERN_OK
 ```
 
-关闭时自动从资源追踪中注销。这意味着即使任务忘记手动 `kern_close()`，`kern_exit()` 时也会通过资源追踪自动回收所有 FD。
+关闭时自动从资源追踪中注销，并递减 inode 引用计数。这意味着即使任务忘记手动 `kern_close()`，`kern_exit()` 时也会通过资源追踪自动回收所有 FD。
+
+### inode 引用计数
+
+*📄 Source: [kern_vfs.c](../../src/kernel/kern_vfs.c#L33-L62)*
+
+v2 为 `kern_inode_t` 新增 `ref_count` 字段，用于跟踪还有多少个 dentry 和打开 FD 指向该 inode：
+
+```c
+typedef struct kern_inode {
+    kern_file_type_t type;           /* 文件类型 */
+    kern_file_ops_t *fops;           /* 文件操作函数表 */
+    void *private_data;              /* 设备/文件系统私有数据 */
+    uint32_t ref_count;              /* 引用计数（dentry + 打开 FD） */
+} kern_inode_t;
+```
+
+生命周期规则：
+
+| 操作 | 引用计数变化 | 说明 |
+|------|-------------|------|
+| `kern_dentry_register()` 挂载 inode | `ref_count++` | dentry 持有一份引用 |
+| `kern_open()` 成功 | `ref_count++` | 打开 FD 持有一份引用 |
+| `kern_close()` | `ref_count--` | FD 释放引用 |
+| `kern_vfs_unlink()` | `ref_count--` | dentry 释放引用 |
+| `ref_count == 0` | 释放 inode | 由 `kern_inode_unref()` 调用 `free(inode)` |
+
+这种设计允许文件仍被打开时被 `unlink()`：dentry 被移除但 inode 不会立即释放，直到最后一个 FD 关闭。`private_data` 由创建者（设备驱动/文件系统）持有，VFS 不负责释放。
+
+#### 测试辅助函数
+
+*📄 Source: [kern_vfs.h](../../src/kernel/kern_vfs.h#L184-L191)*
+
+```c
+#ifdef NATIVE_TEST
+uint32_t kern_vfs_inode_ref_count(const kern_inode_t *inode);
+#endif /* NATIVE_TEST */
+```
+
+`kern_vfs_inode_ref_count()` 仅在 Native 测试环境下暴露，用于验证引用计数在 open/close/unlink 路径中的正确性。
 
 ---
 
@@ -238,7 +290,7 @@ path_walk(root, "/dev/fb0", auto_create=false):
 
 ## 目录项注册 API
 
-*📄 Source: [kern_vfs.h](../../src/kernel/kern_vfs.h#L106-L137)*
+*📄 Source: [kern_vfs.h](../../src/kernel/kern_vfs.h#L99-L138)*
 
 | API | 用途 | 关键行为 |
 |-----|------|----------|

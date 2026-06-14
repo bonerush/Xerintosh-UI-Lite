@@ -14,7 +14,7 @@ App 层是用户应用代码所在。每个 App 在独立子目录中，通过 `
 | 菜单构建 | [app-menu.md](app-menu.md) | `src/app/app_menu.c/h` | Xerintosh UI 菜单树构造 |
 | 输入处理 | [app-input.md](app-input.md) | `src/app/app_input.c/h` | 按键输入路由与状态机调度 |
 | 全局状态 | — | `src/app/app_state.c/h` | 跨模块全局状态（`g_wifi_on`、`g_bt_on`） |
-| UI 公共服务 | [ui-service.md](ui-service.md) | `src/app/ui_service.c/h` | `user_item` 生命周期公共辅助 |
+| UI 公共服务 | [ui-service.md](ui-service.md) | `src/app/ui_service.c/h` | `user_item` 生命周期公共辅助 + 横屏切换 helper |
 | 设置管理 | [settings.md](settings.md) | `src/app/settings/settings.c/h` | 亮度/动画/方向/波特率配置与存储 |
 | 任务管理器 | [taskmgr.md](taskmgr.md) | `src/app/taskmgr/` | 任务查看与终止（动画行列表 + 横屏3行布局） |
 | 串口监视器 | [serial-monitor.md](serial-monitor.md) | `src/app/serial_monitor/` | 串口监视器 App（SER/BLE 双数据源 + 入场滑入动画 + 按钮平滑过渡） |
@@ -29,6 +29,8 @@ App 层是用户应用代码所在。每个 App 在独立子目录中，通过 `
 | 蓝牙 UART | — | `src/app/bluetooth/bt_uart_service.cpp/h` | BT UART 串口服务（SPP） |
 | 串口输入 | — | `src/app/serial_input/serial_input.cpp/h` | 串口 CLI 输入（WiFi/蓝牙密码） |
 | UI 任务 | [ui-task.md](ui-task.md) | `src/app/ui_task.c` | Xerintosh UI 内核任务包装（输入→渲染→yield） |
+| Token Usage | [token-usage.md](token-usage.md) | `src/app/token_usage/` | DeepSeek API Token 用量统计 |
+| 服务管理助手 | [svc-mgr-helper.md](svc-mgr-helper.md) | `src/app/svc_mgr_helper.c/h` | 系统服务懒加载助手（BT enable/disable） |
 | UI 服务 | — | `src/app/ui_service.c/h` | 共享 UI 工具函数 |
 
 ---

@@ -33,9 +33,43 @@
 
 ### app_menu_build()
 
-*📄 Source: [app_menu.c](../../src/app/app_menu.c#L32-L103)*
+*📄 Source: [app_menu.c](../../src/app/app_menu.c#L73-L153)*
 
 构建完整菜单树并挂载到根节点。该函数内部调用 `flasher_menu_init()` 与 `flasher_menu_get_root()` 获取烧录器引脚子菜单。
+
+### app_menu_push_checked()
+
+*📄 Source: [app_menu.c](../../src/app/app_menu.c#L39-L52)*
+
+```c
+static bool app_menu_push_checked(xerintosh_list_item_t *parent,
+                                  xerintosh_list_item_t *child,
+                                  const char *name)
+```
+
+安全挂载子项的 helper：
+
+- 若 `child == NULL`，打印错误日志并返回 `false`
+- 若 `xerintosh_push_item_to_list()` 返回失败，打印错误日志并返回 `false`
+- 否则返回 `true`
+
+phase 2.5 重构新增此 helper，避免菜单构建过程中因某个子项创建失败或挂载失败导致未定义行为，同时也让 `app_menu_build()` 的主流程更简洁。
+
+#### 中文伪代码拆解
+
+```
+函数 安全挂载子项(父项, 子项, 名称) {
+    if (子项 == NULL) {
+        记录错误日志("app_menu: failed to create item 名称")
+        return 失败
+    }
+    if (!挂载子项到父项(父项, 子项)) {
+        记录错误日志("app_menu: failed to push item 名称")
+        return 失败
+    }
+    return 成功
+}
+```
 
 ---
 

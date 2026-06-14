@@ -1,80 +1,85 @@
 # 服务管理助手（Service Manager Helper）
 
-> **Parent:** [App 层索引](index.md) | **Related:** [WiFi 管理器](../../src/app/wifi/wifi_manager.cpp), [蓝牙管理器](../../src/app/bluetooth/bt_manager.cpp)
+> **Parent:** [App 层索引](index.md) | **Related:** [蓝牙管理器](../../src/app/bluetooth/bt_manager.cpp), [串口监视器](serial-monitor.md)
 
 ## 概述
 
-⚠️ **该模块已移除**。原 `svc_mgr_helper.c/h` 中的 `svc_mgr_handle_switch_toggle()` 工具函数已被内联到各管理器中。WiFi 和蓝牙管理器现在各自独立处理开关切换逻辑。
+`svc_mgr_helper` 模块为各 `user_item` App 提供统一的系统服务生命周期管理，避免各 App 直接调用底层 manager 时出现重复代码和生命周期泄漏。phase 2.5 重构后，该模块首先提供蓝牙（BT）懒加载助手：进入 App 时按需启用蓝牙，退出时根据懒加载标志禁用蓝牙。
 
 ---
 
-## 当前实现
+## 核心 API
 
-### WiFi 开关切换
-
-*📄 Source: [wifi_manager.cpp](../../src/app/wifi/wifi_manager.cpp#L288-L296)*
+*📄 Source: [svc_mgr_helper.h](../../src/app/svc_mgr_helper.h#L24-L35)*
 
 ```c
-void wifi_mgr_on_switch_toggle(void *ud) {
-    (void)ud;
-    if (g_wifi_on) {
-        wifi_mgr_enable();
-    } else {
-        wifi_mgr_disable();
-    }
-}
+void svc_mgr_bt_request_enable(bool *lazy_inited);
+void svc_mgr_bt_request_disable(bool *lazy_inited);
 ```
 
-### 蓝牙开关切换
+### svc_mgr_bt_request_enable()
 
-*📄 Source: [bt_manager.cpp](../../src/app/bluetooth/bt_manager.cpp#L235-L242)*
+*📄 Source: [svc_mgr_helper.c](../../src/app/svc_mgr_helper.c#L14-L24)*
+
+请求启用蓝牙并记录懒加载状态：
 
 ```c
-void bt_mgr_on_switch_toggle(void *ud) {
-    (void)ud;
-    if (g_bt_on) {
+void svc_mgr_bt_request_enable(bool *lazy_inited)
+{
+    if (lazy_inited == NULL) return;
+
+    if (!bt_mgr_is_enabled()) {
         bt_mgr_request_enable();
-    } else {
-        bt_mgr_request_disable();
+        *lazy_inited = true;
     }
 }
 ```
+
+| 输入 | 行为 |
+|------|------|
+| `lazy_inited == NULL` | 直接返回，不做任何操作 |
+| 蓝牙已启用 | 不重复请求，`*lazy_inited` 保持原值 |
+| 蓝牙未启用 | 调用 `bt_mgr_request_enable()`，并将 `*lazy_inited` 置为 `true` |
+
+### svc_mgr_bt_request_disable()
+
+*📄 Source: [svc_mgr_helper.c](../../src/app/svc_mgr_helper.c#L26-L36)*
+
+请求禁用蓝牙并清除懒加载状态：
+
+```c
+void svc_mgr_bt_request_disable(bool *lazy_inited)
+{
+    if (lazy_inited == NULL) return;
+
+    if (*lazy_inited && bt_mgr_is_enabled()) {
+        bt_mgr_request_disable();
+        *lazy_inited = false;
+    }
+}
+```
+
+| 输入 | 行为 |
+|------|------|
+| `lazy_inited == NULL` | 直接返回 |
+| `*lazy_inited == false` | 说明不是由本 App 启用的蓝牙，不请求禁用 |
+| `*lazy_inited == true` 且蓝牙仍启用 | 调用 `bt_mgr_request_disable()`，并将 `*lazy_inited` 置为 `false` |
 
 ---
 
 ## 设计说明
 
-各服务管理器直接根据全局开关标志 `g_wifi_on` / `g_bt_on` 调用自身的 enable/disable 函数：
-
-- **WiFi**：`wifi_mgr_enable()` / `wifi_mgr_disable()` 是同步阻塞调用，直接控制 WiFi 状态机
-- **蓝牙**：`bt_mgr_request_enable()` / `bt_mgr_request_disable()` 是异步请求，由 `bt_mgr_update()` 在独立任务循环中处理状态转换
-
-两者均通过 `xerintosh_new_switch_item()` 在 `app_init.c` 中注册为 switch_item 的回调：
-
-*📄 Source: [app_init.c](../../src/app/app_init.c#L163-L164)*
-
-```c
-xerintosh_list_item_t* sw1 = xerintosh_new_switch_item(
-    "WiFi", &g_wifi_on, NULL, wifi_mgr_on_switch_toggle, default_icon);
-```
-
-*📄 Source: [app_init.c](../../src/app/app_init.c#L345-L356)*
-
-```c
-void app_init_managers(void)
-{
-    bt_mgr_init();
-    wifi_mgr_init();
-    power_key_popup_init();
-
-    /* BT 初始化已移至 deferred_kernel_init()（内核任务 spawn 之后），
-       避免在 setup() 中过早消耗内存导致 FreeRTOS 任务创建失败。 */
-    if (g_wifi_on) wifi_mgr_enable();
-}
-```
-
-注意：`app_init_managers()` 中不再在初始化时自动启用蓝牙（`g_bt_on` 不触发 `bt_mgr_enable()`），因为蓝牙初始化已延迟到 `deferred_kernel_init()` 中执行。
+- **懒加载标志**：每个使用蓝牙的 `user_item` 需要维护自己的 `bool g_bt_lazy_inited` 静态变量，在 `init()` 中传入 `&g_bt_lazy_inited`
+- **生命周期对称**：`request_enable()` 在 App 进入时调用，`request_disable()` 在 App 退出时调用，确保不会泄漏蓝牙功耗
+- **不越权关闭**：只有被本 App 懒加载启用的蓝牙才会在退出时请求禁用，避免影响其他已经启用蓝牙的模块
 
 ---
 
-> **See Also:** [App 层索引](index.md) | [应用初始化](app-init.md)
+## 历史
+
+- phase 2.4 之前：`svc_mgr_helper.c/h` 中的 `svc_mgr_handle_switch_toggle()` 已被内联到各管理器
+- phase 2.5：模块重新创建，职责改为 `user_item` 系统服务懒加载助手
+
+---
+
+> **See Also:** [App 层索引](index.md) | [应用初始化](app-init.md) | [串口监视器](serial-monitor.md)

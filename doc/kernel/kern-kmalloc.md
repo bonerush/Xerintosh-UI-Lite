@@ -226,6 +226,61 @@ kern_krealloc(ptr, new_size)
 
 **关键安全设计**：当 `realloc()` 失败时，旧内存块仍然有效。代码会**重新追踪**旧块的 `(owner, ptr)` 关系到资源追踪系统，确保不会因为 untrack 后就丢失了追踪信息。这保证了失败路径下的状态一致性。
 
+### kern_kmalloc_for_task — 为指定任务分配并追踪
+
+*📄 Source: [kern_kmalloc.c](../../src/kernel/kern_kmalloc.c#L88-L92)*
+
+```c
+void *kern_kmalloc_for_task(kern_task_t *task, size_t size)
+{
+    if (task == NULL) return NULL;
+    return kern_kmalloc_impl(size, task, true);
+}
+```
+
+与 `kern_kmalloc()` 的区别在于：分配块的 `owner` 字段被设为传入的 `task`，而不是当前任务。典型用途是在**目标任务尚未开始运行前**就为其分配栈内存，使栈能被目标任务的资源链表正确追踪。
+
+*📄 调用点: [kern_task_stack.c](../../src/kernel/kern_task_stack.c#L28)*
+
+```c
+task->stack_base = (uint8_t *)kern_kmalloc_for_task(task, stack_size);
+```
+
+### kern_kmalloc_untracked / kern_kfree_untracked — 不进入资源追踪
+
+*📄 Source: [kern_kmalloc.c](../../src/kernel/kern_kmalloc.c#L94-L97) / [L129-L137](../../src/kernel/kern_kmalloc.c#L129-L137)*
+
+```c
+void *kern_kmalloc_untracked(size_t size)
+{
+    return kern_kmalloc_impl(size, NULL, false);
+}
+
+void kern_kfree_untracked(void *ptr)
+{
+    if (ptr == NULL) return;
+
+    kmalloc_header_t *hdr = get_header(ptr);
+    if (hdr == NULL) return;
+
+    free(hdr);
+}
+```
+
+`untracked` 分配块仍然带有 `kmalloc_header_t`（便于与标准 `free` 兼容），但 `owner = NULL` 且**不进入任何任务的资源追踪链表**。适用场景：
+
+| 场景 | 原因 |
+|------|------|
+| 资源追踪节点自身 | `kern_resource_t` 若用 `kern_kmalloc()` 分配，会形成"追踪节点追踪自己"的递归依赖 |
+| 全局/静态生命周期对象 | 对象生命周期不绑定任何任务 |
+| 内核启动早期 | 当前任务尚未建立，无法追踪 |
+
+*📄 调用点: [kern_resource.c](../../src/kernel/kern_resource.c#L36)*
+
+```c
+kern_resource_t *res = (kern_resource_t *)kern_kmalloc_untracked(sizeof(kern_resource_t));
+```
+
 ---
 
 ## 完整分配→追踪→回收链路

@@ -47,7 +47,7 @@
 
 ### 双缓冲架构（真机）
 
-*📄 Source: [hal_display_fb.cpp](../../src/hal/hal_display_fb.cpp#L76-L106)*
+*📄 Source: [hal_display_fb.cpp](../../src/hal/hal_display_fb.cpp#L84-L105)*
 
 ```c
 M5Canvas* g_canvas = nullptr;       /* 离屏画布 */

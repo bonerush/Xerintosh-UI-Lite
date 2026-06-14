@@ -60,7 +60,11 @@ typedef struct kern_task {
     struct kern_task   *next;                   /* 下一个任务 */
 
     /* 资源追踪（v2 新增） */
+    volatile bool resource_lock;                 /* 保护 resource_head 的自旋锁 */
     struct kern_resource *resource_head;        /* 持有的资源链表头 */
+
+    /* 文件描述符表（v2 新增） */
+    kern_file_t *fd_table[KERN_MAX_FD_PER_TASK]; /* 每任务独立的 FD 命名空间 */
 
     /* MPU 内存保护（v2 新增） */
     kern_mpu_config_t  *mpu_config;             /* 每任务 MPU 配置（可为 NULL） */
@@ -108,7 +112,9 @@ typedef struct kern_task {
 | `mpu_config` | `kern_mpu_config_t*` | `NULL` | 每任务的 MPU 区域配置。上下文切换时 `kern_mpu_apply()` 加载此配置 |
 | `priority` | `uint8_t` | `128`（`kern_spawn` 中硬编码） | 优先级 0-255。RR 不使用此字段，FIFO 按优先级排序 |
 | `timeslice_remaining` | `uint8_t` | `SCHED_RR_DEFAULT_TIMESLICE` (10) | RR 时间片剩余 tick。每次 `sched_rr_tick()` 递减，归零时标记 `g_need_resched` |
-| `scheduler_class_id` | `int8_t` | `0`（`calloc` 默认，未显式初始化） | 指向 `g_sched_classes[]` 索引。当前代码中未在 `kern_spawn()` 中显式设置，依赖 `calloc` 清零 |
+| `scheduler_class_id` | `int8_t` | `-1` → `KERN_SCHED_CLASS_RR_ID` (0) | `kern_spawn()` 先初始化为 `-1`，随后默认加入 RR 调度类并同步为 `0`；调度类 `enqueue/dequeue` 负责维护此字段 |
+| `resource_lock` | `volatile bool` | `false` | 保护 `resource_head` 链表的布尔自旋锁，避免 SMP 下并发修改资源链表 |
+| `fd_table[]` | `kern_file_t*[KERN_MAX_FD_PER_TASK]` | 全 `NULL` | 每任务独立的文件描述符表，VFS `open/close/read/write` 只操作当前任务的 FD 槽位 |
 
 ### 调度循环与 pick_next_ready
 
@@ -204,8 +210,10 @@ if (g_current_task != NULL && g_current_task != g_idle_task
        ├→ 分配 TCB（calloc，所有字段默认清零）
        ├→ 设置 priority = 128（默认值）
        ├→ 设置 timeslice_remaining = SCHED_RR_DEFAULT_TIMESLICE
+       ├→ 设置 scheduler_class_id = -1（未分配），随后默认加入 RR 类并同步为 KERN_SCHED_CLASS_RR_ID
        ├→ 设置 cpu_id = KERN_CPU_ANY（自动分配；SMP 模式下调用 kern_smp_migrate_assign()）
        ├→ PID 递增分配
+       ├→ 初始化 fd_table[KERN_MAX_FD_PER_TASK] 为全 NULL
        ├→ 创建底层上下文（FreeRTOS线程 / ucontext / setjmp栈）
        ├→ 插入 g_task_list 链表尾部
        ├→ 调用 kern_mpu_setup_stack_guard() 配置栈守卫（Native 后端）
@@ -233,6 +241,7 @@ if (g_current_task != NULL && g_current_task != g_idle_task
 5. EXIT 阶段
    └→ 任务调用 kern_exit()
        ├→ kern_resource_release_all(cur)  ← v2 新增：自动释放当前任务的所有追踪资源
+       ├→ stack_base = NULL                 ← 标记栈已释放，防止后续栈使用率查询踩空指针
        ├→ 状态设为 ZOMBIE
        └→ reap_zombies() 在下次 tick 中释放 TCB 和栈内存
 ```
@@ -271,11 +280,11 @@ kern_task_unregister_virtual(pid);
 
 ## 与其他组件的关系
 
-- **kern_sched_class**：`scheduler_class_id` 字段预留用于指向所属调度类，但当前 `kern_spawn()` 中未显式初始化（依赖 `calloc` 清零为 0）。任务直接插入全局 `g_task_list` 链表，未通过 `class->enqueue()` 注册
+- **kern_sched_class**：`scheduler_class_id` 在 `kern_spawn()` 中先初始化为 `-1`，随后默认设为 `KERN_SCHED_CLASS_RR_ID`；调度类的 `enqueue()` / `dequeue()` 在维护任务链表时同步更新此字段
 - **kern_smp**：`cpu_id` 决定任务运行在哪个 CPU，`KERN_CPU_ANY` 表示由 `kern_smp_migrate_assign()` 自动分配（SMP 模式下分配到任务数较少的核心）
 - **kern_mpu**：`mpu_config` 在上下文切换时由 `kern_mpu_apply()` 加载（当前为框架实现，尚未写入实际硬件寄存器）
-- **kern_resource**：`resource_head` 在任务退出时自动遍历释放
-- **kern_vfs**：VFS 使用全局 `g_fd_table[]` 管理文件描述符，任务退出时由 `kern_resource_release_all()` 自动关闭关联的 FD
+- **kern_resource**：`resource_head` 在任务退出时自动遍历释放；`resource_lock` 保护链表操作，避免 SMP 下并发冲突
+- **kern_vfs**：文件描述符表已迁移到 TCB 中（`fd_table[KERN_MAX_FD_PER_TASK]`），每个任务拥有独立的 FD 命名空间；任务退出时 `kern_resource_release_all()` 自动关闭关联的 FD
 - **kern_procfs**：`/proc/tasks` 遍历调度器链表显示任务信息
 
 ---

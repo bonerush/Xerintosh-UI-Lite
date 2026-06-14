@@ -10,12 +10,15 @@
 
 ## 核心 API
 
-*📄 Source: [ui_service.h](../../src/app/ui_service.h#L24-L42)*
+*📄 Source: [ui_service.h](../../src/app/ui_service.h#L24-L50)*
 
 ```c
 void ui_service_user_item_init(void);
 bool ui_service_user_item_loop(hal_event_t event_b);
 void ui_service_user_item_exit(void);
+
+void ui_service_enter_landscape(void);
+void ui_service_exit_landscape(void);
 ```
 
 ### ui_service_user_item_init()
@@ -29,6 +32,24 @@ void ui_service_user_item_exit(void);
 ### ui_service_user_item_exit()
 
 退出 `user_item` 时调用，重置按键事件，避免退出后的残留事件影响菜单导航。
+
+### ui_service_enter_landscape()
+
+*📄 Source: [ui_service.c](../../src/app/ui_service.c#L35-L52)*
+
+进入全屏 App 前临时切换到横屏。该函数会：
+
+1. 保存进入前的屏幕方向到内部静态变量 `s_prev_landscape`
+2. 若当前不是横屏，则设置 `g_is_landscape = true`、`g_screen_rotation_level = ORIENTATION_LANDSCAPE`
+3. 调用 `hal_display_set_rotation(1)` 并重新初始化显示
+
+适用于需要在横屏下渲染的 `user_item`（如 `taskmgr` 三行布局、串口监视器宽屏终端）。
+
+### ui_service_exit_landscape()
+
+*📄 Source: [ui_service.c](../../src/app/ui_service.c#L54-L70)*
+
+退出全屏 App 时恢复之前保存的屏幕方向。仅当进入前不是横屏时才会切回竖屏，避免不必要的显示重初始化。
 
 ---
 

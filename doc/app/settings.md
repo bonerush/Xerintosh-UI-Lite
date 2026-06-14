@@ -80,9 +80,25 @@ int16_t g_serial_baud_rate       = 5;                        /* 默认波特率�
 |------|------|
 | `settings_get_brightness()` / `settings_set_brightness(level)` | 亮度档位 1-10 |
 | `settings_get_anim_speed()` / `settings_set_anim_speed(level)` | 动画速度档位 1-10 |
-| `settings_get_rotation()` / `settings_set_rotation(level)` | 屏幕方向 1=竖屏, 2=横屏 |
+| `settings_get_rotation()` / `settings_set_rotation(level)` | 屏幕方向 1=竖屏, 2=横屏；非法值回退到横屏 |
 | `settings_get_landscape()` / `settings_set_landscape(landscape)` | 横屏布尔开关 |
 | `settings_get_baud_rate()` / `settings_set_baud_rate(level)` | 波特率档位 1-6 |
+
+### 屏幕方向输入校验
+
+*📄 Source: [settings.c](../../src/app/settings/settings.c#L97-L103)*
+
+```c
+void settings_set_rotation(int16_t level) {
+    if (level != ORIENTATION_PORTRAIT && level != ORIENTATION_LANDSCAPE) {
+        level = ORIENTATION_LANDSCAPE;
+    }
+    g_screen_rotation_level = level;
+    g_is_landscape = (level == ORIENTATION_LANDSCAPE);
+}
+```
+
+`settings_set_rotation()` 现在对输入做严格校验：只有 `ORIENTATION_PORTRAIT`（1）或 `ORIENTATION_LANDSCAPE`（2）被接受，任何非法值都会回退到默认横屏，并同步更新 `g_is_landscape`。
 
 ### 从存储加载
 

@@ -58,11 +58,11 @@ struct kern_device {
 
 ```c
 typedef struct kern_device_ops {
-    int  (*open)(kern_device_t *dev, int flags);
-    int  (*close)(kern_device_t *dev);
-    int  (*read)(kern_device_t *dev, void *buf, size_t len, size_t *offset);
-    int  (*write)(kern_device_t *dev, const void *buf, size_t len, size_t *offset);
-    int  (*ioctl)(kern_device_t *dev, unsigned int cmd, unsigned long arg);
+    kern_err_t  (*open)(kern_device_t *dev, int flags);
+    kern_err_t  (*close)(kern_device_t *dev);
+    kern_err_t  (*read)(kern_device_t *dev, void *buf, size_t len, size_t *offset);
+    kern_err_t  (*write)(kern_device_t *dev, const void *buf, size_t len, size_t *offset);
+    kern_err_t  (*ioctl)(kern_device_t *dev, unsigned int cmd, unsigned long arg);
 } kern_device_ops_t;
 ```
 
@@ -73,6 +73,7 @@ typedef struct kern_device_ops {
 | 第一参数 | `kern_file_t *f` | `kern_device_t *dev` |
 | 关闭回调名 | `release` | `close` |
 | read/write 偏移量 | 通过 `f->f_pos` 隐式传递 | 通过 `size_t *offset` 显式传递 |
+| 返回类型 | `int` / `ssize_t` | `kern_err_t` |
 | 关注点 | VFS 文件系统语义 | 设备硬件操作语义 |
 
 这种解耦使设备驱动无需了解 VFS 内部结构（如 `kern_file_t` 的布局），只需关注设备本身。
@@ -96,7 +97,7 @@ static kern_device_t *g_device_list = NULL;   /* 单链表头指针 */
 *📄 Source: [kern_device.c](../../src/kernel/kern_device.c#L21-L59)*
 
 ```c
-int kern_device_register(kern_device_t *dev)
+kern_err_t kern_device_register(kern_device_t *dev)
 {
     // 校验：dev 非空，名称非空
     // 去重：若同名设备已存在 → KERN_EEXIST
@@ -263,9 +264,9 @@ kern_dev_register("pwrkey", &pwrkey_fops, KERN_FILE_CHRDEV, NULL);
 ```c
 // 新版：实现 kern_device_ops_t（设备语义）
 static kern_device_ops_t g_pwrkey_ops = {
-    .open  = pwrkey_open,     // 签名: int (*)(kern_device_t*, int)
-    .close = pwrkey_close,    // 签名: int (*)(kern_device_t*)
-    .read  = pwrkey_read,     // 签名: int (*)(kern_device_t*, void*, size_t, size_t*)
+    .open  = pwrkey_open,     // 签名: kern_err_t (*)(kern_device_t*, int)
+    .close = pwrkey_close,    // 签名: kern_err_t (*)(kern_device_t*)
+    .read  = pwrkey_read,     // 签名: kern_err_t (*)(kern_device_t*, void*, size_t, size_t*)
     .write = pwrkey_write,    // 只需关注设备本身，无需了解 VFS
     .ioctl = pwrkey_ioctl,
 };
@@ -287,7 +288,7 @@ kern_devfs_register_device(&g_pwrkey_dev);
 *📄 Source: [dev_pwrkey.c](../../src/kernel/devices/dev_pwrkey.c#L18-L70)*
 
 ```c
-static int pwrkey_read(kern_device_t *dev, void *buf, size_t len, size_t *offset)
+static kern_err_t pwrkey_read(kern_device_t *dev, void *buf, size_t len, size_t *offset)
 {
     if (len < DEV_PWRKEY_EVENT_SIZE) return KERN_EINVAL;
 
@@ -318,7 +319,7 @@ static int pwrkey_read(kern_device_t *dev, void *buf, size_t len, size_t *offset
 用户任务:
   kern_read(fd, buf, 9)
     │
-    ├─ fd_get(fd) → 查 g_fd_table 获取 kern_file_t*
+    ├─ fd_get(fd) → 查当前任务 task->fd_table[fd] 获取 kern_file_t*
     │
     ├─ f->fops->read(f, buf, 9)
     │      │
