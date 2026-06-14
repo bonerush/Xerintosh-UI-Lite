@@ -66,7 +66,7 @@ static bool app_menu_push_checked(xerintosh_list_item_t *parent,
  *        │   └── 波特率（子菜单）
  *        ├── 任务管理器（user_item）
  *        ├── 串口监视器（user_item）
- *        ├── Token Usage（user_item）
+ *        ├── Token 消耗（user_item）
  *        ├── 烧录器（user_item）
  *        └── 关于（user_item）
  */
@@ -84,7 +84,7 @@ void app_menu_build(void)
     xerintosh_list_item_t* item3 = xerintosh_new_user_item(
         "串口监视器", serial_monitor_init, serial_monitor_loop, serial_monitor_exit, default_icon);
     xerintosh_list_item_t* tu_item = xerintosh_new_user_item(
-        "Token Usage", token_usage_init, token_usage_loop, token_usage_exit, default_icon);
+        "Token 消耗", token_usage_init, token_usage_loop, token_usage_exit, default_icon);
     xerintosh_list_item_t* flasher_item = xerintosh_new_user_item(
         "烧录器", flasher_init, flasher_loop, flasher_exit, default_icon);
     xerintosh_list_item_t* item4 = xerintosh_new_user_item(
@@ -137,7 +137,7 @@ void app_menu_build(void)
     app_menu_push_checked(root, item1, "设置");
     app_menu_push_checked(root, item2, "任务管理器");
     app_menu_push_checked(root, item3, "串口监视器");
-    app_menu_push_checked(root, tu_item, "Token Usage");
+    app_menu_push_checked(root, tu_item, "Token 消耗");
     app_menu_push_checked(root, flasher_item, "烧录器");
     app_menu_push_checked(root, item4, "关于");  /* 关于（永远最后） */
 

@@ -4,7 +4,7 @@
  * @details 以 user_item 形式运行的任务管理器，显示所有内核任务
  *          （包括虚任务），支持选择并终止非系统关键任务。
  *
- *          保护链：idle / shell / ui / taskmgr / 任务管理器 不可终止。
+ *          保护链：idle / shell / ui / taskmgr / Task Manager 不可终止。
  *          终止前显示框架 pop_up 确认提示。
  *
  *          架构参考 serial_monitor：init/loop/draw 三层分离。
@@ -63,7 +63,13 @@ static void taskmgr_refresh_list(void)
     g_tm.count = 0;
     kern_task_t *t = kern_task_list_head();
     while (t != NULL && g_tm.count < KERN_MAX_TASKS) {
+        /* 跳过已消亡的真实任务 */
         if (t->state == KERN_TASK_ZOMBIE && !(t->flags & KERN_TASK_FLAG_VIRTUAL)) {
+            t = t->next;
+            continue;
+        }
+        /* 跳过虚任务（UI App），避免退出时访问已释放的自身虚任务指针 */
+        if (t->flags & KERN_TASK_FLAG_VIRTUAL) {
             t = t->next;
             continue;
         }

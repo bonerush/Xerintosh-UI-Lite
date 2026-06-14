@@ -15,7 +15,10 @@
 #include "hal/hal_display.h"
 #include "hal/hal_layout.h"
 #include "ui/ui_anim_row.h"
+#include "ui/ui_drawer.h"
+#include "hal/hal_system.h"
 #include <stdio.h>
+#include <string.h>
 
 /* ═══ 布局常量（对齐框架 ui_item.h 规范）═══ */
 
@@ -36,6 +39,26 @@ static const char *state_str(kern_task_state_t state)
 }
 
 /**
+ * @brief 将字节数格式化为紧凑的 B/K/M 单位字符串
+ */
+static void format_size(size_t bytes, char *buf, size_t size)
+{
+    if (buf == NULL || size == 0) return;
+
+    if (bytes < 1024) {
+        snprintf(buf, size, "%zuB", bytes);
+    } else if (bytes < 1024 * 1024) {
+        size_t kb = bytes / 1024;
+        size_t frac = (bytes % 1024) * 10 / 1024;
+        snprintf(buf, size, "%zu.%zuK", kb, frac);
+    } else {
+        size_t mb = bytes / (1024 * 1024);
+        size_t frac = (bytes % (1024 * 1024)) * 10 / (1024 * 1024);
+        snprintf(buf, size, "%zu.%zuM", mb, frac);
+    }
+}
+
+/**
  * @brief 格式化为单行显示字符串
  */
 static void format_line(kern_task_t *task, char *buf, size_t size)
@@ -44,16 +67,18 @@ static void format_line(kern_task_t *task, char *buf, size_t size)
 
     bool is_prot = kern_task_is_protected(task);
     const char *mark = is_prot ? "*" : " ";
+    char size_str[16];
 
     if (task->flags & KERN_TASK_FLAG_VIRTUAL) {
         snprintf(buf, size, "%s%2d %-12s %s  n/a",
                  mark, task->pid, task->name,
                  state_str(task->state));
     } else {
-        snprintf(buf, size, "%s%2d %-12s %s  %zu",
+        format_size(kern_task_stack_usage(task), size_str, sizeof(size_str));
+        snprintf(buf, size, "%s%2d %-12s %s  %s",
                  mark, task->pid, task->name,
                  state_str(task->state),
-                 kern_task_stack_usage(task));
+                 size_str);
     }
 }
 
@@ -159,8 +184,49 @@ static void draw_confirm_overlay(void)
                     "A=Yes  B=No", COLOR_FG);
 }
 
+/* ═══ 底部信息栏跑马灯状态 ═══ */
+
+static char     s_footer_info[64];
+static int16_t  s_footer_text_width;
+static int16_t  s_footer_avail_width;
+static bool     s_footer_is_scrolling;
+static uint32_t s_footer_scroll_start_ms;
+
+/**
+ * @brief 更新底部信息栏文本与滚动状态
+ * @note  当文本宽度超过可用宽度时启用跑马灯滚动。
+ */
+static void update_footer_info(kern_task_t *t, bool is_prot)
+{
+    if (t->flags & KERN_TASK_FLAG_VIRTUAL) {
+        snprintf(s_footer_info, sizeof(s_footer_info), "PID:%d [V] %s",
+                 t->pid, is_prot ? "PROTECTED" : "killable");
+    } else {
+        char used_str[16];
+        char total_str[16];
+        format_size(kern_task_stack_usage(t), used_str, sizeof(used_str));
+        format_size(t->stack_size, total_str, sizeof(total_str));
+        snprintf(s_footer_info, sizeof(s_footer_info), "PID:%d %s  stk:%s/%s  %s",
+                 t->pid, t->name,
+                 used_str, total_str,
+                 is_prot ? "PROTECTED" : "killable");
+    }
+
+    s_footer_text_width = hal_get_string_width(s_footer_info);
+    s_footer_avail_width = SCREEN_WIDTH - TASKMGR_LEFT_MARGIN - HAL_MARGIN_MD;
+
+    bool need_scroll = (s_footer_text_width > s_footer_avail_width);
+    if (need_scroll && !s_footer_is_scrolling) {
+        s_footer_is_scrolling = true;
+        s_footer_scroll_start_ms = hal_get_ticks();
+    } else if (!need_scroll) {
+        s_footer_is_scrolling = false;
+    }
+}
+
 /**
  * @brief 绘制底部信息栏
+ * @note  信息过长时采用与菜单项相同的无缝循环跑马灯效果。
  */
 static void draw_footer(void)
 {
@@ -176,19 +242,32 @@ static void draw_footer(void)
     hal_draw_line(0, sep_y, SCREEN_WIDTH, sep_y, COLOR_FG);
 
     bool is_prot = taskmgr_is_task_protected(selected);
-    char info[64];
+    update_footer_info(t, is_prot);
 
-    if (t->flags & KERN_TASK_FLAG_VIRTUAL) {
-        snprintf(info, sizeof(info), "PID:%d [V] %s",
-                 t->pid, is_prot ? "PROTECTED" : "killable");
-    } else {
-        snprintf(info, sizeof(info), "PID:%d %s  stk:%zu/%zu  %s",
-                 t->pid, t->name,
-                 kern_task_stack_usage(t), t->stack_size,
-                 is_prot ? "PROTECTED" : "killable");
-    }
     int16_t text_y = HAL_FOOTER_BOTTOM() - HAL_MARGIN_SM;  /* 底部留边距 */
-    hal_draw_string(TASKMGR_LEFT_MARGIN, text_y, info, COLOR_FG);
+    float scroll_x = 0.0f;
+
+    if (s_footer_is_scrolling) {
+        uint32_t elapsed = hal_get_ticks() - s_footer_scroll_start_ms;
+        scroll_x = xerintosh_compute_scroll_offset(s_footer_text_width,
+                                                   s_footer_avail_width,
+                                                   true, elapsed);
+    }
+
+    /* 设置裁剪区域，限制文字只在 footer 行内显示 */
+    int16_t clip_y = HAL_FOOTER_TOP();
+    hal_set_clip_rect(0, clip_y, SCREEN_WIDTH, HAL_ROW_H());
+
+    int16_t draw_x = TASKMGR_LEFT_MARGIN - (int16_t)scroll_x;
+    int16_t cycle_dist = s_footer_text_width + s_footer_avail_width;
+
+    /* 绘制两份文字形成无缝循环 */
+    hal_draw_string(draw_x, text_y, s_footer_info, COLOR_FG);
+    if (s_footer_is_scrolling) {
+        hal_draw_string(draw_x + cycle_dist, text_y, s_footer_info, COLOR_FG);
+    }
+
+    hal_clear_clip_rect();
 }
 
 /* ═══ 入口 ═══ */
