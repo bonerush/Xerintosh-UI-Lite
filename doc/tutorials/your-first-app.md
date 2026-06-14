@@ -28,7 +28,7 @@
 ```
 ┌─────────────────────────────────────────┐
 │  第 3 层：App 层（你写代码的地方）        │
-│  my_app.c / app_init.c / settings.c     │
+│  my_app.c / app_menu.c / settings.c     │
 │  职责：定义菜单树、实现业务逻辑           │
 ├─────────────────────────────────────────┤
 │  第 2 层：UI Core 层（框架核心）          │
@@ -120,6 +120,7 @@ void my_stopwatch_exit(void *user_data);
 #include "hal/hal_system.h"
 #include "hal/hal_input.h"
 #include "ui/ui_item.h"
+#include "app/ui_service.h"
 #include <stdio.h>
 
 /* ═══ 状态变量 ═══ */
@@ -136,7 +137,7 @@ void my_stopwatch_init(void *user_data)
     g_start_ms = 0;
     g_running = false;
     g_elapsed_at_pause = 0;
-    hal_input_reset_events();  /* ★ 必须：清除进入前的残留按键事件 */
+    ui_service_user_item_init();  /* ★ 必须：清除进入前的残留按键事件 */
 }
 
 void my_stopwatch_loop(void *user_data)
@@ -182,7 +183,7 @@ void my_stopwatch_loop(void *user_data)
     hal_event_t ev_a = hal_input_get_event(HAL_BTN_A);
 
     /* ── 6. ★ 标准退出检查（必须在所有 App 输入处理之后）── */
-    if (ui_user_item_try_exit(ev_b)) return;
+    if (ui_service_user_item_loop(ev_b)) return;
 
     if (ev_b == HAL_EVENT_SHORT_PRESS) {
         if (!g_running) {
@@ -210,15 +211,15 @@ void my_stopwatch_exit(void *user_data)
     g_running = false;
     g_start_ms = 0;
     g_elapsed_at_pause = 0;
-    hal_input_reset_events();  /* ★ 必须：清除退出时的残留事件 */
+    ui_service_user_item_exit();  /* ★ 必须：清除退出时的残留事件 */
 }
 ```
 
 **注意**：
 - 框架在调用 `loop()` **之前**已经执行了 `hal_display_clear()`，所以你**不需要**在 `loop()` 中手动清屏
 - 回调函数必须带有 `void *user_data` 参数（框架会传入 `item->user_data`）
-- `hal_input_reset_events()` 在 `init()` 和 `exit()` 中必须调用，否则残留按键会导致意外行为
-- `ui_user_item_try_exit(ev_b)` 是标准退出检查，缺少它用户将无法退出 App
+- `ui_service_user_item_init()` 在 `init()` 中调用，`ui_service_user_item_exit()` 在 `exit()` 中调用，否则残留按键会导致意外行为
+- `ui_service_user_item_loop(ev_b)` 是标准退出检查，缺少它用户将无法退出 App
 
 ### 中文伪代码拆解
 
@@ -263,7 +264,7 @@ void my_stopwatch_exit(void *user_data)
     A键事件 = 获取按键事件(A键)
 
     // 第六步：标准退出检查
-    if (尝试退出(B键事件)) return
+    if (ui_service_user_item_loop(B键事件)) return
 
     if (B键短按) {
         if (没在运行) { 开始计时 }
@@ -279,7 +280,7 @@ void my_stopwatch_exit(void *user_data)
     正在运行 = false
     起始毫秒 = 0
     累计毫秒 = 0
-    清除按键残留事件()
+    ui_service_user_item_exit()
 }
 ```
 
@@ -293,7 +294,7 @@ void my_stopwatch_exit(void *user_data)
 
 ### 3.1 包含头文件
 
-打开 `src/app/app_init.c`，在顶部添加你的头文件：
+打开 `src/app/app_menu.c`，在顶部添加你的头文件：
 
 ```c
 #include "my_stopwatch.h"
@@ -301,12 +302,12 @@ void my_stopwatch_exit(void *user_data)
 
 ### 3.2 在菜单树中创建入口
 
-在 `app_init_ui()` 函数中，添加以下代码：
+在 `app_menu_build()` 函数中，添加以下代码：
 
-*📄 Source: [app_init.c](../../src/app/app_init.c#L147-L232)*
+*📄 Source: [app_menu.c](../../src/app/app_menu.c#L32-L103)*
 
 ```c
-void app_init_ui(void)
+void app_menu_build(void)
 {
     xerintosh_list_item_t* root = xerintosh_get_root_list();
 

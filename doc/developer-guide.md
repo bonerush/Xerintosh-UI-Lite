@@ -273,6 +273,7 @@ xerintosh_list_item_t* app = xerintosh_new_user_item(
 #include "hal/hal_system.h"
 #include "hal/hal_input.h"
 #include "ui/ui_item.h"
+#include "app/ui_service.h"
 #include <stdio.h>   /* for snprintf */
 
 static uint32_t start_time = 0;
@@ -281,7 +282,7 @@ void my_app_init(void *user_data)
 {
     (void)user_data;
     // 一次性初始化：分配资源、重置状态
-    hal_input_reset_events();  // ★ 必须：清除进入前的残留按键事件
+    ui_service_user_item_init();  // ★ 必须：清除进入前的残留按键事件
     start_time = hal_get_ticks();
 }
 
@@ -305,14 +306,14 @@ void my_app_loop(void *user_data)
 
     // ★ 标准退出检查（必须在所有 App 输入处理之后）
     hal_event_t event_b = hal_input_get_event(HAL_BTN_B);
-    if (ui_user_item_try_exit(event_b)) return;
+    if (ui_service_user_item_loop(event_b)) return;
 }
 
 void my_app_exit(void *user_data)
 {
     (void)user_data;
     // 清理资源：释放内存、关闭外设、保存状态等
-    hal_input_reset_events();  // ★ 必须：清除退出时的残留事件
+    ui_service_user_item_exit();  // ★ 必须：清除退出时的残留事件
     start_time = 0;
 }
 ```
@@ -357,16 +358,16 @@ void my_game_loop(void *user_data)
 ```
 
 **注意**：
-- `app_init.c` 的 `app_input_process()` 在每帧运行时会先调用 `hal_input_update()`，但若处于 `user_item` 内部会立即返回，不处理框架导航
-- 如果你需要完全接管按键（例如 A 键在游戏中也有用），建议在 `init_function` 中设置一个全局标志，在 `app_init.c` 的 `app_input_process()` 中判断该标志以跳过框架导航
+- `app_input.c` 的 `app_input_process()` 在每帧运行时会先调用 `hal_input_update()`，但若处于 `user_item` 内部会立即返回，不处理框架导航
+- 如果你需要完全接管按键（例如 A 键在游戏中也有用），建议在 `init_function` 中设置一个全局标志，在 `app_input.c` 的 `app_input_process()` 中判断该标志以跳过框架导航
 
 ---
 
 ## 5. 输入交互映射
 
-框架默认的按键映射（定义在 `app_init.c` 的 `app_input_process()`）：
+框架默认的按键映射（定义在 `app_input.c` 的 `app_input_process()`）：
 
-*📄 Source: [app_init.c](../src/app/app_init.c#L469-L494)*
+*📄 Source: [app_input.c](../src/app/app_input.c#L33-L90)*
 
 | 按键 | 短按 | 长按 |
 |------|------|------|
@@ -383,7 +384,7 @@ void my_game_loop(void *user_data)
 
 ### 5.2 修改按键映射
 
-如果你希望自定义按键行为（例如交换 A/B 功能），修改 `app_init.c` 中的 `app_input_process()`：
+如果你希望自定义按键行为（例如交换 A/B 功能），修改 `app_input.c` 中的 `app_input_process()`：
 
 ```c
 void app_input_process(void)
@@ -483,7 +484,7 @@ void app_clock_exit(void *user_data)
 }
 ```
 
-然后在 `app_init.c` 中挂载：
+然后在 `app_menu.c` 中挂载：
 
 ```c
 #include "app_clock.h"
@@ -521,6 +522,7 @@ void app_init_ui(void)
 
 ```cpp
 #include "ui/ui_item.h"
+#include "app/ui_service.h"
 
 // ========== 状态变量 ==========
 static bool wifi_on     = false;
@@ -541,7 +543,7 @@ static void on_factory_reset(void *user_data)
 static void sensor_app_init(void *user_data)
 {
     (void)user_data;
-    hal_input_reset_events();
+    ui_service_user_item_init();
     // 初始化传感器
 }
 
@@ -552,13 +554,13 @@ static void sensor_app_loop(void *user_data)
     // ... 读取并显示传感器数据
 
     hal_event_t ev_b = hal_input_get_event(HAL_BTN_B);
-    if (ui_user_item_try_exit(ev_b)) return;
+    if (ui_service_user_item_loop(ev_b)) return;
 }
 
 static void sensor_app_exit(void *user_data)
 {
     (void)user_data;
-    hal_input_reset_events();
+    ui_service_user_item_exit();
     // 关闭传感器
 }
 
@@ -588,6 +590,8 @@ void build_main_menu(void)
     xerintosh_push_item_to_list(root, about);
 }
 ```
+
+*📄 Source: [app_menu.c](../../src/app/app_menu.c#L32-L103)*
 
 ---
 

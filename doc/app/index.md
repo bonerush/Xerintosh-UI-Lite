@@ -10,7 +10,11 @@ App 层是用户应用代码所在。每个 App 在独立子目录中，通过 `
 
 | 模块 | 文档 | 源码 | 说明 |
 |------|------|------|------|
-| 应用初始化 | [app-init.md](app-init.md) | `src/app/app_init.c/h` | 菜单树构建、管理器初始化、按键映射 |
+| 应用初始化 | [app-init.md](app-init.md) | `src/app/app_init.c/h` | 入口封装，委托菜单构建、输入处理与管理器初始化 |
+| 菜单构建 | [app-menu.md](app-menu.md) | `src/app/app_menu.c/h` | Xerintosh UI 菜单树构造 |
+| 输入处理 | [app-input.md](app-input.md) | `src/app/app_input.c/h` | 按键输入路由与状态机调度 |
+| 全局状态 | — | `src/app/app_state.c/h` | 跨模块全局状态（`g_wifi_on`、`g_bt_on`） |
+| UI 公共服务 | [ui-service.md](ui-service.md) | `src/app/ui_service.c/h` | `user_item` 生命周期公共辅助 |
 | 设置管理 | [settings.md](settings.md) | `src/app/settings/settings.c/h` | 亮度/动画/方向/波特率配置与存储 |
 | 任务管理器 | [taskmgr.md](taskmgr.md) | `src/app/taskmgr/` | 任务查看与终止（动画行列表 + 横屏3行布局） |
 | 串口监视器 | [serial-monitor.md](serial-monitor.md) | `src/app/serial_monitor/` | 串口监视器 App（SER/BLE 双数据源 + 入场滑入动画 + 按钮平滑过渡） |

@@ -42,7 +42,7 @@ typedef void (*xerintosh_cb_t)(void *user_data);
 
 **用途**：创建子菜单、作为其他 item 的容器。
 
-*📄 Source: [app_init.c](../../src/app/app_init.c#L151-L152)*
+*📄 Source: [app_menu.c](../../src/app/app_menu.c#L35-L36)*
 ```c
 /* 1. 创建父容器 */
 xerintosh_list_item_t *parent = xerintosh_new_list_item("设置", list_icon);
@@ -62,11 +62,12 @@ xerintosh_push_item_to_list(parent, child);
 
 **特殊用法 — `init_function` 动态初始化子菜单**：
 
-*📄 Source: [app_init.c](../../src/app/app_init.c#L207)*
+*📄 Source: [flasher_menu.c](../../src/app/flasher/flasher_menu.c#L152-L154)*
 ```c
 /* 进入子菜单时自动调用，常用于动态更新子项内容 */
-xerintosh_list_item_t *submenu = xerintosh_new_list_item("烧录器引脚", default_icon);
-submenu->init_function = on_enter_flasher_submenu;
+xerintosh_list_item_t *pin_item = xerintosh_new_list_item(
+    s_pin_label_bufs[i], default_icon);
+pin_item->init_function = on_enter_flasher_submenu;
 ```
 
 ---
@@ -630,7 +631,7 @@ hal_input_set_double_click_enabled(true);               // 启用/禁用双击�
 
 **默认按键映射**：
 
-*📄 Source: [app_init.c](../../src/app/app_init.c#L469-L494)*
+*📄 Source: [app_input.c](../../src/app/app_input.c#L33-L90)*
 
 | 按键 | 短按 | 长按 |
 |------|------|------|
