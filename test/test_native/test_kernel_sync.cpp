@@ -78,13 +78,16 @@ TEST(KernelSyncTest, MutexLockSetsOwner)
     EXPECT_EQ(m.owner, nullptr);
 }
 
-TEST(KernelSyncTest, MutexUnlockWithoutLockDoesNotCrash)
+TEST(KernelSyncTest, MutexUnlockWithoutLockReturnsPermError)
 {
+    kern_init();
+    kern_sched_init();
+
     mutex_t m;
     mutex_init(&m);
 
-    /* 单核下 mutex_unlock 仅设置 owner=NULL，无竞争 */
-    mutex_unlock(&m);
+    /* 未持有锁时解锁应返回 KERN_EPERM */
+    EXPECT_EQ(mutex_unlock(&m), KERN_EPERM);
     EXPECT_EQ(m.owner, nullptr);
 }
 
@@ -96,15 +99,60 @@ TEST(KernelSyncTest, MutexLockAfterUnlock)
     mutex_t m;
     mutex_init(&m);
 
-    mutex_lock(&m);
+    EXPECT_EQ(mutex_lock(&m), KERN_OK);
     EXPECT_EQ(m.owner, g_current_task);
 
-    mutex_unlock(&m);
+    EXPECT_EQ(mutex_unlock(&m), KERN_OK);
     EXPECT_EQ(m.owner, nullptr);
 
     /* 再次加锁应成功 */
-    mutex_lock(&m);
+    EXPECT_EQ(mutex_lock(&m), KERN_OK);
     EXPECT_EQ(m.owner, g_current_task);
 
-    mutex_unlock(&m);
+    EXPECT_EQ(mutex_unlock(&m), KERN_OK);
+}
+
+TEST(KernelSyncTest, MutexRecursiveLockIncrementsCount)
+{
+    kern_init();
+    kern_sched_init();
+
+    mutex_t m;
+    mutex_init(&m);
+
+    EXPECT_EQ(mutex_lock(&m), KERN_OK);
+    EXPECT_EQ(m.owner, g_current_task);
+    EXPECT_EQ(m.recursive_count, 1u);
+
+    EXPECT_EQ(mutex_lock(&m), KERN_OK);   /* 递归加锁 */
+    EXPECT_EQ(m.recursive_count, 2u);
+
+    EXPECT_EQ(mutex_unlock(&m), KERN_OK); /* 第一次解锁不释放 */
+    EXPECT_EQ(m.owner, g_current_task);
+    EXPECT_EQ(m.recursive_count, 1u);
+
+    EXPECT_EQ(mutex_unlock(&m), KERN_OK); /* 最终释放 */
+    EXPECT_EQ(m.owner, nullptr);
+    EXPECT_EQ(m.recursive_count, 0u);
+}
+
+TEST(KernelSyncTest, MutexUnlockByNonOwnerFails)
+{
+    kern_init();
+    kern_sched_init();
+
+    mutex_t m;
+    mutex_init(&m);
+    EXPECT_EQ(mutex_lock(&m), KERN_OK);
+
+    /* 伪造非 owner 任务指针 */
+    kern_task_t fake = {0};
+    kern_task_t *real = g_current_task;
+    g_current_task = &fake;
+
+    kern_err_t rc = mutex_unlock(&m);
+    g_current_task = real;
+
+    EXPECT_EQ(rc, KERN_EPERM);
+    EXPECT_EQ(m.owner, real);
 }

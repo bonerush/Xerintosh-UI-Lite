@@ -14,6 +14,8 @@ extern "C" {
 #include "kernel/kern_types.h"
 #include "kernel/kern_task.h"
 #include "kernel/kern_init.h"
+#include "kernel/kern_resource.h"
+#include "kernel/kern_smp.h"
 }
 
 /* ═══ 辅助：任务间通信变量 ═══ */
@@ -346,4 +348,54 @@ TEST(KernelTaskKillTest, KillZombieIsIdempotent)
     kern_task_t *task = kern_task_get(pid);
     ASSERT_NE(task, nullptr);
     EXPECT_EQ(task->state, KERN_TASK_ZOMBIE);
+}
+
+/* ═══ 任务自然返回资源释放测试 ═══ */
+
+static volatile bool g_release_called = false;
+
+static void release_flag(void *arg)
+{
+    (void)arg;
+    g_release_called = true;
+}
+
+static void no_exit_task(void *arg)
+{
+    (void)arg;
+    /* 注册一个资源后自然返回，不调用 kern_exit() */
+    kern_resource_track(g_current_task, (void*)0x1234,
+                        KERN_RES_MEMORY, release_flag);
+}
+
+TEST(KernelTaskTest, NaturalReturnCallsExit)
+{
+    kern_sched_init();
+    g_release_called = false;
+
+    kern_pid_t pid = kern_spawn("no_exit", no_exit_task, NULL, 0);
+    ASSERT_GE(pid, 0);
+
+    for (int i = 0; i < 100 && !g_release_called; i++) {
+        kern_sched_tick();
+    }
+
+    EXPECT_TRUE(g_release_called);
+}
+
+TEST(KernelTaskTest, SpawnManyTasksDoesNotLeakStack)
+{
+    kern_sched_init();
+
+    for (int round = 0; round < 50; round++) {
+        g_simple_counter = 0;
+        kern_pid_t pid = kern_spawn("leak_test", simple_task, NULL, 0);
+        ASSERT_GE(pid, 0);
+
+        for (int i = 0; i < 100 && kern_task_get(pid) != NULL; i++) {
+            kern_sched_tick();
+        }
+
+        EXPECT_EQ(kern_task_get(pid), nullptr);
+    }
 }

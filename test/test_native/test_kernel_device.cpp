@@ -2,7 +2,7 @@
  * @file   test_kernel_device.cpp
  * @brief  Xeros 设备驱动模型单元测试
  * @details 测试 kern_device_register / kern_device_find、
- *          kern_devfs_register_device 和 VFS bridge 操作。
+ *          VFS bridge 操作和 /dev 节点自动创建。
  *
  * @copyright Copyright (c) 2026
  */
@@ -92,6 +92,21 @@ TEST(KernelDeviceTest, RegisterNullReturnsEinval)
 {
     int rc = kern_device_register(NULL);
     EXPECT_EQ(rc, KERN_EINVAL);
+}
+
+TEST(KernelDeviceTest, RegisterCreatesDevNode)
+{
+    kern_init();
+    kern_vfs_init();
+    kern_devfs_init();
+
+    kern_err_t rc = kern_device_register(&g_test_dev);
+    EXPECT_EQ(rc, KERN_OK);
+
+    kern_dentry_t *d = kern_path_resolve("/dev/testdev");
+    EXPECT_NE(d, nullptr);
+    EXPECT_NE(d->inode, nullptr);
+    EXPECT_EQ(d->inode->type, KERN_FILE_CHRDEV);
 }
 
 TEST(KernelDeviceTest, RegisterEmptyNameReturnsEinval)

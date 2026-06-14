@@ -85,3 +85,12 @@ TEST(KernelSmpTest, KernCpuAnyConstantIsCorrect)
 {
     EXPECT_EQ(KERN_CPU_ANY, (uint8_t)0xFF);
 }
+
+TEST(KernelSmpTest, NeedReschedAvailableWithoutPreempt)
+{
+    /* g_need_resched 宏必须始终可用，不依赖 CONFIG_PREEMPT_ENABLED */
+    g_need_resched = true;
+    EXPECT_TRUE(g_need_resched);
+    g_need_resched = false;
+    EXPECT_FALSE(g_need_resched);
+}
