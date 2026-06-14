@@ -23,6 +23,11 @@ static bool      g_needs_refresh = true;
 
 /* ═══ 生命周期 ═══ */
 
+const tu_data_t* token_usage_get_data(void)
+{
+    return &g_tu_data;
+}
+
 void token_usage_init(void *ud)
 {
     (void)ud;
@@ -55,10 +60,14 @@ void token_usage_loop(void *ud)
     if (g_needs_refresh || (now - g_last_refresh >= TU_REFRESH_INTERVAL)) {
         /* 获取 API key */
         char ds_key[STORAGE_API_KEY_MAX_LEN];
-        storage_get_deepseek_key(ds_key, sizeof(ds_key));
+        bool has_key = storage_get_deepseek_key(ds_key, sizeof(ds_key));
 
-        /* 刷新数据 */
-        g_tu_data.deepseek_ok = tu_api_fetch_deepseek(ds_key, &g_tu_data.deepseek);
+        /* 刷新数据（空 key 时跳过请求） */
+        if (has_key && ds_key[0] != '\0') {
+            g_tu_data.deepseek_ok = tu_api_fetch_deepseek(ds_key, &g_tu_data.deepseek);
+        } else {
+            g_tu_data.deepseek_ok = false;
+        }
         g_tu_data.last_update = now;
 
         g_last_refresh  = now;

@@ -11,6 +11,7 @@
 #define TU_APP_H
 
 #include "token_usage.h"
+#include "tu_api.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -19,6 +20,10 @@ extern "C" {
 /* ═══ 内部常量 ═══ */
 
 #define TU_REFRESH_INTERVAL 30000  /* 自动刷新间隔（毫秒） */
+
+/* ═══ 测试可见 getter ═══ */
+
+const tu_data_t* token_usage_get_data(void);
 
 #ifdef __cplusplus
 }
