@@ -59,6 +59,9 @@ kern_pid_t kern_spawn(const char *name, void (*entry)(void *arg),
         snprintf(task->name, KERN_TASK_NAME_LEN, "task_%d", task->pid);
     }
 
+    /* 初始化每任务文件描述符表 */
+    memset(task->fd_table, 0, sizeof(task->fd_table));
+
     /* 默认加入 RR 调度类 */
     task->scheduler_class_id = KERN_SCHED_CLASS_RR_ID;
 
@@ -136,6 +139,9 @@ kern_pid_t kern_spawn(const char *name, void (*entry)(void *arg),
         snprintf(task->name, KERN_TASK_NAME_LEN, "task_%d", task->pid);
     }
 
+    /* 初始化每任务文件描述符表 */
+    memset(task->fd_table, 0, sizeof(task->fd_table));
+
     /* 默认加入 RR 调度类 */
     task->scheduler_class_id = KERN_SCHED_CLASS_RR_ID;
 
@@ -195,6 +201,9 @@ kern_pid_t kern_spawn(const char *name, void (*entry)(void *arg),
     } else {
         snprintf(task->name, KERN_TASK_NAME_LEN, "task_%d", task->pid);
     }
+
+    /* 初始化每任务文件描述符表 */
+    memset(task->fd_table, 0, sizeof(task->fd_table));
 
     /* 默认加入 RR 调度类 */
     task->scheduler_class_id = KERN_SCHED_CLASS_RR_ID;

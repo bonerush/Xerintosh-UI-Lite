@@ -26,7 +26,7 @@ static bool g_vfs_initialized = false;
 
 /* ═══ 文件描述符表 ═══ */
 
-static kern_file_t g_fd_table[KERN_MAX_FD_PER_TASK];
+/* 文件描述符表已迁入 kern_task_t：每任务独立的 FD 命名空间。 */
 
 /* ═══ inode 引用计数管理 ═══ */
 
@@ -162,9 +162,6 @@ void kern_vfs_init(void)
     g_root_dentry.parent = NULL;
     g_root_dentry.inode = NULL;
     g_root_dentry.child_count = 0;
-
-    /* 初始化文件描述符表 */
-    memset(g_fd_table, 0, sizeof(g_fd_table));
 }
 
 kern_dentry_t *kern_vfs_get_root(void)
@@ -325,15 +322,36 @@ kern_err_t kern_vfs_touch(const char *path)
 
 /* ═══ 文件描述符分配 ═══ */
 
-static kern_fd_t fd_alloc(void)
+/**
+ * @brief 在当前任务的 FD 表中分配一个空闲槽位
+ * @param[out] out_fd  返回分配的 FD 编号（或错误码）
+ * @return  成功返回指向新分配 kern_file_t 的指针；失败返回 NULL
+ * @note    失败时 *out_fd 会被设为 KERN_EMFILE 或 KERN_ENOMEM
+ */
+static kern_file_t *fd_alloc(kern_fd_t *out_fd)
 {
+    kern_task_t *cur = kern_task_current();
+    if (cur == NULL) {
+        *out_fd = KERN_EBADF;
+        return NULL;
+    }
+
     for (kern_fd_t i = 0; i < KERN_MAX_FD_PER_TASK; i++) {
-        if (!g_fd_table[i].in_use) {
-            g_fd_table[i].in_use = true;
-            return i;
+        if (cur->fd_table[i] == NULL) {
+            kern_file_t *f = (kern_file_t *)calloc(1, sizeof(kern_file_t));
+            if (f == NULL) {
+                *out_fd = KERN_ENOMEM;
+                return NULL;
+            }
+            f->in_use = true;
+            cur->fd_table[i] = f;
+            *out_fd = i;
+            return f;
         }
     }
-    return KERN_EMFILE;
+
+    *out_fd = KERN_EMFILE;
+    return NULL;
 }
 
 static kern_file_t *fd_get(kern_fd_t fd)
@@ -341,20 +359,50 @@ static kern_file_t *fd_get(kern_fd_t fd)
     if (fd < 0 || fd >= KERN_MAX_FD_PER_TASK) {
         return NULL;
     }
-    if (!g_fd_table[fd].in_use) {
+
+    kern_task_t *cur = kern_task_current();
+    if (cur == NULL) {
         return NULL;
     }
-    return &g_fd_table[fd];
+
+    return cur->fd_table[fd];
+}
+
+/**
+ * @brief 释放 FD 对应的 file 结构（不操作资源追踪链表）
+ * @note  供 kern_close 在 untrack 后调用，也供 fd_release 在任务退出时调用，
+ *        避免 release_all 遍历过程中重复释放资源节点。
+ */
+static void fd_close_raw(kern_fd_t fd)
+{
+    kern_task_t *cur = kern_task_current();
+    if (cur == NULL || fd < 0 || fd >= KERN_MAX_FD_PER_TASK) {
+        return;
+    }
+
+    kern_file_t *f = cur->fd_table[fd];
+    if (f == NULL) {
+        return;
+    }
+
+    /* 调用设备的 release 回调 */
+    if (f->fops != NULL && f->fops->release != NULL) {
+        f->fops->release(f);
+    }
+
+    kern_inode_t *inode = f->inode;
+    cur->fd_table[fd] = NULL;
+    free(f);
+    kern_inode_unref(inode);
 }
 
 /* ═══ FD 资源释放回调 ═══ */
 
 static void fd_release(void *ptr)
 {
-    kern_fd_t fd = (kern_fd_t)(intptr_t)ptr;
-    if (fd >= 0) {
-        kern_close(fd);
-    }
+    /* open 时存储的是 fd + 1，避免 fd == 0 时 ptr 为 NULL */
+    kern_fd_t fd = (kern_fd_t)(intptr_t)ptr - 1;
+    fd_close_raw(fd);
 }
 
 /* ═══ 文件操作 ═══ */
@@ -372,12 +420,14 @@ kern_fd_t kern_open(const char *path, unsigned int flags)
         return KERN_EISDIR;  /* 打开了目录 */
     }
 
-    kern_fd_t fd = fd_alloc();
-    if (fd < 0) {
-        return fd;  /* 返回错误码 */
+    kern_task_t *cur = kern_task_current();
+
+    kern_fd_t fd;
+    kern_file_t *f = fd_alloc(&fd);
+    if (f == NULL) {
+        return fd;  /* 返回 KERN_EMFILE / KERN_ENOMEM / KERN_EBADF */
     }
 
-    kern_file_t *f = &g_fd_table[fd];
     f->dentry = dentry;
     f->inode = dentry->inode;
     f->fops = dentry->inode->fops;
@@ -391,17 +441,24 @@ kern_fd_t kern_open(const char *path, unsigned int flags)
     if (f->fops != NULL && f->fops->open != NULL) {
         int open_rc = f->fops->open(f, flags);
         if (open_rc != KERN_OK) {
+            /* open 失败：释放 inode 引用，回收 file 结构与 FD 槽位 */
             kern_inode_unref(f->inode);
-            memset(f, 0, sizeof(kern_file_t));
+            if (cur != NULL && fd >= 0 && fd < KERN_MAX_FD_PER_TASK) {
+                cur->fd_table[fd] = NULL;
+            }
+            free(f);
             return open_rc;
         }
     }
 
     /* 追踪 FD 到当前任务 */
-    kern_task_t *cur = kern_task_current();
     if (cur != NULL) {
-        kern_resource_track(cur, (void *)(intptr_t)fd,
-                            KERN_RES_FD, fd_release);
+        if (kern_resource_track(cur, (void *)(intptr_t)(fd + 1),
+                                KERN_RES_FD, fd_release) != KERN_OK) {
+            /* 资源追踪失败：关闭已打开的 FD，避免槽位泄漏 */
+            kern_close(fd);
+            return KERN_ENOMEM;
+        }
     }
 
     return fd;
@@ -409,25 +466,20 @@ kern_fd_t kern_open(const char *path, unsigned int flags)
 
 kern_err_t kern_close(kern_fd_t fd)
 {
-    kern_file_t *f = fd_get(fd);
-    if (f == NULL) {
+    kern_task_t *cur = kern_task_current();
+    if (cur == NULL || fd < 0 || fd >= KERN_MAX_FD_PER_TASK) {
         return KERN_EBADF;
     }
 
-    /* 从资源追踪中移除 */
-    kern_task_t *cur = kern_task_current();
-    if (cur != NULL) {
-        kern_resource_untrack(cur, (void *)(intptr_t)fd);
+    if (cur->fd_table[fd] == NULL) {
+        return KERN_EBADF;
     }
 
-    /* 调用设备的 release 回调 */
-    if (f->fops != NULL && f->fops->release != NULL) {
-        f->fops->release(f);
-    }
+    /* 从资源追踪中移除（open 时存储的是 fd + 1） */
+    kern_resource_untrack(cur, (void *)(intptr_t)(fd + 1));
 
-    kern_inode_t *inode = f->inode;
-    memset(f, 0, sizeof(kern_file_t));
-    kern_inode_unref(inode);
+    /* 释放 file 实例与 FD 槽位 */
+    fd_close_raw(fd);
     return KERN_OK;
 }
 

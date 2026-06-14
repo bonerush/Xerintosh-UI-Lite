@@ -34,6 +34,10 @@ typedef ucontext_t    kern_ctx_t;
 #include "kern_ctx_esp32.h"
 #endif
 
+/* ═══ 前向声明（避免 kern_task.h 与 kern_vfs.h 循环包含） ═══ */
+
+typedef struct kern_file kern_file_t;
+
 /* ═══ 任务控制块（TCB） ═══ */
 
 /**
@@ -81,6 +85,9 @@ typedef struct kern_task {
     /* 资源追踪 */
     volatile bool resource_lock;         /* 保护 resource_head 的布尔自旋锁 */
     struct kern_resource *resource_head; /* 持有的资源链表头 */
+
+    /* 文件描述符表：每任务独立的 FD 命名空间 */
+    kern_file_t *fd_table[KERN_MAX_FD_PER_TASK]; /* 打开的文件实例指针 */
 
     /* MPU 内存保护 */
     kern_mpu_config_t    *mpu_config;    /* 每任务 MPU 配置（可为 NULL） */

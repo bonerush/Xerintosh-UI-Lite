@@ -19,6 +19,8 @@ extern "C" {
 
 #include "app/app_state.h"
 
+#include "kernel/kern_task.h"
+
 /* 桩回调（供 native 测试链接 app_init.c / app_menu.c 使用） */
 void on_brightness_change_cb(void *ud) { (void)ud; }
 void on_anim_speed_change_cb(void *ud) { (void)ud; }
@@ -76,6 +78,7 @@ int main(int argc, char **argv)
     hal_system_init();
     hal_display_init();
     hal_input_init();
+    kern_sched_init();   /* 创建 idle 任务，为未显式 spawn 的测试提供当前任务上下文 */
     return RUN_ALL_TESTS();
 }
 

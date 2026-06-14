@@ -14,6 +14,8 @@ extern "C" {
 #include "kernel/kern_types.h"
 #include "kernel/kern_vfs.h"
 #include "kernel/kern_init.h"
+#include "kernel/kern_task.h"
+#include "kernel/kern_sched.h"
 }
 
 /* ═══ 简单 inode 工厂（供测试用） ═══ */
@@ -411,4 +413,135 @@ TEST(KernelVFSTest, ReplaceInodeDecrementsOldRef)
     kern_dentry_t *d = kern_path_resolve("/replace_ref");
     ASSERT_NE(d, nullptr);
     EXPECT_EQ(d->inode, new_);
+}
+
+/* ═══ 子任务 T1：每任务 FD 命名空间与失败释放测试 ═══ */
+
+static int failing_open(kern_file_t *f, unsigned int flags)
+{
+    (void)f;
+    (void)flags;
+    return KERN_EINVAL;
+}
+
+static kern_file_ops_t mock_fops_failing_open = {
+    .open = failing_open,
+    .read = mock_read,
+    .write = mock_write,
+    .ioctl = NULL,
+    .release = NULL,
+};
+
+static volatile bool g_child_open_ok = false;
+static volatile kern_fd_t g_child_fd = KERN_FD_INVALID;
+
+static void child_open_one(void *arg)
+{
+    (void)arg;
+    kern_fd_t fd = kern_open("/dev/fdtest", KERN_O_RDONLY);
+    g_child_fd = fd;
+    g_child_open_ok = (fd >= 0);
+    kern_exit();
+}
+
+TEST(KernelVFSTest, FdNamespaceIsolated)
+{
+    kern_vfs_init();
+    kern_sched_init();
+    kern_inode_t *ino = make_mock_inode(KERN_FILE_REGULAR);
+    kern_dentry_register("/dev/fdtest", ino);
+
+    /* 父任务占满全部 8 个 FD */
+    kern_fd_t fds[KERN_MAX_FD_PER_TASK];
+    for (int i = 0; i < KERN_MAX_FD_PER_TASK; i++) {
+        fds[i] = kern_open("/dev/fdtest", KERN_O_RDONLY);
+        EXPECT_GE(fds[i], 0) << "parent fd " << i << " should be valid";
+    }
+
+    g_child_open_ok = false;
+    g_child_fd = KERN_FD_INVALID;
+    kern_pid_t pid = kern_spawn("fd_child", child_open_one, NULL, 0);
+    ASSERT_GE(pid, 0);
+
+    for (int i = 0; i < 100 && kern_task_get(pid) != NULL; i++) {
+        kern_sched_tick();
+    }
+
+    EXPECT_EQ(kern_task_get(pid), nullptr);
+    EXPECT_TRUE(g_child_open_ok);
+    EXPECT_GE(g_child_fd, 0) << "child should get a valid fd in its own namespace";
+
+    for (int i = 0; i < KERN_MAX_FD_PER_TASK; i++) {
+        kern_close(fds[i]);
+    }
+}
+
+TEST(KernelVFSTest, OpenFailureReleasesFd)
+{
+    kern_vfs_init();
+    kern_sched_init();
+
+    /* 先占一个已知 slot，然后释放，确认该 slot 处于空闲 */
+    kern_inode_t *ino_marker = make_mock_inode(KERN_FILE_REGULAR);
+    kern_dentry_register("/dev/marker", ino_marker);
+    kern_fd_t marker_fd = kern_open("/dev/marker", KERN_O_RDONLY);
+    ASSERT_GE(marker_fd, 0);
+    kern_close(marker_fd);
+
+    kern_inode_t *ino = make_mock_inode(KERN_FILE_REGULAR);
+    ino->fops = &mock_fops_failing_open;
+    kern_dentry_register("/dev/failing_open", ino);
+
+    kern_fd_t fd1 = kern_open("/dev/failing_open", KERN_O_RDONLY);
+    EXPECT_EQ(fd1, KERN_EINVAL);
+
+    /* 失败后立即再次打开，应该复用刚才释放的 slot */
+    kern_inode_t *ino2 = make_mock_inode(KERN_FILE_REGULAR);
+    kern_dentry_register("/dev/success", ino2);
+    kern_fd_t fd2 = kern_open("/dev/success", KERN_O_RDONLY);
+    EXPECT_GE(fd2, 0);
+    EXPECT_EQ(fd2, marker_fd) << "open failure should release the allocated fd slot";
+
+    kern_close(fd2);
+}
+
+static volatile bool g_child_fd_done = false;
+
+static void child_open_and_close(void *arg)
+{
+    (void)arg;
+    kern_fd_t fd = kern_open("/dev/shared", KERN_O_RDONLY);
+    if (fd >= 0) {
+        kern_close(fd);
+    }
+    g_child_fd_done = true;
+    kern_exit();
+}
+
+TEST(KernelVFSTest, ChildFdDoesNotAffectParent)
+{
+    kern_vfs_init();
+    kern_sched_init();
+
+    kern_inode_t *ino = make_mock_inode(KERN_FILE_REGULAR);
+    kern_dentry_register("/dev/shared", ino);
+
+    kern_fd_t parent_fd = kern_open("/dev/shared", KERN_O_RDONLY);
+    EXPECT_GE(parent_fd, 0);
+
+    g_child_fd_done = false;
+    kern_pid_t pid = kern_spawn("child_fd", child_open_and_close, NULL, 0);
+    ASSERT_GE(pid, 0);
+
+    for (int i = 0; i < 100 && kern_task_get(pid) != NULL; i++) {
+        kern_sched_tick();
+    }
+
+    EXPECT_EQ(kern_task_get(pid), nullptr);
+    EXPECT_TRUE(g_child_fd_done);
+
+    /* 子任务关闭自己的 fd 后，父任务的 fd 仍应有效 */
+    char buf[16];
+    EXPECT_EQ(kern_read(parent_fd, buf, sizeof(buf)), 0);
+    kern_close(parent_fd);
 }
