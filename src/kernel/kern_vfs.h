@@ -52,6 +52,7 @@ typedef struct kern_inode {
     kern_file_type_t type;           /* 文件类型 */
     kern_file_ops_t *fops;           /* 文件操作函数表 */
     void *private_data;              /* 设备/文件系统私有数据 */
+    uint32_t ref_count;              /* 引用计数（dentry + 打开 FD） */
 } kern_inode_t;
 
 /**
@@ -179,6 +180,15 @@ extern ssize_t kern_write(kern_fd_t fd, const char *buf, size_t len);
  * @return KERN_OK 成功，< 0 为错误码
  */
 extern kern_err_t kern_ioctl(kern_fd_t fd, unsigned int cmd, unsigned long arg);
+
+#ifdef NATIVE_TEST
+/**
+ * @brief  获取 inode 当前引用计数（仅用于测试）
+ * @param  inode 目标 inode
+ * @return 引用计数值；inode 为 NULL 时返回 0
+ */
+extern uint32_t kern_vfs_inode_ref_count(const kern_inode_t *inode);
+#endif /* NATIVE_TEST */
 
 #ifdef __cplusplus
 }

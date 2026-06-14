@@ -47,6 +47,7 @@ static kern_inode_t *make_mock_inode(kern_file_type_t type)
         ino->type = type;
         ino->fops = &mock_fops;
         ino->private_data = NULL;
+        ino->ref_count = 0;
     }
     return ino;
 }
@@ -329,4 +330,85 @@ TEST(KernelVFSTest, IoctlWithoutFopsReturnsError)
     int rc = kern_ioctl(fd, 1, 0);
     EXPECT_EQ(rc, KERN_EINVAL);
     kern_close(fd);
+}
+
+/* ═══ inode 引用计数测试 ═══ */
+
+TEST(KernelVFSTest, InodeRefCountOnRegister)
+{
+    kern_vfs_init();
+    kern_inode_t *ino = make_mock_inode(KERN_FILE_REGULAR);
+
+    EXPECT_EQ(kern_vfs_inode_ref_count(ino), 0u);
+    kern_dentry_register("/refcount_reg", ino);
+    EXPECT_EQ(kern_vfs_inode_ref_count(ino), 1u);
+}
+
+TEST(KernelVFSTest, OpenIncrementsRefCount)
+{
+    kern_vfs_init();
+    kern_inode_t *ino = make_mock_inode(KERN_FILE_REGULAR);
+    kern_dentry_register("/refcount_open", ino);
+
+    EXPECT_EQ(kern_vfs_inode_ref_count(ino), 1u);
+    kern_fd_t fd = kern_open("/refcount_open", KERN_O_RDONLY);
+    EXPECT_GE(fd, 0);
+    EXPECT_EQ(kern_vfs_inode_ref_count(ino), 2u);
+
+    kern_close(fd);
+    EXPECT_EQ(kern_vfs_inode_ref_count(ino), 1u);
+}
+
+TEST(KernelVFSTest, UnlinkWhileOpenKeepsInode)
+{
+    kern_vfs_init();
+    kern_inode_t *ino = make_mock_inode(KERN_FILE_REGULAR);
+    kern_dentry_register("/refcount_unlink_open", ino);
+
+    kern_fd_t fd = kern_open("/refcount_unlink_open", KERN_O_RDWR);
+    EXPECT_GE(fd, 0);
+    EXPECT_EQ(kern_vfs_inode_ref_count(ino), 2u);
+
+    EXPECT_EQ(kern_vfs_unlink("/refcount_unlink_open"), KERN_OK);
+    EXPECT_EQ(kern_vfs_inode_ref_count(ino), 1u);
+    EXPECT_EQ(kern_path_resolve("/refcount_unlink_open"), nullptr);
+
+    /* FD 仍应可读写 */
+    ssize_t n = kern_write(fd, "x", 1);
+    EXPECT_EQ(n, 1);
+
+    kern_close(fd);
+}
+
+TEST(KernelVFSTest, CloseAfterUnlinkFreesInode)
+{
+    kern_vfs_init();
+    kern_inode_t *ino = make_mock_inode(KERN_FILE_REGULAR);
+    kern_dentry_register("/refcount_close_after_unlink", ino);
+
+    kern_fd_t fd = kern_open("/refcount_close_after_unlink", KERN_O_RDONLY);
+    EXPECT_GE(fd, 0);
+    EXPECT_EQ(kern_vfs_unlink("/refcount_close_after_unlink"), KERN_OK);
+    kern_close(fd);
+
+    EXPECT_EQ(kern_path_resolve("/refcount_close_after_unlink"), nullptr);
+    kern_fd_t fd2 = kern_open("/refcount_close_after_unlink", KERN_O_RDONLY);
+    EXPECT_EQ(fd2, KERN_ENOENT);
+}
+
+TEST(KernelVFSTest, ReplaceInodeDecrementsOldRef)
+{
+    kern_vfs_init();
+    kern_inode_t *old = make_mock_inode(KERN_FILE_CHRDEV);
+    kern_inode_t *new_ = make_mock_inode(KERN_FILE_REGULAR);
+
+    kern_dentry_register("/replace_ref", old);
+    EXPECT_EQ(kern_vfs_inode_ref_count(old), 1u);
+
+    kern_dentry_register("/replace_ref", new_);
+    EXPECT_EQ(kern_vfs_inode_ref_count(new_), 1u);
+
+    kern_dentry_t *d = kern_path_resolve("/replace_ref");
+    ASSERT_NE(d, nullptr);
+    EXPECT_EQ(d->inode, new_);
 }

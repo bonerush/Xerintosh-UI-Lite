@@ -28,6 +28,46 @@ static bool g_vfs_initialized = false;
 
 static kern_file_t g_fd_table[KERN_MAX_FD_PER_TASK];
 
+/* ═══ inode 引用计数管理 ═══ */
+
+static void kfree_inode(kern_inode_t *inode)
+{
+    if (inode == NULL) {
+        return;
+    }
+    /* private_data 由创建者（设备驱动/文件系统）持有，VFS 不负责释放 */
+    free(inode);
+}
+
+static void kern_inode_ref(kern_inode_t *inode)
+{
+    if (inode == NULL) {
+        return;
+    }
+    inode->ref_count++;
+}
+
+static void kern_inode_unref(kern_inode_t *inode)
+{
+    if (inode == NULL) {
+        return;
+    }
+    if (inode->ref_count == 0) {
+        return;
+    }
+    inode->ref_count--;
+    if (inode->ref_count == 0) {
+        kfree_inode(inode);
+    }
+}
+
+#ifdef NATIVE_TEST
+uint32_t kern_vfs_inode_ref_count(const kern_inode_t *inode)
+{
+    return inode != NULL ? inode->ref_count : 0;
+}
+#endif /* NATIVE_TEST */
+
 /* ═══ 路径解析辅助 ═══ */
 
 /**
@@ -146,7 +186,15 @@ kern_err_t kern_dentry_register(const char *path, kern_inode_t *inode)
     }
 
     /* 挂载 inode（如果已有旧 inode 则替换） */
+    if (dentry->inode == inode) {
+        dentry->inode->fops = inode->fops;
+        return KERN_OK;
+    }
+    if (dentry->inode != NULL) {
+        kern_inode_unref(dentry->inode);
+    }
     dentry->inode = inode;
+    kern_inode_ref(inode);
     dentry->inode->fops = inode->fops;
 
     return KERN_OK;
@@ -197,6 +245,7 @@ kern_err_t kern_vfs_unlink(const char *path)
     if (dentry->child_count > 0) return KERN_ENOTEMPTY;
 
     /* 从父节点的 children 数组中移除 */
+    kern_inode_t *inode = dentry->inode;
     kern_dentry_t *parent = dentry->parent;
     for (uint8_t i = 0; i < parent->child_count; i++) {
         if (parent->children[i] == dentry) {
@@ -211,6 +260,7 @@ kern_err_t kern_vfs_unlink(const char *path)
     }
 
     free(dentry);
+    kern_inode_unref(inode);
     return KERN_OK;
 }
 
@@ -335,10 +385,13 @@ kern_fd_t kern_open(const char *path, unsigned int flags)
     f->f_pos = 0;
     f->private_data = NULL;
 
+    kern_inode_ref(f->inode);
+
     /* 调用设备的 open 回调（如果存在） */
     if (f->fops != NULL && f->fops->open != NULL) {
         int open_rc = f->fops->open(f, flags);
         if (open_rc != KERN_OK) {
+            kern_inode_unref(f->inode);
             memset(f, 0, sizeof(kern_file_t));
             return open_rc;
         }
@@ -372,7 +425,9 @@ kern_err_t kern_close(kern_fd_t fd)
         f->fops->release(f);
     }
 
+    kern_inode_t *inode = f->inode;
     memset(f, 0, sizeof(kern_file_t));
+    kern_inode_unref(inode);
     return KERN_OK;
 }
 
