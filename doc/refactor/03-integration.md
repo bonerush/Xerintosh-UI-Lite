@@ -1,114 +1,112 @@
-# Phase 3 集成验证报告
+# 集成验证报告
 
-> **Parent:** [重构跟踪](README.md) | **Prev:** [Phase 2.5 文档同步](02-refactor/docs.md)
+## 分支信息
 
-## 1. 验证目标
+- **工作树**：`/Users/yukisala/Documents/PlatformIO/Projects/M5Stick-P1/.worktrees/refactor-2026-06-14-kernel-first`
+- **分支**：`refactor/2026-06-14-kernel-first`
+- **基线 commit**：`a4d8bab2703908ff0c4934daf97c1bced671eb40`（`main`）
+- **最终 commit**：待阶段 4 归档后补充
 
-确认内核层、HAL 层、UI 核心层、App 层重构后的代码能够：
+## 验证结果
 
-1. 在 native 环境通过全部单元测试；
-2. 在硬件目标（m5stick-c）无 warning、无 error 地编译通过；
-3. 保持 `main.cpp`、`app_init.h` 等公共入口 API 不变；
-4. 行为等价：菜单结构、烧录器引脚配置流程、WiFi/BT 开关行为与重构前一致。
-
-## 2. 环境
-
-- **分支**：`refactor/2026-06-14-kernel-ui`
-- **基线 commit**：`6411c578124f1bf029169ffe1f5dfbef9fddeee5`
-- **验证日期**：2026-06-14
-- **PlatformIO**：通过 VS Code + PlatformIO IDE 扩展
-- **硬件目标**：M5Stick-C（ESP32-PICO）
-
-## 3. 验证项目
-
-### 3.1 Native 测试
+### 1. Native 测试
 
 ```bash
-rm -rf .pio/build/native
 pio test -e native
 ```
 
-结果：
+**结果**：✅ PASS
+- 415 个测试用例
+- 414 个 succeeded
+- 1 个 skipped（`TuAppTest.Loop_WithValidKey_FetchesData`，因 NATIVE_TEST 下 storage 桩固定返回空 key）
+- 总耗时：约 6 秒
 
-| 测试套件 | 状态 | 用例数 |
-|----------|------|--------|
-| test_ble_uart | PASSED | 见详细日志 |
-| test_native | PASSED | 见详细日志 |
-| test_token_usage | PASSED | 见详细日志 |
-| **总计** | **PASSED** | **371 test cases** |
-
-### 3.2 硬件编译
+### 2. 硬件构建
 
 ```bash
-rm -rf .pio/build/m5stick-c
 pio run -e m5stick-c
 ```
 
-结果：
+**结果**：✅ SUCCESS
+- RAM：22.3%（73,024 / 327,680 bytes）
+- Flash：88.0%（1,846,329 / 2,097,152 bytes）
+- 构建耗时：约 4 秒
 
-```
-RAM:   [==        ]  22.3% (used 73216 bytes from 327680 bytes)
-Flash: [========= ]  88.0% (used 1845325 bytes from 2097152 bytes)
-========================= [SUCCESS] Took 4.09 seconds =========================
-```
+### 3. 基线对比
 
-### 3.3 Warning / Error 审查
+| 指标 | 基线（main） | 本轮最终 | 变化 |
+|------|-------------|----------|------|
+| Native 测试数 | 371 | 414 | +43 |
+| Flash 占用 | 88.0% (1,845,389 B) | 88.0% (1,846,329 B) | +940 B |
+| RAM 占用 | 22.3% (73,216 B) | 22.3% (73,024 B) | -192 B |
+
+> 注：RAM 占用略降是因为内核 FD 表从全局单表改为 per-task 指针数组后，全局表被移除；每个任务仅在使用 FD 时承担 8 个指针的内存。
+
+## 变更统计
 
 ```bash
-pio run -e m5stick-c 2>&1 | grep -Ei "warning:|error:|note:"
+git diff --stat main
 ```
 
-输出为空，无新增 warning/error。
+**结果**：80 个文件变更，+3,661 / -978 行。
 
-### 3.4 Public API 稳定性检查
+### 按层统计
 
-| API | 位置 | 状态 |
-|-----|------|------|
-| `app_init_ui()` | `app_init.h` | 保持 |
-| `app_init_managers()` | `app_init.h` | 保持 |
-| `app_input_process()` | `app_init.h`/`app_input.h` | 保持（实现迁移到 `app_input.c`） |
-| `xerintosh_ui_main_core()` | `ui_core.h` | 保持 |
-| `xerintosh_selector_go_next_item()` 等 | `ui_item.h` | 保持 |
+| 层级 | 主要变更文件 | 说明 |
+|------|-------------|------|
+| 内核层 | `kern_task.h`、`kern_vfs.c/h`、`kern_kmalloc.c/h`、`kern_resource.c`、`kern_task_lifecycle.c`、`kern_task_stack.c`、`kern_sched_class.c/h`、`kern_sched_rr.c`、`kern_sched_fifo.c`、`kern_sched.c`、`kern_procfs.c`、`kern_device.h`、`devices/dev_*.c/h` | FD 命名空间、inode 引用计数、资源分配器、调度类 ID、错误码统一 |
+| App 层 | `app_menu.c`、`ui_service.c/h`、`svc_mgr_helper.c/h`、`serial_monitor/sm_app.cpp`、`flasher/flasher_app.cpp`、`settings/settings.c`、`token_usage/tu_app.cpp/h`、`bluetooth/bt_manager.h/cpp` | NULL 检查、横屏 helper、BT 服务助手、rotation 校验、空 key 跳过 |
+| HAL 层 | `hal_display_fb.cpp`、`hal_system.cpp` | 色深顺序 helper、native 真实延时 |
+| UI 层 | `ui_item.h` | `extern "C"` 保护 |
+| 测试 | `test_native/test_kernel_*.cpp`、`test_native/test_app_menu_safety.cpp`、`test_native/test_ui_service_landscape.cpp`、`test_native/test_svc_mgr_helper.cpp`、`test_native/test_tu_app.cpp`、`test_native/test_hal_display.cpp`、`test_native/test_hal_system.cpp`、`test_native/test_ui_dispatch.cpp`、`test_native/test_settings_accessors.cpp`、`test_native/test_kernel_devfs.cpp`、`test_native/test_kernel_device.cpp` | 新增 40+ 测试用例 |
+| 文档 | `doc/kernel/*.md`、`doc/app/*.md`、`doc/hal/display.md`、`doc/hal/system.md`、`doc/ui/item.md`、`doc/index.md` | 同步所有 public API 变化 |
 
-`main.cpp` 新增 `#include "app/app_state.h"`、移除 `g_wifi_on`/`g_bt_on` 局部定义，并将显示旋转/亮度调用改为 HAL API。整体调用流程未变。
+## 代码规模
 
-### 3.5 关键 diff 审查
+```bash
+find src -type f \( -name "*.c" -o -name "*.cpp" -o -name "*.h" -o -name "*.hpp" \) | wc -l
+find src ... -exec wc -l {} + | tail -1
+find doc -type f -name "*.md" | wc -l
+find doc ... -exec wc -l {} + | tail -1
+```
 
-| 改动文件 | 说明 | 风险 |
-|----------|------|------|
-| `src/app/app_init.c` | 从 347 行精简到 27 行，变为入口封装 | 低，菜单/输入逻辑完整迁移 |
-| `src/app/app_menu.c` | 新增，承担菜单构建 | 低，与原 `app_init.c` 等价 |
-| `src/app/app_input.c` | 新增，承担输入路由 | 低，与原 `app_init.c` 等价 |
-| `src/app/flasher/flasher_menu.c` | 新增，烧录器引脚配置与强制解除状态机 | 低，逻辑整体平移 |
-| `src/app/app_state.c` | 新增，集中全局状态 | 低，`main.cpp`/`native_main.cpp` 已移除重复定义 |
-| `src/ui/ui_dispatch.c` | 新增完整生命周期 vtable | 低，测试覆盖 enter/measure/draw/destroy 等路径 |
-| `src/ui/ui_core.c` | 增加空根保护 | 低，已加测试 |
-| `src/hal/hal_display_fb.cpp` | 新增，帧缓冲/画布生命周期 + 方向/亮度配置 | 低，与旧 `hal_display.cpp` 等价 |
-| `src/hal/hal_display_draw.cpp` | 新增，绘制原语 | 低，代码来自旧 `hal_display.cpp` 拆分 |
-| `src/hal/hal_display_font.cpp` | 新增，字体与文本 | 低，native 增加 6×8 字体模拟 |
-| `src/hal/hal_display_adv.cpp` | 新增，XOR/XBM/裁剪/测试钩子 | 低，代码来自旧 `hal_display.cpp` 拆分 |
-| `src/hal/hal_screen.c/h` | 新增，运行时屏幕尺寸查询 | 低，`g_screen_width/height` 集中定义 |
+- `src/`：166 个文件，24,210 行
+- `doc/`：76 个文件，16,721 行
 
-## 4. 测试覆盖新增
+## 未提交变更
 
-| 测试文件 | 新增用例 | 覆盖目标 |
-|----------|----------|----------|
-| `test/test_native/test_ui_empty_root.cpp` | 2 | 空根菜单安全 |
-| `test/test_native/test_ui_dispatch.cpp` | 8 | vtable 生命周期行为 |
-| `test/test_native/test_ui_item_null_value.cpp` | 2 | 空值保护 |
-| `test/test_native/test_app_state.cpp` | 2 | 全局状态默认值 |
-| `test/test_native/test_flasher_menu.cpp` | 3 | 角色标签、默认引脚配置 |
-| `test/test_native/test_kernel_*.cpp` | 若干 | 内核设备模型、SMP、同步、任务生命周期 |
+集成验证阶段结束后，工作区仅剩：
+- `M doc/refactor/README.md`（阶段状态已更新为“集成验证 RUNNING”）
 
-基线 `test_native` 为 354 tests；当前为 **371 tests**，新增 **17 个** UI/App/内核相关测试用例。
+将在阶段 4 与归档文档一起提交。
 
-## 5. 集成结论
+## 遗留问题
 
-- ✅ native 测试全通过（371/371）
-- ✅ 硬件编译成功（Flash 88.0%，RAM 22.3%）
-- ✅ 无新增 warning/error
-- ✅ 公共入口 API 未发生破坏性变更
-- ✅ `main.cpp` 改动最小（包含、全局状态迁移、显示配置 HAL 化）
-- ✅ HAL 层 `M5.Display` 直接调用已清零
+| ID | 问题 | 状态 |
+|----|------|------|
+| K-P1-02 | `path_walk()` 不支持 `.` / `..` | 延后 |
+| K-P1-04 | `kmalloc_header_t` 未显式对齐 | 延后 |
+| K-P1-05 | `kern_krealloc()` 非原子语义 | 延后 |
+| K-P1-06 | FIFO 调度抢占语义 | 延后 |
+| K-P2-01 | `kern_shell_cmds.c` 文件过长 | 延后 |
+| K-P2-02 | sysfs 路径不一致 | 延后 |
+| K-P2-04 | `minprintf` `%zd` 支持 | 延后 |
+| A-P1-02 | `wifi_manager.cpp` 过长 | 延后 |
+| A-P1-03 | WiFi/BT 状态机重复 | 延后 |
+| A-P1-04 | taskmgr 硬编码任务名 | 延后 |
+| H-P1-02 | 输入事件模型统一 | 延后 |
+| H-P2-04 | `xerintosh_push_pop_up()` 拆分 | 延后 |
 
-**建议**：可以进入 Phase 4 归档，整理最终报告与提交摘要。
+## 硬件烧录建议
+
+- 当前 `m5stick-c` 构建成功，可直接通过 `pio run -e m5stick-c --target upload` 烧录硬件验证。
+- 建议验证项：
+  1. 开机菜单结构是否正常。
+  2. 进入/退出串口监视器、烧录器时屏幕旋转是否正常。
+  3. 串口监视器 BLE 源切换与退出是否正常。
+  4. Token Usage 在空 API key 时是否不再发起网络请求。
+  5. 设置中旋转方向切换是否正常。
+
+## 结论
+
+本轮重构通过全部 native 测试和硬件构建验证。内核层核心 P0 问题已修复，App/HAL/UI 层按计划完成可控范围改造，文档已同步。剩余遗留问题均为非阻塞性技术债务，可在后续专门轮次处理。
