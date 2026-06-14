@@ -87,6 +87,30 @@ TEST_F(SettingsAccessorTest, RotationSetPortrait)
     EXPECT_EQ(settings_get_rotation(), ORIENTATION_PORTRAIT);
 }
 
+TEST_F(SettingsAccessorTest, RotationClampsInvalidLow)
+{
+    settings_set_rotation(0);
+    EXPECT_EQ(settings_get_rotation(), ORIENTATION_LANDSCAPE);
+}
+
+TEST_F(SettingsAccessorTest, RotationClampsInvalidHigh)
+{
+    settings_set_rotation(99);
+    EXPECT_EQ(settings_get_rotation(), ORIENTATION_LANDSCAPE);
+}
+
+TEST_F(SettingsAccessorTest, RotationSetPortraitStillWorks)
+{
+    settings_set_rotation(ORIENTATION_PORTRAIT);
+    EXPECT_EQ(settings_get_rotation(), ORIENTATION_PORTRAIT);
+}
+
+TEST_F(SettingsAccessorTest, RotationSetLandscapeStillWorks)
+{
+    settings_set_rotation(ORIENTATION_LANDSCAPE);
+    EXPECT_EQ(settings_get_rotation(), ORIENTATION_LANDSCAPE);
+}
+
 TEST_F(SettingsAccessorTest, LandscapeDefaultIsTrue)
 {
     EXPECT_TRUE(settings_get_landscape());

@@ -95,6 +95,9 @@ void settings_set_anim_speed(int16_t level) {
 
 int16_t settings_get_rotation(void) { return g_screen_rotation_level; }
 void settings_set_rotation(int16_t level) {
+    if (level != ORIENTATION_PORTRAIT && level != ORIENTATION_LANDSCAPE) {
+        level = ORIENTATION_LANDSCAPE;
+    }
     g_screen_rotation_level = level;
     g_is_landscape = (level == ORIENTATION_LANDSCAPE);
 }
