@@ -31,6 +31,7 @@
 #include "app/settings/settings.h"
 #include "hal/hal_display.h"
 #include "hal/hal_input.h"
+#include "hal/hal_screen.h"
 #include "hal/hal_system.h"
 #include "ui/ui_core.h"
 #include "ui/ui_selector.h"
@@ -118,7 +119,6 @@ bool g_flasher_bridge_active = false;
 
 #ifndef NATIVE_TEST
 #include <Arduino.h>
-#include <M5Unified.h>
 #endif
 
 /* ═══ STK500 进度解析器 ═══ */
@@ -373,9 +373,8 @@ void flasher_init(void *ud)
     if (!g_is_landscape) {
         g_is_landscape = true;
         g_screen_rotation_level = ORIENTATION_LANDSCAPE;
-        M5.Display.setRotation(1);
-        g_screen_width = M5.Display.width();
-        g_screen_height = M5.Display.height();
+        hal_display_set_rotation(1);
+        hal_screen_get_size(&g_screen_width, &g_screen_height);
         hal_display_init();
     }
     hal_input_reset_events();
@@ -531,9 +530,8 @@ void flasher_exit(void *ud)
     if (!s_prev_landscape) {
         g_is_landscape = false;
         g_screen_rotation_level = ORIENTATION_PORTRAIT;
-        M5.Display.setRotation(0);
-        g_screen_width = M5.Display.width();
-        g_screen_height = M5.Display.height();
+        hal_display_set_rotation(0);
+        hal_screen_get_size(&g_screen_width, &g_screen_height);
         hal_display_init();
     }
     hal_input_set_double_click_enabled(false);

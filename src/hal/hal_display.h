@@ -11,19 +11,18 @@
 #define HAL_DISPLAY_H
 
 #include <stdint.h>
+#include "hal_screen.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/* ═══ 常量 ═══ */
+/* ═══ 常量（保持向后兼容）═══ */
 
 #ifdef NATIVE_TEST
 #define SCREEN_WIDTH  80   /* native 测试环境屏幕宽度 */
 #define SCREEN_HEIGHT 160  /* native 测试环境屏幕高度 */
 #else
-extern int16_t g_screen_width;   /* 运行时屏幕宽度（硬件环境从 M5.Display 读取） */
-extern int16_t g_screen_height;  /* 运行时屏幕高度 */
 #define SCREEN_WIDTH  g_screen_width
 #define SCREEN_HEIGHT g_screen_height
 #endif
@@ -228,6 +227,33 @@ extern void hal_set_clip_rect(int16_t x, int16_t y, int16_t w, int16_t h);
  * @brief  清除裁剪矩形，恢复全屏绘制
  */
 extern void hal_clear_clip_rect(void);
+
+/* ═══ 显示配置 ═══ */
+
+/**
+ * @brief 设置屏幕方向
+ * @param rotation 方向值（0-3），与 M5GFX setRotation 语义一致：
+ *                 0=竖屏, 1=横屏, 2=反向竖屏, 3=反向横屏
+ */
+void hal_display_set_rotation(int rotation);
+
+/**
+ * @brief 获取当前屏幕方向
+ * @return 当前方向值（0-3）
+ */
+int hal_display_get_rotation(void);
+
+/**
+ * @brief 设置屏幕背光亮度
+ * @param level 亮度值（0-255）
+ */
+void hal_display_set_brightness(uint8_t level);
+
+/**
+ * @brief 获取当前屏幕背光亮度
+ * @return 亮度值（0-255）
+ */
+uint8_t hal_display_get_brightness(void);
 
 /* ═══ 测试钩子（仅 NATIVE_TEST） ═══ */
 

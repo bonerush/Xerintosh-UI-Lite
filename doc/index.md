@@ -32,6 +32,7 @@ Project Root
 │   │   └── [版本信息](kernel/kern-version.md)       ← 版本号与开发者管理
 ├── HAL 层（硬件抽象）
 │   ├── [显示驱动](hal/display.md)      ← TFT 双缓冲 / Native 内存帧缓冲
+│   ├── [屏幕尺寸](hal/screen.md)       ← 运行时屏幕尺寸查询
 │   ├── [输入系统](hal/input.md)        ← 按键消抖 + 短按/长按/双击状态机
 │   └── [系统时钟](hal/system.md)       ← tick 与延时
 ├── UI 核心层（纯 C）— 2026年6月重构
@@ -165,7 +166,8 @@ FreeRTOS 继续在底层为 WiFi/BT 协议栈服务。SMP 模式下 Xeros 在每
 - **[API 调用模板](tutorials/api-templates.md)** — 12 个可直接复制的 API 调用模板，涵盖 UI 组件、服务模块、HAL 层与常见陷阱
 
 ### HAL 层
-- **[显示驱动](hal/display.md)** — TFT/Native 双实现、绘制原语、XOR 矩形
+- **[显示驱动](hal/display.md)** — TFT/Native 双实现、绘制原语、XOR 矩形、字体与文本
+- **[屏幕尺寸](hal/screen.md)** — 运行时屏幕尺寸查询，解耦布局模块与显示驱动
 - **[输入系统](hal/input.md)** — 按键状态机、消抖、事件派发
 - **[系统时钟](hal/system.md)** — `millis()` 封装、`std::chrono` 桌面回退
 

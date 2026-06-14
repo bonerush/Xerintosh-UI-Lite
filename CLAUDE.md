@@ -163,7 +163,12 @@ UI Core Layer (src/ui/) — Pure C, do not modify framework logic lightly
 └── ui_camera.h               — Camera type definitions
 
 HAL Layer (src/hal/) — Hardware abstraction
-├── hal_display.cpp/h         — TFT double-buffer (M5Canvas) / native memory framebuffer
+├── hal_display.h             — Unified display API header
+├── hal_display_fb.cpp        — Framebuffer/canvas lifecycle, rotation & brightness
+├── hal_display_draw.cpp      — Drawing primitives (pixel/line/rect/circle/round rect)
+├── hal_display_font.cpp      — Font setup, string drawing, text width/height
+├── hal_display_adv.cpp       — XOR highlight, XBM bitmap, clip rect, test hooks
+├── hal_screen.h/c            — Screen size query (decouples layout from display.h)
 ├── hal_input.cpp/h           — Button state machine (debounce, short/long press)
 ├── hal_input_double_click.c/h — Double-click detection extension
 ├── hal_system.cpp/h          — Tick and delay wrappers
@@ -256,8 +261,8 @@ Defined in `app_init.c` (`app_input_process()`):
 
 ## Known Pitfalls
 
-- **Color depth order**: In `hal_display.cpp`, `setColorDepth(8)` must be called **before** `createSprite()`. `createSprite()` without a prior color-depth call defaults to alpha=0 and renders black.
-- **Backlight**: `M5.begin()` does not always set max brightness. Explicitly call `M5.Display.setBrightness(...)`.
+- **Color depth order**: In `hal_display_fb.cpp`, `setColorDepth(8)` must be called **before** `createSprite()`. `createSprite()` without a prior color-depth call defaults to alpha=0 and renders black.
+- **Backlight**: `M5.begin()` does not always set max brightness. Use `hal_display_set_brightness(...)` instead of calling `M5.Display` directly.
 - **M5.update()**: Must be called in `loop()` before reading button state. Without it, all buttons read as false.
 - **build_src_filter is unreliable**: The project uses `#ifdef NATIVE_TEST` to exclude `main.cpp` in native builds, not `build_src_filter`.
 - **PlatformIO cache**: Delete `.pio/build/` after `platformio.ini` changes.

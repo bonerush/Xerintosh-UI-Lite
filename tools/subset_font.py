@@ -215,7 +215,7 @@ extern const uint8_t lgfx_cn_font_subset[];
 ''')
 
     print("Generated: src/fonts/cn_font_subset.c + .h")
-    print("Now update hal_display.cpp to use lgfx_cn_font_subset instead of efontCN_12")
+    print("Now update src/hal/hal_display_adv.cpp to use lgfx_cn_font_subset instead of efontCN_12")
 
 if __name__ == '__main__':
     main()

@@ -4,7 +4,7 @@
 
 ## 1. 验证目标
 
-确认内核层、UI 核心层、App 层重构后的代码能够：
+确认内核层、HAL 层、UI 核心层、App 层重构后的代码能够：
 
 1. 在 native 环境通过全部单元测试；
 2. 在硬件目标（m5stick-c）无 warning、无 error 地编译通过；
@@ -70,7 +70,7 @@ pio run -e m5stick-c 2>&1 | grep -Ei "warning:|error:|note:"
 | `xerintosh_ui_main_core()` | `ui_core.h` | 保持 |
 | `xerintosh_selector_go_next_item()` 等 | `ui_item.h` | 保持 |
 
-`main.cpp` 仅新增 `#include "app/app_state.h"`，移除 `g_wifi_on`/`g_bt_on` 局部定义。整体调用流程未变。
+`main.cpp` 新增 `#include "app/app_state.h"`、移除 `g_wifi_on`/`g_bt_on` 局部定义，并将显示旋转/亮度调用改为 HAL API。整体调用流程未变。
 
 ### 3.5 关键 diff 审查
 
@@ -83,6 +83,11 @@ pio run -e m5stick-c 2>&1 | grep -Ei "warning:|error:|note:"
 | `src/app/app_state.c` | 新增，集中全局状态 | 低，`main.cpp`/`native_main.cpp` 已移除重复定义 |
 | `src/ui/ui_dispatch.c` | 新增完整生命周期 vtable | 低，测试覆盖 enter/measure/draw/destroy 等路径 |
 | `src/ui/ui_core.c` | 增加空根保护 | 低，已加测试 |
+| `src/hal/hal_display_fb.cpp` | 新增，帧缓冲/画布生命周期 + 方向/亮度配置 | 低，与旧 `hal_display.cpp` 等价 |
+| `src/hal/hal_display_draw.cpp` | 新增，绘制原语 | 低，代码来自旧 `hal_display.cpp` 拆分 |
+| `src/hal/hal_display_font.cpp` | 新增，字体与文本 | 低，native 增加 6×8 字体模拟 |
+| `src/hal/hal_display_adv.cpp` | 新增，XOR/XBM/裁剪/测试钩子 | 低，代码来自旧 `hal_display.cpp` 拆分 |
+| `src/hal/hal_screen.c/h` | 新增，运行时屏幕尺寸查询 | 低，`g_screen_width/height` 集中定义 |
 
 ## 4. 测试覆盖新增
 
@@ -103,6 +108,7 @@ pio run -e m5stick-c 2>&1 | grep -Ei "warning:|error:|note:"
 - ✅ 硬件编译成功（Flash 88.0%，RAM 22.3%）
 - ✅ 无新增 warning/error
 - ✅ 公共入口 API 未发生破坏性变更
-- ✅ `main.cpp` 改动最小（仅包含和全局状态迁移）
+- ✅ `main.cpp` 改动最小（包含、全局状态迁移、显示配置 HAL 化）
+- ✅ HAL 层 `M5.Display` 直接调用已清零
 
 **建议**：可以进入 Phase 4 归档，整理最终报告与提交摘要。

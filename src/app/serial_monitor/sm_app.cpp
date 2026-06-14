@@ -16,6 +16,7 @@
 #include "app/bluetooth/bt_uart_service.h"
 #include "hal/hal_display.h"
 #include "hal/hal_input.h"
+#include "hal/hal_screen.h"
 #include "hal/hal_system.h"
 #include "ui/ui_core.h"
 #include "ui/ui_item.h"
@@ -37,7 +38,6 @@ float       sm_btn_alpha_1 = 0.0f;
 
 #ifndef NATIVE_TEST
 #include <Arduino.h>
-#include <M5Unified.h>
 static char        sm_rx_buf[SM_TERM_LINE_LEN];
 static uint8_t     sm_rx_len = 0;
 static bool        s_prev_landscape = true; /* 保存进入前的屏幕方向 */
@@ -115,9 +115,8 @@ void serial_monitor_init(void *ud)
         /* 从竖屏菜单进入时临时切换到横屏 */
         g_is_landscape = true;
         g_screen_rotation_level = ORIENTATION_LANDSCAPE;
-        M5.Display.setRotation(1);
-        g_screen_width = M5.Display.width();
-        g_screen_height = M5.Display.height();
+        hal_display_set_rotation(1);
+        hal_screen_get_size(&g_screen_width, &g_screen_height);
         hal_display_init();
     }
     hal_input_reset_events();
@@ -268,9 +267,8 @@ void serial_monitor_exit(void *ud)
         /* 恢复之前的竖屏方向 */
         g_is_landscape = false;
         g_screen_rotation_level = ORIENTATION_PORTRAIT;
-        M5.Display.setRotation(0);
-        g_screen_width = M5.Display.width();
-        g_screen_height = M5.Display.height();
+        hal_display_set_rotation(0);
+        hal_screen_get_size(&g_screen_width, &g_screen_height);
         hal_display_init();
     }
     hal_input_set_double_click_enabled(false);

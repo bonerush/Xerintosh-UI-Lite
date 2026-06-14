@@ -4,13 +4,13 @@
 
 ## 1. 重构摘要
 
-本次重构围绕 M5Stick-P1 的 **Xeros 内核层**、**Xerintosh UI 核心层** 与 **App 层** 展开，目标是在不破坏公共 API 的前提下，解决职责耦合、消除内联类型分支、收敛全局状态、补齐边界测试与文档。
+本次重构围绕 M5Stick-P1 的 **Xeros 内核层**、**HAL 层**、**Xerintosh UI 核心层** 与 **App 层** 展开，目标是在不破坏公共 API 的前提下，解决职责耦合、消除内联类型分支、补齐硬件抽象、收敛全局状态、补齐边界测试与文档。
 
 - **分支**：`refactor/2026-06-14-kernel-ui`
 - **基线 commit**：`6411c578124f1bf029169ffe1f5dfbef9fddeee5`
 - **完成日期**：2026-06-14
-- **总提交数**：10 个
-- **总改动**：96 个文件，`+4926 / -1459` 行（含文档 `+2334 / -364`，代码与测试 `+2121 / -1091`）
+- **总提交数**：11 个
+- **总改动**：113 个文件，`+6348 / -2102` 行
 
 ## 2. 各阶段产出
 
@@ -19,7 +19,7 @@
 | 0. 基线建立 | DONE | `00-baseline.md` |
 | 1. 扫描诊断 | DONE | `01-diagnosis.md`、`01-diagnosis-kernel.md`、`01-diagnosis-ui.md` |
 | 2.1 内核层重构 | DONE | 统一设备模型（`kern_device.c/h`、`kern_devices.c/h`）、统一错误码、调度类与任务退出强化 |
-| 2.2 HAL 层重构 | SKIPPED | 本轮 HAL 状态良好，未做结构性改动 |
+| 2.2 HAL 层重构 | DONE | 拆分 `hal_display.cpp`、新增 `hal_screen.h/c`、补齐旋转/亮度 HAL API、`M5.Display` 直接调用清零 |
 | 2.3 UI 核心层重构 | DONE | 完整生命周期 vtable（`ui_dispatch.c`）、空根 NULL 保护、动画/绘制缓存优化 |
 | 2.4 App 层重构 | DONE | `app_state.c/h`、`app_menu.c/h`、`app_input.c/h`、`ui_service.c/h`、`flasher_menu.c/h` |
 | 2.5 文档同步 | DONE | 更新 `CLAUDE.md`、知识地图、开发者指南、教程与新增模块文档 |
@@ -34,14 +34,24 @@
 - 强化任务退出资源回收：退出路径始终调用 `kern_exit()`。
 - 调度类与 SMP 相关头文件语义澄清。
 
-### 3.2 UI 核心层（Phase 2.3）
+### 3.2 HAL 层（Phase 2.2）
+
+- 拆分 `src/hal/hal_display.cpp` 为四个职责清晰的文件：
+  - `hal_display_fb.cpp`：帧缓冲/画布生命周期、方向与亮度配置
+  - `hal_display_draw.cpp`：绘制原语（像素、线、矩形、圆、圆角矩形）
+  - `hal_display_font.cpp`：字体与文本；native 环境实现 6×8 ASCII 位图字体模拟
+  - `hal_display_adv.cpp`：XOR 反色矩形、XBM 位图、裁剪矩形、`hal_test_fb_read` 测试钩子
+- 新增 `hal_display_set_rotation/get_rotation/set_brightness/get_brightness` API，迁移 `main.cpp`、`flasher_app.cpp`、`sm_app.cpp`、`dev_fb0.c` 中的 `M5.Display` 直接调用。
+- 新增 `src/hal/hal_screen.h/c`，集中定义运行时屏幕尺寸 `g_screen_width` / `g_screen_height`，解耦布局模块与完整显示头文件。
+
+### 3.3 UI 核心层（Phase 2.3）
 
 - `ui_dispatch.c`：实现覆盖 `enter / input_next / input_prev / input_exit / measure / draw / draw_overlay / destroy / has_right_control` 的完整 vtable，替代所有内联 `switch(type)` 分支。
 - `ui_core.c`/`ui_item_selector.c`/`ui_draw_list.c`：迁移到派发表，并增加空根保护。
 - 列表可见性判断 `xerintosh_is_item_visible()` 公开化。
 - 滚动条长度缓存、字体缓存修复、选择器宽度缓存等微优化。
 
-### 3.3 App 层（Phase 2.4）
+### 3.4 App 层（Phase 2.4）
 
 - 新增 `app_state.c/h`：收敛 `g_wifi_on`、`g_bt_on` 与设置变更回调声明。
 - 拆分 `app_init.c`：
@@ -53,7 +63,7 @@
 - 解耦 `settings.c` 与 `flasher_gpio.h`，迁移角色标签函数。
 - 修复 `ui_task.c` 直接调用 Arduino `delay()` 的问题。
 
-### 3.4 测试
+### 3.5 测试
 
 - 新增 5 个测试文件：
   - `test_ui_empty_root.cpp`（空根安全）
@@ -87,7 +97,7 @@
 
 1. **继续迁移 user_item App 到 ui_service**：优先迁移 `taskmgr` 与 `about` 之后最常用的 `serial_monitor`。
 2. **补充 E2E/冒烟测试**：当前 native 测试集中在单元级别，建议增加菜单导航路径、烧录器引脚配置流程的集成测试。
-3. **HAL 层重构评估**：Phase 2.2 本轮跳过，后续若需要支持新硬件或新屏幕方向，可重新评估 HAL 层抽象。
+3. **HAL 层进一步解耦**：`hal_layout.h` 仍为 `hal_get_font_height()` 依赖 `hal_display.h`，若未来需要更彻底的隔离，可将字体高度前向声明移入布局头文件。
 4. **内存优化**：Flash 已使用 88%，未来新增功能需关注空间余量。
 5. **文档自动化**：考虑在 CI 中增加文档链接有效性检查，避免源链接因行号变化而失效。
 

@@ -1,6 +1,6 @@
 # 显示驱动（HAL Display）
 
-> **Parent:** [知识地图](../index.md) | **Related:** [输入系统](input.md), [系统时钟](system.md)
+> **Parent:** [知识地图](../index.md) | **Related:** [输入系统](input.md), [系统时钟](system.md), [屏幕尺寸](screen.md)
 
 ## 概述
 
@@ -11,21 +11,30 @@
 
 两套实现共享同一套 C API，UI 上层无感知。
 
+源码按职责拆分为四个文件，统一通过 `hal_display.h` 暴露：
+
+| 文件 | 职责 |
+|---|---|
+| `src/hal/hal_display_fb.cpp` | 帧缓冲/画布生命周期、方向与亮度配置 |
+| `src/hal/hal_display_draw.cpp` | 绘制原语（像素、线、矩形、圆、圆角矩形） |
+| `src/hal/hal_display_font.cpp` | 字体设置、字符串绘制、文本宽度/高度查询 |
+| `src/hal/hal_display_adv.cpp` | 高级绘制（XOR 反色、XBM 位图、裁剪矩形、测试钩子） |
+
+屏幕尺寸常量与运行时查询已收敛到 [`hal_screen.h`](screen.md)。
+
 ---
 
 ## 关键概念
 
 ### 屏幕参数
 
-*📄 Source: [hal_display.h](../../src/hal/hal_display.h#L21-L35)*
+*📄 Source: [hal_display.h](../../src/hal/hal_display.h#L21-L35) / [hal_screen.h](../../src/hal/hal_screen.h#L19-L36)*
 
 ```c
 #ifdef NATIVE_TEST
 #define SCREEN_WIDTH  80   /* native 测试环境屏幕宽度 */
 #define SCREEN_HEIGHT 160  /* native 测试环境屏幕高度 */
 #else
-extern int16_t g_screen_width;   /* 运行时屏幕宽度（硬件环境从 M5.Display 读取） */
-extern int16_t g_screen_height;  /* 运行时屏幕高度 */
 #define SCREEN_WIDTH  g_screen_width
 #define SCREEN_HEIGHT g_screen_height
 #endif
@@ -38,12 +47,12 @@ extern int16_t g_screen_height;  /* 运行时屏幕高度 */
 
 ### 双缓冲架构（真机）
 
-*📄 Source: [hal_display.cpp](../../src/hal/hal_display.cpp#L353-L401)*
+*📄 Source: [hal_display_fb.cpp](../../src/hal/hal_display_fb.cpp#L76-L94)*
 
 ```c
-static M5Canvas* g_canvas = nullptr;  /* 离屏画布 */
-int16_t g_screen_width = 160;         /* 默认屏幕宽度，init 时从硬件读取 */
-int16_t g_screen_height = 80;         /* 默认屏幕高度 */
+M5Canvas* g_canvas = nullptr;       /* 离屏画布 */
+static int g_rotation = 0;          /* 当前屏幕方向 */
+static uint8_t g_brightness = 128;  /* 当前背光亮度 */
 
 void hal_display_init(void) {
     if (!g_canvas) {
@@ -53,24 +62,6 @@ void hal_display_init(void) {
     g_screen_width = M5.Display.width();
     g_screen_height = M5.Display.height();
     g_canvas->createSprite(g_screen_width, g_screen_height);
-}
-
-void hal_display_deinit(void) {
-    if (g_canvas) {
-        g_canvas->deleteSprite();  /* 释放 80×160×8bit = 12.8KB 帧缓冲 */
-    }
-}
-
-void hal_display_clear(void) {
-    if (g_canvas) {
-        g_canvas->fillScreen(COLOR_BG);
-    }
-}
-
-void hal_display_flush(void) {
-    if (g_canvas) {
-        g_canvas->pushSprite(&M5.Display, 0, 0);
-    }
 }
 ```
 
@@ -88,36 +79,39 @@ void hal_display_flush(void) {
     屏幕高 = M5.Display.高度()
     画布.创建精灵(宽, 高)
 }
-
-函数 显示反初始化() {
-    if (画布存在) {
-        画布.删除精灵()   // 释放 12.8KB 帧缓冲
-    }
-}
-
-函数 显示清空() {
-    画布.填充屏幕(黑色)
-}
-
-函数 显示刷新() {
-    // 将后台画布一次性推送到 TFT
-    画布.推送精灵到(地址取 M5.Display, x=0, y=0)
-}
 ```
 
 **关键顺序**：`setColorDepth(8)` 必须**在** `createSprite()` 之前调用。若顺序颠倒，alpha=0 会导致所有绘制不可见（黑屏）。8-bit RGB332 相比 16-bit 节省 12.8KB 内存，确保 ESP32-PICO 无 PSRAM 时也能同时运行 Classic BT SPP + UI 渲染。
 
-### Native 内存帧缓冲（测试）
-
-*📄 Source: [hal_display.cpp](../../src/hal/hal_display.cpp#L19-L47)*
+*📄 Source: [hal_display_fb.cpp](../../src/hal/hal_display_fb.cpp#L101-L104)*
 
 ```c
-static uint16_t g_framebuffer[SCREEN_WIDTH * SCREEN_HEIGHT];  /* RGB565 帧缓冲区 */
+void hal_display_deinit(void) {
+    if (g_canvas) {
+        g_canvas->deleteSprite();  /* 释放 80×160×8bit = 12.8KB 帧缓冲 */
+    }
+}
+```
+
+### Native 内存帧缓冲（测试）
+
+*📄 Source: [hal_display_fb.cpp](../../src/hal/hal_display_fb.cpp#L18-L31)*
+
+```c
+uint16_t g_framebuffer[SCREEN_WIDTH * SCREEN_HEIGHT];  /* RGB565 帧缓冲区 */
+extern uint16_t *g_font_fb;  /* 定义在 hal_display_font.cpp，native 字体层 */
 
 void hal_display_init(void) {
     memset(g_framebuffer, 0, sizeof(g_framebuffer));
+    if (g_font_fb != NULL) {
+        memset(g_font_fb, 0, SCREEN_WIDTH * SCREEN_HEIGHT * sizeof(uint16_t));
+    }
 }
+```
 
+*📄 Source: [hal_display_draw.cpp](../../src/hal/hal_display_draw.cpp#L20-L23)*
+
+```c
 void hal_draw_pixel(int16_t x, int16_t y, uint16_t color) {
     if (x < 0 || x >= SCREEN_WIDTH || y < 0 || y >= SCREEN_HEIGHT) return;
     g_framebuffer[y * SCREEN_WIDTH + x] = color;
@@ -136,14 +130,46 @@ void hal_draw_pixel(int16_t x, int16_t y, uint16_t color) {
 ```
 
 Native 环境下所有复杂图形（线、圆、圆角矩形）都通过**软件算法**实现：
-- 直线：[Bresenham 算法](../../src/hal/hal_display.cpp#L52-L72)
-- 圆和圆角矩形：[中点圆算法](../../src/hal/hal_display.cpp#L126-L203)
+- 直线：[Bresenham 算法](../../src/hal/hal_display_draw.cpp#L28-L48)
+- 圆和圆角矩形：[中点圆算法](../../src/hal/hal_display_draw.cpp#L102-L140)
+
+### 显示配置
+
+上层不再直接调用 `M5.Display.setRotation()` / `setBrightness()`。HAL 提供统一配置接口：
+
+*📄 Source: [hal_display.h](../../src/hal/hal_display.h#L238-L256)*
+
+```c
+void hal_display_set_rotation(int rotation);
+int  hal_display_get_rotation(void);
+void hal_display_set_brightness(uint8_t level);
+uint8_t hal_display_get_brightness(void);
+```
+
+*📄 Source: [hal_display_fb.cpp](../../src/hal/hal_display_fb.cpp#L107-L126)*
+
+```c
+void hal_display_set_rotation(int rotation) {
+    if (rotation < 0 || rotation > 3) rotation = 0;
+    g_rotation = rotation;
+    M5.Display.setRotation(rotation);
+    g_screen_width = M5.Display.width();
+    g_screen_height = M5.Display.height();
+}
+
+void hal_display_set_brightness(uint8_t level) {
+    g_brightness = level;
+    M5.Display.setBrightness(level);
+}
+```
+
+`/dev/fb0` 的 `DEV_FB_IOCTL_SET_ROTATION` 也转发到 `hal_display_set_rotation()`，实现 Shell 与 sysfs 对屏幕方向的统一控制。
 
 ### XOR 反色矩形（选择器高亮）
 
 TFT 不支持 OLED 的 `draw_color(2)` 反色模式。我们采用**像素级 XOR** 实现选择器高亮。
 
-*📄 Source: [hal_display.cpp](../../src/hal/hal_display.cpp#L510-L531)*
+*📄 Source: [hal_display_adv.cpp](../../src/hal/hal_display_adv.cpp#L103-L124)*
 
 ```c
 void hal_draw_xor_rect(int16_t x, int16_t y, int16_t w, int16_t h) {
@@ -192,7 +218,7 @@ void hal_draw_xor_rect(int16_t x, int16_t y, int16_t w, int16_t h) {
 
 真机环境下直接委托给 M5GFX 的文本 API：
 
-*📄 Source: [hal_display.cpp](../../src/hal/hal_display.cpp#L466-L501)*
+*📄 Source: [hal_display_font.cpp](../../src/hal/hal_display_font.cpp#L240-L272)*
 
 ```c
 void hal_draw_string(int16_t x, int16_t y, const char* str, uint16_t color) {
@@ -223,7 +249,52 @@ int16_t hal_get_font_height(void) {
 #define hal_get_utf8_width(str) hal_get_string_width(str)
 ```
 
-Native 测试环境目前将文本绘制设为空实现（只返回固定字高 8px），因为测试框架主要验证动画和逻辑，不验证字体渲染。
+Native 测试环境提供**固定宽度 ASCII 字体模拟**（6×8 位图字体），使 UI 布局测试获得可预测的尺寸输入：
+
+- `hal_get_font_height()` 返回 `8`
+- `hal_get_string_width(str)` 返回 `strlen(str) * 7`（含 1px 字间距）
+- `hal_draw_string()` 将字符写入独立的字体层，最终通过 `hal_test_fb_read()` 与帧缓冲叠加输出
+
+*📄 Source: [hal_display_font.cpp](../../src/hal/hal_display_font.cpp#L185-L214)*
+
+```c
+void hal_draw_string(int16_t x, int16_t y, const char* str, uint16_t color) {
+    if (!str) return;
+    font_fb_init_once();
+    int16_t cx = x;
+    int16_t cy = y - FONT_H + 1;
+    while (*str) {
+        font_draw_char(cx, cy, *str, color);
+        cx += FONT_W + 1;
+        str++;
+    }
+}
+
+int16_t hal_get_string_width(const char* str) {
+    if (!str) return 0;
+    size_t len = strlen(str);
+    return (int16_t)(len * (FONT_W + 1));
+}
+```
+
+### 测试钩子
+
+*📄 Source: [hal_display_adv.cpp](../../src/hal/hal_display_adv.cpp#L77-L86)*
+
+```c
+uint16_t hal_test_fb_read(int16_t x, int16_t y)
+{
+    if (x < 0 || x >= SCREEN_WIDTH || y < 0 || y >= SCREEN_HEIGHT) return 0;
+    uint16_t v = g_framebuffer[y * SCREEN_WIDTH + x];
+    if (g_font_fb != NULL) {
+        uint16_t fv = g_font_fb[y * SCREEN_WIDTH + x];
+        if (fv != 0) v = fv;
+    }
+    return v;
+}
+```
+
+仅当定义了 `NATIVE_TEST` 时暴露，用于 `/dev/fb0` 与内核设备测试验证像素写入结果。
 
 ---
 
@@ -233,7 +304,9 @@ Native 测试环境目前将文本绘制设为空实现（只返回固定字高 
 - **ui_drawer**：调用 `hal_draw_xor_rect()` 实现选择器反色高亮
 - **main.cpp**：每帧调用 `hal_display_clear()` → 绘制 → `hal_display_flush()`
 - **hal_layout.h**：提供基于 `hal_get_font_height()` 和 `SCREEN_WIDTH/HEIGHT` 的布局宏
+- **hal_screen.h**：集中定义运行时屏幕尺寸 `g_screen_width` / `g_screen_height`
+- **dev_fb0.c**：通过 `hal_display_*` 原语实现 `/dev/fb0` 设备协议
 
 ---
 
-> **See Also:** [输入系统](input.md) | [绘制管线](../ui/drawer.md)
+> **See Also:** [输入系统](input.md) | [屏幕尺寸](screen.md) | [绘制管线](../ui/drawer.md)

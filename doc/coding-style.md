@@ -242,7 +242,7 @@ if (_item->init_function != NULL) {
 ### 5.2 示例：HAL 显示模块
 
 ```cpp
-/* hal_display.cpp — 内部使用 M5GFX (C++) */
+/* hal_display_fb.cpp — 内部使用 M5GFX (C++) */
 #include <M5Unified.h>
 #include <M5GFX.h>
 

@@ -65,7 +65,7 @@ extern "C" void on_brightness_change_cb(void *ud)
     (void)ud;
     brightness = g_brightness_level * 10;
     uint8_t hw = (uint8_t)settings_brightness_hw_value();
-    M5.Display.setBrightness(hw);
+    hal_display_set_brightness(hw);
     storage_set_brightness(brightness);
 }
 
@@ -115,7 +115,7 @@ extern "C" void on_screen_rotation_change_cb(void *ud)
     g_screen_rotation_level = g_is_landscape ? ORIENTATION_LANDSCAPE : ORIENTATION_PORTRAIT;
 
     int16_t gfx_rotation = g_is_landscape ? 1 : 0;
-    M5.Display.setRotation(gfx_rotation);
+    hal_display_set_rotation(gfx_rotation);
     storage_set_screen_rotation((uint8_t)g_screen_rotation_level);
     hal_display_init();
 
@@ -147,7 +147,7 @@ void setup()
     Serial.println("[  OK  ] Settings loaded from NVS");
 
     brightness = g_brightness_level * 10;
-    M5.Display.setBrightness((uint8_t)settings_brightness_hw_value());
+    hal_display_set_brightness((uint8_t)settings_brightness_hw_value());
     g_anim_speed = settings_anim_speed_value();
 
     /* M5StickC 实测 rotation 效果：
@@ -155,7 +155,7 @@ void setup()
      *   setRotation(1) → 正常横屏 (landscape) */
     g_is_landscape = (g_screen_rotation_level == ORIENTATION_LANDSCAPE);
     int16_t gfx_rotation = g_is_landscape ? 1 : 0;
-    M5.Display.setRotation(gfx_rotation);
+    hal_display_set_rotation(gfx_rotation);
 
     Serial.printf("[  OK  ] Display driver, free_heap=%u\n", ESP.getFreeHeap());
     hal_display_init();
@@ -216,7 +216,7 @@ static void deferred_kernel_init(void)
         [](kern_sysfs_attr_t attr, int32_t val, void *ud) {
             (void)attr; (void)ud;
             uint8_t hw = (uint8_t)(val > 255 ? 255 : val);
-            M5.Display.setBrightness(hw);
+            hal_display_set_brightness(hw);
             brightness = (int16_t)val;
             storage_set_brightness(val);
         }, NULL);
@@ -226,7 +226,7 @@ static void deferred_kernel_init(void)
         [](kern_sysfs_attr_t attr, int32_t val, void *ud) {
             (void)attr; (void)ud;
             if (val < 0 || val > 3) return;
-            M5.Display.setRotation((int32_t)val);
+            hal_display_set_rotation((int)val);
             g_screen_rotation_level = (val == 0 || val == 2)
                                       ? ORIENTATION_PORTRAIT
                                       : ORIENTATION_LANDSCAPE;

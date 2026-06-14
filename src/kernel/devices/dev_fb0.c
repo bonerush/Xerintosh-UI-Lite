@@ -100,8 +100,7 @@ static int dev_fb0_ioctl(kern_device_t *dev, unsigned int cmd, unsigned long arg
     case DEV_FB_IOCTL_GET_HEIGHT:
         return (int)SCREEN_HEIGHT;
     case DEV_FB_IOCTL_SET_ROTATION:
-        /* 硬件环境: M5.Display.setRotation(arg) 但 HAL 层未暴露旋转 API，
-         * 保留此 ioctl 供未来扩展 */
+        hal_display_set_rotation((int)arg);
         return KERN_OK;
     default:
         return KERN_ENOTTY;
