@@ -17,16 +17,14 @@ extern "C" {
 #include "ui/ui_core.h"
 #include "ui/ui_item.h"
 
-/* 桩回调（供 native 测试链接 app_init.c 使用） */
+#include "app/app_state.h"
+
+/* 桩回调（供 native 测试链接 app_init.c / app_menu.c 使用） */
 void on_brightness_change_cb(void *ud) { (void)ud; }
 void on_anim_speed_change_cb(void *ud) { (void)ud; }
 void on_anim_enabled_change_cb(void *ud) { (void)ud; }
 void on_screen_rotation_change_cb(void *ud) { (void)ud; }
 void on_serial_baud_change_cb(void *ud) { (void)ud; }
-
-/* 外部状态标志桩 */
-bool g_wifi_on = true;
-bool g_bt_on = true;
 }
 
 /* ═══ 动画测试 ═══ */

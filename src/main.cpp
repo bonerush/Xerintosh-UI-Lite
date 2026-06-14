@@ -12,6 +12,7 @@
 #include "app/storage/storage.h"
 #include "app/settings/settings.h"
 #include "app/app_init.h"
+#include "app/app_state.h"
 
 extern "C" {
 void wifi_mgr_task_main(void *arg);
@@ -19,11 +20,6 @@ void bt_mgr_task_main(void *arg);
 }
 
 #ifndef NATIVE_TEST
-
-extern "C" {
-bool g_wifi_on = true;  /* WiFi 默认开启（BT 默认关闭，内存充足） */
-bool g_bt_on = false;   /* 蓝牙默认关，仅在串口监视器 BLE 模式时懒加载 */
-}
 
 #include <M5Unified.h>
 #include <M5GFX.h>
