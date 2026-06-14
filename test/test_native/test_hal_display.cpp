@@ -76,3 +76,15 @@ TEST(HalDisplayEquivalence, BothAcceptSameParameterTypes)
     /* 两者类型相同，赋值不会产生警告 */
     EXPECT_EQ(w1, w2);
 }
+
+/* ═══ 初始化可调用性 ═══ */
+
+TEST(HalDisplayInit, InitDoesNotCrash)
+{
+    /*
+     * native 路径下 hal_display_init() 为空操作/清空帧缓冲。
+     * 验证 public 签名可用、不崩溃，确保 HAL 生命周期可正常调用。
+     */
+    hal_display_init();
+    SUCCEED();
+}

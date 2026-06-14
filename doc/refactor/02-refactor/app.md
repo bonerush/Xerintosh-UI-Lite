@@ -1,115 +1,99 @@
-# Phase 2.4 App 层重构报告
+# App 上层重构报告
 
-> **Parent:** [重构跟踪](../README.md) | **Prev:** [Phase 2.3 UI 核心层重构](ui.md)
+## 范围
 
-## 1. 目标
+- 处理诊断问题：A-P1-01、A-P1-05、A-P1-06、A-P2-01、A-P2-02
+- 延后问题：A-P1-02、A-P1-03、A-P1-04
 
-解决 App 层当前最突出的结构性问题：
+## 变更摘要
 
-1. `app_init.c` 职责过重（菜单构建 + 输入路由 + 烧录器业务逻辑）。
-2. flasher 引脚配置/强制解除状态机侵入 `app_init.c`。
-3. WiFi/BT/设置相关全局状态散乱，多处 `extern` 声明。
-4. `ui_service.c/h` 缺失，各 `user_item` App 生命周期实现不统一。
-5. settings 模块反向依赖 flasher。
+| 变更类型 | 数量 | 说明 |
+|----------|------|------|
+| 修改文件 | 9 | App 源码与测试 |
+| 新增文件 | 4 | `svc_mgr_helper.c/h`、`test_app_menu_safety.cpp`、`test_svc_mgr_helper.cpp` |
+| 新增 API | 4 | `ui_service_enter_landscape`、`ui_service_exit_landscape`、`svc_mgr_bt_request_enable`、`svc_mgr_bt_request_disable` |
+| 行为修复 | 3 | 菜单 NULL 检查、rotation 输入校验、空 API key 跳过网络请求 |
+| 新增测试 | 14+ | 覆盖菜单安全、横屏 helper、BT 服务助手、settings、token usage |
 
-## 2. 诊断摘要
+## 详细变更
 
-| ID | 优先级 | 问题 | 位置 |
-|---|---|---|---|
-| A-P0-1 | P0 | `app_init.c` 同时承担菜单构建、输入路由、管理器初始化、烧录器业务逻辑 | `src/app/app_init.c:147-495` |
-| A-P0-2 | P0 | `app_input_process()` 混合电源键弹窗、WiFi 弹窗、延迟弹窗、烧录器状态机、框架导航 | `src/app/app_init.c:372-495` |
-| A-P0-3 | P0 | flasher 引脚配置/强制解除状态机实现位于 `app_init.c` | `src/app/app_init.c:58-467` |
-| A-P1-1 | P1 | WiFi/BT 弹窗与 `app_input_process()` 过度耦合 | `src/app/app_init.c:381-384,479-483` |
-| A-P1-2 | P1 | 全局状态（`g_wifi_on`、`g_bt_on`、设置回调）散乱 | `main.cpp`、`app_init.c`、`settings.c` |
-| A-P1-3 | P1 | `user_item` App 生命周期与动画不统一 | 各 `src/app/*/` |
-| A-P1-4 | P1 | `settings.c` 反向依赖 `flasher_gpio.h` | `src/app/settings/settings.c:13,180-189` |
-| A-P1-5 | P1 | `ui_service.c/h`、`svc_mgr_helper.c/h` 实际缺失但文档仍列出 | `CLAUDE.md`、`doc/index.md` |
-| A-P2-3 | P2 | `ui_task.c` 直接调用 Arduino `delay()` | `src/app/ui_task.c:75` |
-| A-P2-4 | P2 | `on_baud_selected_cb` 未使用回调参数 `ud` | `src/app/app_init.c:240-248` |
+### 1. APP-01：菜单构建 NULL 检查（A-P1-01）
+**原因**：A-P1-01  
+**实现**：
+- 在 `src/app/app_menu.c` 中新增 `static app_menu_push_checked()` 辅助函数。
+- `app_menu_build()` 中每个 `xerintosh_new_*_item()` 返回后检查 NULL，失败时记录日志并跳过。
+- 所有 `xerintosh_push_item_to_list()` 替换为 `app_menu_push_checked()`。
+**影响接口**：无 public API 变化（辅助函数为 static）。  
+**文档更新**：`doc/app/app-init.md`（阶段 2.5 更新）。
 
-## 3. 实施计划
+### 2. APP-05：提取公共横屏辅助函数（A-P1-05）
+**原因**：A-P1-05  
+**实现**：
+- 在 `src/app/ui_service.h` 新增 `ui_service_enter_landscape()` / `ui_service_exit_landscape()`。
+- 在 `src/app/ui_service.c` 中用静态变量保存进入前方向状态，进入/退出时统一设置 HAL 旋转。
+- `src/app/serial_monitor/sm_app.cpp` 和 `src/app/flasher/flasher_app.cpp` 移除本地状态变量，改为调用 helper。
+**影响接口**：新增 2 个 public helper。  
+**文档更新**：`doc/app/ui-service.md`（已部分更新，阶段 2.5 补充）。
 
-### Step 1 — 拆分 `app_init.c`
+### 3. APP-06：串口监视器使用服务管理助手请求 BT（A-P1-06）
+**原因**：A-P1-06  
+**实现**：
+- 新建 `src/app/svc_mgr_helper.c` / `src/app/svc_mgr_helper.h`。
+- 新增 `svc_mgr_bt_request_enable(bool *lazy_inited)` / `svc_mgr_bt_request_disable(bool *lazy_inited)`。
+- `src/app/bluetooth/bt_manager.h` / `bt_manager.cpp` 新增 `bt_mgr_test_set_enabled()` 测试接缝。
+- `src/app/serial_monitor/sm_app.cpp` 改用 helper，不再直接调用 `bt_mgr_request_enable()` / `bt_mgr_disable()`。
+**影响接口**：新增 2 个 public helper 和 1 个测试接缝。  
+**文档更新**：`doc/app/svc-mgr-helper.md`（阶段 2.5 更新）。
 
-- 新建 `src/app/app_menu.c/h`：负责菜单树构建（`app_menu_build()`）。
-- 新建 `src/app/app_input.c/h`：负责输入路由（`app_input_process()`）。
-- 保留 `src/app/app_init.c/h`：仅作为入口封装，调用 `app_menu_build()` 与 `app_input_process()`。
+### 4. APP-P2-01：`settings_set_rotation()` 输入校验（A-P2-01）
+**原因**：A-P2-01  
+**实现**：
+- `src/app/settings/settings.c` 中 `settings_set_rotation()` 增加校验：非法值钳位到 `ORIENTATION_LANDSCAPE`。
+**影响接口**：无 public API 变化。  
+**文档更新**：`doc/app/settings.md`（阶段 2.5 更新）。
 
-### Step 2 — 迁回 flasher 逻辑
+### 5. APP-P2-02：`tu_app` API key 为空时跳过请求（A-P2-02）
+**原因**：A-P2-02  
+**实现**：
+- `src/app/token_usage/tu_app.cpp` 中 `token_usage_loop()` 增加空 key 判断，空 key 时跳过 `tu_api_fetch_deepseek()`。
+- `src/app/token_usage/tu_app.h` 新增 `token_usage_get_data()` 测试 getter。
+**影响接口**：新增 1 个测试可见 getter。  
+**文档更新**：`doc/app/token-usage.md`（阶段 2.5 更新）。
 
-- 新建 `src/app/flasher/flasher_menu.c/h`。
-- 将 `g_flasher_pin_menu`、`g_flasher_sub_state`、`safe_set_content()`、`update_flasher_pin_label()`、`on_enter_flasher_submenu()`、`on_g36_pressed_cb()`、`on_flasher_role_selected_cb()` 及强制解除状态机迁移到 `flasher_menu.c/h`。
-- `app_menu.c` 仅调用 `flasher_menu_get_root()` 获取烧录器引脚子菜单并挂载。
+## 测试
 
-### Step 3 — 收敛全局状态
+- 新增测试：
+  - `test/test_native/test_app_menu_safety.cpp`
+  - `test/test_native/test_ui_service_landscape.cpp`
+  - `test/test_native/test_svc_mgr_helper.cpp`
+  - `test/test_native/test_settings_accessors.cpp` 新增 rotation 校验用例
+  - `test/test_native/test_tu_app.cpp`
+- 验证结果：
+  - `pio test -e native`：✅ PASS（409 个测试用例，1 个 skipped，408 个 succeeded）
+  - `pio run -e m5stick-c`：✅ PASS（Flash 88.0%，RAM 22.3%）
 
-- 新建 `src/app/app_state.c/h`。
-- 将 `g_wifi_on`、`g_bt_on` 从 `main.cpp` 移至 `app_state.c`。
-- 将设置变更回调声明集中到 `app_state.h`。
-- `main.cpp`、`app_init.c`、WiFi/BT 管理器统一包含 `app_state.h`。
+## 检查清单
 
-### Step 4 — 重建 `ui_service`
+- [x] 所有导出函数有模块前缀
+- [x] 头文件有 `extern "C"` 保护
+- [x] 头文件有 include guard
+- [x] 结构体继承时基类放第一位（无新增继承）
+- [x] 类型转换有安全检查
+- [x] 回调统一带 `user_data`（无新增回调）
+- [x] 没有 `nullptr`、`&` 引用出现在 C 接口中
+- [ ] 文档已同步更新（阶段 2.5 统一处理）
+- [x] 新增/修改代码有 native 测试覆盖
+- [x] 硬件构建无新增警告
 
-- 新建 `src/app/ui_service.c/h`。
-- 提供 `ui_user_item_template_init/loop/exit` 或 `ui_user_item_begin()` / `ui_user_item_end()` 工具函数。
-- 统一处理：按键事件重置、屏幕方向保存/恢复、标准退出检测。
-- 本次先提供 API，后续各 App 逐步迁移；本次至少让 `about.c` 使用统一入口。
+## 回滚点
 
-### Step 5 — 解耦 settings 与 flasher
+- 每个子任务均为独立 commit，可单独 `git revert <commit>`。
+- 统一回滚到阶段 2.2 开始前：`git reset --hard 3d47845`（T1 内核提交）。
 
-- 将 `settings_flasher_role_label()` 从 `settings.c` 移到 `flasher_gpio.c/h`（或新建 `flasher_text.c/h`）。
-- `settings.c` 不再包含 `flasher_gpio.h`。
+## 遗留问题
 
-### Step 6 — 修复 P2 细节
-
-- `ui_task.c`：`delay(1)` → `hal_delay_ms(1)`。
-- 波特率按钮 `user_data` 直接使用 `ud`，避免回调中读取全局选择器。
-
-### Step 7 — 文档同步
-
-- 更新 `doc/refactor/README.md`，标记 phase 2.4 为 `DONE`。
-- 更新 `CLAUDE.md`、`doc/index.md` 中 `ui_service`、`svc_mgr_helper` 描述。
-- 更新 `doc/app/app-init.md` 等文档以反映新文件结构。
-
-## 4. 风险与约束
-
-- 不修改 UI 核心层、HAL 层、内核层（已在本轮前序阶段完成）。
-- 每步修改前先补充 native 测试，确保 `pio test -e native` 通过。
-- `app_init.h` 的公共 API（`app_init_ui()`、`app_init_managers()`、`app_input_process()`）保持不变，避免 `main.cpp` 改动过大。
-- flasher 的菜单状态机迁回后，行为必须与迁回前一致。
-
-## 5. 验证标准
-
-- `pio test -e native` 通过。
-- `pio run -e m5stick-c` 编译通过且无新 warning。
-- 菜单结构、烧录器引脚配置流程、WiFi/BT 开关行为与重构前一致。
-
-## 6. 实际完成摘要
-
-### 代码改动
-
-- 新增 `src/app/app_state.c/h`：集中定义 `g_wifi_on`、`g_bt_on` 与设置变更回调声明。
-- 新增 `src/app/app_menu.c/h`：从 `app_init.c` 拆分出菜单构建逻辑。
-- 新增 `src/app/app_input.c/h`：从 `app_init.c` 拆分出输入处理逻辑。
-- 新增 `src/app/ui_service.c/h`：提供 `ui_service_user_item_init/loop/exit` 公共模板。
-- 新增 `src/app/flasher/flasher_menu.c/h`：将烧录器引脚配置 UI、角色选择回调、强制解除状态机从 `app_init.c` 迁回 flasher 模块。
-- 精简 `src/app/app_init.c`：仅保留入口封装，调用 `app_menu_build()` 与 `app_input_process()`。
-- 将 `settings_flasher_role_label()` 迁移为 `flasher_role_label()`，移除 `settings.c` 对 `flasher_gpio.h` 的反向依赖。
-- 修复 `src/app/ui_task.c` 直接调用 Arduino `delay()` 的问题，改为 `hal_delay_ms(1)`。
-- 波特率选择回调改为直接使用 `user_data`，不再读取全局选择器。
-- 迁移 `about.c` 使用 `ui_service` 提供的统一入口。
-
-### 测试
-
-- 新增 `test/test_native/test_app_state.cpp`（2 个用例）。
-- 新增 `test/test_native/test_flasher_menu.cpp`（3 个用例）。
-- `pio test -e native` 通过（371 tests passed）。
-- `pio run -e m5stick-c` 成功，Flash 占用 88.0%，RAM 占用 22.3%。
-
-### 文档
-
-- 更新 `doc/app/app-init.md` 反映新文件结构与入口封装。
-- 新增 `doc/app/app-menu.md`、`doc/app/app-input.md`、`doc/app/ui-service.md`。
-- 更新 `doc/app/settings.md` 移除已迁移的 `settings_flasher_role_label` 章节。
-- 更新 `CLAUDE.md`、`doc/index.md` 中 App 层文件列表与文档树。
-- 更新 `doc/refactor/README.md` 标记 phase 2.4 为 `DONE`。
+| ID | 问题 | 后续处理 |
+|----|------|----------|
+| A-P1-02 | `wifi_manager.cpp` 文件过长、状态机职责过重 | 延后，需设计公共状态机模板 |
+| A-P1-03 | WiFi/BT enable/disable/request 异步状态机重复 | 依赖 A-P1-02 |
+| A-P1-04 | taskmgr 硬编码任务名禁用服务 | 延后，需任务退出回调或通用服务禁用机制 |

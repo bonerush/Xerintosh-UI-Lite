@@ -47,21 +47,28 @@
 
 ### 双缓冲架构（真机）
 
-*📄 Source: [hal_display_fb.cpp](../../src/hal/hal_display_fb.cpp#L76-L94)*
+*📄 Source: [hal_display_fb.cpp](../../src/hal/hal_display_fb.cpp#L76-L106)*
 
 ```c
 M5Canvas* g_canvas = nullptr;       /* 离屏画布 */
 static int g_rotation = 0;          /* 当前屏幕方向 */
 static uint8_t g_brightness = 128;  /* 当前背光亮度 */
 
+static void hal_display_create_sprite(M5Canvas* canvas,
+                                      int16_t w, int16_t h,
+                                      uint8_t depth)
+{
+    canvas->setColorDepth(depth);
+    canvas->createSprite(w, h);
+}
+
 void hal_display_init(void) {
     if (!g_canvas) {
         g_canvas = new M5Canvas(&M5.Display);
     }
-    g_canvas->setColorDepth(8);   /* 8-bit 色深：RGB332, 256 色，每像素 1 字节 */
     g_screen_width = M5.Display.width();
     g_screen_height = M5.Display.height();
-    g_canvas->createSprite(g_screen_width, g_screen_height);
+    hal_display_create_sprite(g_canvas, g_screen_width, g_screen_height, 8);
 }
 ```
 
@@ -73,17 +80,16 @@ void hal_display_init(void) {
         // 关键：必须传入父显示对象，否则 pushSprite 会失败
         画布 = 新建 M5Canvas(地址取 M5.Display)
     }
-    // 必须在 createSprite 之前设置色深
-    画布.设置色深(8位)
     屏幕宽 = M5.Display.宽度()
     屏幕高 = M5.Display.高度()
-    画布.创建精灵(宽, 高)
+    // 由 helper 统一保证：先 setColorDepth，再 createSprite
+    创建精灵_封装(画布, 宽, 高, 8位)
 }
 ```
 
-**关键顺序**：`setColorDepth(8)` 必须**在** `createSprite()` 之前调用。若顺序颠倒，alpha=0 会导致所有绘制不可见（黑屏）。8-bit RGB332 相比 16-bit 节省 12.8KB 内存，确保 ESP32-PICO 无 PSRAM 时也能同时运行 Classic BT SPP + UI 渲染。
+**关键顺序**：`setColorDepth(8)` 必须**在** `createSprite()` 之前调用。若顺序颠倒，alpha=0 会导致所有绘制不可见（黑屏）。该顺序已封装到 `hal_display_create_sprite()` helper 中，由调用方统一保证，避免人工维护时顺序被颠倒。8-bit RGB332 相比 16-bit 节省 12.8KB 内存，确保 ESP32-PICO 无 PSRAM 时也能同时运行 Classic BT SPP + UI 渲染。
 
-*📄 Source: [hal_display_fb.cpp](../../src/hal/hal_display_fb.cpp#L101-L104)*
+*📄 Source: [hal_display_fb.cpp](../../src/hal/hal_display_fb.cpp#L113-L116)*
 
 ```c
 void hal_display_deinit(void) {

@@ -9,8 +9,8 @@
 | 0 | 基线建立与冻结 | DONE | coder | `00-baseline.md` |
 | 1 | 扫描与诊断 | DONE | explore | `01-diagnosis.md` |
 | 2.1 | 内核层重构 | DONE | coder | `02-refactor/kernel.md` |
-| 2.2 | App 上层重构 | RUNNING | coder | `02-refactor/app.md` |
-| 2.3 | HAL 层重构 | PENDING | coder | `02-refactor/hal.md` |
+| 2.2 | App 上层重构 | DONE | coder | `02-refactor/app.md` |
+| 2.3 | HAL 层重构 | RUNNING | coder | `02-refactor/hal.md` |
 | 2.4 | UI 核心层重构 | PENDING | coder | `02-refactor/ui.md` |
 | 2.5 | 文档体系同步 | PENDING | coder | `02-refactor/docs.md` |
 | 3 | 集成验证 | PENDING | verification | `03-integration.md` |

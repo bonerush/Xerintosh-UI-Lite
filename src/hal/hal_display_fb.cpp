@@ -78,6 +78,18 @@ static int g_rotation = 0;          /* 当前屏幕方向 */
 static uint8_t g_brightness = 128;  /* 当前背光亮度 */
 
 /**
+ * @brief 统一封装 M5Canvas 创建顺序：必须先设置色深再创建精灵。
+ * @note  该 helper 消除 setColorDepth/createSprite 顺序被人工颠倒的风险。
+ */
+static void hal_display_create_sprite(M5Canvas* canvas,
+                                      int16_t w, int16_t h,
+                                      uint8_t depth)
+{
+    canvas->setColorDepth(depth);
+    canvas->createSprite(w, h);
+}
+
+/**
  * @brief 初始化显示：创建 M5Canvas 并设置颜色深度为 8bit（RGB332, 256 色）
  * @note  8-bit 帧缓冲 80×160×1 = 12.8KB，相比 16-bit 节省 12.8KB，
  *        相比 4-bit 多 256 色精度，确保 RED/GREEN 文本正确渲染。
@@ -87,10 +99,9 @@ void hal_display_init(void) {
     if (!g_canvas) {
         g_canvas = new M5Canvas(&M5.Display);
     }
-    g_canvas->setColorDepth(8);   /* 8-bit 色深：RGB332, 256 色，每像素 1 字节 */
     g_screen_width = M5.Display.width();
     g_screen_height = M5.Display.height();
-    g_canvas->createSprite(g_screen_width, g_screen_height);
+    hal_display_create_sprite(g_canvas, g_screen_width, g_screen_height, 8);
 }
 
 /**
