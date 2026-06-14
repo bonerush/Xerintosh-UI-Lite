@@ -1,0 +1,27 @@
+src//app/serial_monitor/serial_monitor.h:32: * @note  若处于 NORM 模式则清空缓冲区；DEBUG 模式保留历史
+src//app/serial_monitor/serial_monitor.h:40: * @note  仅在 START 或 DEBUG 状态下读取串口数据并缓存到环形缓冲区。
+src//app/serial_monitor/serial_monitor.h:46: * @brief  查询串口监视器是否活跃（运行中或 DEBUG 模式）
+src//kernel/kern_sched.c:102:    kern_log(KERN_LOG_DEBUG, "scheduler initialized (native)");
+src//kernel/kern_sched.c:141:    kern_log(KERN_LOG_DEBUG, "scheduler initialized (esp32-native-sched)");
+src//kernel/kern_sched.c:211:    kern_log(KERN_LOG_DEBUG, "scheduler initialized (esp32-freertos, 2 cores)");
+src//kernel/kern_types.h:62:    KERN_LOG_DEBUG = 0,  /* 调试信息 */
+src//kernel/kern_port_freertos.c:195:    kern_log(KERN_LOG_DEBUG, "task %d (%s) exited on cpu %d", task->pid, task->name, cpu);
+src//kernel/kern_task_virtual.c:57:    kern_log(KERN_LOG_DEBUG, "virtual task %d (%s) registered", task->pid, task->name);
+src//kernel/kern_task_virtual.c:73:    kern_log(KERN_LOG_DEBUG, "virtual task %d (%s) unregistered", task->pid, task->name);
+src//kernel/kern_init.c:61:    case KERN_LOG_DEBUG: return "DEBUG";
+src//kernel/kern_init.c:121:        /* TODO: 硬件 LED 闪烁 */
+src//kernel/kern_task_lifecycle.c:99:    kern_log(KERN_LOG_DEBUG, "spawned task %d: %s", task->pid, task->name);
+src//kernel/kern_task_lifecycle.c:155:    kern_log(KERN_LOG_DEBUG, "spawned task %d: %s", task->pid, task->name);
+src//kernel/kern_task_lifecycle.c:230:    kern_log(KERN_LOG_DEBUG, "spawned task %d: %s", task->pid, task->name);
+src//kernel/kern_task_lifecycle.c:297:    kern_log(KERN_LOG_DEBUG, "task %d (%s) exited", cur->pid, cur->name);
+src//kernel/kern_task_lifecycle.c:313:    kern_log(KERN_LOG_DEBUG, "task %d (%s) exited", cur->pid, cur->name);
+src//kernel/kern_task_lifecycle.c:331:    kern_log(KERN_LOG_DEBUG, "task %d (%s) exited", cur->pid, cur->name);
+src//kernel/kern_task_lifecycle.c:436:    kern_log(KERN_LOG_DEBUG, "task %d (%s) killed", task->pid, task->name);
+src//kernel/kern_task_lifecycle.c:485:                kern_log(KERN_LOG_DEBUG, "reaped zombie %d (%s)", zombie->pid, zombie->name);
+src//kernel/debug_serial.h:8:#ifndef DEBUG_SERIAL_H
+src//kernel/debug_serial.h:9:#define DEBUG_SERIAL_H
+src//kernel/debug_serial.h:30:#endif /* DEBUG_SERIAL_H */
+src//kernel/kern_port_native.c:198:    /* TODO: 使用 esp_timer 或简单的忙等待 */
+doc//kernel/kern-init.md:120:        /* TODO: 硬件 LED 闪烁 */
+doc//kernel/kern-types.md:111:    KERN_LOG_DEBUG = 0,  /* 调试信息 */
+doc//refactor/assets/build-m5stick-c.log:17:DEBUG: Current (cmsis-dap) External (cmsis-dap, esp-bridge, esp-prog, iot-bus-jtag, jlink, minimodule, olimex-arm-usb-ocd, olimex-arm-usb-ocd-h, olimex-arm-usb-tiny-h, olimex-jtag-tiny, tumpa)

@@ -268,18 +268,8 @@ typedef struct xerintosh_selector_t
 ```c
 void xerintosh_selector_go_next_item()
 {
-  if (g_xerintosh_selector.selected_item->type == slider_item
-      && xerintosh_to_slider_item(g_xerintosh_selector.selected_item)->is_confirmed)
-  {
-    xerintosh_slider_item_t* _selected_slider_item = xerintosh_to_slider_item(g_xerintosh_selector.selected_item);
-    *_selected_slider_item->value += _selected_slider_item->value_step;
-    if (*_selected_slider_item->value >= _selected_slider_item->value_max)
-      *_selected_slider_item->value = _selected_slider_item->value_max;
-    return;
-  }
-
-  if (g_xerintosh_selector.selected_item->type == user_item
-      && xerintosh_to_user_item(g_xerintosh_selector.selected_item)->in_user_item) return;
+  if (g_xerintosh_selector.selected_item == NULL) return;
+  if (xerintosh_dispatch_input_next(g_xerintosh_selector.selected_item)) return;
 
   g_xerintosh_refresh_list_value = true;
 
@@ -299,14 +289,11 @@ void xerintosh_selector_go_next_item()
 
 ```
 函数 选择下一个() {
-    if (当前项是滑条 且 处于编辑状态) {
-        值 += 步进
-        if (值超过最大值) 值 = 最大值
-        return
-    }
+    if (选择器未绑定任何项) return
 
-    if (当前项是用户App 且 已进入运行态) {
-        return   // 不导航，由 App 自行处理输入
+    if (派发表消费了"下一项"输入) {
+        // slider 编辑模式增加值，或 user_item 运行态忽略导航
+        return
     }
 
     标记需要刷新列表值 = true
@@ -332,6 +319,7 @@ void xerintosh_selector_go_next_item()
 void xerintosh_selector_jump_to_selected_item()
 {
     if (!g_in_xerintosh) return;
+    if (g_xerintosh_selector.selected_item == NULL) return;
     xerintosh_dispatch_enter(g_xerintosh_selector.selected_item);
 }
 ```
@@ -355,21 +343,8 @@ void xerintosh_selector_jump_to_selected_item()
 ```c
 void xerintosh_selector_exit_current_item()
 {
-  if (g_xerintosh_selector.selected_item->type == slider_item
-      && xerintosh_to_slider_item(g_xerintosh_selector.selected_item)->is_confirmed)
-  {
-    xerintosh_slider_item_t* _selected_slider_item = xerintosh_to_slider_item(g_xerintosh_selector.selected_item);
-    _selected_slider_item->is_confirmed = false;
-    *_selected_slider_item->value = _selected_slider_item->value_backup;
-    return;
-  }
-
-  if (g_xerintosh_selector.selected_item->type == user_item
-      && xerintosh_to_user_item(g_xerintosh_selector.selected_item)->in_user_item)
-  {
-    handle_user_item_exit(xerintosh_to_user_item(g_xerintosh_selector.selected_item));
-    return;
-  }
+  if (g_xerintosh_selector.selected_item == NULL) return;
+  if (xerintosh_dispatch_input_exit(g_xerintosh_selector.selected_item)) return;
 
   g_xerintosh_refresh_list_value = true;
 

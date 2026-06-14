@@ -107,23 +107,7 @@ static void xerintosh_draw_list_item()
     int16_t _y_list_item = _item->y_list_item + g_xerintosh_camera.y_camera - _font_h_2;
 
     g_xerintosh_draw_color = COLOR_FG;
-    switch (_item->type)
-    {
-      case list_item:
-      case button_item:
-      case user_item:
-        draw_list_item_icon_only(_item, _x_list_item, _y_list_item);
-        break;
-      case switch_item:
-        draw_list_item_switch(xerintosh_to_switch_item(_item), _x_list_item, _y_list_item);
-        break;
-      case slider_item:
-        draw_list_item_slider(xerintosh_to_slider_item(_item), _x_list_item, _y_list_item);
-        break;
-      default:
-        draw_list_item_icon_only(_item, _x_list_item, _y_list_item);
-        break;
-    }
+    xerintosh_dispatch_draw(_item, _x_list_item, _y_list_item);
 
     if (_item->icon == custom_icon && _item->bitmap_data != NULL) {
       xerintosh_draw_item_bitmap(_item, _x_list_item, _y_list_item);
@@ -148,12 +132,8 @@ static void xerintosh_draw_list_item()
         屏幕X = 相机X + 左边距4
         屏幕Y = 项.当前Y + 相机Y - 字体半高
 
-        switch (项的类型) {
-            case 普通列表项/按钮/用户页: 仅绘制图标
-            case 开关项: 绘制图标 + 右侧开关控件（外框+滑块）
-            case 滑条项: 绘制图标 + 右侧数值
-            default: 仅绘制图标
-        }
+        // 绘制行为由 ui_dispatch.c 的 vtable 按类型路由
+        xerintosh_dispatch_draw(项, 屏幕X, 屏幕Y)
 
         if (项有自定义位图) 绘制位图图标
 

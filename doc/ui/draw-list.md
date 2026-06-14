@@ -125,23 +125,7 @@ static void xerintosh_draw_list_item()
 
     /* 根据类型分发到对应的绘制函数 */
     g_xerintosh_draw_color = COLOR_FG;
-    switch (_item->type)
-    {
-      case list_item:
-      case button_item:
-      case user_item:
-        draw_list_item_icon_only(_item, _x_list_item, _y_list_item);
-        break;
-      case switch_item:
-        draw_list_item_switch(xerintosh_to_switch_item(_item), _x_list_item, _y_list_item);
-        break;
-      case slider_item:
-        draw_list_item_slider(xerintosh_to_slider_item(_item), _x_list_item, _y_list_item);
-        break;
-      default:
-        draw_list_item_icon_only(_item, _x_list_item, _y_list_item);
-        break;
-    }
+    xerintosh_dispatch_draw(_item, _x_list_item, _y_list_item);
 
     /* 自定义位图图标补充绘制 */
     if (_item->icon == custom_icon && _item->bitmap_data != NULL) {
@@ -153,14 +137,12 @@ static void xerintosh_draw_list_item()
         _y_list_item + _font_h_2 < SCREEN_HEIGHT)
     {
       int16_t _text_width = hal_get_string_width(_item->content);
-      bool _has_right_control = (_item->type == switch_item || _item->type == slider_item);
+      bool _has_right_control = xerintosh_dispatch_has_right_control(_item);
       int16_t _right_margin = _has_right_control ? LIST_ITEM_RIGHT_MARGIN : 4;
       int16_t _avail_width = SCREEN_WIDTH - LIST_ITEM_LEFT_MARGIN - 10 - _right_margin;
 
       /* switch/slider 额外占用右侧控件空间 */
-      if (_item->type == switch_item)
-        _avail_width -= 11;
-      else if (_item->type == slider_item)
+      if (_has_right_control)
         _avail_width -= 11;
 
       bool _is_selected = (_item == g_xerintosh_selector.selected_item);

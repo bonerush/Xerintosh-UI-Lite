@@ -1,0 +1,310 @@
+Processing m5stick-c (platform: espressif32; board: m5stick-c; framework: arduino)
+--------------------------------------------------------------------------------
+Library Manager: Installing m5stack/M5Unified @ ^0.2.14
+Unpacking 0% 10% 20% 30% 40% 50% 60% 70% 80% 90% 100%
+Library Manager: M5Unified@0.2.17 has been installed!
+Library Manager: Resolving dependencies...
+Library Manager: Installing M5GFX @ >=0.2.22
+Unpacking 0% 10% 20% 30% 40% 50% 60% 70% 80% 90% 100%
+Library Manager: M5GFX@0.2.22 has been installed!
+Library Manager: Installing bblanchon/ArduinoJson @ ^7.0.0
+Unpacking 0% 10% 20% 30% 40% 50% 60% 70% 80% 90% 100%
+Library Manager: ArduinoJson@7.4.3 has been installed!
+Verbose mode can be enabled via `-v, --verbose` option
+CONFIGURATION: https://docs.platformio.org/page/boards/espressif32/m5stick-c.html
+PLATFORM: Espressif 32 (7.0.1) > M5Stick-C
+HARDWARE: ESP32 240MHz, 320KB RAM, 4MB Flash
+DEBUG: Current (cmsis-dap) External (cmsis-dap, esp-bridge, esp-prog, iot-bus-jtag, jlink, minimodule, olimex-arm-usb-ocd, olimex-arm-usb-ocd-h, olimex-arm-usb-tiny-h, olimex-jtag-tiny, tumpa)
+PACKAGES: 
+ - framework-arduinoespressif32 @ 3.20017.241212+sha.dcc1105b 
+ - tool-esptoolpy @ 2.41100.0 (4.11.0) 
+ - toolchain-xtensa-esp32 @ 8.4.0+2021r2-patch5
+LDF: Library Dependency Finder -> https://bit.ly/configure-pio-ldf
+LDF Modes: Finder ~ chain, Compatibility ~ soft
+Found 36 compatible libraries
+Scanning dependencies...
+Dependency Graph
+|-- M5Unified @ 0.2.17
+|-- M5GFX @ 0.2.22
+|-- ArduinoJson @ 7.4.3
+|-- BluetoothSerial @ 2.0.0
+|-- Preferences @ 2.0.0
+|-- HTTPClient @ 2.0.0
+|-- WiFi @ 2.0.0
+Building in release mode
+Retrieved `.pio/build/m5stick-c/src/app/about/about.c.o' from cache
+Retrieved `.pio/build/m5stick-c/src/app/app_init.c.o' from cache
+Retrieved `.pio/build/m5stick-c/src/app/bluetooth/bt_manager.cpp.o' from cache
+Retrieved `.pio/build/m5stick-c/src/app/bluetooth/bt_uart_service.cpp.o' from cache
+Retrieved `.pio/build/m5stick-c/src/app/boot/boot_screen.c.o' from cache
+Retrieved `.pio/build/m5stick-c/src/app/flasher/flasher_app.cpp.o' from cache
+Retrieved `.pio/build/m5stick-c/src/app/flasher/flasher_gpio.cpp.o' from cache
+Retrieved `.pio/build/m5stick-c/src/app/flasher/flasher_ui.cpp.o' from cache
+Retrieved `.pio/build/m5stick-c/src/app/serial_input/serial_input.cpp.o' from cache
+Retrieved `.pio/build/m5stick-c/src/app/serial_monitor/sm_app.cpp.o' from cache
+Retrieved `.pio/build/m5stick-c/src/app/serial_monitor/sm_buffer.c.o' from cache
+Retrieved `.pio/build/m5stick-c/src/app/serial_monitor/sm_ui.c.o' from cache
+Retrieved `.pio/build/m5stick-c/src/app/settings/settings.c.o' from cache
+Retrieved `.pio/build/m5stick-c/src/app/shutdown/power_key_popup.c.o' from cache
+Retrieved `.pio/build/m5stick-c/src/app/shutdown/shutdown_screen.c.o' from cache
+Retrieved `.pio/build/m5stick-c/src/app/storage/storage.cpp.o' from cache
+Retrieved `.pio/build/m5stick-c/src/app/taskmgr/taskmgr_app.c.o' from cache
+Retrieved `.pio/build/m5stick-c/src/app/taskmgr/taskmgr_ui.c.o' from cache
+Retrieved `.pio/build/m5stick-c/src/app/token_usage/tu_api.cpp.o' from cache
+Retrieved `.pio/build/m5stick-c/src/app/token_usage/tu_app.cpp.o' from cache
+Retrieved `.pio/build/m5stick-c/src/app/token_usage/tu_ui.cpp.o' from cache
+Retrieved `.pio/build/m5stick-c/src/app/ui_task.c.o' from cache
+Retrieved `.pio/build/m5stick-c/src/app/wifi/wifi_manager.cpp.o' from cache
+Retrieved `.pio/build/m5stick-c/src/fonts/cn_font_subset.c.o' from cache
+Retrieved `.pio/build/m5stick-c/src/hal/hal_display.cpp.o' from cache
+Retrieved `.pio/build/m5stick-c/src/hal/hal_input.cpp.o' from cache
+Retrieved `.pio/build/m5stick-c/src/hal/hal_input_double_click.c.o' from cache
+Retrieved `.pio/build/m5stick-c/src/hal/hal_power_key.cpp.o' from cache
+Retrieved `.pio/build/m5stick-c/src/hal/hal_power_off.cpp.o' from cache
+Retrieved `.pio/build/m5stick-c/src/hal/hal_system.cpp.o' from cache
+Retrieved `.pio/build/m5stick-c/src/kernel/debug_serial.cpp.o' from cache
+Retrieved `.pio/build/m5stick-c/src/kernel/devices/dev_fb0.c.o' from cache
+Retrieved `.pio/build/m5stick-c/src/kernel/devices/dev_input0.c.o' from cache
+Retrieved `.pio/build/m5stick-c/src/kernel/devices/dev_pwrkey.c.o' from cache
+Retrieved `.pio/build/m5stick-c/src/kernel/devices/dev_ttyS0.cpp.o' from cache
+Retrieved `.pio/build/m5stick-c/src/kernel/devices/kern_devices.c.o' from cache
+Retrieved `.pio/build/m5stick-c/src/kernel/kern_devfs.c.o' from cache
+Retrieved `.pio/build/m5stick-c/src/kernel/kern_device.c.o' from cache
+Retrieved `.pio/build/m5stick-c/src/kernel/kern_gpiofs.c.o' from cache
+Retrieved `.pio/build/m5stick-c/src/kernel/kern_init.c.o' from cache
+Retrieved `.pio/build/m5stick-c/src/kernel/kern_kmalloc.c.o' from cache
+Retrieved `.pio/build/m5stick-c/src/kernel/kern_minprintf.c.o' from cache
+Retrieved `.pio/build/m5stick-c/src/kernel/kern_mpu.c.o' from cache
+Retrieved `.pio/build/m5stick-c/src/kernel/kern_port_freertos.c.o' from cache
+Retrieved `.pio/build/m5stick-c/src/kernel/kern_port_native.c.o' from cache
+Retrieved `.pio/build/m5stick-c/src/kernel/kern_procfs.c.o' from cache
+Retrieved `.pio/build/m5stick-c/src/kernel/kern_resource.c.o' from cache
+Retrieved `.pio/build/m5stick-c/src/kernel/kern_sched.c.o' from cache
+Retrieved `.pio/build/m5stick-c/src/kernel/kern_sched_class.c.o' from cache
+Retrieved `.pio/build/m5stick-c/src/kernel/kern_sched_fifo.c.o' from cache
+Retrieved `.pio/build/m5stick-c/src/kernel/kern_sched_rr.c.o' from cache
+Retrieved `.pio/build/m5stick-c/src/kernel/kern_shell.c.o' from cache
+Retrieved `.pio/build/m5stick-c/src/kernel/kern_shell_cmds.c.o' from cache
+Retrieved `.pio/build/m5stick-c/src/kernel/kern_shell_parser.c.o' from cache
+Retrieved `.pio/build/m5stick-c/src/kernel/kern_smp.c.o' from cache
+Retrieved `.pio/build/m5stick-c/src/kernel/kern_sync.c.o' from cache
+Retrieved `.pio/build/m5stick-c/src/kernel/kern_sysfs.c.o' from cache
+Retrieved `.pio/build/m5stick-c/src/kernel/kern_task.c.o' from cache
+Retrieved `.pio/build/m5stick-c/src/kernel/kern_task_lifecycle.c.o' from cache
+Retrieved `.pio/build/m5stick-c/src/kernel/kern_task_stack.c.o' from cache
+Retrieved `.pio/build/m5stick-c/src/kernel/kern_task_virtual.c.o' from cache
+Retrieved `.pio/build/m5stick-c/src/kernel/kern_vfs.c.o' from cache
+Retrieved `.pio/build/m5stick-c/src/main.cpp.o' from cache
+Retrieved `.pio/build/m5stick-c/src/native_main.cpp.o' from cache
+Retrieved `.pio/build/m5stick-c/src/ui/ui_anim_row.c.o' from cache
+Retrieved `.pio/build/m5stick-c/src/ui/ui_context.c.o' from cache
+Retrieved `.pio/build/m5stick-c/src/ui/ui_core.c.o' from cache
+Retrieved `.pio/build/m5stick-c/src/ui/ui_dispatch.c.o' from cache
+Retrieved `.pio/build/m5stick-c/src/ui/ui_draw_anim.c.o' from cache
+Retrieved `.pio/build/m5stick-c/src/ui/ui_draw_icons.c.o' from cache
+Retrieved `.pio/build/m5stick-c/src/ui/ui_draw_list.c.o' from cache
+Retrieved `.pio/build/m5stick-c/src/ui/ui_draw_widgets.c.o' from cache
+Retrieved `.pio/build/m5stick-c/src/ui/ui_item_base.c.o' from cache
+Retrieved `.pio/build/m5stick-c/src/ui/ui_item_camera.c.o' from cache
+Retrieved `.pio/build/m5stick-c/src/ui/ui_item_list.c.o' from cache
+Retrieved `.pio/build/m5stick-c/src/ui/ui_item_popup.c.o' from cache
+Retrieved `.pio/build/m5stick-c/src/ui/ui_item_selector.c.o' from cache
+Retrieved `.pio/build/m5stick-c/bootloader.bin' from cache
+Retrieved `.pio/build/m5stick-c/partitions.bin' from cache
+Retrieved `.pio/build/m5stick-c/lib5b2/SPI/SPI.cpp.o' from cache
+Retrieved `.pio/build/m5stick-c/lib56f/Wire/Wire.cpp.o' from cache
+Retrieved `.pio/build/m5stick-c/lib5b2/libSPI.a' from cache
+Compiling .pio/build/m5stick-c/lib171/M5GFX/M5GFX.cpp.o
+Retrieved `.pio/build/m5stick-c/lib56f/libWire.a' from cache
+Compiling .pio/build/m5stick-c/lib171/M5GFX/lgfx/Fonts/IPA/lgfx_font_japan.c.o
+Compiling .pio/build/m5stick-c/lib171/M5GFX/lgfx/Fonts/efont/lgfx_efont_cn.c.o
+cc1: warning: command line option '-fno-rtti' is valid for C++/ObjC++ but not for C
+cc1: warning: command line option '-fno-rtti' is valid for C++/ObjC++ but not for C
+Compiling .pio/build/m5stick-c/lib171/M5GFX/lgfx/Fonts/efont/lgfx_efont_ja.c.o
+cc1: warning: command line option '-fno-rtti' is valid for C++/ObjC++ but not for C
+Compiling .pio/build/m5stick-c/lib171/M5GFX/lgfx/Fonts/efont/lgfx_efont_kr.c.o
+cc1: warning: command line option '-fno-rtti' is valid for C++/ObjC++ but not for C
+Compiling .pio/build/m5stick-c/lib171/M5GFX/lgfx/Fonts/efont/lgfx_efont_tw.c.o
+Compiling .pio/build/m5stick-c/lib171/M5GFX/lgfx/utility/lgfx_miniz.c.o
+cc1: warning: command line option '-fno-rtti' is valid for C++/ObjC++ but not for C
+Compiling .pio/build/m5stick-c/lib171/M5GFX/lgfx/utility/lgfx_pngle.c.o
+cc1: warning: command line option '-fno-rtti' is valid for C++/ObjC++ but not for C
+cc1: warning: command line option '-fno-rtti' is valid for C++/ObjC++ but not for C
+Compiling .pio/build/m5stick-c/lib171/M5GFX/lgfx/utility/lgfx_qoi.c.o
+cc1: warning: command line option '-fno-rtti' is valid for C++/ObjC++ but not for C
+Compiling .pio/build/m5stick-c/lib171/M5GFX/lgfx/utility/lgfx_qrcode.c.o
+cc1: warning: command line option '-fno-rtti' is valid for C++/ObjC++ but not for C
+Compiling .pio/build/m5stick-c/lib171/M5GFX/lgfx/utility/lgfx_tjpgd.c.o
+Compiling .pio/build/m5stick-c/lib171/M5GFX/lgfx/v1/LGFXBase.cpp.o
+cc1: warning: command line option '-fno-rtti' is valid for C++/ObjC++ but not for C
+Compiling .pio/build/m5stick-c/lib171/M5GFX/lgfx/v1/LGFX_Button.cpp.o
+Compiling .pio/build/m5stick-c/lib171/M5GFX/lgfx/v1/LGFX_Sprite.cpp.o
+Compiling .pio/build/m5stick-c/lib171/M5GFX/lgfx/v1/lgfx_fonts.cpp.o
+Compiling .pio/build/m5stick-c/lib171/M5GFX/lgfx/v1/misc/DividedFrameBuffer.cpp.o
+Compiling .pio/build/m5stick-c/lib171/M5GFX/lgfx/v1/misc/SpriteBuffer.cpp.o
+Compiling .pio/build/m5stick-c/lib171/M5GFX/lgfx/v1/misc/common_function.cpp.o
+Compiling .pio/build/m5stick-c/lib171/M5GFX/lgfx/v1/misc/pixelcopy.cpp.o
+Compiling .pio/build/m5stick-c/lib171/M5GFX/lgfx/v1/panel/Panel_AMOLED.cpp.o
+Compiling .pio/build/m5stick-c/lib171/M5GFX/lgfx/v1/panel/Panel_Device.cpp.o
+Compiling .pio/build/m5stick-c/lib171/M5GFX/lgfx/v1/panel/Panel_ED2208.cpp.o
+Compiling .pio/build/m5stick-c/lib171/M5GFX/lgfx/v1/panel/Panel_EPDiy.cpp.o
+Compiling .pio/build/m5stick-c/lib171/M5GFX/lgfx/v1/panel/Panel_FrameBufferBase.cpp.o
+Compiling .pio/build/m5stick-c/lib171/M5GFX/lgfx/v1/panel/Panel_GDEW0154D67.cpp.o
+Compiling .pio/build/m5stick-c/lib171/M5GFX/lgfx/v1/panel/Panel_GDEW0154M09.cpp.o
+Compiling .pio/build/m5stick-c/lib171/M5GFX/lgfx/v1/panel/Panel_HasBuffer.cpp.o
+Compiling .pio/build/m5stick-c/lib171/M5GFX/lgfx/v1/panel/Panel_IT8951.cpp.o
+Compiling .pio/build/m5stick-c/lib171/M5GFX/lgfx/v1/panel/Panel_LCD.cpp.o
+Compiling .pio/build/m5stick-c/lib171/M5GFX/lgfx/v1/panel/Panel_M5HDMI.cpp.o
+Compiling .pio/build/m5stick-c/lib171/M5GFX/lgfx/v1/panel/Panel_M5UnitGLASS.cpp.o
+Compiling .pio/build/m5stick-c/lib171/M5GFX/lgfx/v1/panel/Panel_M5UnitLCD.cpp.o
+Compiling .pio/build/m5stick-c/lib171/M5GFX/lgfx/v1/panel/Panel_SSD1306.cpp.o
+Compiling .pio/build/m5stick-c/lib171/M5GFX/lgfx/v1/panel/Panel_SSD1677.cpp.o
+Compiling .pio/build/m5stick-c/lib171/M5GFX/lgfx/v1/platforms/esp32/Bus_EPD.cpp.o
+Compiling .pio/build/m5stick-c/lib171/M5GFX/lgfx/v1/platforms/esp32/Bus_I2C.cpp.o
+Compiling .pio/build/m5stick-c/lib171/M5GFX/lgfx/v1/platforms/esp32/Bus_Parallel8.cpp.o
+Compiling .pio/build/m5stick-c/lib171/M5GFX/lgfx/v1/platforms/esp32/Bus_SPI.cpp.o
+Compiling .pio/build/m5stick-c/lib171/M5GFX/lgfx/v1/platforms/esp32/Light_PWM.cpp.o
+Compiling .pio/build/m5stick-c/lib171/M5GFX/lgfx/v1/platforms/esp32/Panel_CVBS.cpp.o
+Compiling .pio/build/m5stick-c/lib171/M5GFX/lgfx/v1/platforms/esp32/Panel_EPD.cpp.o
+Compiling .pio/build/m5stick-c/lib171/M5GFX/lgfx/v1/platforms/esp32/common.cpp.o
+Compiling .pio/build/m5stick-c/lib171/M5GFX/lgfx/v1/platforms/esp32c3/Bus_Parallel8.cpp.o
+Compiling .pio/build/m5stick-c/lib171/M5GFX/lgfx/v1/platforms/esp32p4/Bus_DSI.cpp.o
+Compiling .pio/build/m5stick-c/lib171/M5GFX/lgfx/v1/platforms/esp32p4/Panel_DSI.cpp.o
+Compiling .pio/build/m5stick-c/lib171/M5GFX/lgfx/v1/platforms/esp32p4/Touch_ST7123.cpp.o
+Compiling .pio/build/m5stick-c/lib171/M5GFX/lgfx/v1/platforms/esp32s2/Bus_Parallel16.cpp.o
+Compiling .pio/build/m5stick-c/lib171/M5GFX/lgfx/v1/platforms/esp32s2/Bus_Parallel8.cpp.o
+Compiling .pio/build/m5stick-c/lib171/M5GFX/lgfx/v1/platforms/esp32s3/Bus_Parallel16.cpp.o
+Compiling .pio/build/m5stick-c/lib171/M5GFX/lgfx/v1/platforms/esp32s3/Bus_Parallel8.cpp.o
+Compiling .pio/build/m5stick-c/lib171/M5GFX/lgfx/v1/platforms/framebuffer/Panel_fb.cpp.o
+Compiling .pio/build/m5stick-c/lib171/M5GFX/lgfx/v1/platforms/framebuffer/common.cpp.o
+Compiling .pio/build/m5stick-c/lib171/M5GFX/lgfx/v1/platforms/sdl/Panel_sdl.cpp.o
+Compiling .pio/build/m5stick-c/lib171/M5GFX/lgfx/v1/platforms/sdl/common.cpp.o
+Compiling .pio/build/m5stick-c/lib171/M5GFX/lgfx/v1/touch/Touch_CSTxxx.cpp.o
+Compiling .pio/build/m5stick-c/lib171/M5GFX/lgfx/v1/touch/Touch_FT5x06.cpp.o
+Compiling .pio/build/m5stick-c/lib171/M5GFX/lgfx/v1/touch/Touch_GT911.cpp.o
+Compiling .pio/build/m5stick-c/libad4/M5Unified/M5Unified.cpp.o
+Compiling .pio/build/m5stick-c/libad4/M5Unified/utility/Button_Class.cpp.o
+Compiling .pio/build/m5stick-c/libad4/M5Unified/utility/I2C_Class.cpp.o
+Compiling .pio/build/m5stick-c/libad4/M5Unified/utility/IMU_Class.cpp.o
+Compiling .pio/build/m5stick-c/libad4/M5Unified/utility/LED_Class.cpp.o
+Compiling .pio/build/m5stick-c/libad4/M5Unified/utility/Log_Class.cpp.o
+Compiling .pio/build/m5stick-c/libad4/M5Unified/utility/M5Timer.cpp.o
+Compiling .pio/build/m5stick-c/libad4/M5Unified/utility/Mic_Class.cpp.o
+Archiving .pio/build/m5stick-c/lib171/libM5GFX.a
+Indexing .pio/build/m5stick-c/lib171/libM5GFX.a
+Compiling .pio/build/m5stick-c/libad4/M5Unified/utility/PI4IOE5V6408_Class.cpp.o
+Compiling .pio/build/m5stick-c/libad4/M5Unified/utility/Power_Class.cpp.o
+Compiling .pio/build/m5stick-c/libad4/M5Unified/utility/RTC_Class.cpp.o
+Compiling .pio/build/m5stick-c/libad4/M5Unified/utility/Speaker_Class.cpp.o
+Compiling .pio/build/m5stick-c/libad4/M5Unified/utility/Touch_Class.cpp.o
+Compiling .pio/build/m5stick-c/libad4/M5Unified/utility/imu/AK8963_Class.cpp.o
+Compiling .pio/build/m5stick-c/libad4/M5Unified/utility/imu/BMI270_Class.cpp.o
+Compiling .pio/build/m5stick-c/libad4/M5Unified/utility/imu/BMM150_Class.cpp.o
+Compiling .pio/build/m5stick-c/libad4/M5Unified/utility/imu/IMU_Base.cpp.o
+Compiling .pio/build/m5stick-c/libad4/M5Unified/utility/imu/MPU6886_Class.cpp.o
+Compiling .pio/build/m5stick-c/libad4/M5Unified/utility/imu/SH200Q_Class.cpp.o
+Compiling .pio/build/m5stick-c/libad4/M5Unified/utility/led/LED_PMIC_Class.cpp.o
+Compiling .pio/build/m5stick-c/libad4/M5Unified/utility/led/LED_PaperMono_Class.cpp.o
+Compiling .pio/build/m5stick-c/libad4/M5Unified/utility/led/LED_PowerHub_Class.cpp.o
+Compiling .pio/build/m5stick-c/libad4/M5Unified/utility/led/LED_Strip_Class.cpp.o
+Compiling .pio/build/m5stick-c/libad4/M5Unified/utility/power/AW32001_Class.cpp.o
+Compiling .pio/build/m5stick-c/libad4/M5Unified/utility/power/AXP192_Class.cpp.o
+Compiling .pio/build/m5stick-c/libad4/M5Unified/utility/power/AXP2101_Class.cpp.o
+Compiling .pio/build/m5stick-c/libad4/M5Unified/utility/power/BQ27220_Class.cpp.o
+Compiling .pio/build/m5stick-c/libad4/M5Unified/utility/power/INA226_Class.cpp.o
+Compiling .pio/build/m5stick-c/libad4/M5Unified/utility/power/INA3221_Class.cpp.o
+Compiling .pio/build/m5stick-c/libad4/M5Unified/utility/power/IP5306_Class.cpp.o
+Compiling .pio/build/m5stick-c/libad4/M5Unified/utility/power/PY32PMIC_Class.cpp.o
+Compiling .pio/build/m5stick-c/libad4/M5Unified/utility/rtc/PCF8563_Class.cpp.o
+Compiling .pio/build/m5stick-c/libad4/M5Unified/utility/rtc/RTC_Base.cpp.o
+Compiling .pio/build/m5stick-c/libad4/M5Unified/utility/rtc/RTC_PowerHub_Class.cpp.o
+Compiling .pio/build/m5stick-c/libad4/M5Unified/utility/rtc/RX8130_Class.cpp.o
+Retrieved `.pio/build/m5stick-c/libc64/BluetoothSerial/BTAddress.cpp.o' from cache
+Retrieved `.pio/build/m5stick-c/libc64/BluetoothSerial/BTAdvertisedDeviceSet.cpp.o' from cache
+Retrieved `.pio/build/m5stick-c/libc64/BluetoothSerial/BTScanResultsSet.cpp.o' from cache
+Retrieved `.pio/build/m5stick-c/libc64/BluetoothSerial/BluetoothSerial.cpp.o' from cache
+Retrieved `.pio/build/m5stick-c/lib419/Preferences/Preferences.cpp.o' from cache
+Retrieved `.pio/build/m5stick-c/libc64/libBluetoothSerial.a' from cache
+Retrieved `.pio/build/m5stick-c/lib419/libPreferences.a' from cache
+Retrieved `.pio/build/m5stick-c/libea3/WiFi/WiFi.cpp.o' from cache
+Retrieved `.pio/build/m5stick-c/libea3/WiFi/WiFiAP.cpp.o' from cache
+Archiving .pio/build/m5stick-c/libad4/libM5Unified.a
+Retrieved `.pio/build/m5stick-c/libea3/WiFi/WiFiClient.cpp.o' from cache
+Retrieved `.pio/build/m5stick-c/libea3/WiFi/WiFiGeneric.cpp.o' from cache
+Retrieved `.pio/build/m5stick-c/libea3/WiFi/WiFiMulti.cpp.o' from cache
+Retrieved `.pio/build/m5stick-c/libea3/WiFi/WiFiSTA.cpp.o' from cache
+Indexing .pio/build/m5stick-c/libad4/libM5Unified.a
+Retrieved `.pio/build/m5stick-c/libea3/WiFi/WiFiScan.cpp.o' from cache
+Retrieved `.pio/build/m5stick-c/libea3/WiFi/WiFiServer.cpp.o' from cache
+Retrieved `.pio/build/m5stick-c/libea3/WiFi/WiFiUdp.cpp.o' from cache
+Retrieved `.pio/build/m5stick-c/lib4c2/WiFiClientSecure/WiFiClientSecure.cpp.o' from cache
+Retrieved `.pio/build/m5stick-c/libea3/libWiFi.a' from cache
+Retrieved `.pio/build/m5stick-c/lib4c2/WiFiClientSecure/esp_crt_bundle.c.o' from cache
+Retrieved `.pio/build/m5stick-c/lib4c2/WiFiClientSecure/ssl_client.cpp.o' from cache
+Retrieved `.pio/build/m5stick-c/lib2c1/HTTPClient/HTTPClient.cpp.o' from cache
+Retrieved `.pio/build/m5stick-c/lib4c2/libWiFiClientSecure.a' from cache
+Retrieved `.pio/build/m5stick-c/FrameworkArduino/Esp.cpp.o' from cache
+Retrieved `.pio/build/m5stick-c/lib2c1/libHTTPClient.a' from cache
+Retrieved `.pio/build/m5stick-c/FrameworkArduino/FirmwareMSC.cpp.o' from cache
+Retrieved `.pio/build/m5stick-c/FrameworkArduino/FunctionalInterrupt.cpp.o' from cache
+Retrieved `.pio/build/m5stick-c/FrameworkArduino/HWCDC.cpp.o' from cache
+Retrieved `.pio/build/m5stick-c/FrameworkArduino/HardwareSerial.cpp.o' from cache
+Retrieved `.pio/build/m5stick-c/FrameworkArduino/IPAddress.cpp.o' from cache
+Retrieved `.pio/build/m5stick-c/FrameworkArduino/IPv6Address.cpp.o' from cache
+Retrieved `.pio/build/m5stick-c/FrameworkArduino/MD5Builder.cpp.o' from cache
+Retrieved `.pio/build/m5stick-c/FrameworkArduino/Print.cpp.o' from cache
+Retrieved `.pio/build/m5stick-c/FrameworkArduino/Stream.cpp.o' from cache
+Retrieved `.pio/build/m5stick-c/FrameworkArduino/StreamString.cpp.o' from cache
+Retrieved `.pio/build/m5stick-c/FrameworkArduino/Tone.cpp.o' from cache
+Retrieved `.pio/build/m5stick-c/FrameworkArduino/USB.cpp.o' from cache
+Retrieved `.pio/build/m5stick-c/FrameworkArduino/USBCDC.cpp.o' from cache
+Retrieved `.pio/build/m5stick-c/FrameworkArduino/USBMSC.cpp.o' from cache
+Retrieved `.pio/build/m5stick-c/FrameworkArduino/WMath.cpp.o' from cache
+Retrieved `.pio/build/m5stick-c/FrameworkArduino/WString.cpp.o' from cache
+Retrieved `.pio/build/m5stick-c/FrameworkArduino/base64.cpp.o' from cache
+Retrieved `.pio/build/m5stick-c/FrameworkArduino/cbuf.cpp.o' from cache
+Retrieved `.pio/build/m5stick-c/FrameworkArduino/esp32-hal-adc.c.o' from cache
+Retrieved `.pio/build/m5stick-c/FrameworkArduino/esp32-hal-bt.c.o' from cache
+Retrieved `.pio/build/m5stick-c/FrameworkArduino/esp32-hal-cpu.c.o' from cache
+Retrieved `.pio/build/m5stick-c/FrameworkArduino/esp32-hal-dac.c.o' from cache
+Retrieved `.pio/build/m5stick-c/FrameworkArduino/esp32-hal-gpio.c.o' from cache
+Retrieved `.pio/build/m5stick-c/FrameworkArduino/esp32-hal-i2c-slave.c.o' from cache
+Retrieved `.pio/build/m5stick-c/FrameworkArduino/esp32-hal-i2c.c.o' from cache
+Retrieved `.pio/build/m5stick-c/FrameworkArduino/esp32-hal-ledc.c.o' from cache
+Retrieved `.pio/build/m5stick-c/FrameworkArduino/esp32-hal-matrix.c.o' from cache
+Retrieved `.pio/build/m5stick-c/FrameworkArduino/esp32-hal-misc.c.o' from cache
+Retrieved `.pio/build/m5stick-c/FrameworkArduino/esp32-hal-psram.c.o' from cache
+Retrieved `.pio/build/m5stick-c/FrameworkArduino/esp32-hal-rgb-led.c.o' from cache
+Retrieved `.pio/build/m5stick-c/FrameworkArduino/esp32-hal-rmt.c.o' from cache
+Retrieved `.pio/build/m5stick-c/FrameworkArduino/esp32-hal-sigmadelta.c.o' from cache
+Retrieved `.pio/build/m5stick-c/FrameworkArduino/esp32-hal-spi.c.o' from cache
+Retrieved `.pio/build/m5stick-c/FrameworkArduino/esp32-hal-time.c.o' from cache
+Retrieved `.pio/build/m5stick-c/FrameworkArduino/esp32-hal-timer.c.o' from cache
+Retrieved `.pio/build/m5stick-c/FrameworkArduino/esp32-hal-tinyusb.c.o' from cache
+Retrieved `.pio/build/m5stick-c/FrameworkArduino/esp32-hal-touch.c.o' from cache
+Retrieved `.pio/build/m5stick-c/FrameworkArduino/esp32-hal-uart.c.o' from cache
+Retrieved `.pio/build/m5stick-c/FrameworkArduino/firmware_msc_fat.c.o' from cache
+Retrieved `.pio/build/m5stick-c/FrameworkArduino/libb64/cdecode.c.o' from cache
+Retrieved `.pio/build/m5stick-c/FrameworkArduino/libb64/cencode.c.o' from cache
+Retrieved `.pio/build/m5stick-c/FrameworkArduino/main.cpp.o' from cache
+Retrieved `.pio/build/m5stick-c/FrameworkArduino/stdlib_noniso.c.o' from cache
+Retrieved `.pio/build/m5stick-c/FrameworkArduino/wiring_pulse.c.o' from cache
+Retrieved `.pio/build/m5stick-c/FrameworkArduino/wiring_shift.c.o' from cache
+Retrieved `.pio/build/m5stick-c/libFrameworkArduino.a' from cache
+Linking .pio/build/m5stick-c/firmware.elf
+Retrieving maximum program size .pio/build/m5stick-c/firmware.elf
+Checking size .pio/build/m5stick-c/firmware.elf
+Advanced Memory Usage is available via "PlatformIO Home > Project Inspect"
+RAM:   [==        ]  22.3% (used 73072 bytes from 327680 bytes)
+Flash: [========= ]  88.0% (used 1844713 bytes from 2097152 bytes)
+Building .pio/build/m5stick-c/firmware.bin
+esptool.py v4.11.0
+Creating esp32 image...
+Merged 27 ELF sections
+Successfully created esp32 image.
+========================= [SUCCESS] Took 26.36 seconds =========================
+
+Environment    Status    Duration
+-------------  --------  ------------
+m5stick-c      SUCCESS   00:00:26.356
+========================= 1 succeeded in 00:00:26.356 =========================

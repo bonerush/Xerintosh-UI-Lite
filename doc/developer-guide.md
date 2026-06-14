@@ -627,7 +627,7 @@ void bad_example(void) {
 **边界条件**：
 - 所有 `xerintosh_new_*_item()` 在 `malloc`/`strdup` 失败时返回 **NULL**
 - `xerintosh_get_root_list()` 在首次调用时分配内存，失败时也返回 **NULL**
-- 根节点为空（未添加任何子项）时调用 `xerintosh_init_core()` 会导致框架内部越界读取，**务必在初始化前至少添加一个子项到根节点**
+- 根节点为空（未添加任何子项）时调用 `xerintosh_init_core()` 是安全的：选择器保持未绑定状态，`xerintosh_ui_main_core()` 会直接返回，不会崩溃
 - 所有 item 的 `content` 传入 NULL 时创建不会失败，但后续渲染会崩溃（`hal_get_string_width(NULL)`）
 
 *📄 Source: [ui_item_list.c](../src/ui/ui_item_list.c#L43-L68) | [ui_item_base.c](../src/ui/ui_item_base.c#L79-L89)*

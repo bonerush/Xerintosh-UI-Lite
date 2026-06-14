@@ -4,72 +4,86 @@
 
 ## 概述
 
-`ui_dispatch.c` 是 UI 框架的**类型派发层**，使用**函数指针数组**（dispatch table）替代了原先 `xerintosh_selector_jump_to_selected_item()` 中内联的 `if/else if` 类型判断链。
+`ui_dispatch.c` 是 UI 框架的**类型派发层**，使用**函数指针 vtable** 集中管理所有 item 类型相关的生命周期行为。
 
-在重构前，确认操作的逻辑是一段约 60 行的 `if (type == user_item) ... else if (type == switch_item) ... else if ...` 链。每次新增 Item 类型都需要修改这个核心函数，违反了开闭原则。
+在重构前，类型判断以 `if (type == user_item) ... else if (type == switch_item) ...` 的内联链形式散落在 `xerintosh_selector_jump_to_selected_item()`、`xerintosh_selector_go_next_item()`、`xerintosh_draw_list_item()`、`xerintosh_destroy_item_tree()` 等核心函数中。每次新增 Item 类型都需要修改多个文件，违反了开闭原则。
 
-重构后的派发表将**"根据类型选择行为"**的过程从条件分支变为 O(1) 数组索引，代码更清晰、可扩展性更强。
+重构后的派发表将**"根据类型选择行为"**的过程从分散的条件分支变为 O(1) 数组索引，所有类型特定逻辑集中到 `ui_dispatch.c`，代码更清晰、可扩展性更强。
 
 ---
 
 ## 关键概念
 
-### 派发表架构
+### 生命周期 vtable
 
 ```
-调用方 (xerintosh_selector_jump_to_selected_item)
+调用方
   │
-  └─► xerintosh_dispatch_enter(item)
-        │
-        ├─ NULL 检查
-        ├─ 类型范围检查 (type > button_item → return)
-        │
-        └─► s_enter_dispatch[item->type](item)
-              │
-              ├─ [list_item]   → dispatch_enter_list()
-              ├─ [switch_item] → dispatch_enter_switch()
-              ├─ [slider_item] → dispatch_enter_slider()
-              ├─ [user_item]   → dispatch_enter_user()
-              └─ [button_item] → dispatch_enter_button()
+  ├─ xerintosh_dispatch_enter(item)      → 确认/进入
+  ├─ xerintosh_dispatch_input_next(item) → 下一项输入
+  ├─ xerintosh_dispatch_input_prev(item) → 上一项输入
+  ├─ xerintosh_dispatch_input_exit(item) → 返回/退出输入
+  ├─ xerintosh_dispatch_measure(item)    → 选择器宽度
+  ├─ xerintosh_dispatch_draw(item,x,y)   → 列表项绘制
+  ├─ xerintosh_dispatch_draw_overlay(item) → 覆盖层绘制
+  ├─ xerintosh_dispatch_destroy(item)    → 类型特定销毁
+  └─ xerintosh_dispatch_has_right_control(item) → 是否有右侧控件
 ```
+
+每个公开函数都会执行 NULL 检查与类型范围检查，再索引到 `s_dispatch[item->type]` 对应的处理函数。
 
 ### 函数指针类型
 
-*📄 Source: [ui_dispatch.c](../../src/ui/ui_dispatch.c#L68)*
+*📄 Source: [ui_dispatch.c](../../src/ui/ui_dispatch.c)*
 
 ```c
-typedef void (*enter_fn_t)(xerintosh_list_item_t *);
+typedef struct {
+    void (*enter)(xerintosh_list_item_t *);
+    bool (*input_next)(xerintosh_list_item_t *);
+    bool (*input_prev)(xerintosh_list_item_t *);
+    bool (*input_exit)(xerintosh_list_item_t *);
+    int16_t (*measure)(xerintosh_list_item_t *);
+    void (*draw)(xerintosh_list_item_t *, int16_t, int16_t);
+    void (*draw_overlay)(xerintosh_list_item_t *);
+    void (*destroy)(xerintosh_list_item_t *);
+    bool (*has_right_control)(xerintosh_list_item_t *);
+} xerintosh_dispatch_vtable_t;
 ```
 
-所有派发处理函数共享同一个签名：接受 `xerintosh_list_item_t *`（基类指针），无返回值。类型安全的向下转型（如 `xerintosh_to_switch_item()`）在各自处理函数内部完成。
+输入类函数（`input_next` / `input_prev` / `input_exit`）返回 `bool`：
+- `true` 表示输入已被类型特定逻辑消费（如 slider 编辑模式增减值、user_item 运行态忽略导航）。
+- `false` 表示未消费，调用方应执行默认导航。
 
 ### 派发表定义
 
-*📄 Source: [ui_dispatch.c](../../src/ui/ui_dispatch.c#L70-L76)*
+*📄 Source: [ui_dispatch.c](../../src/ui/ui_dispatch.c)*
 
 ```c
-static const enter_fn_t s_enter_dispatch[] = {
-    [list_item]   = dispatch_enter_list,
-    [switch_item] = dispatch_enter_switch,
-    [slider_item] = dispatch_enter_slider,
-    [user_item]   = dispatch_enter_user,
-    [button_item] = dispatch_enter_button,
+static const xerintosh_dispatch_vtable_t s_dispatch[] = {
+    [list_item]   = { .enter = dispatch_enter_list,   .input_next = ..., ... },
+    [switch_item] = { .enter = dispatch_enter_switch, .input_next = ..., ... },
+    [slider_item] = { .enter = dispatch_enter_slider, .input_next = ..., ... },
+    [user_item]   = { .enter = dispatch_enter_user,   .input_next = ..., ... },
+    [button_item] = { .enter = dispatch_enter_button, .input_next = ..., ... },
 };
 ```
 
-使用 C99 **指定初始化器**（designated initializer）语法 `[list_item] = ...`，按枚举值索引到对应的处理函数。编译器保证数组大小足够容纳所有枚举值，且未指定的索引位置自动置零（即 NULL 函数指针，由调用方的范围检查防护）。
+使用 C99 **指定初始化器**（designated initializer）语法 `[list_item] = { ... }`，按枚举值索引到对应的处理函数组。未指定的函数指针自动置零，由调用方在运行时检查防护。
 
 ### 公开派发函数
 
-*📄 Source: [ui_dispatch.c](../../src/ui/ui_dispatch.c#L80-L85)*
+*📄 Source: [ui_dispatch.c](../../src/ui/ui_dispatch.c)*
 
 ```c
-void xerintosh_dispatch_enter(xerintosh_list_item_t *item)
-{
-    if (item == NULL) return;
-    if (item->type > button_item) return;
-    s_enter_dispatch[item->type](item);
-}
+void xerintosh_dispatch_enter(xerintosh_list_item_t *item);
+bool xerintosh_dispatch_input_next(xerintosh_list_item_t *item);
+bool xerintosh_dispatch_input_prev(xerintosh_list_item_t *item);
+bool xerintosh_dispatch_input_exit(xerintosh_list_item_t *item);
+int16_t xerintosh_dispatch_measure(xerintosh_list_item_t *item);
+void xerintosh_dispatch_draw(xerintosh_list_item_t *item, int16_t x, int16_t y);
+void xerintosh_dispatch_draw_overlay(xerintosh_list_item_t *item);
+void xerintosh_dispatch_destroy(xerintosh_list_item_t *item);
+bool xerintosh_dispatch_has_right_control(xerintosh_list_item_t *item);
 ```
 
 两层防护：
@@ -82,7 +96,7 @@ void xerintosh_dispatch_enter(xerintosh_list_item_t *item)
 
 ### dispatch_enter_list — 进入子菜单
 
-*📄 Source: [ui_dispatch.c](../../src/ui/ui_dispatch.c#L53-L64)*
+*📄 Source: [ui_dispatch.c](../../src/ui/ui_dispatch.c-L64)*
 
 ```c
 static void dispatch_enter_list(xerintosh_list_item_t *item)
@@ -122,7 +136,7 @@ static void dispatch_enter_list(xerintosh_list_item_t *item)
 
 ### dispatch_enter_user — 进入全屏 App
 
-*📄 Source: [ui_dispatch.c](../../src/ui/ui_dispatch.c#L16-L25)*
+*📄 Source: [ui_dispatch.c](../../src/ui/ui_dispatch.c-L25)*
 
 ```c
 static void dispatch_enter_user(xerintosh_list_item_t *item)
@@ -162,7 +176,7 @@ static void dispatch_enter_user(xerintosh_list_item_t *item)
 
 ### dispatch_enter_switch — 切换开关
 
-*📄 Source: [ui_dispatch.c](../../src/ui/ui_dispatch.c#L27-L32)*
+*📄 Source: [ui_dispatch.c](../../src/ui/ui_dispatch.c-L32)*
 
 ```c
 static void dispatch_enter_switch(xerintosh_list_item_t *item)
@@ -177,7 +191,7 @@ static void dispatch_enter_switch(xerintosh_list_item_t *item)
 
 ### dispatch_enter_slider — 滑条确认/退出编辑
 
-*📄 Source: [ui_dispatch.c](../../src/ui/ui_dispatch.c#L41-L51)*
+*📄 Source: [ui_dispatch.c](../../src/ui/ui_dispatch.c-L51)*
 
 ```c
 static void dispatch_enter_slider(xerintosh_list_item_t *item)
@@ -200,11 +214,11 @@ static void dispatch_enter_slider(xerintosh_list_item_t *item)
 | 第一次 | 进入编辑模式 | 备份当前值，设置 `is_confirmed = true` |
 | 第二次 | 退出编辑模式 | 触发 `exit_function` 持久化，清除 `is_confirmed` |
 
-`value_backup` 用于长按取消时恢复原值（由 `xerintosh_selector_go_prev_item` 或专门的长按取消逻辑处理）。
+`value_backup` 用于长按取消时恢复原值（由 `xerintosh_dispatch_input_exit()` 处理）。
 
 ### dispatch_enter_button — 触发按钮回调
 
-*📄 Source: [ui_dispatch.c](../../src/ui/ui_dispatch.c#L34-L39)*
+*📄 Source: [ui_dispatch.c](../../src/ui/ui_dispatch.c-L39)*
 
 ```c
 static void dispatch_enter_button(xerintosh_list_item_t *item)
@@ -249,15 +263,30 @@ void xerintosh_selector_jump_to_selected_item()
 }
 ```
 
-### 重构后：一行派发
+### 重构后：按行为统一派发
 
-*📄 Source: [ui_item_selector.c](../../src/ui/ui_item_selector.c#L150-L154)*
+*📄 Source: [ui_item_selector.c](../../src/ui/ui_item_selector.c)*
 
 ```c
 void xerintosh_selector_jump_to_selected_item()
 {
     if (!g_in_xerintosh) return;
+    if (g_xerintosh_selector.selected_item == NULL) return;
     xerintosh_dispatch_enter(g_xerintosh_selector.selected_item);
+}
+
+void xerintosh_selector_go_next_item()
+{
+    if (g_xerintosh_selector.selected_item == NULL) return;
+    if (xerintosh_dispatch_input_next(g_xerintosh_selector.selected_item)) return;
+    // 默认循环导航 ...
+}
+
+void xerintosh_selector_exit_current_item()
+{
+    if (g_xerintosh_selector.selected_item == NULL) return;
+    if (xerintosh_dispatch_input_exit(g_xerintosh_selector.selected_item)) return;
+    // 默认返回导航 ...
 }
 ```
 
@@ -265,11 +294,11 @@ void xerintosh_selector_jump_to_selected_item()
 
 | 维度 | 重构前 | 重构后 |
 |------|--------|--------|
-| `xerintosh_selector_jump_to_selected_item` 行数 | ~60 行 | 5 行 |
-| 新增 Item 类型时的修改点 | 修改核心函数 + 可能新增辅助函数 | 新增 `dispatch_enter_*` + 在数组中加一行 |
+| 类型判断分布 | 散落在 selector / draw / destroy / core 等多个文件 | 全部集中在 `ui_dispatch.c` |
+| 新增 Item 类型时的修改点 | 修改多个核心函数 + 可能新增辅助函数 | 新增对应 `dispatch_*` 函数 + 在 vtable 中加一行 |
 | 类型-行为映射 | O(n) 线性查找（最坏遍历全部 if） | O(1) 数组索引 |
 | 每个类型的逻辑可见性 | 混在一起，需滚动阅读 | 独立函数，一目了然 |
-| 单元测试难度 | 需 mock 全局状态才能测试单类型 | 可直接测试 `dispatch_enter_*` 静态函数 |
+| 单元测试难度 | 需 mock 全局状态才能测试单类型 | 可直接测试公开派发函数 |
 
 ---
 
@@ -278,31 +307,55 @@ void xerintosh_selector_jump_to_selected_item()
 假设要新增一个 `color_item`（颜色选择器）：
 
 1. 在 `ui_types.h` 的 `xerintosh_list_item_type_t` 枚举中添加 `color_item`
-2. 在 `ui_item.h` 中定义 `xerintosh_color_item_t` 结构体
-3. 在 `ui_dispatch.c` 中添加处理函数：
+2. 在 `ui_item_core.h` 中定义 `xerintosh_color_item_t` 结构体
+3. 在 `ui_dispatch.c` 中添加所需生命周期的处理函数：
    ```c
    static void dispatch_enter_color(xerintosh_list_item_t *item)
    {
        xerintosh_color_item_t *clr = xerintosh_to_color_item(item);
        // 实现颜色选择进入逻辑
    }
+
+   static bool dispatch_input_next_color(xerintosh_list_item_t *item)
+   {
+       // 颜色选择器下一个颜色
+       return true; // 消费输入
+   }
+
+   static int16_t dispatch_measure_color(xerintosh_list_item_t *item)
+   {
+       (void)item;
+       return SCREEN_WIDTH - 18; // 全宽选择器
+   }
    ```
-4. 在 `s_enter_dispatch` 数组中添加映射：
+4. 在 `s_dispatch` vtable 中添加映射：
    ```c
-   static const enter_fn_t s_enter_dispatch[] = {
+   static const xerintosh_dispatch_vtable_t s_dispatch[] = {
        // ... 已有条目 ...
-       [color_item] = dispatch_enter_color,
+       [color_item] = {
+           .enter        = dispatch_enter_color,
+           .input_next   = dispatch_input_next_color,
+           .input_prev   = dispatch_input_prev_color,
+           .input_exit   = dispatch_input_exit_default,
+           .measure      = dispatch_measure_color,
+           .draw         = dispatch_draw_color,
+           .draw_overlay = NULL,
+           .destroy      = dispatch_destroy_default,
+           .has_right_control = dispatch_right_control_true,
+       },
    };
    ```
-5. 无需修改 `xerintosh_dispatch_enter()` 或 `xerintosh_selector_jump_to_selected_item()`
+5. 无需修改 `xerintosh_dispatch_*()` 调用方或 `xerintosh_selector_jump_to_selected_item()`
 
 ---
 
 ## 与其他组件的关系
 
-- **ui_item_selector.c**：`xerintosh_selector_jump_to_selected_item()` 是派发表的唯一调用方
-- **ui_core.c**：`xerintosh_ui_update_lifecycle()` 管理 `user_item` 的 init/loop/exit 生命周期（派发表只负责进入时的状态设置）
-- **ui_item.h**：提供 `xerintosh_to_*_item()` 安全类型转换函数
+- **ui_item_selector.c**：通过 `xerintosh_dispatch_enter()`、`xerintosh_dispatch_input_next()`、`xerintosh_dispatch_input_prev()`、`xerintosh_dispatch_input_exit()` 处理所有类型相关的导航行为。
+- **ui_core.c**：通过 `xerintosh_dispatch_measure()` 获取选择器宽度；`xerintosh_ui_update_lifecycle()` 仍直接管理 `user_item` 的 init/loop/exit 时序（派发表不介入运行时循环）。
+- **ui_draw_list.c**：通过 `xerintosh_dispatch_draw()` 绘制列表项，`xerintosh_dispatch_draw_overlay()` 绘制覆盖层，`xerintosh_dispatch_has_right_control()` 判断文字可用宽度。
+- **ui_item_list.c**：通过 `xerintosh_dispatch_destroy()` 调用 `user_item` 的 `destroy_callback`。
+- **ui_item.h / ui_item_core.h**：提供 `xerintosh_to_*_item()` 安全类型转换函数与公开派发 API 声明。
 
 ---
 
