@@ -30,10 +30,6 @@ static inline void task_list_unlock(void) {
 #define task_list_unlock()  do {} while (0)
 #endif
 
-/* ═══ Round-Robin 内部状态 ═══ */
-
-static uint8_t s_rr_last_prio = 0;  /* 未使用，保留给未来扩展 */
-
 /* ═══ enqueue：追加到链表尾部 ═══ */
 
 static void sched_rr_enqueue(kern_task_t *task)
