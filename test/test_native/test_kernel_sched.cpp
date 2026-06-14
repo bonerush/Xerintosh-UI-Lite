@@ -177,3 +177,38 @@ TEST(KernelSchedTest, RoundRobinAlternatesBetweenTwoTasks)
     EXPECT_EQ(g_rr_a_count, 5);
     EXPECT_EQ(g_rr_b_count, 5);
 }
+
+/* ═══ 调度类注册 API 返回类型测试 ═══ */
+
+TEST(KernelSchedTest, SchedClassRegisterReturnsEinval)
+{
+    kern_err_t rc = kern_sched_class_register(NULL);
+    EXPECT_EQ(rc, KERN_EINVAL);
+}
+
+TEST(KernelSchedTest, SchedClassRegisterReturnsEnospc)
+{
+    kern_sched_init();
+
+    /* 保存并恢复 class 注册表，避免栈上 dummy 指针悬空影响后续测试 */
+    uint8_t saved_count = g_sched_class_count;
+    kern_sched_class_t *saved_classes[KERN_SCHED_MAX_CLASSES];
+    memcpy(saved_classes, g_sched_classes, sizeof(saved_classes));
+
+    kern_sched_class_t dummy;
+    memset(&dummy, 0, sizeof(dummy));
+
+    /* 填满剩余注册槽 */
+    while (g_sched_class_count < KERN_SCHED_MAX_CLASSES) {
+        kern_err_t rc = kern_sched_class_register(&dummy);
+        EXPECT_EQ(rc, KERN_OK);
+    }
+
+    /* 超过最大数量时应返回 KERN_ENOSPC */
+    kern_err_t rc = kern_sched_class_register(&dummy);
+    EXPECT_EQ(rc, KERN_ENOSPC);
+
+    /* 恢复 class 注册表 */
+    g_sched_class_count = saved_count;
+    memcpy(g_sched_classes, saved_classes, KERN_SCHED_MAX_CLASSES * sizeof(kern_sched_class_t *));
+}

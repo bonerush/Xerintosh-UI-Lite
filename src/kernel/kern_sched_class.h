@@ -54,10 +54,11 @@ extern uint8_t g_sched_class_count;
 /**
  * @brief  注册一个调度器 class
  * @param  cls 类实例指针
+ * @return KERN_OK 成功，KERN_EINVAL 参数无效，KERN_ENOSPC 注册表已满
  * @note   按注册顺序决定 class 优先级（先注册 = 先被 pick_next_ready 查询）
  *         必须在 kern_sched_init() 中调用。
  */
-void kern_sched_class_register(kern_sched_class_t *cls);
+kern_err_t kern_sched_class_register(kern_sched_class_t *cls);
 
 /**
  * @brief  从所有 class 列表中选择下一个就绪任务

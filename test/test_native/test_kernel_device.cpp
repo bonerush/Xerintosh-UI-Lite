@@ -9,6 +9,7 @@
 
 #include <gtest/gtest.h>
 #include <cstring>
+#include <type_traits>
 
 extern "C" {
 #include "kernel/kern_types.h"
@@ -18,6 +19,33 @@ extern "C" {
 #include "kernel/kern_init.h"
 }
 
+/* ═══ 编译期检查：设备 ops 回调返回类型为 kern_err_t ═══ */
+
+static_assert(std::is_same<
+    decltype(kern_device_ops_t::open),
+    kern_err_t (*)(kern_device_t *, int)
+>::value, "kern_device_ops_t::open must return kern_err_t");
+
+static_assert(std::is_same<
+    decltype(kern_device_ops_t::close),
+    kern_err_t (*)(kern_device_t *)
+>::value, "kern_device_ops_t::close must return kern_err_t");
+
+static_assert(std::is_same<
+    decltype(kern_device_ops_t::read),
+    kern_err_t (*)(kern_device_t *, void *, size_t, size_t *)
+>::value, "kern_device_ops_t::read must return kern_err_t");
+
+static_assert(std::is_same<
+    decltype(kern_device_ops_t::write),
+    kern_err_t (*)(kern_device_t *, const void *, size_t, size_t *)
+>::value, "kern_device_ops_t::write must return kern_err_t");
+
+static_assert(std::is_same<
+    decltype(kern_device_ops_t::ioctl),
+    kern_err_t (*)(kern_device_t *, unsigned int, unsigned long)
+>::value, "kern_device_ops_t::ioctl must return kern_err_t");
+
 /* ═══ 辅助：测试设备操作回调 ═══ */
 
 static int g_test_open_called = 0;
@@ -26,7 +54,7 @@ static int g_test_read_called = 0;
 static int g_test_write_called = 0;
 static int g_test_ioctl_called = 0;
 
-static int test_dev_open(kern_device_t *dev, int flags)
+static kern_err_t test_dev_open(kern_device_t *dev, int flags)
 {
     (void)dev;
     (void)flags;
@@ -34,14 +62,14 @@ static int test_dev_open(kern_device_t *dev, int flags)
     return KERN_OK;
 }
 
-static int test_dev_close(kern_device_t *dev)
+static kern_err_t test_dev_close(kern_device_t *dev)
 {
     (void)dev;
     g_test_close_called++;
     return KERN_OK;
 }
 
-static int test_dev_read(kern_device_t *dev, void *buf, size_t len, size_t *offset)
+static kern_err_t test_dev_read(kern_device_t *dev, void *buf, size_t len, size_t *offset)
 {
     (void)dev;
     (void)buf;
@@ -51,17 +79,17 @@ static int test_dev_read(kern_device_t *dev, void *buf, size_t len, size_t *offs
     return 0;
 }
 
-static int test_dev_write(kern_device_t *dev, const void *buf, size_t len, size_t *offset)
+static kern_err_t test_dev_write(kern_device_t *dev, const void *buf, size_t len, size_t *offset)
 {
     (void)dev;
     (void)buf;
     (void)len;
     (void)offset;
     g_test_write_called++;
-    return (int)len;
+    return (kern_err_t)len;
 }
 
-static int test_dev_ioctl(kern_device_t *dev, unsigned int cmd, unsigned long arg)
+static kern_err_t test_dev_ioctl(kern_device_t *dev, unsigned int cmd, unsigned long arg)
 {
     (void)dev;
     (void)cmd;
@@ -90,7 +118,7 @@ static kern_device_t g_test_dev = {
 
 TEST(KernelDeviceTest, RegisterNullReturnsEinval)
 {
-    int rc = kern_device_register(NULL);
+    kern_err_t rc = kern_device_register(NULL);
     EXPECT_EQ(rc, KERN_EINVAL);
 }
 
@@ -112,7 +140,7 @@ TEST(KernelDeviceTest, RegisterCreatesDevNode)
 TEST(KernelDeviceTest, RegisterEmptyNameReturnsEinval)
 {
     kern_device_t dev = { .name = "", .type = KERN_DEV_CHAR };
-    int rc = kern_device_register(&dev);
+    kern_err_t rc = kern_device_register(&dev);
     EXPECT_EQ(rc, KERN_EINVAL);
 }
 
@@ -190,4 +218,26 @@ TEST(KernelDeviceTest, DeviceTypeEnumValues)
     /* 验证枚举值存在 */
     EXPECT_EQ(KERN_DEV_CHAR, 0);
     EXPECT_EQ(KERN_DEV_BLOCK, 1);
+}
+
+/* ═══ 设备 ops 返回类型运行时一致性 ═══ */
+
+TEST(KernelDeviceTest, DeviceOpsReturnKernErrT)
+{
+    kern_device_t dev;
+    memset(&dev, 0, sizeof(dev));
+    dev.ops = &g_test_ops;
+
+    char buf[16];
+    kern_err_t rc_open  = dev.ops->open(&dev, 0);
+    kern_err_t rc_close = dev.ops->close(&dev);
+    kern_err_t rc_read  = dev.ops->read(&dev, buf, sizeof(buf), NULL);
+    kern_err_t rc_write = dev.ops->write(&dev, buf, sizeof(buf), NULL);
+    kern_err_t rc_ioctl = dev.ops->ioctl(&dev, 0, 0);
+
+    EXPECT_EQ(rc_open, KERN_OK);
+    EXPECT_EQ(rc_close, KERN_OK);
+    EXPECT_EQ(rc_read, 0);
+    EXPECT_EQ(rc_write, (kern_err_t)sizeof(buf));
+    EXPECT_EQ(rc_ioctl, KERN_OK);
 }

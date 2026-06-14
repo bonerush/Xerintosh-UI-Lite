@@ -14,10 +14,16 @@
 kern_sched_class_t *g_sched_classes[KERN_SCHED_MAX_CLASSES] = { NULL };
 uint8_t g_sched_class_count = 0;
 
-void kern_sched_class_register(kern_sched_class_t *cls)
+kern_err_t kern_sched_class_register(kern_sched_class_t *cls)
 {
-    if (cls == NULL || g_sched_class_count >= KERN_SCHED_MAX_CLASSES) return;
+    if (cls == NULL) {
+        return KERN_EINVAL;
+    }
+    if (g_sched_class_count >= KERN_SCHED_MAX_CLASSES) {
+        return KERN_ENOSPC;
+    }
     g_sched_classes[g_sched_class_count++] = cls;
+    return KERN_OK;
 }
 
 struct kern_task *pick_next_ready(void)

@@ -14,20 +14,20 @@
 
 /* ═══ 设备回调 ═══ */
 
-static int dev_fb0_open(kern_device_t *dev, int flags)
+static kern_err_t dev_fb0_open(kern_device_t *dev, int flags)
 {
     (void)dev;
     (void)flags;
     return KERN_OK;
 }
 
-static int dev_fb0_close(kern_device_t *dev)
+static kern_err_t dev_fb0_close(kern_device_t *dev)
 {
     (void)dev;
     return KERN_OK;
 }
 
-static int dev_fb0_read(kern_device_t *dev, void *buf, size_t len, size_t *offset)
+static kern_err_t dev_fb0_read(kern_device_t *dev, void *buf, size_t len, size_t *offset)
 {
     (void)dev;
     (void)buf;
@@ -36,7 +36,7 @@ static int dev_fb0_read(kern_device_t *dev, void *buf, size_t len, size_t *offse
     return KERN_EINVAL;  /* 帧缓冲不支持读取 */
 }
 
-static int dev_fb0_write(kern_device_t *dev, const void *buf, size_t len, size_t *offset)
+static kern_err_t dev_fb0_write(kern_device_t *dev, const void *buf, size_t len, size_t *offset)
 {
     (void)dev;
     (void)offset;
@@ -86,19 +86,19 @@ static int dev_fb0_write(kern_device_t *dev, const void *buf, size_t len, size_t
         }
     }
 
-    return (int)len;
+    return (kern_err_t)len;
 }
 
-static int dev_fb0_ioctl(kern_device_t *dev, unsigned int cmd, unsigned long arg)
+static kern_err_t dev_fb0_ioctl(kern_device_t *dev, unsigned int cmd, unsigned long arg)
 {
     (void)dev;
     (void)arg;
 
     switch (cmd) {
     case DEV_FB_IOCTL_GET_WIDTH:
-        return (int)SCREEN_WIDTH;
+        return (kern_err_t)SCREEN_WIDTH;
     case DEV_FB_IOCTL_GET_HEIGHT:
-        return (int)SCREEN_HEIGHT;
+        return (kern_err_t)SCREEN_HEIGHT;
     case DEV_FB_IOCTL_SET_ROTATION:
         hal_display_set_rotation((int)arg);
         return KERN_OK;

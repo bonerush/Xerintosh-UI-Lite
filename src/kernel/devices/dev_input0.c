@@ -15,20 +15,20 @@
 
 /* ═══ 设备回调 ═══ */
 
-static int dev_input0_open(kern_device_t *dev, int flags)
+static kern_err_t dev_input0_open(kern_device_t *dev, int flags)
 {
     (void)dev;
     (void)flags;
     return KERN_OK;
 }
 
-static int dev_input0_close(kern_device_t *dev)
+static kern_err_t dev_input0_close(kern_device_t *dev)
 {
     (void)dev;
     return KERN_OK;
 }
 
-static int dev_input0_read(kern_device_t *dev, void *buf, size_t len, size_t *offset)
+static kern_err_t dev_input0_read(kern_device_t *dev, void *buf, size_t len, size_t *offset)
 {
     (void)dev;
     (void)offset;
@@ -55,7 +55,7 @@ static int dev_input0_read(kern_device_t *dev, void *buf, size_t len, size_t *of
     return DEV_INPUT_EVENT_SIZE;
 }
 
-static int dev_input0_write(kern_device_t *dev, const void *buf, size_t len, size_t *offset)
+static kern_err_t dev_input0_write(kern_device_t *dev, const void *buf, size_t len, size_t *offset)
 {
     (void)dev;
     (void)buf;
@@ -64,7 +64,7 @@ static int dev_input0_write(kern_device_t *dev, const void *buf, size_t len, siz
     return KERN_EINVAL;  /* 输入设备不支持写入 */
 }
 
-static int dev_input0_ioctl(kern_device_t *dev, unsigned int cmd, unsigned long arg)
+static kern_err_t dev_input0_ioctl(kern_device_t *dev, unsigned int cmd, unsigned long arg)
 {
     (void)dev;
 

@@ -226,7 +226,7 @@ static ssize_t procfs_write(kern_file_t *f, const char *buf, size_t len)
 
 /* ═══ 内部：注册单个 procfs 文件 ═══ */
 
-static int procfs_register_file(const char *name, kern_procfs_file_type_t type)
+static kern_err_t procfs_register_file(const char *name, kern_procfs_file_type_t type)
 {
     char path[KERN_PATH_MAX];
     int written = snprintf(path, sizeof(path), "/proc/%s", name);
@@ -243,7 +243,7 @@ static int procfs_register_file(const char *name, kern_procfs_file_type_t type)
     inode->fops         = &g_procfs_fops;
     inode->private_data = (void *)(uintptr_t)type;
 
-    int rc = kern_dentry_register(path, inode);
+    kern_err_t rc = kern_dentry_register(path, inode);
     if (rc != KERN_OK) {
         free(inode);
         return rc;
@@ -267,7 +267,7 @@ void kern_procfs_init(void)
     kern_vfs_mkdir("/proc");
 
     /* 注册文件 */
-    int rc;
+    kern_err_t rc;
     rc = procfs_register_file("tasks", KERN_PROCFS_TASKS);
     if (rc != KERN_OK) {
         kern_log(KERN_LOG_WARN, "procfs: failed to register /proc/tasks");

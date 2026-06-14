@@ -34,11 +34,11 @@ typedef struct kern_device kern_device_t;
  * @note  每个设备实现自己的操作表，kernel 通过 bridge 桥接到 VFS
  */
 typedef struct kern_device_ops {
-    int  (*open)(kern_device_t *dev, int flags);
-    int  (*close)(kern_device_t *dev);
-    int  (*read)(kern_device_t *dev, void *buf, size_t len, size_t *offset);
-    int  (*write)(kern_device_t *dev, const void *buf, size_t len, size_t *offset);
-    int  (*ioctl)(kern_device_t *dev, unsigned int cmd, unsigned long arg);
+    kern_err_t  (*open)(kern_device_t *dev, int flags);
+    kern_err_t  (*close)(kern_device_t *dev);
+    kern_err_t  (*read)(kern_device_t *dev, void *buf, size_t len, size_t *offset);
+    kern_err_t  (*write)(kern_device_t *dev, const void *buf, size_t len, size_t *offset);
+    kern_err_t  (*ioctl)(kern_device_t *dev, unsigned int cmd, unsigned long arg);
 } kern_device_ops_t;
 
 /* ═══ 设备结构体 ═══ */

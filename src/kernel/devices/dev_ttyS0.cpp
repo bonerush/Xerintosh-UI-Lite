@@ -45,20 +45,20 @@ static volatile int g_tx_count = 0;
 
 /* ═══ 设备回调 ═══ */
 
-static int dev_ttyS0_open(kern_device_t *dev, int flags)
+static kern_err_t dev_ttyS0_open(kern_device_t *dev, int flags)
 {
     (void)dev;
     (void)flags;
     return KERN_OK;
 }
 
-static int dev_ttyS0_close(kern_device_t *dev)
+static kern_err_t dev_ttyS0_close(kern_device_t *dev)
 {
     (void)dev;
     return KERN_OK;
 }
 
-static int dev_ttyS0_read(kern_device_t *dev, void *buf, size_t len, size_t *offset)
+static kern_err_t dev_ttyS0_read(kern_device_t *dev, void *buf, size_t len, size_t *offset)
 {
     (void)dev;
     (void)offset;
@@ -73,7 +73,7 @@ static int dev_ttyS0_read(kern_device_t *dev, void *buf, size_t len, size_t *off
         g_tty_tail = (g_tty_tail + 1) % TTY_BUF_SIZE;
         g_tty_count--;
     }
-    return (int)total;
+    return (kern_err_t)total;
 #else
     size_t total = 0;
     while (total < len && g_rx_count > 0) {
@@ -81,11 +81,11 @@ static int dev_ttyS0_read(kern_device_t *dev, void *buf, size_t len, size_t *off
         g_rx_tail = (g_rx_tail + 1) % TTY_RX_BUF_SIZE;
         __atomic_fetch_sub(&g_rx_count, 1, __ATOMIC_RELAXED);
     }
-    return (int)total;
+    return (kern_err_t)total;
 #endif
 }
 
-static int dev_ttyS0_write(kern_device_t *dev, const void *buf, size_t len, size_t *offset)
+static kern_err_t dev_ttyS0_write(kern_device_t *dev, const void *buf, size_t len, size_t *offset)
 {
     (void)dev;
     (void)offset;
@@ -100,7 +100,7 @@ static int dev_ttyS0_write(kern_device_t *dev, const void *buf, size_t len, size
         g_tty_head = (g_tty_head + 1) % TTY_BUF_SIZE;
         g_tty_count++;
     }
-    return (int)total;
+    return (kern_err_t)total;
 #else
     size_t total = 0;
     while (total < len && g_tx_count < TTY_TX_BUF_SIZE) {
@@ -109,11 +109,11 @@ static int dev_ttyS0_write(kern_device_t *dev, const void *buf, size_t len, size
         __atomic_fetch_add(&g_tx_count, 1, __ATOMIC_RELAXED);
         total++;
     }
-    return (int)total;
+    return (kern_err_t)total;
 #endif
 }
 
-static int dev_ttyS0_ioctl(kern_device_t *dev, unsigned int cmd, unsigned long arg)
+static kern_err_t dev_ttyS0_ioctl(kern_device_t *dev, unsigned int cmd, unsigned long arg)
 {
     (void)dev;
     (void)cmd;

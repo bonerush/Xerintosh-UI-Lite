@@ -15,20 +15,20 @@
 
 /* ═══ 设备回调实现 ═══ */
 
-static int pwrkey_open(kern_device_t *dev, int flags)
+static kern_err_t pwrkey_open(kern_device_t *dev, int flags)
 {
     (void)dev;
     (void)flags;
     return KERN_OK;
 }
 
-static int pwrkey_close(kern_device_t *dev)
+static kern_err_t pwrkey_close(kern_device_t *dev)
 {
     (void)dev;
     return KERN_OK;
 }
 
-static int pwrkey_read(kern_device_t *dev, void *buf, size_t len, size_t *offset)
+static kern_err_t pwrkey_read(kern_device_t *dev, void *buf, size_t len, size_t *offset)
 {
     (void)dev;
     (void)offset;
@@ -52,7 +52,7 @@ static int pwrkey_read(kern_device_t *dev, void *buf, size_t len, size_t *offset
     return DEV_PWRKEY_EVENT_SIZE;
 }
 
-static int pwrkey_write(kern_device_t *dev, const void *buf, size_t len, size_t *offset)
+static kern_err_t pwrkey_write(kern_device_t *dev, const void *buf, size_t len, size_t *offset)
 {
     (void)dev;
     (void)buf;
@@ -61,7 +61,7 @@ static int pwrkey_write(kern_device_t *dev, const void *buf, size_t len, size_t 
     return KERN_EINVAL;  /* 电源键设备不支持写入 */
 }
 
-static int pwrkey_ioctl(kern_device_t *dev, unsigned int cmd, unsigned long arg)
+static kern_err_t pwrkey_ioctl(kern_device_t *dev, unsigned int cmd, unsigned long arg)
 {
     (void)dev;
     (void)cmd;

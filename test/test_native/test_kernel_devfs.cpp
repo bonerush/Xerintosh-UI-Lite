@@ -40,20 +40,20 @@ TEST(KernelDevFSTest, DevFsInitBeforeVfsIsSafe)
 
 /* ═══ /dev/null 设备 ═══ */
 
-static int null_open(kern_device_t *dev, int flags)
+static kern_err_t null_open(kern_device_t *dev, int flags)
 {
     (void)dev;
     (void)flags;
     return KERN_OK;
 }
 
-static int null_close(kern_device_t *dev)
+static kern_err_t null_close(kern_device_t *dev)
 {
     (void)dev;
     return KERN_OK;
 }
 
-static int null_read(kern_device_t *dev, void *buf, size_t len, size_t *offset)
+static kern_err_t null_read(kern_device_t *dev, void *buf, size_t len, size_t *offset)
 {
     (void)dev;
     (void)buf;
@@ -62,12 +62,12 @@ static int null_read(kern_device_t *dev, void *buf, size_t len, size_t *offset)
     return 0;  /* EOF */
 }
 
-static int null_write(kern_device_t *dev, const void *buf, size_t len, size_t *offset)
+static kern_err_t null_write(kern_device_t *dev, const void *buf, size_t len, size_t *offset)
 {
     (void)dev;
     (void)buf;
     (void)offset;
-    return (int)len;  /* 丢弃数据，假装写入成功 */
+    return (kern_err_t)len;  /* 丢弃数据，假装写入成功 */
 }
 
 static kern_device_ops_t g_null_ops = {
