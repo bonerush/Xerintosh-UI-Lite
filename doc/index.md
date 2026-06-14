@@ -41,7 +41,12 @@ Project Root
 │   ├── [全局上下文](ui/context.md)     ← 单例状态容器、向后兼容宏、退场动画状态
 │   └── [行列表动画工具](ui/ui-anim-row.md) ← 可复用行列表动画（入场滑入+高亮过渡）
 ├── App 层（每个 App 独立子目录）
-│   ├── app_init.c/h        ← 菜单构建、管理器初始化、输入处理
+│   ├── app_init.c/h        ← 入口封装（委托给 app_menu/app_input）
+│   ├── app_menu.c/h        ← 菜单树构建
+│   ├── app_input.c/h       ← 每帧输入路由与状态机调度
+│   ├── app_state.c/h       ← 跨模块全局状态（g_wifi_on/g_bt_on）
+│   ├── ui_service.c/h      ← user_item 生命周期公共辅助
+│   ├── ui_task.c           ← UI 内核任务包装（输入→渲染→yield）
 │   ├── boot/               ← 开机画面
 │   ├── settings/           ← 亮度/动画/方向设置 + 旋转兼容转换
 │   ├── storage/            ← NVS 持久化存储
@@ -51,8 +56,7 @@ Project Root
 │   ├── serial_monitor/     ← 串口监视器 App（缓冲区/状态机/界面）
 │   ├── taskmgr/             ← 任务管理器 App（进程列表/终止/保护）
 │   ├── about/              ← 关于页面（版本/Logo/开发者信息）
-│   ├── ui_task.c           ← UI 内核任务包装（输入→渲染→yield）
-│   └── svc_mgr_helper.c/h  ← WiFi/BT 共享开关切换抽象
+│   └── svc_mgr_helper.c/h  ← 已移除（见 svc-mgr-helper.md）
 ├── [编码风格规范](coding-style.md)     ← C OOP 命名、封装、继承规范
 ├── 教程
 │   └── [从零开始创建 App](tutorials/your-first-app.md) ← 面向初学者的 App 开发教程
@@ -146,12 +150,15 @@ FreeRTOS 继续在底层为 WiFi/BT 协议栈服务。SMP 模式下 Xeros 在每
 - **[版本信息](kernel/kern-version.md)** — 版本号与开发者信息管理
 
 ### App 层
-- **[应用初始化](app/app-init.md)** — 菜单树构建、管理器初始化、按键映射
+- **[应用初始化](app/app-init.md)** — 入口封装，委托菜单构建、输入处理与管理器初始化
+- **[菜单构建](app/app-menu.md)** — Xerintosh UI 菜单树构造
+- **[输入处理](app/app-input.md)** — 按键映射与各状态机调度
+- **[UI 公共服务](app/ui-service.md)** — user_item 生命周期公共辅助
 - **[设置管理](app/settings.md)** — 亮度/动画/方向/波特率配置与存储
 - **[任务管理器](app/taskmgr.md)** — 进程列表查看与安全终止（动画行列表 + 横屏 3 行）
 - **[串口监视器](app/serial-monitor.md)** — 串口数据监视（入场滑入动画 + 按钮平滑过渡）
 - **[UI 任务](app/ui-task.md)** — 内核任务包装的 UI 主循环
-- **[服务管理助手](app/svc-mgr-helper.md)** — WiFi/BT 共享开关切换抽象
+- **[服务管理助手](app/svc-mgr-helper.md)** — 已移除，保留文档说明历史
 
 ### 入门教程
 - **[从零开始创建 App](tutorials/your-first-app.md)** — 面向初学者的完整教程，手把手教你创建第一个 `user_item` App

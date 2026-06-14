@@ -60,10 +60,12 @@ The project uses a **four-layer architecture** with strict module prefixes:
 
 ```
 App Layer (src/app/) — Each app in its own subdirectory
-├── app_init.c/h              — Menu tree construction, input dispatch
+├── app_init.c/h              — Entry wrapper (delegates to app_menu/app_input)
+├── app_menu.c/h              — Menu tree construction
+├── app_input.c/h             — Per-frame input routing and state-machine dispatch
+├── app_state.c/h             — Cross-module global state (g_wifi_on, g_bt_on)
 ├── ui_task.c                 — Xeros kernel task wrapper (input→render→yield)
-├── ui_service.c/h            — UI service layer (shared UI utilities)
-├── svc_mgr_helper.c/h        — WiFi/BT shared toggle abstraction
+├── ui_service.c/h            — user_item lifecycle helpers (input reset, exit check)
 ├── boot/
 │   └── boot_screen.c/h       — Macintosh 128K boot screen
 ├── settings/
@@ -96,7 +98,8 @@ App Layer (src/app/) — Each app in its own subdirectory
 ├── flasher/
 │   ├── flasher.h             — Flasher app public API
 │   ├── flasher_app.cpp       — Wired flashing bridge state machine
-│   ├── flasher_gpio.cpp/h    — GPIO bit-banging for flasher signals
+│   ├── flasher_gpio.cpp/h    — GPIO bit-banging for flasher signals + role label helper
+│   ├── flasher_menu.c/h      — Pin config submenu + force-release state machine
 │   └── flasher_ui.cpp/h      — Flasher UI rendering
 └── shutdown/
     ├── shutdown_screen.c/h   — Shutdown screen

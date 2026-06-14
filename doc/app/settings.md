@@ -109,25 +109,6 @@ int16_t settings_anim_speed_value(void);         /* 速度档位 → 45-95 实�
 int32_t settings_serial_baud_hw_value(int16_t);  /* 波特率档位 → 实际波特率数值 */
 ```
 
-### 烧录器引脚角色标签
-
-*📄 Source: [settings.c](../../src/app/settings/settings.c#L180-L189)*
-
-```c
-const char* settings_flasher_role_label(flasher_signal_t role);
-```
-
-返回烧录器信号角色的显示字符串：
-
-| 角色 | 返回值 |
-|------|--------|
-| `FLASHER_SIG_NONE` | `"未分配"` |
-| `FLASHER_SIG_TX` | `"TX"` |
-| `FLASHER_SIG_RX` | `"RX"` |
-| `FLASHER_SIG_BOOT` | `"BOOT/DTR"` |
-
----
-
 ## 初始化流程
 
 ```

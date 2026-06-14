@@ -16,7 +16,7 @@
 | 2.1 内核层重构 | `DONE` | `02-refactor/kernel.md` |
 | 2.2 HAL 层重构 | `SKIPPED` | `02-refactor/hal.md` |
 | 2.3 UI 核心层重构 | `DONE` | `02-refactor/ui.md` |
-| 2.4 App 层重构 | `PENDING` | `02-refactor/app.md` |
+| 2.4 App 层重构 | `DONE` | `02-refactor/app.md` |
 | 2.5 文档同步 | `PENDING` | `02-refactor/docs.md` |
 | 3. 集成验证 | `PENDING` | `03-integration.md` |
 | 4. 归档 | `PENDING` | `04-archive.md` |
