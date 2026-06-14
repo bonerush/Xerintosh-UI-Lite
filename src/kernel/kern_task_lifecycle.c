@@ -67,7 +67,7 @@ kern_pid_t kern_spawn(const char *name, void (*entry)(void *arg),
 
     if (getcontext(&task->ctx) < 0) {
         kern_log(KERN_LOG_WARN, "getcontext failed for task %s", task->name);
-        free(task->stack_base);
+        kern_resource_release_all(task);
         free(task);
         return KERN_ERR;
     }
@@ -304,6 +304,7 @@ void kern_exit(void)
     if (cur == NULL) return;
 
     kern_resource_release_all(cur);
+    cur->stack_base = NULL;
 
     cur->state = KERN_TASK_ZOMBIE;
     kern_log(KERN_LOG_DEBUG, "task %d (%s) exited", cur->pid, cur->name);
@@ -320,6 +321,7 @@ void kern_exit(void)
     if (cur == NULL) return;
 
     kern_resource_release_all(cur);
+    cur->stack_base = NULL;
 
     cur->state = KERN_TASK_ZOMBIE;
     kern_log(KERN_LOG_DEBUG, "task %d (%s) exited", cur->pid, cur->name);
@@ -338,6 +340,7 @@ void kern_exit(void)
     if (cur == NULL) return;
 
     kern_resource_release_all(cur);
+    cur->stack_base = NULL;
 
     cur->state = KERN_TASK_ZOMBIE;
     kern_log(KERN_LOG_DEBUG, "task %d (%s) exited", cur->pid, cur->name);
@@ -450,11 +453,7 @@ kern_err_t kern_task_kill(kern_pid_t pid)
 #if defined(NATIVE_TEST)
     /* Native: TCB 在下次 sched_tick 时由 reap_zombies 回收 */
 #elif defined(XEROS_NATIVE_SCHED)
-    /* 原生调度器：释放手动分配的栈 */
-    if (task->stack_base != NULL) {
-        free(task->stack_base);
-        task->stack_base = NULL;
-    }
+    /* 原生调度器：栈已纳入资源追踪，由 kern_resource_release_all 统一释放 */
 #else
     /* FreeRTOS: 销毁底层线程 */
     if (task->port_thread != KERN_PORT_THREAD_NULL) {
@@ -493,10 +492,7 @@ void reap_zombies(void)
                 if (g_last_picked == zombie) g_last_picked = NULL;
                 /* 同步更新 g_task_list（如为此 list） */
                 if (g_task_list == zombie) g_task_list = t;
-                if (zombie->stack_base != NULL) {
-                    free(zombie->stack_base);
-                    zombie->stack_base = NULL;
-                }
+                /* 栈内存已纳入资源追踪，由 kern_resource_release_all 释放 */
                 g_task_count--;
                 kern_log(KERN_LOG_DEBUG, "reaped zombie %d (%s)", zombie->pid, zombie->name);
                 free(zombie);

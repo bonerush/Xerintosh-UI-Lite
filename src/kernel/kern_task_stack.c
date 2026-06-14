@@ -8,6 +8,7 @@
 
 #include "kern_sched.h"
 #include "kern_task.h"
+#include "kern_kmalloc.h"
 #include "kern_init.h"
 #include "kern_port.h"
 
@@ -24,7 +25,7 @@ void task_stack_init(kern_task_t *task, size_t stack_size)
     if (stack_size < KERN_STACK_MIN) stack_size = KERN_STACK_MIN;
 
     task->stack_size = stack_size;
-    task->stack_base = (uint8_t *)malloc(stack_size);
+    task->stack_base = (uint8_t *)kern_kmalloc_for_task(task, stack_size);
     if (task->stack_base == NULL) {
         kern_log(KERN_LOG_WARN, "stack alloc failed for task %s, size=%zu",
                  task->name, stack_size);

@@ -17,6 +17,10 @@
 extern "C" {
 #endif
 
+/* 前向声明任务控制块，避免与 kern_task.h 循环包含 */
+struct kern_task;
+typedef struct kern_task kern_task_t;
+
 /* ═══ 内核分配器 API ═══ */
 
 /**
@@ -25,6 +29,15 @@ extern "C" {
  * @return 分配的内存指针，失败返回 NULL
  */
 void *kern_kmalloc(size_t size);
+
+/**
+ * @brief  分配内存并追踪到指定任务
+ * @param  task 资源所有者任务
+ * @param  size 分配字节数
+ * @return 分配的内存指针，失败返回 NULL
+ * @note   用于任务栈等需要在目标任务运行前就绑定到其资源链表的内存
+ */
+void *kern_kmalloc_for_task(kern_task_t *task, size_t size);
 
 /**
  * @brief  分配并清零内存（自动追踪到当前任务）

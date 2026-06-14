@@ -98,6 +98,11 @@ TEST(KernelKmallocTest, AllocatedMemoryTrackedToTask)
 
     kern_task_t *task = kern_task_current();
     ASSERT_NE(task, nullptr);
+
+    /* 隔离 idle 任务栈资源，避免影响测试计数 */
+    kern_resource_t *idle_stack_res = task->resource_head;
+    task->resource_head = nullptr;
+
     EXPECT_EQ(task->resource_head, nullptr);
 
     void *ptr = kern_kmalloc(128);
@@ -110,6 +115,9 @@ TEST(KernelKmallocTest, AllocatedMemoryTrackedToTask)
 
     /* 释放后资源追踪应清除 */
     EXPECT_EQ(task->resource_head, nullptr);
+
+    /* 恢复 idle 栈资源 */
+    task->resource_head = idle_stack_res;
 }
 
 TEST(KernelKmallocTest, MultipleAllocationsAreTracked)
@@ -119,6 +127,10 @@ TEST(KernelKmallocTest, MultipleAllocationsAreTracked)
 
     kern_task_t *task = kern_task_current();
     ASSERT_NE(task, nullptr);
+
+    /* 隔离 idle 任务栈资源 */
+    kern_resource_t *idle_stack_res = task->resource_head;
+    task->resource_head = nullptr;
 
     void *p1 = kern_kmalloc(32);
     void *p2 = kern_kmalloc(64);
@@ -141,6 +153,9 @@ TEST(KernelKmallocTest, MultipleAllocationsAreTracked)
     kern_kfree(p2);
     kern_kfree(p3);
     EXPECT_EQ(task->resource_head, nullptr);
+
+    /* 恢复 idle 栈资源 */
+    task->resource_head = idle_stack_res;
 }
 
 /* ═══ untracked 分配测试 ═══ */
@@ -152,6 +167,11 @@ TEST(KernelKmallocTest, UntrackedAllocNotTracked)
 
     kern_task_t *task = kern_task_current();
     ASSERT_NE(task, nullptr);
+
+    /* 隔离 idle 任务栈资源 */
+    kern_resource_t *idle_stack_res = task->resource_head;
+    task->resource_head = nullptr;
+
     EXPECT_EQ(task->resource_head, nullptr);
 
     void *ptr = kern_kmalloc_untracked(64);
@@ -165,6 +185,9 @@ TEST(KernelKmallocTest, UntrackedAllocNotTracked)
     EXPECT_EQ(count, 0);
 
     kern_kfree_untracked(ptr);
+
+    /* 恢复 idle 栈资源 */
+    task->resource_head = idle_stack_res;
 }
 
 TEST(KernelKmallocTest, UntrackedFreeDoesNotCrash)
@@ -186,6 +209,11 @@ TEST(KernelKmallocTest, TrackedAllocIsTracked)
 
     kern_task_t *task = kern_task_current();
     ASSERT_NE(task, nullptr);
+
+    /* 隔离 idle 任务栈资源 */
+    kern_resource_t *idle_stack_res = task->resource_head;
+    task->resource_head = nullptr;
+
     EXPECT_EQ(task->resource_head, nullptr);
 
     void *ptr = kern_kmalloc(64);
@@ -198,6 +226,9 @@ TEST(KernelKmallocTest, TrackedAllocIsTracked)
     EXPECT_EQ(count, 1);
 
     kern_kfree(ptr);
+
+    /* 恢复 idle 栈资源 */
+    task->resource_head = idle_stack_res;
 }
 
 /* ═══ realloc 测试 ═══ */
@@ -217,13 +248,23 @@ TEST(KernelKmallocTest, KreallocZeroSizeBehavesLikeFree)
     kern_init();
     kern_sched_init();
 
+    kern_task_t *task = kern_task_current();
+    ASSERT_NE(task, nullptr);
+
+    /* 隔离 idle 任务栈资源 */
+    kern_resource_t *idle_stack_res = task->resource_head;
+    task->resource_head = nullptr;
+
     void *ptr = kern_kmalloc(128);
     ASSERT_NE(ptr, nullptr);
 
     void *result = kern_krealloc(ptr, 0);
     EXPECT_EQ(result, nullptr);
     /* ptr 应已释放，任务资源链表为空 */
-    EXPECT_EQ(kern_task_current()->resource_head, nullptr);
+    EXPECT_EQ(task->resource_head, nullptr);
+
+    /* 恢复 idle 栈资源 */
+    task->resource_head = idle_stack_res;
 }
 
 TEST(KernelKmallocTest, KreallocGrow)

@@ -85,6 +85,12 @@ void *kern_kmalloc(size_t size)
     return kern_kmalloc_impl(size, kern_task_current(), true);
 }
 
+void *kern_kmalloc_for_task(kern_task_t *task, size_t size)
+{
+    if (task == NULL) return NULL;
+    return kern_kmalloc_impl(size, task, true);
+}
+
 void *kern_kmalloc_untracked(size_t size)
 {
     return kern_kmalloc_impl(size, NULL, false);

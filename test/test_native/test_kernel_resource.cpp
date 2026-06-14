@@ -81,6 +81,10 @@ TEST(KernelResourceTest, TrackAndUntrack)
     kern_task_t *task = kern_task_current();
     ASSERT_NE(task, nullptr);
 
+    /* 隔离 idle 任务栈资源 */
+    kern_resource_t *idle_stack_res = task->resource_head;
+    task->resource_head = nullptr;
+
     void *resource = (void *)0xDEAD;
     EXPECT_EQ(task->resource_head, nullptr);
 
@@ -94,6 +98,9 @@ TEST(KernelResourceTest, TrackAndUntrack)
     rc = kern_resource_untrack(task, resource);
     EXPECT_EQ(rc, KERN_OK);
     EXPECT_EQ(task->resource_head, nullptr);
+
+    /* 恢复 idle 栈资源 */
+    task->resource_head = idle_stack_res;
 }
 
 TEST(KernelResourceTest, UntrackNonexistentReturnsEnoent)
@@ -116,6 +123,10 @@ TEST(KernelResourceTest, MultipleResourcesInLinkedList)
     kern_task_t *task = kern_task_current();
     ASSERT_NE(task, nullptr);
 
+    /* 隔离 idle 任务栈资源，避免 release_all 误释放 idle 栈 */
+    kern_resource_t *idle_stack_res = task->resource_head;
+    task->resource_head = nullptr;
+
     void *r1 = (void *)0x1000;
     void *r2 = (void *)0x2000;
     void *r3 = (void *)0x3000;
@@ -136,6 +147,9 @@ TEST(KernelResourceTest, MultipleResourcesInLinkedList)
     /* 清理 */
     kern_resource_release_all(task);
     EXPECT_EQ(task->resource_head, nullptr);
+
+    /* 恢复 idle 栈资源 */
+    task->resource_head = idle_stack_res;
 }
 
 TEST(KernelResourceTest, ReleaseAllCallsAllCallbacks)
@@ -145,6 +159,10 @@ TEST(KernelResourceTest, ReleaseAllCallsAllCallbacks)
 
     kern_task_t *task = kern_task_current();
     ASSERT_NE(task, nullptr);
+
+    /* 隔离 idle 任务栈资源，避免 release_all 误释放 idle 栈 */
+    kern_resource_t *idle_stack_res = task->resource_head;
+    task->resource_head = nullptr;
 
     g_release_count = 0;
 
@@ -156,6 +174,9 @@ TEST(KernelResourceTest, ReleaseAllCallsAllCallbacks)
 
     EXPECT_EQ(g_release_count, 3);
     EXPECT_EQ(task->resource_head, nullptr);
+
+    /* 恢复 idle 栈资源 */
+    task->resource_head = idle_stack_res;
 }
 
 TEST(KernelResourceTest, ReleaseAllOnNullTaskDoesNotCrash)
@@ -206,6 +227,10 @@ TEST(KernelResourceTest, ResourceTrackUnderLock)
     kern_task_t *task = kern_task_current();
     ASSERT_NE(task, nullptr);
 
+    /* 隔离 idle 任务栈资源，避免 release_all 误释放 idle 栈 */
+    kern_resource_t *idle_stack_res = task->resource_head;
+    task->resource_head = nullptr;
+
     void *r1 = (void *)0x1000;
     void *r2 = (void *)0x2000;
     void *r3 = (void *)0x3000;
@@ -230,4 +255,7 @@ TEST(KernelResourceTest, ResourceTrackUnderLock)
     kern_resource_release_all(task);
     EXPECT_EQ(task->resource_head, nullptr);
     EXPECT_EQ(task->resource_lock, false);
+
+    /* 恢复 idle 栈资源 */
+    task->resource_head = idle_stack_res;
 }
