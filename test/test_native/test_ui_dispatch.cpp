@@ -226,3 +226,12 @@ TEST_F(UiDispatchTest, DestroyCallsUserItemDestroyCallback)
     free((void *)item->content);
     free(item);
 }
+
+/**
+ * @brief C++ 翻译单元可安全包含 ui_item.h 并链接
+ */
+TEST_F(UiDispatchTest, CppCanIncludeUiItemHeader)
+{
+    xerintosh_list_item_t *root = xerintosh_get_root_list();
+    ASSERT_NE(root, nullptr);
+}
