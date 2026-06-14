@@ -36,6 +36,8 @@ static void sched_fifo_enqueue(kern_task_t *task)
         t->next = task;
     }
 
+    task->scheduler_class_id = sched_class_fifo.class_id;
+
     /* 如果入队任务优先级高于当前运行的任务，触发抢占 */
     if (g_current_task != NULL
         && task->state == KERN_TASK_READY
@@ -60,6 +62,7 @@ static void sched_fifo_dequeue(kern_task_t *task)
             } else {
                 *head = t->next;
             }
+            task->scheduler_class_id = -1;
             return;
         }
         prev = t;

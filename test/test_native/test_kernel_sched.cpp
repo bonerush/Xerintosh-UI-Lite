@@ -14,6 +14,8 @@ extern "C" {
 #include "kernel/kern_types.h"
 #include "kernel/kern_task.h"
 #include "kernel/kern_sched.h"
+#include "kernel/kern_sched_rr.h"
+#include "kernel/kern_sched_fifo.h"
 #include "kernel/kern_init.h"
 }
 
@@ -211,4 +213,90 @@ TEST(KernelSchedTest, SchedClassRegisterReturnsEnospc)
     /* 恢复 class 注册表 */
     g_sched_class_count = saved_count;
     memcpy(g_sched_classes, saved_classes, KERN_SCHED_MAX_CLASSES * sizeof(kern_sched_class_t *));
+}
+
+/* ═══ 辅助：构造一个未入队的 dummy 任务 ═══ */
+
+static void init_dummy_task(kern_task_t *task, const char *name)
+{
+    memset(task, 0, sizeof(*task));
+    if (name != NULL) {
+        strncpy(task->name, name, KERN_TASK_NAME_LEN);
+        task->name[KERN_TASK_NAME_LEN] = '\0';
+    }
+    task->state = KERN_TASK_READY;
+    task->scheduler_class_id = -1;
+}
+
+/* ═══ scheduler_class_id 初始化与同步测试 ═══ */
+
+TEST(KernelSchedTest, SpawnInitializesSchedulerClassId)
+{
+    kern_sched_init();
+
+    kern_pid_t pid = kern_spawn("classid_test", simple_counter, NULL, 0);
+    ASSERT_GE(pid, 0);
+
+    kern_task_t *task = kern_task_get(pid);
+    ASSERT_NE(task, nullptr);
+    EXPECT_EQ(task->scheduler_class_id, KERN_SCHED_CLASS_RR_ID);
+    EXPECT_NE(task->scheduler_class_id, -1);
+}
+
+TEST(KernelSchedTest, RrEnqueueSetsClassId)
+{
+    kern_sched_init();
+
+    kern_task_t dummy;
+    init_dummy_task(&dummy, "rr_dummy");
+
+    sched_class_rr.enqueue(&dummy);
+    EXPECT_EQ(dummy.scheduler_class_id, KERN_SCHED_CLASS_RR_ID);
+
+    /* 清理，避免影响后续测试 */
+    sched_class_rr.dequeue(&dummy);
+}
+
+TEST(KernelSchedTest, RrDequeueClearsClassId)
+{
+    kern_sched_init();
+
+    kern_task_t dummy;
+    init_dummy_task(&dummy, "rr_dummy");
+
+    sched_class_rr.enqueue(&dummy);
+    ASSERT_NE(dummy.scheduler_class_id, -1);
+
+    sched_class_rr.dequeue(&dummy);
+    EXPECT_EQ(dummy.scheduler_class_id, -1);
+}
+
+TEST(KernelSchedTest, FifoEnqueueSetsClassId)
+{
+    kern_sched_init();
+
+    kern_task_t dummy;
+    init_dummy_task(&dummy, "fifo_dummy");
+    dummy.priority = 128;
+
+    sched_class_fifo.enqueue(&dummy);
+    EXPECT_EQ(dummy.scheduler_class_id, sched_class_fifo.class_id);
+
+    /* 清理 */
+    sched_class_fifo.dequeue(&dummy);
+}
+
+TEST(KernelSchedTest, FifoDequeueClearsClassId)
+{
+    kern_sched_init();
+
+    kern_task_t dummy;
+    init_dummy_task(&dummy, "fifo_dummy");
+    dummy.priority = 128;
+
+    sched_class_fifo.enqueue(&dummy);
+    ASSERT_NE(dummy.scheduler_class_id, -1);
+
+    sched_class_fifo.dequeue(&dummy);
+    EXPECT_EQ(dummy.scheduler_class_id, -1);
 }

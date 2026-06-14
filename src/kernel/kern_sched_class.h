@@ -29,6 +29,7 @@ struct kern_task;
  */
 typedef struct kern_sched_class {
     const char *name;                               /* 类名称（调试用） */
+    int8_t              class_id;                   /* 在全局注册表中的索引，-1 表示未注册 */
 
     void (*enqueue)(struct kern_task *task);        /* 将任务加入本 class */
     void (*dequeue)(struct kern_task *task);        /* 将任务从本 class 移除 */
@@ -39,6 +40,9 @@ typedef struct kern_sched_class {
 
     struct kern_task *task_list;                    /* 本 class 的任务链表头 */
 } kern_sched_class_t;
+
+/** 默认 Round-Robin 调度类 ID（RR 总是第一个注册） */
+#define KERN_SCHED_CLASS_RR_ID 0
 
 /* ═══ 全局 class 注册表 ═══ */
 

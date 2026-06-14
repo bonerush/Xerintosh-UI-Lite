@@ -44,6 +44,7 @@ kern_pid_t kern_spawn(const char *name, void (*entry)(void *arg),
     task->state = KERN_TASK_READY;
     task->priority = 128;
     task->timeslice_remaining = SCHED_RR_DEFAULT_TIMESLICE;
+    task->scheduler_class_id = -1;
     task->cpu_id = KERN_CPU_ANY;
 #ifdef CONFIG_SMP_ENABLED
     task->cpu_id = kern_smp_migrate_assign();
@@ -57,6 +58,9 @@ kern_pid_t kern_spawn(const char *name, void (*entry)(void *arg),
     } else {
         snprintf(task->name, KERN_TASK_NAME_LEN, "task_%d", task->pid);
     }
+
+    /* 默认加入 RR 调度类 */
+    task->scheduler_class_id = KERN_SCHED_CLASS_RR_ID;
 
     size_t stack_sz = (stack_min > 0) ? stack_min : (size_t)KERN_STACK_MIN;
     task_stack_init(task, stack_sz);
@@ -117,6 +121,7 @@ kern_pid_t kern_spawn(const char *name, void (*entry)(void *arg),
     task->state = KERN_TASK_READY;
     task->priority = 128;
     task->timeslice_remaining = SCHED_RR_DEFAULT_TIMESLICE;
+    task->scheduler_class_id = -1;
     task->cpu_id = KERN_CPU_ANY;
 #ifdef CONFIG_SMP_ENABLED
     task->cpu_id = kern_smp_migrate_assign();
@@ -130,6 +135,9 @@ kern_pid_t kern_spawn(const char *name, void (*entry)(void *arg),
     } else {
         snprintf(task->name, KERN_TASK_NAME_LEN, "task_%d", task->pid);
     }
+
+    /* 默认加入 RR 调度类 */
+    task->scheduler_class_id = KERN_SCHED_CLASS_RR_ID;
 
     /* 手动分配栈 + setjmp/longjmp 上下文 */
     task_stack_init(task, (stack_min > 0) ? stack_min : KERN_STACK_MIN);
@@ -173,6 +181,7 @@ kern_pid_t kern_spawn(const char *name, void (*entry)(void *arg),
     task->state = KERN_TASK_READY;
     task->priority = 128;
     task->timeslice_remaining = SCHED_RR_DEFAULT_TIMESLICE;
+    task->scheduler_class_id = -1;
     task->cpu_id = KERN_CPU_ANY;
 #ifdef CONFIG_SMP_ENABLED
     task->cpu_id = kern_smp_migrate_assign();
@@ -186,6 +195,9 @@ kern_pid_t kern_spawn(const char *name, void (*entry)(void *arg),
     } else {
         snprintf(task->name, KERN_TASK_NAME_LEN, "task_%d", task->pid);
     }
+
+    /* 默认加入 RR 调度类 */
+    task->scheduler_class_id = KERN_SCHED_CLASS_RR_ID;
 
     /* 通过可移植层创建底层线程承载此 Xeros 任务 */
     size_t stack_sz = (stack_min > 0) ? stack_min : (size_t)KERN_PORT_STACK_MIN;

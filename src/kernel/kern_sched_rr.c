@@ -51,6 +51,8 @@ static void sched_rr_enqueue(kern_task_t *task)
     t->next = task;
     task->next = NULL;
 
+    task->scheduler_class_id = sched_class_rr.class_id;
+
     task_list_unlock();
 }
 
@@ -73,6 +75,7 @@ static void sched_rr_dequeue(kern_task_t *task)
                 *head = t->next;
             }
             if (g_last_picked == task) g_last_picked = NULL;
+            task->scheduler_class_id = -1;
             task_list_unlock();
             return;
         }
@@ -80,6 +83,7 @@ static void sched_rr_dequeue(kern_task_t *task)
         t = t->next;
     }
 
+    task->scheduler_class_id = -1;
     task_list_unlock();
 }
 

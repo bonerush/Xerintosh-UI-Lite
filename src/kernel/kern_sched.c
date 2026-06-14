@@ -95,6 +95,7 @@ void kern_sched_init(void)
 
     g_task_list = g_idle_task;
     sched_class_rr.task_list = g_task_list;
+    g_idle_task->scheduler_class_id = KERN_SCHED_CLASS_RR_ID;
     g_task_count = 1;
     g_current_task = g_idle_task;
     g_last_picked = g_idle_task;
@@ -134,6 +135,7 @@ void kern_sched_init(void) /* XEROS_NATIVE_SCHED */
 
     g_task_list = g_idle_task;
     sched_class_rr.task_list = g_task_list;
+    g_idle_task->scheduler_class_id = KERN_SCHED_CLASS_RR_ID;
     g_task_count = 1;
     g_current_task = g_idle_task;
     g_last_picked = g_idle_task;
@@ -191,6 +193,7 @@ void kern_sched_init(void)
         /* 链接到全局任务列表 */
         idle->next = g_task_list;
         g_task_list = idle;
+        idle->scheduler_class_id = KERN_SCHED_CLASS_RR_ID;
         g_task_count++;
 
         g_per_cpu[cpu].idle_task = idle;

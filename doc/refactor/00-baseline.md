@@ -2,58 +2,55 @@
 
 ## 分支与 Commit
 
-- 分支：`refactor/2026-06-14-kernel-ui`
-- 起始 commit：`6411c578124f1bf029169ffe1f5dfbef9fddeee5`
-- Worktree：`.worktrees/refactor-2026-06-14-kernel-ui`
+- 分支：`refactor/2026-06-14-kernel-first`
+- 起始 commit：`a4d8bab2703908ff0c4934daf97c1bced671eb40`
+- 工作目录：`/Users/yukisala/Documents/PlatformIO/Projects/M5Stick-P1/.worktrees/refactor-2026-06-14-kernel-first`
 
 ## 构建基线
 
-- `pio run -e m5stick-c`：✅ PASS（Took 26.36s）
-- `pio test -e native`：✅ PASS（348 test cases succeeded）
+### 硬件构建
 
-> 硬件构建日志：`doc/refactor/assets/build-m5stick-c.log`
-> Native 测试日志：`doc/refactor/assets/test-native.log`
+- 命令：`pio run -e m5stick-c`
+- 结果：✅ PASS
+- 耗时：26.35 秒
+- 内存占用：
+  - RAM：22.3%（73,216 bytes / 327,680 bytes）
+  - Flash：88.0%（1,845,389 bytes / 2,097,152 bytes）
+- 新增警告：构建日志中出现 `cc1: warning: command line option '-fno-rtti' is valid for C++/ObjC++ but not for C`，来自 `M5GFX` 等第三方库的 C 文件编译，非项目源码新增警告。
+
+### Native 测试
+
+- 命令：`pio test -e native`
+- 结果：✅ PASS
+- 测试套件：3 个
+- 测试用例：371 个全部通过
+- 总耗时：8.602 秒
 
 ## 代码规模
 
-| 范围 | 文件数 | 代码行数（估算） |
-|------|--------|------------------|
-| `src/` C/C++ 源文件 | ~149 | 17,417 |
-| `src/` 头文件 | - | 5,466 |
-| `doc/` Markdown | 55 | 14,192 |
-| `src/kernel/` + `src/ui/` 合计 | 49 | 11,189 |
+> **说明**：`cloc` 未安装，因此使用 `find` + `wc` 进行补充统计；语言级别的代码行/注释行拆分待后续安装 `cloc` 后补充。
 
-> 注：`cloc` 未安装，使用 `find + wc -l` 统计。
+| 范围 | 文件数 | 总行数 |
+|------|--------|--------|
+| `src/` | 165 | 23,773 |
+| `doc/` | 89 | 21,051 |
 
-## 已知问题（来自代码/文档扫描）
+## 已知问题（来自 `src/` 与 `doc/` 扫描）
 
-1. `src/kernel/kern_devfs.c` 暴露 `kern_devfs_register_device()`，而 `kern_device_register()` 也是 public 入口，双轨 API 需统一。
-2. `src/kernel/kern_port_freertos.c:39` 的 `kern_port_native_sched_init()` 长达 376 行，职责过重。
-3. `src/kernel/kern_init.c:121` 存在 TODO：`/* TODO: 硬件 LED 闪烁 */`。
-4. `src/kernel/kern_port_native.c:198` 存在 TODO：`/* TODO: 使用 esp_timer 或简单的忙等待 */`。
-5. UI 层已无明显的内联 `switch (item_type)` 残余，但需验证 `ui_dispatch.c` 是否覆盖所有生命周期点。
+扫描关键词：`TODO`、`FIXME`、`XXX`、`HACK`、`已知陷阱`。
 
-## 超长函数抽样（>50 行）
+1. `src/kernel/kern_init.c:121` 存在 TODO：`/* TODO: 硬件 LED 闪烁 */`。
+2. `src/kernel/kern_port_native.c:198` 存在 TODO：`/* TODO: 使用 esp_timer 或简单的忙等待 */`。
+3. `doc/kernel/kern-init.md:120` 引用了源码中的同一 TODO（`/* TODO: 硬件 LED 闪烁 */`），文档与代码同步。
 
-| 行数 | 文件 | 函数 | 所属层 |
-|------|------|------|--------|
-| 690 | `src/app/wifi/wifi_manager.cpp` | `wifi_mgr_init` | App |
-| 406 | `src/app/storage/storage.cpp` | `storage_init` | App |
-| 376 | `src/kernel/kern_port_freertos.c` | `kern_port_native_sched_init` | Kernel |
-| 284 | `src/app/bluetooth/bt_uart_service.cpp` | `bt_uart_poll` | App |
-| 208 | `src/app/serial_input/serial_input.cpp` | `serial_request_wifi_password` | App |
-| 206 | `src/app/bluetooth/bt_manager.cpp` | `bt_mgr_init` | App |
-| 183 | `src/hal/hal_input.cpp` | `hal_input_init` | HAL |
-| 132 | `src/app/taskmgr/taskmgr_app.c` | `taskmgr_get_count` | App |
+> 注：`tools/ui-layout-designer/exporter.js:198` 存在 `// TODO: Render the layout elements above using HAL APIs`，但不在 `src/` 或 `doc/` 范围内，故未计入本轮基线。
 
 ## 本次重构范围
 
-- [x] 内核层（重点）
-- [x] UI 核心层（重点）
-- [ ] HAL 层（仅同步必要改动）
-- [ ] App 层（仅同步必要改动）
-- [x] 文档体系（随接口变化同步）
+本轮重构以 **内核层** 为首要目标，视阶段 1 诊断结果决定是否扩展至其他层级。
 
-## 下一步
-
-进入阶段 1：扫描与诊断。
+- [x] 内核层
+- [ ] UI 核心层
+- [ ] HAL 层
+- [ ] App 层
+- [ ] 文档体系

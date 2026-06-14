@@ -22,6 +22,7 @@ kern_err_t kern_sched_class_register(kern_sched_class_t *cls)
     if (g_sched_class_count >= KERN_SCHED_MAX_CLASSES) {
         return KERN_ENOSPC;
     }
+    cls->class_id = (int8_t)g_sched_class_count;
     g_sched_classes[g_sched_class_count++] = cls;
     return KERN_OK;
 }
