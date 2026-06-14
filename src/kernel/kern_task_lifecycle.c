@@ -410,7 +410,7 @@ bool kern_task_is_protected(kern_task_t *task)
 
 /* ═══ 外部任务终止 ═══ */
 
-int kern_task_kill(kern_pid_t pid)
+kern_err_t kern_task_kill(kern_pid_t pid)
 {
     kern_task_t *task = kern_task_get(pid);
     if (task == NULL) return KERN_ENOENT;
@@ -481,6 +481,10 @@ void reap_zombies(void)
                 if (g_last_picked == zombie) g_last_picked = NULL;
                 /* 同步更新 g_task_list（如为此 list） */
                 if (g_task_list == zombie) g_task_list = t;
+                if (zombie->stack_base != NULL) {
+                    free(zombie->stack_base);
+                    zombie->stack_base = NULL;
+                }
                 g_task_count--;
                 kern_log(KERN_LOG_DEBUG, "reaped zombie %d (%s)", zombie->pid, zombie->name);
                 free(zombie);
@@ -511,8 +515,7 @@ void task_entry_trampoline(void)
 
     task->entry(task->arg);
 
-    task->state = KERN_TASK_ZOMBIE;
-    g_current_task = g_idle_task;
-    setcontext(&g_sched_ctx);
+    /* 任务自然返回时统一走 kern_exit() 释放资源 */
+    kern_exit();
 }
 #endif /* NATIVE_TEST */

@@ -268,6 +268,65 @@ extern void xerintosh_destroy_item_tree(xerintosh_list_item_t *_item);
  */
 extern void xerintosh_dispatch_enter(xerintosh_list_item_t *item);
 
+/**
+ * @brief  通过派发表处理“下一项”输入
+ * @param  item 当前选中的列表项指针
+ * @return true  输入已被类型特定逻辑消费（如 slider 编辑模式增加值）
+ * @return false 输入未被消费，调用方应执行默认导航
+ */
+extern bool xerintosh_dispatch_input_next(xerintosh_list_item_t *item);
+
+/**
+ * @brief  通过派发表处理“上一项”输入
+ * @param  item 当前选中的列表项指针
+ * @return true  输入已被类型特定逻辑消费（如 slider 编辑模式减少值）
+ * @return false 输入未被消费，调用方应执行默认导航
+ */
+extern bool xerintosh_dispatch_input_prev(xerintosh_list_item_t *item);
+
+/**
+ * @brief  通过派发表处理“返回/退出”输入
+ * @param  item 当前选中的列表项指针
+ * @return true  输入已被类型特定逻辑消费（如 slider 取消编辑、user_item 触发退出）
+ * @return false 输入未被消费，调用方应执行默认返回导航
+ */
+extern bool xerintosh_dispatch_input_exit(xerintosh_list_item_t *item);
+
+/**
+ * @brief  通过派发表测量当前选择器宽度
+ * @param  item 当前选中的列表项指针
+ * @return 选择器目标宽度（像素）
+ */
+extern int16_t xerintosh_dispatch_measure(xerintosh_list_item_t *item);
+
+/**
+ * @brief  通过派发表绘制列表项
+ * @param  item 要绘制的列表项指针
+ * @param  x    图标左上角 x 坐标
+ * @param  y    项中心 y 坐标
+ */
+extern void xerintosh_dispatch_draw(xerintosh_list_item_t *item, int16_t x, int16_t y);
+
+/**
+ * @brief  通过派发表绘制项的覆盖层（如已确认 slider 的数值反色框）
+ * @param  item 要绘制覆盖层的列表项指针
+ */
+extern void xerintosh_dispatch_draw_overlay(xerintosh_list_item_t *item);
+
+/**
+ * @brief  通过派发表执行类型特定的销毁清理
+ * @param  item 要销毁的列表项指针
+ */
+extern void xerintosh_dispatch_destroy(xerintosh_list_item_t *item);
+
+/**
+ * @brief  通过派发表判断该项是否有右侧控件（影响文字可用宽度）
+ * @param  item 列表项指针
+ * @return true  有右侧控件（switch/slider）
+ * @return false 无右侧控件
+ */
+extern bool xerintosh_dispatch_has_right_control(xerintosh_list_item_t *item);
+
 #ifdef __cplusplus
 }
 #endif

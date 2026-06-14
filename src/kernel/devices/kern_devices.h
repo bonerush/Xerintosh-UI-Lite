@@ -17,10 +17,10 @@ extern "C" {
 
 /**
  * @brief 注册所有物理设备到 VFS
- * @note  依赖 devfs 已初始化（kern_devfs_init）
+ * @note  依赖 VFS 已初始化（kern_vfs_init 或 kern_devfs_init）
  * @return KERN_OK 成功，< 0 为错误码
  */
-extern int kern_devices_init(void);
+extern kern_err_t kern_devices_init(void);
 
 #ifdef __cplusplus
 }

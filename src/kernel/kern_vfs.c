@@ -134,7 +134,7 @@ kern_dentry_t *kern_vfs_get_root(void)
 
 /* ═══ 目录项注册 ═══ */
 
-int kern_dentry_register(const char *path, kern_inode_t *inode)
+kern_err_t kern_dentry_register(const char *path, kern_inode_t *inode)
 {
     if (!g_vfs_initialized) return KERN_ERR;
     if (path == NULL) return KERN_EINVAL;
@@ -160,7 +160,7 @@ kern_dentry_t *kern_path_resolve(const char *path)
     return path_walk(&g_root_dentry, path, false);
 }
 
-int kern_vfs_mkdir(const char *path)
+kern_err_t kern_vfs_mkdir(const char *path)
 {
     if (!g_vfs_initialized) return KERN_ERR;
     if (path == NULL) return KERN_EINVAL;
@@ -181,7 +181,7 @@ int kern_vfs_mkdir(const char *path)
 
 /* ─── unlink —— 删除文件或空目录 ─── */
 
-int kern_vfs_unlink(const char *path)
+kern_err_t kern_vfs_unlink(const char *path)
 {
     if (!g_vfs_initialized) return KERN_ERR;
     if (path == NULL || path[0] != '/') return KERN_EINVAL;
@@ -245,7 +245,7 @@ static kern_file_ops_t g_ramfile_fops = {
     .release = ramfile_release,
 };
 
-int kern_vfs_touch(const char *path)
+kern_err_t kern_vfs_touch(const char *path)
 {
     if (!g_vfs_initialized) return KERN_ERR;
     if (path == NULL || path[0] != '/') return KERN_EINVAL;
@@ -354,7 +354,7 @@ kern_fd_t kern_open(const char *path, unsigned int flags)
     return fd;
 }
 
-int kern_close(kern_fd_t fd)
+kern_err_t kern_close(kern_fd_t fd)
 {
     kern_file_t *f = fd_get(fd);
     if (f == NULL) {
@@ -408,7 +408,7 @@ ssize_t kern_write(kern_fd_t fd, const char *buf, size_t len)
     return f->fops->write(f, buf, len);
 }
 
-int kern_ioctl(kern_fd_t fd, unsigned int cmd, unsigned long arg)
+kern_err_t kern_ioctl(kern_fd_t fd, unsigned int cmd, unsigned long arg)
 {
     kern_file_t *f = fd_get(fd);
     if (f == NULL) {

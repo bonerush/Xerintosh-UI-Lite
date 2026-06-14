@@ -159,7 +159,7 @@ void kern_mpu_setup_stack_guard(struct kern_task *task,
 
 /* ═══ 添加数据区域 ═══ */
 
-int kern_mpu_add_region(struct kern_task *task,
+kern_err_t kern_mpu_add_region(struct kern_task *task,
                         void *base, size_t size, kern_mpu_access_t access)
 {
     if (task == NULL || base == NULL || size == 0) {

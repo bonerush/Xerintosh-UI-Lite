@@ -115,6 +115,7 @@ xerintosh_list_item_t *xerintosh_new_switch_item(const char *_content, bool *_va
                                           xerintosh_cb_t _init_function, xerintosh_cb_t _exit_function,
                                           xerintosh_list_item_icon_t icon)
 {
+  if (_value == NULL) return NULL;
   xerintosh_switch_item_t *_item = (xerintosh_switch_item_t*)malloc(sizeof(xerintosh_switch_item_t));
   if (_item == NULL) return NULL;
   xerintosh_init_base_item(&_item->base_item, switch_item, _content, icon, switch_icon);
@@ -158,6 +159,7 @@ xerintosh_list_item_t *xerintosh_new_slider_item(const char *_content, int16_t *
                                           xerintosh_cb_t _init_function, xerintosh_cb_t _exit_function,
                                           xerintosh_list_item_icon_t icon)
 {
+  if (_value == NULL) return NULL;
   xerintosh_slider_item_t *_item = (xerintosh_slider_item_t*)malloc(sizeof(xerintosh_slider_item_t));
   if (_item == NULL) return NULL;
   xerintosh_init_base_item(&_item->base_item, slider_item, _content, icon, slider_icon);

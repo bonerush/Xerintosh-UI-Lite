@@ -46,7 +46,7 @@ typedef struct kern_resource {
  * @param  release 释放回调函数
  * @return KERN_OK 成功，< 0 为错误码
  */
-int kern_resource_track(kern_task_t *task, void *ptr,
+kern_err_t kern_resource_track(kern_task_t *task, void *ptr,
                         kern_resource_type_t type, void (*release)(void *));
 
 /**
@@ -55,7 +55,7 @@ int kern_resource_track(kern_task_t *task, void *ptr,
  * @param  ptr  资源标识指针
  * @return KERN_OK 成功，< 0 为错误码
  */
-int kern_resource_untrack(kern_task_t *task, void *ptr);
+kern_err_t kern_resource_untrack(kern_task_t *task, void *ptr);
 
 /**
  * @brief  释放任务持有的所有追踪资源

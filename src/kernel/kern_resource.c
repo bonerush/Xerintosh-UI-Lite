@@ -14,7 +14,7 @@
 
 /* ═══ 资源追踪 ═══ */
 
-int kern_resource_track(kern_task_t *task, void *ptr,
+kern_err_t kern_resource_track(kern_task_t *task, void *ptr,
                         kern_resource_type_t type, void (*release)(void *))
 {
     if (task == NULL || ptr == NULL || release == NULL) {
@@ -37,7 +37,7 @@ int kern_resource_track(kern_task_t *task, void *ptr,
     return KERN_OK;
 }
 
-int kern_resource_untrack(kern_task_t *task, void *ptr)
+kern_err_t kern_resource_untrack(kern_task_t *task, void *ptr)
 {
     if (task == NULL || ptr == NULL) {
         return KERN_EINVAL;

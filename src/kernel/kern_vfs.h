@@ -103,7 +103,7 @@ extern kern_dentry_t *kern_vfs_get_root(void);
  * @return KERN_OK 成功，< 0 为错误码
  * @note   自动创建中间目录节点
  */
-extern int kern_dentry_register(const char *path, kern_inode_t *inode);
+extern kern_err_t kern_dentry_register(const char *path, kern_inode_t *inode);
 
 /**
  * @brief  创建目录（仅创建 dentry，不挂载 inode）
@@ -111,7 +111,7 @@ extern int kern_dentry_register(const char *path, kern_inode_t *inode);
  * @return KERN_OK 成功，< 0 为错误码
  * @note   自动创建中间目录节点；若已存在则幂等返回 KERN_OK
  */
-extern int kern_vfs_mkdir(const char *path);
+extern kern_err_t kern_vfs_mkdir(const char *path);
 
 /**
  * @brief  删除文件或空目录
@@ -119,7 +119,7 @@ extern int kern_vfs_mkdir(const char *path);
  * @return KERN_OK 成功，< 0 为错误码
  * @note   仅从目录树中移除 dentry；非空目录返回 KERN_ENOTEMPTY
  */
-extern int kern_vfs_unlink(const char *path);
+extern kern_err_t kern_vfs_unlink(const char *path);
 
 /**
  * @brief  创建空文件
@@ -127,7 +127,7 @@ extern int kern_vfs_unlink(const char *path);
  * @return KERN_OK 成功，KERN_EEXIST 已存在，< 0 为其他错误
  * @note   自动创建中间目录节点
  */
-extern int kern_vfs_touch(const char *path);
+extern kern_err_t kern_vfs_touch(const char *path);
 
 /**
  * @brief  按路径解析目录项
@@ -151,7 +151,7 @@ extern kern_fd_t kern_open(const char *path, unsigned int flags);
  * @param  fd 文件描述符
  * @return KERN_OK 成功，< 0 为错误码
  */
-extern int kern_close(kern_fd_t fd);
+extern kern_err_t kern_close(kern_fd_t fd);
 
 /**
  * @brief  从文件描述符读取数据
@@ -178,7 +178,7 @@ extern ssize_t kern_write(kern_fd_t fd, const char *buf, size_t len);
  * @param  arg 可选参数
  * @return KERN_OK 成功，< 0 为错误码
  */
-extern int kern_ioctl(kern_fd_t fd, unsigned int cmd, unsigned long arg);
+extern kern_err_t kern_ioctl(kern_fd_t fd, unsigned int cmd, unsigned long arg);
 
 #ifdef __cplusplus
 }

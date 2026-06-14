@@ -190,15 +190,10 @@ static void task_wrapper(void *arg)
         task->entry(task->arg);
     }
 
-    /* 入口返回：任务结束 */
-    task->state = KERN_TASK_ZOMBIE;
-    kern_log(KERN_LOG_DEBUG, "task %d (%s) exited on cpu %d", task->pid, task->name, cpu);
+    /* 入口返回：任务结束；统一走 kern_exit() 释放资源并退出 */
+    kern_exit();
 
-    /* 归还令牌（通过本 CPU 的 done 信号量） */
-    xSemaphoreGive(g_done_sem[cpu]);
-
-    /* 删除自身（不会返回） */
-    vTaskDelete(NULL);
+    /* kern_exit() 不会返回 */
 }
 
 /* ═══ 生命周期 ═══ */

@@ -62,7 +62,7 @@ extern void kern_sysfs_init(void);
  * @note   回调在 sysfs_write 内部同步调用，需快速返回。
  *         同一属性可绑定多个回调。
  */
-extern int kern_sysfs_bind(kern_sysfs_attr_t attr,
+extern kern_err_t kern_sysfs_bind(kern_sysfs_attr_t attr,
                            kern_sysfs_change_callback_t cb,
                            void *user_data);
 

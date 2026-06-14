@@ -1,7 +1,7 @@
 /**
  * @file   dev_input0.c
- * @brief  /dev/input0 按键输入设备实现
- * @details 将 HAL 输入层事件映射为 VFS 文件操作。
+ * @brief  /dev/input0 按键输入设备实现（统一设备模型）
+ * @details 将 HAL 输入层事件映射为 kern_device_ops_t 回调。
  *          read() 返回结构化按键事件（6 字节）。
  *
  * @copyright Copyright (c) 2026
@@ -13,11 +13,25 @@
 
 #include <string.h>
 
-/* ═══ read ═══ */
+/* ═══ 设备回调 ═══ */
 
-static ssize_t dev_input0_read(kern_file_t *f, char *buf, size_t len)
+static int dev_input0_open(kern_device_t *dev, int flags)
 {
-    (void)f;
+    (void)dev;
+    (void)flags;
+    return KERN_OK;
+}
+
+static int dev_input0_close(kern_device_t *dev)
+{
+    (void)dev;
+    return KERN_OK;
+}
+
+static int dev_input0_read(kern_device_t *dev, void *buf, size_t len, size_t *offset)
+{
+    (void)dev;
+    (void)offset;
 
     if (len < DEV_INPUT_EVENT_SIZE) {
         return KERN_EINVAL;
@@ -41,11 +55,18 @@ static ssize_t dev_input0_read(kern_file_t *f, char *buf, size_t len)
     return DEV_INPUT_EVENT_SIZE;
 }
 
-/* ═══ ioctl ═══ */
-
-static int dev_input0_ioctl(kern_file_t *f, unsigned int cmd, unsigned long arg)
+static int dev_input0_write(kern_device_t *dev, const void *buf, size_t len, size_t *offset)
 {
-    (void)f;
+    (void)dev;
+    (void)buf;
+    (void)len;
+    (void)offset;
+    return KERN_EINVAL;  /* 输入设备不支持写入 */
+}
+
+static int dev_input0_ioctl(kern_device_t *dev, unsigned int cmd, unsigned long arg)
+{
+    (void)dev;
 
     switch (cmd) {
     case DEV_INPUT_IOCTL_SET_DOUBLE_CLICK:
@@ -56,24 +77,22 @@ static int dev_input0_ioctl(kern_file_t *f, unsigned int cmd, unsigned long arg)
     }
 }
 
-/* ═══ release ═══ */
+/* ═══ 设备操作表 ═══ */
 
-static int dev_input0_release(kern_file_t *f)
-{
-    (void)f;
-    return KERN_OK;
-}
-
-/* ═══ 操作表 ═══ */
-
-static kern_file_ops_t g_dev_input0_fops = {
-    .read    = dev_input0_read,
-    .write   = NULL,
-    .ioctl   = dev_input0_ioctl,
-    .release = dev_input0_release,
+static kern_device_ops_t g_input0_ops = {
+    .open  = dev_input0_open,
+    .close = dev_input0_close,
+    .read  = dev_input0_read,
+    .write = dev_input0_write,
+    .ioctl = dev_input0_ioctl,
 };
 
-kern_file_ops_t *dev_input0_get_fops(void)
-{
-    return &g_dev_input0_fops;
-}
+/* ═══ 设备描述符 ═══ */
+
+kern_device_t g_input0_dev = {
+    .name         = "input0",
+    .type         = KERN_DEV_CHAR,
+    .ops          = &g_input0_ops,
+    .private_data = NULL,
+    .next         = NULL,
+};

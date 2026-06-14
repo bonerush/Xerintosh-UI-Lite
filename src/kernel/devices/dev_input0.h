@@ -11,7 +11,7 @@
 #define DEV_INPUT0_H
 
 #include "../kern_types.h"
-#include "../kern_vfs.h"
+#include "../kern_device.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -34,13 +34,13 @@ typedef struct {
 
 #define DEV_INPUT_IOCTL_SET_DOUBLE_CLICK  0x20  /* arg = 0 (disable) / 1 (enable) */
 
-/* ═══ 设备操作表 ═══ */
+/* ═══ 设备描述符 ═══ */
 
 /**
- * @brief  获取 /dev/input0 的文件操作表
- * @return 文件操作表指针（静态分配，始终有效）
+ * @brief /dev/input0 设备实例（统一设备模型）
+ * @note  通过 kern_device_register(&g_input0_dev) 注册
  */
-extern kern_file_ops_t *dev_input0_get_fops(void);
+extern kern_device_t g_input0_dev;
 
 #ifdef __cplusplus
 }

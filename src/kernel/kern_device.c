@@ -9,8 +9,11 @@
 
 #include "kern_device.h"
 #include "kern_init.h"
+#include "kern_vfs.h"
 
 #include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 /* ═══ 全局设备链表 ═══ */
 
@@ -18,7 +21,7 @@ static kern_device_t *g_device_list = NULL;
 
 /* ═══ 设备注册 / 查找 ═══ */
 
-int kern_device_register(kern_device_t *dev)
+kern_err_t kern_device_register(kern_device_t *dev)
 {
     if (dev == NULL) {
         return KERN_EINVAL;
@@ -30,6 +33,10 @@ int kern_device_register(kern_device_t *dev)
     /* 检查同名设备是否已注册 */
     kern_device_t *existing = kern_device_find(dev->name);
     if (existing != NULL) {
+        /* 同一设备指针多次注册视为幂等 */
+        if (existing == dev) {
+            return KERN_OK;
+        }
         return KERN_EEXIST;
     }
 
@@ -37,7 +44,35 @@ int kern_device_register(kern_device_t *dev)
     dev->next = g_device_list;
     g_device_list = dev;
 
-    kern_log(KERN_LOG_INFO, "device registered: %s", dev->name);
+    /* 创建 /dev/<name> 节点 */
+    char path[KERN_PATH_MAX];
+    int written = snprintf(path, sizeof(path), "/dev/%s", dev->name);
+    if (written < 0 || (size_t)written >= sizeof(path)) {
+        g_device_list = dev->next;
+        dev->next = NULL;
+        return KERN_ENOSPC;
+    }
+
+    kern_inode_t *inode = (kern_inode_t *)calloc(1, sizeof(kern_inode_t));
+    if (inode == NULL) {
+        g_device_list = dev->next;
+        dev->next = NULL;
+        return KERN_ENOMEM;
+    }
+
+    inode->type = KERN_FILE_CHRDEV;
+    inode->fops = kern_device_create_fops(dev);
+    inode->private_data = dev;
+
+    kern_err_t rc = kern_dentry_register(path, inode);
+    if (rc != KERN_OK) {
+        free(inode);
+        g_device_list = dev->next;
+        dev->next = NULL;
+        return rc;
+    }
+
+    kern_log(KERN_LOG_INFO, "device registered: %s", path);
     return KERN_OK;
 }
 

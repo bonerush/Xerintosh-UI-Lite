@@ -1,7 +1,7 @@
 /**
  * @file   dev_ttyS0.c
- * @brief  /dev/ttyS0 串口设备实现
- * @details 通过环形缓冲区将硬件串口映射为 VFS 文件操作。
+ * @brief  /dev/ttyS0 串口设备实现（统一设备模型）
+ * @details 通过环形缓冲区将硬件串口映射为 kern_device_ops_t 回调。
  *
  *          为避免任务上下文中的 FreeRTOS 冲突，所有 Serial 访问
  *          都在 dev_ttyS0_poll() 中执行（由主 loop 调用）。
@@ -13,6 +13,8 @@
 #include "kernel/devices/dev_ttyS0.h"
 #include "app/serial_input/serial_input.h"
 #include "app/serial_monitor/serial_monitor.h"
+
+#include <string.h>
 
 /* 烧录器有线桥接激活时，Shell 跳过 Serial RX，避免竞争 */
 extern bool g_flasher_bridge_active;
@@ -41,80 +43,108 @@ static volatile int g_tx_tail = 0;
 static volatile int g_tx_count = 0;
 #endif
 
-/* ═══ read ═══ */
+/* ═══ 设备回调 ═══ */
 
-static ssize_t dev_ttyS0_read(kern_file_t *f, char *buf, size_t len)
+static int dev_ttyS0_open(kern_device_t *dev, int flags)
 {
-    (void)f;
+    (void)dev;
+    (void)flags;
+    return KERN_OK;
+}
+
+static int dev_ttyS0_close(kern_device_t *dev)
+{
+    (void)dev;
+    return KERN_OK;
+}
+
+static int dev_ttyS0_read(kern_device_t *dev, void *buf, size_t len, size_t *offset)
+{
+    (void)dev;
+    (void)offset;
+
+    char *out = (char *)buf;
 
 #ifdef NATIVE_TEST
     if (g_tty_count == 0) return 0;
     size_t total = 0;
     while (total < len && g_tty_count > 0) {
-        buf[total++] = g_tty_buf[g_tty_tail];
+        out[total++] = g_tty_buf[g_tty_tail];
         g_tty_tail = (g_tty_tail + 1) % TTY_BUF_SIZE;
         g_tty_count--;
     }
-    return (ssize_t)total;
+    return (int)total;
 #else
     size_t total = 0;
     while (total < len && g_rx_count > 0) {
-        buf[total++] = g_rx_buf[g_rx_tail];
+        out[total++] = g_rx_buf[g_rx_tail];
         g_rx_tail = (g_rx_tail + 1) % TTY_RX_BUF_SIZE;
         __atomic_fetch_sub(&g_rx_count, 1, __ATOMIC_RELAXED);
     }
-    return (ssize_t)total;
+    return (int)total;
 #endif
 }
 
-/* ═══ write ═══ */
-
-static ssize_t dev_ttyS0_write(kern_file_t *f, const char *buf, size_t len)
+static int dev_ttyS0_write(kern_device_t *dev, const void *buf, size_t len, size_t *offset)
 {
-    (void)f;
+    (void)dev;
+    (void)offset;
+
+    const char *in = (const char *)buf;
 
 #ifdef NATIVE_TEST
     size_t total = 0;
     while (total < len) {
         if (g_tty_count >= TTY_BUF_SIZE) break;
-        g_tty_buf[g_tty_head] = buf[total++];
+        g_tty_buf[g_tty_head] = in[total++];
         g_tty_head = (g_tty_head + 1) % TTY_BUF_SIZE;
         g_tty_count++;
     }
-    return (ssize_t)total;
+    return (int)total;
 #else
     size_t total = 0;
     while (total < len && g_tx_count < TTY_TX_BUF_SIZE) {
-        g_tx_buf[g_tx_head] = buf[total];
+        g_tx_buf[g_tx_head] = in[total];
         g_tx_head = (g_tx_head + 1) % TTY_TX_BUF_SIZE;
         __atomic_fetch_add(&g_tx_count, 1, __ATOMIC_RELAXED);
         total++;
     }
-    return (ssize_t)total;
+    return (int)total;
 #endif
 }
 
-/* ═══ release ═══ */
-
-static int dev_ttyS0_release(kern_file_t *f)
+static int dev_ttyS0_ioctl(kern_device_t *dev, unsigned int cmd, unsigned long arg)
 {
-    (void)f;
-    return KERN_OK;
+    (void)dev;
+    (void)cmd;
+    (void)arg;
+    return KERN_ENOTTY;  /* 串口设备暂不支持 ioctl */
 }
 
-/* ═══ 操作表 ═══ */
+/* ═══ 设备操作表 ═══ */
 
-static kern_file_ops_t g_dev_ttyS0_fops = {
-    .read    = dev_ttyS0_read,
-    .write   = dev_ttyS0_write,
-    .ioctl   = NULL,
-    .release = dev_ttyS0_release,
+static kern_device_ops_t g_ttyS0_ops = {
+    .open  = dev_ttyS0_open,
+    .close = dev_ttyS0_close,
+    .read  = dev_ttyS0_read,
+    .write = dev_ttyS0_write,
+    .ioctl = dev_ttyS0_ioctl,
 };
 
-kern_file_ops_t *dev_ttyS0_get_fops(void)
-{
-    return &g_dev_ttyS0_fops;
-}
+/* ═══ 设备描述符 ═══ */
+
+kern_device_t g_ttyS0_dev;
+
+/* C++17 不支持 C99 designated initializers，用全局对象构造函数完成初始化 */
+static struct TtyS0DevInitializer {
+    TtyS0DevInitializer() {
+        memset(&g_ttyS0_dev, 0, sizeof(g_ttyS0_dev));
+        strncpy(g_ttyS0_dev.name, "ttyS0", KERN_NAME_MAX);
+        g_ttyS0_dev.name[KERN_NAME_MAX] = '\0';
+        g_ttyS0_dev.type = KERN_DEV_CHAR;
+        g_ttyS0_dev.ops  = &g_ttyS0_ops;
+    }
+} g_ttyS0_dev_initializer;
 
 /* ═══ 设备轮询（仅 ESP32） ═══ */
 

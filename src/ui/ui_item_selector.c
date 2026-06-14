@@ -10,7 +10,6 @@
 #include "ui_core.h"
 #include "ui_drawer.h"
 #include "hal/hal_input.h"
-#include "kernel/kern_task.h"
 #include <stddef.h>
 
 /* ═══ 选择器 ═══ */
@@ -59,23 +58,13 @@ bool xerintosh_bind_item_to_selector(xerintosh_list_item_t *_item)
 
 /**
  * @brief 选择器移至下一项（循环）
- * @note  若当前为 slider_item 编辑模式，则增加数值；
- *        若已处于 user_item 内部，则忽略
+ * @note  优先通过派发表处理类型特定输入（如 slider 编辑模式）；
+ *        若未被消费，则执行默认循环导航。
  */
 void xerintosh_selector_go_next_item()
 {
-  if (g_xerintosh_selector.selected_item->type == slider_item
-      && xerintosh_to_slider_item(g_xerintosh_selector.selected_item)->is_confirmed)
-  {
-    xerintosh_slider_item_t* _selected_slider_item = xerintosh_to_slider_item(g_xerintosh_selector.selected_item);
-    *_selected_slider_item->value += _selected_slider_item->value_step;
-    if (*_selected_slider_item->value >= _selected_slider_item->value_max)
-      *_selected_slider_item->value = _selected_slider_item->value_max;
-    return;
-  }
-
-  if (g_xerintosh_selector.selected_item->type == user_item
-      && xerintosh_to_user_item(g_xerintosh_selector.selected_item)->in_user_item) return;
+  if (g_xerintosh_selector.selected_item == NULL) return;
+  if (xerintosh_dispatch_input_next(g_xerintosh_selector.selected_item)) return;
 
   g_xerintosh_refresh_list_value = true;
 
@@ -92,23 +81,13 @@ void xerintosh_selector_go_next_item()
 
 /**
  * @brief 选择器移至上一项（循环）
- * @note  若当前为 slider_item 编辑模式，则减少数值；
- *        若已处于 user_item 内部，则忽略
+ * @note  优先通过派发表处理类型特定输入（如 slider 编辑模式）；
+ *        若未被消费，则执行默认循环导航。
  */
 void xerintosh_selector_go_prev_item()
 {
-  if (g_xerintosh_selector.selected_item->type == slider_item
-      && xerintosh_to_slider_item(g_xerintosh_selector.selected_item)->is_confirmed)
-  {
-    xerintosh_slider_item_t* _selected_slider_item = xerintosh_to_slider_item(g_xerintosh_selector.selected_item);
-    *_selected_slider_item->value -= _selected_slider_item->value_step;
-    if (*_selected_slider_item->value <= _selected_slider_item->value_min)
-      *_selected_slider_item->value = _selected_slider_item->value_min;
-    return;
-  }
-
-  if (g_xerintosh_selector.selected_item->type == user_item
-      && xerintosh_to_user_item(g_xerintosh_selector.selected_item)->in_user_item) return;
+  if (g_xerintosh_selector.selected_item == NULL) return;
+  if (xerintosh_dispatch_input_prev(g_xerintosh_selector.selected_item)) return;
 
   g_xerintosh_refresh_list_value = true;
 
@@ -124,25 +103,6 @@ void xerintosh_selector_go_prev_item()
   g_xerintosh_selector.selected_item = g_xerintosh_selector.selected_item->parent->child_list_item[--g_xerintosh_selector.selected_index];
 }
 
-/* ═══ user_item / slider 辅助函数 ═══ */
-
-/**
- * @brief 处理 user_item 退出状态重置
- * @param _user_item 目标 user_item
- */
-static void handle_user_item_exit(xerintosh_user_item_t *_user_item)
-{
-  g_xerintosh_exit_animation_finished = false;
-  _user_item->entering_user_item = false;
-  _user_item->exiting_user_item = true;
-
-  /* 注销虚任务，从内核任务链表移除 */
-  if (_user_item->kernel_pid != KERN_PID_INVALID) {
-    kern_task_unregister_virtual(_user_item->kernel_pid);
-    _user_item->kernel_pid = KERN_PID_INVALID;
-  }
-}
-
 /**
  * @brief 确认/进入当前选中的项
  * @note  通过 xerintosh_dispatch_enter 派发表路由到具体类型处理器
@@ -150,34 +110,19 @@ static void handle_user_item_exit(xerintosh_user_item_t *_user_item)
 void xerintosh_selector_jump_to_selected_item()
 {
   if (!g_in_xerintosh) return;
+  if (g_xerintosh_selector.selected_item == NULL) return;
   xerintosh_dispatch_enter(g_xerintosh_selector.selected_item);
 }
 
 /**
  * @brief 返回/退出当前项
- * @note  根据项类型执行不同操作：
- *        - slider_item 编辑模式：取消修改并恢复备份值
- *        - user_item 运行态：触发退出流程
- *        - 主菜单（layer==0）：不允许退出
- *        - 其他：返回父菜单
+ * @note  优先通过派发表处理类型特定输入（如 slider 取消编辑、user_item 触发退出）；
+ *        若未被消费，则执行默认返回导航。
  */
 void xerintosh_selector_exit_current_item()
 {
-  if (g_xerintosh_selector.selected_item->type == slider_item
-      && xerintosh_to_slider_item(g_xerintosh_selector.selected_item)->is_confirmed)
-  {
-    xerintosh_slider_item_t* _selected_slider_item = xerintosh_to_slider_item(g_xerintosh_selector.selected_item);
-    _selected_slider_item->is_confirmed = false;
-    *_selected_slider_item->value = _selected_slider_item->value_backup;
-    return;
-  }
-
-  if (g_xerintosh_selector.selected_item->type == user_item
-      && xerintosh_to_user_item(g_xerintosh_selector.selected_item)->in_user_item)
-  {
-    handle_user_item_exit(xerintosh_to_user_item(g_xerintosh_selector.selected_item));
-    return;
-  }
+  if (g_xerintosh_selector.selected_item == NULL) return;
+  if (xerintosh_dispatch_input_exit(g_xerintosh_selector.selected_item)) return;
 
   g_xerintosh_refresh_list_value = true;
 

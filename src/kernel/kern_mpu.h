@@ -111,7 +111,7 @@ extern void kern_mpu_setup_stack_guard(struct kern_task *task,
  * @param  access 访问权限
  * @return KERN_OK 成功，< 0 为错误码
  */
-extern int kern_mpu_add_region(struct kern_task *task,
+extern kern_err_t kern_mpu_add_region(struct kern_task *task,
                                void *base, size_t size, kern_mpu_access_t access);
 
 #else /* !CONFIG_MPU_ENABLED — 零开销退化 */
@@ -120,7 +120,7 @@ extern int kern_mpu_add_region(struct kern_task *task,
 #define kern_mpu_apply(t)                  do { (void)(t); } while (0)
 #define kern_mpu_setup_stack_guard(t,b,s)  do { (void)(t); (void)(b); (void)(s); } while (0)
 
-static inline int kern_mpu_add_region(struct kern_task *task,
+static inline kern_err_t kern_mpu_add_region(struct kern_task *task,
                                       void *base, size_t size,
                                       kern_mpu_access_t access)
 {

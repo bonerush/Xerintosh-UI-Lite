@@ -35,14 +35,16 @@ void spinlock_unlock(spinlock_t *lock)
 
 /* ═══ 互斥锁 ═══ */
 
-void mutex_init(mutex_t *m)
+kern_err_t mutex_init(mutex_t *m)
 {
     spinlock_init(&m->lock);
-    m->owner      = NULL;
-    m->wait_queue = NULL;
+    m->owner           = NULL;
+    m->recursive_count = 0;
+    m->wait_queue      = NULL;
+    return KERN_OK;
 }
 
-void mutex_lock(mutex_t *m)
+kern_err_t mutex_lock(mutex_t *m)
 {
     kern_task_t *self = g_current_task;
 
@@ -51,9 +53,11 @@ void mutex_lock(mutex_t *m)
     if (m->owner == NULL) {
         /* 无人持有，直接获取 */
         m->owner = self;
+        m->recursive_count = 1;
         spinlock_unlock(&m->lock);
     } else if (m->owner == self) {
-        /* 递归获取：允许但记录警告 */
+        /* 递归获取：计数器递增 */
+        m->recursive_count++;
         spinlock_unlock(&m->lock);
     } else {
         /* 已被其他任务持有：加入等待队列并自旋 */
@@ -64,20 +68,37 @@ void mutex_lock(mutex_t *m)
             spinlock_lock(&m->lock);
             if (m->owner == NULL) {
                 m->owner = self;
+                m->recursive_count = 1;
                 spinlock_unlock(&m->lock);
-                return;
+                return KERN_OK;
             }
             spinlock_unlock(&m->lock);
             __asm__ volatile("nop");
         }
     }
+
+    return KERN_OK;
 }
 
-void mutex_unlock(mutex_t *m)
+kern_err_t mutex_unlock(mutex_t *m)
 {
     spinlock_lock(&m->lock);
-    m->owner = NULL;
+
+    if (m->owner != g_current_task) {
+        spinlock_unlock(&m->lock);
+        return KERN_EPERM;
+    }
+
+    if (m->recursive_count > 0) {
+        m->recursive_count--;
+    }
+
+    if (m->recursive_count == 0) {
+        m->owner = NULL;
+    }
+
     spinlock_unlock(&m->lock);
+    return KERN_OK;
 }
 
 #endif /* CONFIG_SMP_ENABLED */

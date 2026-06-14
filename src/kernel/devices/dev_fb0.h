@@ -11,7 +11,7 @@
 #define DEV_FB0_H
 
 #include "../kern_types.h"
-#include "../kern_vfs.h"
+#include "../kern_device.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -30,13 +30,13 @@ extern "C" {
 #define DEV_FB_IOCTL_GET_WIDTH     0x11  /* 返回屏幕宽度 */
 #define DEV_FB_IOCTL_GET_HEIGHT    0x12  /* 返回屏幕高度 */
 
-/* ═══ 设备操作表（供 kern_dev_register 使用） ═══ */
+/* ═══ 设备描述符 ═══ */
 
 /**
- * @brief  获取 /dev/fb0 的文件操作表
- * @return 文件操作表指针（静态分配，始终有效）
+ * @brief /dev/fb0 设备实例（统一设备模型）
+ * @note  通过 kern_device_register(&g_fb0_dev) 注册
  */
-extern kern_file_ops_t *dev_fb0_get_fops(void);
+extern kern_device_t g_fb0_dev;
 
 #ifdef __cplusplus
 }

@@ -1,7 +1,7 @@
 /**
  * @file   dev_fb0.c
- * @brief  /dev/fb0 帧缓冲设备实现
- * @details 将 HAL 显示层绘制原语映射为 VFS 文件操作。
+ * @brief  /dev/fb0 帧缓冲设备实现（统一设备模型）
+ * @details 将 HAL 显示层绘制原语映射为 kern_device_ops_t 回调。
  *          write() 接受二进制命令协议批量执行绘制操作。
  *
  * @copyright Copyright (c) 2026
@@ -12,25 +12,49 @@
 
 #include <string.h>
 
-/* ═══ 写命令处理 ═══ */
+/* ═══ 设备回调 ═══ */
 
-static ssize_t dev_fb0_write(kern_file_t *f, const char *buf, size_t len)
+static int dev_fb0_open(kern_device_t *dev, int flags)
 {
-    (void)f;
+    (void)dev;
+    (void)flags;
+    return KERN_OK;
+}
+
+static int dev_fb0_close(kern_device_t *dev)
+{
+    (void)dev;
+    return KERN_OK;
+}
+
+static int dev_fb0_read(kern_device_t *dev, void *buf, size_t len, size_t *offset)
+{
+    (void)dev;
+    (void)buf;
+    (void)len;
+    (void)offset;
+    return KERN_EINVAL;  /* 帧缓冲不支持读取 */
+}
+
+static int dev_fb0_write(kern_device_t *dev, const void *buf, size_t len, size_t *offset)
+{
+    (void)dev;
+    (void)offset;
+
+    const uint8_t *p = (const uint8_t *)buf;
     size_t pos = 0;
 
     while (pos < len) {
-        uint8_t cmd = (uint8_t)buf[pos];
-        pos++;
+        uint8_t cmd = p[pos++];
 
         switch (cmd) {
         case DEV_FB_CMD_PIXEL: {
             if (pos + 6 > len) return KERN_EINVAL;
             int16_t x, y;
             uint16_t color;
-            memcpy(&x,     buf + pos, 2); pos += 2;
-            memcpy(&y,     buf + pos, 2); pos += 2;
-            memcpy(&color, buf + pos, 2); pos += 2;
+            memcpy(&x,     p + pos, 2); pos += 2;
+            memcpy(&y,     p + pos, 2); pos += 2;
+            memcpy(&color, p + pos, 2); pos += 2;
             hal_draw_pixel(x, y, color);
             break;
         }
@@ -38,18 +62,18 @@ static ssize_t dev_fb0_write(kern_file_t *f, const char *buf, size_t len)
             if (pos + 10 > len) return KERN_EINVAL;
             int16_t x, y, w, h;
             uint16_t color;
-            memcpy(&x,     buf + pos, 2); pos += 2;
-            memcpy(&y,     buf + pos, 2); pos += 2;
-            memcpy(&w,     buf + pos, 2); pos += 2;
-            memcpy(&h,     buf + pos, 2); pos += 2;
-            memcpy(&color, buf + pos, 2); pos += 2;
+            memcpy(&x,     p + pos, 2); pos += 2;
+            memcpy(&y,     p + pos, 2); pos += 2;
+            memcpy(&w,     p + pos, 2); pos += 2;
+            memcpy(&h,     p + pos, 2); pos += 2;
+            memcpy(&color, p + pos, 2); pos += 2;
             hal_draw_fill_rect(x, y, w, h, color);
             break;
         }
         case DEV_FB_CMD_CLEAR: {
             if (pos + 2 > len) return KERN_EINVAL;
             uint16_t color;
-            memcpy(&color, buf + pos, 2); pos += 2;
+            memcpy(&color, p + pos, 2); pos += 2;
             (void)color;
             hal_display_clear();
             break;
@@ -62,14 +86,13 @@ static ssize_t dev_fb0_write(kern_file_t *f, const char *buf, size_t len)
         }
     }
 
-    return (ssize_t)len;
+    return (int)len;
 }
 
-/* ═══ ioctl ═══ */
-
-static int dev_fb0_ioctl(kern_file_t *f, unsigned int cmd, unsigned long arg)
+static int dev_fb0_ioctl(kern_device_t *dev, unsigned int cmd, unsigned long arg)
 {
-    (void)f;
+    (void)dev;
+    (void)arg;
 
     switch (cmd) {
     case DEV_FB_IOCTL_GET_WIDTH:
@@ -79,31 +102,28 @@ static int dev_fb0_ioctl(kern_file_t *f, unsigned int cmd, unsigned long arg)
     case DEV_FB_IOCTL_SET_ROTATION:
         /* 硬件环境: M5.Display.setRotation(arg) 但 HAL 层未暴露旋转 API，
          * 保留此 ioctl 供未来扩展 */
-        (void)arg;
         return KERN_OK;
     default:
         return KERN_ENOTTY;
     }
 }
 
-/* ═══ release ═══ */
+/* ═══ 设备操作表 ═══ */
 
-static int dev_fb0_release(kern_file_t *f)
-{
-    (void)f;
-    return KERN_OK;
-}
-
-/* ═══ 操作表 ═══ */
-
-static kern_file_ops_t g_dev_fb0_fops = {
-    .read    = NULL,  /* 帧缓冲不支持读取 */
-    .write   = dev_fb0_write,
-    .ioctl   = dev_fb0_ioctl,
-    .release = dev_fb0_release,
+static kern_device_ops_t g_fb0_ops = {
+    .open  = dev_fb0_open,
+    .close = dev_fb0_close,
+    .read  = dev_fb0_read,
+    .write = dev_fb0_write,
+    .ioctl = dev_fb0_ioctl,
 };
 
-kern_file_ops_t *dev_fb0_get_fops(void)
-{
-    return &g_dev_fb0_fops;
-}
+/* ═══ 设备描述符 ═══ */
+
+kern_device_t g_fb0_dev = {
+    .name         = "fb0",
+    .type         = KERN_DEV_CHAR,
+    .ops          = &g_fb0_ops,
+    .private_data = NULL,
+    .next         = NULL,
+};

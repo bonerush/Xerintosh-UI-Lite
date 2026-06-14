@@ -138,7 +138,7 @@ extern void kern_exit(void);
  *         虚任务：调用 kern_task_unregister_virtual() 注销。
  *         非虚任务：标记 ZOMBIE 并销毁底层 FreeRTOS 线程。
  */
-extern int kern_task_kill(kern_pid_t pid);
+extern kern_err_t kern_task_kill(kern_pid_t pid);
 
 /**
  * @brief  休眠指定的毫秒数

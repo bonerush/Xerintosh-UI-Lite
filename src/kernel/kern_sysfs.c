@@ -203,7 +203,7 @@ void kern_sysfs_init(void)
 
 /* ═══ 绑定 API ═══ */
 
-int kern_sysfs_bind(kern_sysfs_attr_t attr,
+kern_err_t kern_sysfs_bind(kern_sysfs_attr_t attr,
                    kern_sysfs_change_callback_t cb,
                    void *user_data)
 {

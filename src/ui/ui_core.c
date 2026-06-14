@@ -21,9 +21,11 @@
  */
 bool xerintosh_is_in_user_item()
 {
-  return (g_xerintosh_selector.selected_item->type == user_item
-          && xerintosh_to_user_item(g_xerintosh_selector.selected_item)->in_user_item)
-         ? true : false;
+  xerintosh_list_item_t *sel = g_xerintosh_selector.selected_item;
+  if (sel == NULL) return false;
+
+  xerintosh_user_item_t *user = xerintosh_to_user_item(sel);
+  return (user != NULL && user->in_user_item);
 }
 
 /* ═══ 动画工具 ═══ */
@@ -76,6 +78,9 @@ static void xerintosh_refresh_pop_up()
  */
 void xerintosh_refresh_camera_position()
 {
+  if (g_xerintosh_camera.selector == NULL) return;
+  if (g_xerintosh_camera.selector->selected_item == NULL) return;
+
   /* 15 为选择器高度 */
   if (g_xerintosh_camera.selector->y_selector_trg + 15 + g_xerintosh_camera.y_camera_trg > SCREEN_HEIGHT)  /* 向下超出屏幕，需要向下移动 */
     g_xerintosh_camera.y_camera_trg = SCREEN_HEIGHT - g_xerintosh_camera.selector->y_selector_trg - 15;
@@ -109,10 +114,8 @@ void xerintosh_init_core()
 {
   xerintosh_init_list();
   xerintosh_list_item_t *root = xerintosh_get_root_list();
-  if (root->child_num > 0)
+  if (root != NULL && root->child_num > 0)
     xerintosh_bind_item_to_selector(root->child_list_item[0]);
-  else
-    xerintosh_bind_item_to_selector(root);
   xerintosh_bind_selector_to_camera(&g_xerintosh_selector);
 }
 
@@ -121,9 +124,12 @@ void xerintosh_init_core()
  */
 void xerintosh_refresh_list_item_position()
 {
-  for (uint8_t i = 0; i < g_xerintosh_selector.selected_item->parent->child_num; i++)
-    xerintosh_animation(&g_xerintosh_selector.selected_item->parent->child_list_item[i]->y_list_item,
-                     g_xerintosh_selector.selected_item->parent->child_list_item[i]->y_list_item_trg,
+  xerintosh_list_item_t *sel = g_xerintosh_selector.selected_item;
+  if (sel == NULL || sel->parent == NULL) return;
+
+  for (uint8_t i = 0; i < sel->parent->child_num; i++)
+    xerintosh_animation(&sel->parent->child_list_item[i]->y_list_item,
+                     sel->parent->child_list_item[i]->y_list_item_trg,
                      ANIM_SPEED_LIST_ITEM);
 }
 
@@ -132,18 +138,11 @@ void xerintosh_refresh_list_item_position()
  */
 void xerintosh_refresh_selector_position()
 {
+  if (g_xerintosh_selector.selected_item == NULL) return;
+
   xerintosh_set_font(hal_get_cn_font());
   g_xerintosh_selector.y_selector_trg = g_xerintosh_selector.selected_item->y_list_item_trg - hal_get_font_height() + 1;
-  if (g_xerintosh_selector.selected_item->type == switch_item || g_xerintosh_selector.selected_item->type == slider_item) {
-    g_xerintosh_selector.w_selector_trg = SCREEN_WIDTH - 18;
-  } else {
-    /* 仅当选中项内容指针变化时才重新测量字符串宽度 */
-    if (g_xerintosh_cached_selector_content != g_xerintosh_selector.selected_item->content) {
-      g_xerintosh_cached_selector_content = g_xerintosh_selector.selected_item->content;
-      g_xerintosh_cached_selector_width = hal_get_string_width(g_xerintosh_selector.selected_item->content);
-    }
-    g_xerintosh_selector.w_selector_trg = g_xerintosh_cached_selector_width + 12;
-  }
+  g_xerintosh_selector.w_selector_trg = xerintosh_dispatch_measure(g_xerintosh_selector.selected_item);
   g_xerintosh_selector.h_selector_trg = hal_get_font_height() + 4;
   xerintosh_animation(&g_xerintosh_selector.y_selector, g_xerintosh_selector.y_selector_trg, ANIM_SPEED_SELECTOR);
   xerintosh_animation(&g_xerintosh_selector.w_selector, g_xerintosh_selector.w_selector_trg, ANIM_SPEED_SELECTOR);
@@ -170,7 +169,7 @@ void xerintosh_ui_widget_core()
 static void xerintosh_ui_update_lifecycle(void)
 {
   xerintosh_list_item_t *item = g_xerintosh_selector.selected_item;
-  if (item->type != user_item) return;
+  if (item == NULL || item->type != user_item) return;
 
   xerintosh_user_item_t *user = xerintosh_to_user_item(item);
 
@@ -230,6 +229,7 @@ static void xerintosh_ui_render_frame(void)
 void xerintosh_ui_main_core()
 {
   if (!g_in_xerintosh) return;
+  if (g_xerintosh_selector.selected_item == NULL) return;
 
   xerintosh_ui_update_lifecycle();
   xerintosh_ui_render_frame();

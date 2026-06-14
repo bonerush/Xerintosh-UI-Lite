@@ -62,7 +62,7 @@ struct kern_device {
  * @param  dev 设备描述符（必须静态或堆分配，注册后由链表持有）
  * @return KERN_OK 成功，KERN_EEXIST 同名设备已注册，< 0 为其他错误
  */
-extern int kern_device_register(kern_device_t *dev);
+extern kern_err_t kern_device_register(kern_device_t *dev);
 
 /**
  * @brief  按名称查找设备

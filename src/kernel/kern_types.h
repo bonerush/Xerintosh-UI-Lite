@@ -35,6 +35,10 @@ extern "C" {
 #define KERN_EBADF      (-9)    /* 无效文件描述符 */
 #define KERN_ENOTTY     (-25)   /* 不支持的 ioctl */
 #define KERN_ENOTEMPTY  (-39)   /* 目录非空 */
+#define KERN_EPERM      (-40)   /* 操作不允许（如非 owner 解锁 mutex） */
+
+/* 统一错误码返回类型 */
+typedef int kern_err_t;
 
 /* ═══ 任务相关常量 ═══ */
 

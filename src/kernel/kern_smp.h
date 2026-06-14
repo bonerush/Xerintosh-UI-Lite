@@ -77,9 +77,8 @@ static inline uint8_t kern_smp_migrate_assign(void) { return 0; }
 #define g_last_picked    (g_per_cpu[KERN_THIS_CPU].last_picked)
 #define g_percpu_task_count  (g_per_cpu[KERN_THIS_CPU].task_count)
 
-#ifdef CONFIG_PREEMPT_ENABLED
+/* 无条件定义：kern_sched.c 在任何配置下都使用此宏 */
 #define g_need_resched   (g_per_cpu[KERN_THIS_CPU].need_resched)
-#endif
 
 #ifdef __cplusplus
 }

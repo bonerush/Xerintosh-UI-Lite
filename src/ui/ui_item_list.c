@@ -139,13 +139,8 @@ void xerintosh_destroy_item_tree(xerintosh_list_item_t *_item)
   }
   _item->child_num = 0;
 
-  /* 如果是 user_item 且有 destroy_callback，先调用 */
-  if (_item->type == user_item)
-  {
-    xerintosh_user_item_t *user = (xerintosh_user_item_t *)_item;
-    if (user->destroy_callback != NULL && _item->user_data != NULL)
-      user->destroy_callback(_item->user_data);
-  }
+  /* 通过派发表执行类型特定的销毁清理（如 user_item 的 destroy_callback） */
+  xerintosh_dispatch_destroy(_item);
 
   /* 释放 content（由 strdup 分配） */
   if (_item->content != NULL)
