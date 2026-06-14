@@ -15,6 +15,7 @@
 /* ═══ Native 测试环境：std::chrono 实现 ═══ */
 
 #include <chrono>
+#include <thread>
 
 static auto g_start_time = std::chrono::steady_clock::now();  /* 系统启动时间基准 */
 
@@ -34,10 +35,10 @@ uint32_t hal_get_ticks(void) {
 }
 
 /**
- * @brief 延时（native 环境空操作，由测试框架控制）
+ * @brief 延时指定的毫秒数
  */
 void hal_delay_ms(uint32_t ms) {
-    (void)ms;
+    std::this_thread::sleep_for(std::chrono::milliseconds(ms));
 }
 
 #else

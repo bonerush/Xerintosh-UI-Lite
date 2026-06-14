@@ -22,7 +22,7 @@ extern void hal_delay_ms(uint32_t ms);
 
 - `hal_system_init()`：初始化时钟基准（Native 环境下记录起始时间点）
 - `hal_get_ticks()`：返回自启动以来的毫秒数（32-bit，约 49 天回绕）
-- `hal_delay_ms()`：阻塞延时（Native 测试中空实现）
+- `hal_delay_ms()`：阻塞延时（Native 测试中使用 `std::this_thread::sleep_for`）
 
 ### 真机实现（ESP32 Arduino）
 
@@ -44,6 +44,7 @@ void hal_delay_ms(uint32_t ms) { delay(ms); }
 
 ```c
 #include <chrono>
+#include <thread>
 
 static auto g_start_time = std::chrono::steady_clock::now();
 
@@ -57,7 +58,7 @@ uint32_t hal_get_ticks(void) {
 }
 
 void hal_delay_ms(uint32_t ms) {
-    (void)ms;
+    std::this_thread::sleep_for(std::chrono::milliseconds(ms));
 }
 ```
 
@@ -77,11 +78,11 @@ void hal_delay_ms(uint32_t ms) {
 }
 
 函数 延时(毫秒) {
-    // Native 测试不需要阻塞，空实现
+    当前线程.睡眠(毫秒)
 }
 ```
 
-**为什么用 `.cpp` 而不是 `.c`**：Native 实现需要 `<chrono>`，这是 C++ 标准库。PlatformIO 对 `.c` 文件使用 C 编译器，无法识别 C++ 头文件。因此整个 HAL 层统一使用 `.cpp` 扩展名，通过 `extern "C"` 保持 C 链接。
+**为什么用 `.cpp` 而不是 `.c`**：Native 实现需要 `<chrono>` 和 `<thread>`，这是 C++ 标准库。PlatformIO 对 `.c` 文件使用 C 编译器，无法识别 C++ 头文件。因此整个 HAL 层统一使用 `.cpp` 扩展名，通过 `extern "C"` 保持 C 链接。
 
 ---
 
