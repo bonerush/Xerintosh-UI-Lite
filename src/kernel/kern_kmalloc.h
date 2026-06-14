@@ -41,6 +41,19 @@ void *kern_kcalloc(size_t nmemb, size_t size);
 void kern_kfree(void *ptr);
 
 /**
+ * @brief  分配内存（不追踪到任务，用于资源节点自身分配）
+ * @param  size 分配字节数
+ * @return 分配的内存指针，失败返回 NULL
+ */
+void *kern_kmalloc_untracked(size_t size);
+
+/**
+ * @brief  释放 untracked 内存（不操作资源追踪链表）
+ * @param  ptr 要释放的内存指针（可为 NULL）
+ */
+void kern_kfree_untracked(void *ptr);
+
+/**
  * @brief  重新分配内存（自动更新追踪）
  * @param  ptr      旧内存指针（可为 NULL，行为同 malloc）
  * @param  new_size 新分配字节数

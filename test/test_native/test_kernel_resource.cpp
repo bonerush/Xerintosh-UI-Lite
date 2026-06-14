@@ -16,6 +16,7 @@ extern "C" {
 #include "kernel/kern_task.h"
 #include "kernel/kern_sched.h"
 #include "kernel/kern_resource.h"
+#include "kernel/kern_kmalloc.h"
 #include "kernel/kern_init.h"
 }
 
@@ -172,7 +173,7 @@ TEST(KernelResourceTest, TrackWithNullReleaseInReleaseAllSkips)
     ASSERT_NE(task, nullptr);
 
     /* 手动构造一个 release=NULL 的节点来测试边界条件 */
-    kern_resource_t *res = (kern_resource_t *)malloc(sizeof(kern_resource_t));
+    kern_resource_t *res = (kern_resource_t *)kern_kmalloc_untracked(sizeof(kern_resource_t));
     ASSERT_NE(res, nullptr);
     res->ptr = (void *)0x5555;
     res->type = KERN_RES_MEMORY;

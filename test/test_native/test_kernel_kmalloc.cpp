@@ -143,6 +143,63 @@ TEST(KernelKmallocTest, MultipleAllocationsAreTracked)
     EXPECT_EQ(task->resource_head, nullptr);
 }
 
+/* ═══ untracked 分配测试 ═══ */
+
+TEST(KernelKmallocTest, UntrackedAllocNotTracked)
+{
+    kern_init();
+    kern_sched_init();
+
+    kern_task_t *task = kern_task_current();
+    ASSERT_NE(task, nullptr);
+    EXPECT_EQ(task->resource_head, nullptr);
+
+    void *ptr = kern_kmalloc_untracked(64);
+    ASSERT_NE(ptr, nullptr);
+
+    /* untracked 分配不应增加资源链表长度 */
+    int count = 0;
+    for (kern_resource_t *cur = task->resource_head; cur != NULL; cur = cur->next) {
+        count++;
+    }
+    EXPECT_EQ(count, 0);
+
+    kern_kfree_untracked(ptr);
+}
+
+TEST(KernelKmallocTest, UntrackedFreeDoesNotCrash)
+{
+    kern_init();
+    kern_sched_init();
+
+    kern_kfree_untracked(NULL);
+
+    void *ptr = kern_kmalloc_untracked(32);
+    ASSERT_NE(ptr, nullptr);
+    kern_kfree_untracked(ptr);
+}
+
+TEST(KernelKmallocTest, TrackedAllocIsTracked)
+{
+    kern_init();
+    kern_sched_init();
+
+    kern_task_t *task = kern_task_current();
+    ASSERT_NE(task, nullptr);
+    EXPECT_EQ(task->resource_head, nullptr);
+
+    void *ptr = kern_kmalloc(64);
+    ASSERT_NE(ptr, nullptr);
+
+    int count = 0;
+    for (kern_resource_t *cur = task->resource_head; cur != NULL; cur = cur->next) {
+        count++;
+    }
+    EXPECT_EQ(count, 1);
+
+    kern_kfree(ptr);
+}
+
 /* ═══ realloc 测试 ═══ */
 
 TEST(KernelKmallocTest, KreallocNullBehavesLikeMalloc)

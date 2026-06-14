@@ -8,11 +8,8 @@
  */
 
 #include "kern_resource.h"
+#include "kern_kmalloc.h"
 #include "kern_sched.h"
-
-#include <stdlib.h>
-
-/* ═══ 资源追踪 ═══ */
 
 kern_err_t kern_resource_track(kern_task_t *task, void *ptr,
                         kern_resource_type_t type, void (*release)(void *))
@@ -21,7 +18,7 @@ kern_err_t kern_resource_track(kern_task_t *task, void *ptr,
         return KERN_EINVAL;
     }
 
-    kern_resource_t *res = (kern_resource_t *)malloc(sizeof(kern_resource_t));
+    kern_resource_t *res = (kern_resource_t *)kern_kmalloc_untracked(sizeof(kern_resource_t));
     if (res == NULL) {
         return KERN_ENOMEM;
     }
@@ -54,7 +51,7 @@ kern_err_t kern_resource_untrack(kern_task_t *task, void *ptr)
             } else {
                 task->resource_head = cur->next;
             }
-            free(cur);
+            kern_kfree_untracked(cur);
             return KERN_OK;
         }
         prev = cur;
@@ -78,7 +75,7 @@ void kern_resource_release_all(kern_task_t *task)
             cur->release(cur->ptr);
         }
 
-        free(cur);
+        kern_kfree_untracked(cur);
         cur = next;
     }
 

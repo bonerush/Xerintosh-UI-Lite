@@ -13,6 +13,7 @@
 #include "kern_resource.h"
 #include "kern_task.h"
 
+#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -45,9 +46,9 @@ static void kmem_release(void *ptr)
     free(hdr);
 }
 
-/* ═══ 分配 API ═══ */
+/* ═══ 内部分配实现 ═══ */
 
-void *kern_kmalloc(size_t size)
+static void *kern_kmalloc_impl(size_t size, kern_task_t *owner, bool track)
 {
     if (size == 0) return NULL;
 
@@ -59,20 +60,34 @@ void *kern_kmalloc(size_t size)
     if (hdr == NULL) return NULL;
 
     hdr->size = size;
-    hdr->owner = kern_task_current();
+    hdr->owner = owner;
 
     void *user_ptr = (void *)((uint8_t *)hdr + sizeof(kmalloc_header_t));
 
-    /* 追踪到当前任务 */
-    int ret = kern_resource_track(hdr->owner, user_ptr,
-                                  KERN_RES_MEMORY, kmem_release);
-    if (ret != KERN_OK) {
-        /* 追踪失败，释放分配（兼容性保护） */
-        free(hdr);
-        return NULL;
+    if (track) {
+        /* 追踪到当前任务 */
+        int ret = kern_resource_track(owner, user_ptr,
+                                      KERN_RES_MEMORY, kmem_release);
+        if (ret != KERN_OK) {
+            /* 追踪失败，释放分配（兼容性保护） */
+            free(hdr);
+            return NULL;
+        }
     }
 
     return user_ptr;
+}
+
+/* ═══ 分配 API ═══ */
+
+void *kern_kmalloc(size_t size)
+{
+    return kern_kmalloc_impl(size, kern_task_current(), true);
+}
+
+void *kern_kmalloc_untracked(size_t size)
+{
+    return kern_kmalloc_impl(size, NULL, false);
 }
 
 void *kern_kcalloc(size_t nmemb, size_t size)
@@ -101,6 +116,16 @@ void kern_kfree(void *ptr)
     if (hdr->owner != NULL) {
         kern_resource_untrack(hdr->owner, ptr);
     }
+
+    free(hdr);
+}
+
+void kern_kfree_untracked(void *ptr)
+{
+    if (ptr == NULL) return;
+
+    kmalloc_header_t *hdr = get_header(ptr);
+    if (hdr == NULL) return;
 
     free(hdr);
 }
