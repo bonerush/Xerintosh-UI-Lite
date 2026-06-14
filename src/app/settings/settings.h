@@ -14,7 +14,6 @@
 
 /* UI 上下文（提供 g_anim_enabled 等全局状态宏） */
 #include "ui/ui_context.h"
-#include "app/flasher/flasher_gpio.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -83,27 +82,6 @@ int16_t settings_anim_speed_value(void);
  * @note   无效值回退到默认值 115200（level 5）
  */
 int32_t settings_serial_baud_hw_value(int16_t level);
-
-/* 烧录器引脚配置（由 flasher_gpio 管理，settings 层透传） */
-
-/**
- * @brief 从 NVS 加载烧录器引脚映射配置
- */
-void settings_load_flasher_pins(void);
-
-/**
- * @brief 将烧录器引脚映射配置保存到 NVS
- */
-void settings_save_flasher_pins(void);
-
-/* ═══ 烧录器引脚角色标签 ═══ */
-
-/**
- * @brief  获取信号角色的显示标签
- * @param  role 信号角色枚举
- * @return 角色中文/英文标签字符串
- */
-const char* settings_flasher_role_label(flasher_signal_t role);
 
 #ifdef __cplusplus
 }

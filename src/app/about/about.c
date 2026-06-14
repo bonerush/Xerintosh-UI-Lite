@@ -10,6 +10,7 @@
 #include "about.h"
 #include "kernel/kern_version.h"
 #include "app/boot/boot_screen.h"
+#include "app/ui_service.h"
 #include "hal/hal_display.h"
 #include "hal/hal_layout.h"
 #include "hal/hal_input.h"
@@ -85,7 +86,7 @@ void about_init(void *ud)
 {
     (void)ud;
 #ifndef NATIVE_TEST
-    hal_input_reset_events();
+    ui_service_user_item_init();
 #endif
 }
 
@@ -94,7 +95,7 @@ void about_loop(void *ud)
     (void)ud;
     hal_event_t event_b = hal_input_get_event(HAL_BTN_B);
 
-    if (ui_user_item_try_exit(event_b)) return;
+    if (ui_service_user_item_loop(event_b)) return;
 
     about_draw();
 }
@@ -103,6 +104,6 @@ void about_exit(void *ud)
 {
     (void)ud;
 #ifndef NATIVE_TEST
-    hal_input_reset_events();
+    ui_service_user_item_exit();
 #endif
 }

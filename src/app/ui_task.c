@@ -72,7 +72,7 @@ void ui_task_main(void *arg)
          * 确保 TG1 系统看门狗能被及时喂狗。
          * 内核任务和 Arduino loop 都在优先级 1，
          * 若无此让步则 idle 任务会被永久饿死。 */
-        delay(1);
+        hal_delay_ms(1);
 #endif
 
         /* 让出 CPU */

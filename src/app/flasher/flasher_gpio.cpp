@@ -47,6 +47,17 @@ uint8_t flasher_get_pin_for_signal(flasher_signal_t sig)
     return 255;
 }
 
+const char* flasher_role_label(flasher_signal_t role)
+{
+    switch (role) {
+        case FLASHER_SIG_NONE: return "未分配";
+        case FLASHER_SIG_TX:   return "TX";
+        case FLASHER_SIG_RX:   return "RX";
+        case FLASHER_SIG_BOOT: return "BOOT/DTR";
+        default: return "?";
+    }
+}
+
 void flasher_load_pin_config(void)
 {
     for (int i = 0; i < FLASHER_AVAILABLE_PINS; i++) {

@@ -54,6 +54,13 @@ bool flasher_set_pin_role(uint8_t pin, flasher_signal_t role);
 uint8_t flasher_get_pin_for_signal(flasher_signal_t sig);
 
 /**
+ * @brief  将信号角色转换为可显示标签
+ * @param  role 信号角色
+ * @return 角色标签字符串（静态字面量或常量）
+ */
+const char* flasher_role_label(flasher_signal_t role);
+
+/**
  * @brief 从 NVS 加载引脚映射配置到全局数组
  */
 void flasher_load_pin_config(void);
