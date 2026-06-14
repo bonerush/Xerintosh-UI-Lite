@@ -8,16 +8,20 @@
 |------|------|------|------------|----------|
 | 0 | 基线建立与冻结 | DONE | coder | `00-baseline.md` |
 | 1 | 扫描与诊断 | DONE | explore | `01-diagnosis.md` |
-| 2 | 分层重构执行 | RUNNING | coder | `02-refactor/*.md` |
+| 2.1 | 内核层重构 | DONE | coder | `02-refactor/kernel.md` |
+| 2.2 | App 上层重构 | RUNNING | coder | `02-refactor/app.md` |
+| 2.3 | HAL 层重构 | PENDING | coder | `02-refactor/hal.md` |
+| 2.4 | UI 核心层重构 | PENDING | coder | `02-refactor/ui.md` |
+| 2.5 | 文档体系同步 | PENDING | coder | `02-refactor/docs.md` |
 | 3 | 集成验证 | PENDING | verification | `03-integration.md` |
 | 4 | 文档同步与归档 | PENDING | coder | `04-archive.md` |
 
 ## 本轮范围
 
-- [ ] 内核层（`src/kernel/`）
-- [ ] UI 核心层（`src/ui/`）
-- [ ] HAL 层（`src/hal/`）
+- [x] 内核层（`src/kernel/`）
 - [ ] App 层（`src/app/`）
+- [ ] HAL 层（`src/hal/`）
+- [ ] UI 核心层（`src/ui/`）
 - [ ] 文档体系（`doc/`）
 
 ## 快速链接

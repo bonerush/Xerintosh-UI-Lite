@@ -22,10 +22,34 @@
 #include "app/token_usage/token_usage.h"
 #include "app/flasher/flasher.h"
 #include "app/flasher/flasher_menu.h"
+#include "kernel/kern_init.h"
 #include "ui/ui_item.h"
 
 /* 波特率选择回调（前向声明） */
 static void on_baud_selected_cb(void *ud);
+
+/**
+ * @brief 安全挂载子项；创建失败或挂载失败时打印错误日志
+ * @param parent 父项指针
+ * @param child  子项指针
+ * @param name   子项名称（用于日志）
+ * @return true  挂载成功
+ * @return false 子项为空或挂载失败
+ */
+static bool app_menu_push_checked(xerintosh_list_item_t *parent,
+                                  xerintosh_list_item_t *child,
+                                  const char *name)
+{
+    if (child == NULL) {
+        kern_log(KERN_LOG_ERROR, "app_menu: failed to create item %s", name);
+        return false;
+    }
+    if (!xerintosh_push_item_to_list(parent, child)) {
+        kern_log(KERN_LOG_ERROR, "app_menu: failed to push item %s", name);
+        return false;
+    }
+    return true;
+}
 
 /**
  * @brief 构建并初始化 Xerintosh UI 菜单树
@@ -49,6 +73,10 @@ static void on_baud_selected_cb(void *ud);
 void app_menu_build(void)
 {
     xerintosh_list_item_t* root = xerintosh_get_root_list();
+    if (root == NULL) {
+        kern_log(KERN_LOG_ERROR, "app_menu: failed to get root list");
+        return;
+    }
 
     xerintosh_list_item_t* item1 = xerintosh_new_list_item("设置", list_icon);
     xerintosh_list_item_t* item2 = xerintosh_new_user_item(
@@ -62,47 +90,66 @@ void app_menu_build(void)
     xerintosh_list_item_t* item4 = xerintosh_new_user_item(
         "关于", about_init, about_loop, about_exit, user_icon);
 
-    xerintosh_list_item_t* sw1 = xerintosh_new_switch_item(
-        "WiFi", &g_wifi_on, NULL, wifi_mgr_on_switch_toggle, default_icon);
-    xerintosh_list_item_t* sl1 = xerintosh_new_slider_item(
-        "亮度", &g_brightness_level, 1, 1, 10,
-        NULL, on_brightness_change_cb, default_icon);
-    xerintosh_list_item_t* sw_anim = xerintosh_new_switch_item(
-        "动画效果", &g_anim_enabled, NULL, on_anim_enabled_change_cb, default_icon);
-    xerintosh_list_item_t* sl_anim = xerintosh_new_slider_item(
-        "动画速度", &g_anim_speed_level, 1, 1, 10,
-        NULL, on_anim_speed_change_cb, default_icon);
-    xerintosh_list_item_t* sw_rot = xerintosh_new_switch_item(
-        "横屏/竖屏", &g_is_landscape, NULL, on_screen_rotation_change_cb, default_icon);
+    xerintosh_list_item_t* sw1 = NULL;
+    xerintosh_list_item_t* sl1 = NULL;
+    xerintosh_list_item_t* sw_anim = NULL;
+    xerintosh_list_item_t* sl_anim = NULL;
+    xerintosh_list_item_t* sw_rot = NULL;
+    xerintosh_list_item_t* baud_menu = NULL;
+    xerintosh_list_item_t* flasher_pin_menu = NULL;
 
-    /* 波特率子菜单 */
-    xerintosh_list_item_t* baud_menu = xerintosh_new_list_item("波特率", list_icon);
-    const char *baud_labels[] = {"9600", "19200", "38400", "57600", "115200", "230400"};
-    int16_t baud_levels[] = {1, 2, 3, 4, 5, 6};
-    for (int i = 0; i < 6; i++) {
-        xerintosh_list_item_t* btn = xerintosh_new_button_item(
-            baud_labels[i], on_baud_selected_cb, default_icon);
-        btn->user_data = (void*)(intptr_t)baud_levels[i];
-        xerintosh_push_item_to_list(baud_menu, btn);
+    if (item1 != NULL) {
+        sw1 = xerintosh_new_switch_item(
+            "WiFi", &g_wifi_on, NULL, wifi_mgr_on_switch_toggle, default_icon);
+        sl1 = xerintosh_new_slider_item(
+            "亮度", &g_brightness_level, 1, 1, 10,
+            NULL, on_brightness_change_cb, default_icon);
+        sw_anim = xerintosh_new_switch_item(
+            "动画效果", &g_anim_enabled, NULL, on_anim_enabled_change_cb, default_icon);
+        sl_anim = xerintosh_new_slider_item(
+            "动画速度", &g_anim_speed_level, 1, 1, 10,
+            NULL, on_anim_speed_change_cb, default_icon);
+        sw_rot = xerintosh_new_switch_item(
+            "横屏/竖屏", &g_is_landscape, NULL, on_screen_rotation_change_cb, default_icon);
+
+        /* 波特率子菜单 */
+        baud_menu = xerintosh_new_list_item("波特率", list_icon);
+        if (baud_menu != NULL) {
+            const char *baud_labels[] = {"9600", "19200", "38400", "57600", "115200", "230400"};
+            int16_t baud_levels[] = {1, 2, 3, 4, 5, 6};
+            for (int i = 0; i < 6; i++) {
+                xerintosh_list_item_t* btn = xerintosh_new_button_item(
+                    baud_labels[i], on_baud_selected_cb, default_icon);
+                if (btn == NULL) {
+                    kern_log(KERN_LOG_ERROR, "app_menu: failed to create baud item %s", baud_labels[i]);
+                    continue;
+                }
+                btn->user_data = (void*)(intptr_t)baud_levels[i];
+                app_menu_push_checked(baud_menu, btn, baud_labels[i]);
+            }
+        }
+
+        /* 烧录器引脚映射子菜单（由 flasher 模块自包含） */
+        flasher_menu_init();
+        flasher_pin_menu = flasher_menu_get_root();
     }
 
-    /* 烧录器引脚映射子菜单（由 flasher 模块自包含） */
-    flasher_menu_init();
-    xerintosh_list_item_t* flasher_pin_menu = flasher_menu_get_root();
+    app_menu_push_checked(root, item1, "设置");
+    app_menu_push_checked(root, item2, "任务管理器");
+    app_menu_push_checked(root, item3, "串口监视器");
+    app_menu_push_checked(root, tu_item, "Token Usage");
+    app_menu_push_checked(root, flasher_item, "烧录器");
+    app_menu_push_checked(root, item4, "关于");  /* 关于（永远最后） */
 
-    xerintosh_push_item_to_list(root, item1);
-    xerintosh_push_item_to_list(root, item2);
-    xerintosh_push_item_to_list(root, item3);
-    xerintosh_push_item_to_list(root, tu_item);
-    xerintosh_push_item_to_list(root, flasher_item);
-    xerintosh_push_item_to_list(root, item4);  /* 关于（永远最后） */
-    xerintosh_push_item_to_list(item1, sw1);
-    xerintosh_push_item_to_list(item1, sl1);
-    xerintosh_push_item_to_list(item1, sw_anim);
-    xerintosh_push_item_to_list(item1, sl_anim);
-    xerintosh_push_item_to_list(item1, sw_rot);
-    xerintosh_push_item_to_list(item1, flasher_pin_menu);
-    xerintosh_push_item_to_list(item1, baud_menu);
+    if (item1 != NULL) {
+        app_menu_push_checked(item1, sw1, "WiFi");
+        app_menu_push_checked(item1, sl1, "亮度");
+        app_menu_push_checked(item1, sw_anim, "动画效果");
+        app_menu_push_checked(item1, sl_anim, "动画速度");
+        app_menu_push_checked(item1, sw_rot, "横屏/竖屏");
+        app_menu_push_checked(item1, flasher_pin_menu, "烧录器引脚");
+        app_menu_push_checked(item1, baud_menu, "波特率");
+    }
 }
 
 /**
