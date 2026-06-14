@@ -11,6 +11,21 @@
 #include "kern_kmalloc.h"
 #include "kern_sched.h"
 
+/* 资源链表自旋锁（避免循环包含 kern_sync.h，直接使用编译器内置原子操作） */
+#ifdef CONFIG_SMP_ENABLED
+#define _resource_lock(task) do { \
+    while (__sync_lock_test_and_set(&(task)->resource_lock, true)) { \
+        /* spin */ \
+    } \
+} while (0)
+#define _resource_unlock(task) do { \
+    __sync_lock_release(&(task)->resource_lock); \
+} while (0)
+#else
+#define _resource_lock(task)   ((void)0)
+#define _resource_unlock(task) ((void)0)
+#endif
+
 kern_err_t kern_resource_track(kern_task_t *task, void *ptr,
                         kern_resource_type_t type, void (*release)(void *))
 {
@@ -28,8 +43,10 @@ kern_err_t kern_resource_track(kern_task_t *task, void *ptr,
     res->release = release;
 
     /* 插入到资源链表头部 */
+    _resource_lock(task);
     res->next = task->resource_head;
     task->resource_head = res;
+    _resource_unlock(task);
 
     return KERN_OK;
 }
@@ -39,6 +56,8 @@ kern_err_t kern_resource_untrack(kern_task_t *task, void *ptr)
     if (task == NULL || ptr == NULL) {
         return KERN_EINVAL;
     }
+
+    _resource_lock(task);
 
     kern_resource_t *prev = NULL;
     kern_resource_t *cur = task->resource_head;
@@ -51,6 +70,7 @@ kern_err_t kern_resource_untrack(kern_task_t *task, void *ptr)
             } else {
                 task->resource_head = cur->next;
             }
+            _resource_unlock(task);
             kern_kfree_untracked(cur);
             return KERN_OK;
         }
@@ -58,12 +78,15 @@ kern_err_t kern_resource_untrack(kern_task_t *task, void *ptr)
         cur = cur->next;
     }
 
+    _resource_unlock(task);
     return KERN_ENOENT;  /* 资源未找到 */
 }
 
 void kern_resource_release_all(kern_task_t *task)
 {
     if (task == NULL) return;
+
+    _resource_lock(task);
 
     kern_resource_t *cur = task->resource_head;
 
@@ -80,4 +103,6 @@ void kern_resource_release_all(kern_task_t *task)
     }
 
     task->resource_head = NULL;
+
+    _resource_unlock(task);
 }

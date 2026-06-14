@@ -186,3 +186,48 @@ TEST(KernelResourceTest, TrackWithNullReleaseInReleaseAllSkips)
     kern_resource_release_all(task);
     EXPECT_EQ(task->resource_head, nullptr);
 }
+
+TEST(KernelResourceTest, ResourceLockInitialized)
+{
+    kern_init();
+    kern_sched_init();
+
+    kern_task_t *task = kern_task_current();
+    ASSERT_NE(task, nullptr);
+
+    EXPECT_EQ(task->resource_lock, false);
+}
+
+TEST(KernelResourceTest, ResourceTrackUnderLock)
+{
+    kern_init();
+    kern_sched_init();
+
+    kern_task_t *task = kern_task_current();
+    ASSERT_NE(task, nullptr);
+
+    void *r1 = (void *)0x1000;
+    void *r2 = (void *)0x2000;
+    void *r3 = (void *)0x3000;
+
+    EXPECT_EQ(kern_resource_track(task, r1, KERN_RES_MEMORY, counting_release), KERN_OK);
+    EXPECT_EQ(kern_resource_track(task, r2, KERN_RES_MUTEX, counting_release), KERN_OK);
+    EXPECT_EQ(kern_resource_track(task, r3, KERN_RES_FD, counting_release), KERN_OK);
+
+    /* 锁在每次操作后应释放 */
+    EXPECT_EQ(task->resource_lock, false);
+
+    /* 链表应有 3 个节点 */
+    int count = 0;
+    kern_resource_t *cur = task->resource_head;
+    while (cur != NULL) {
+        count++;
+        cur = cur->next;
+    }
+    EXPECT_EQ(count, 3);
+
+    /* 清理 */
+    kern_resource_release_all(task);
+    EXPECT_EQ(task->resource_head, nullptr);
+    EXPECT_EQ(task->resource_lock, false);
+}

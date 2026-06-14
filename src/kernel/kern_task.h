@@ -79,6 +79,7 @@ typedef struct kern_task {
     struct kern_task   *next;           /* 下一个任务（就绪/睡眠队列） */
 
     /* 资源追踪 */
+    volatile bool resource_lock;         /* 保护 resource_head 的布尔自旋锁 */
     struct kern_resource *resource_head; /* 持有的资源链表头 */
 
     /* MPU 内存保护 */
