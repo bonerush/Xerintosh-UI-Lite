@@ -11,7 +11,6 @@
 
 #include "taskmgr_ui.h"
 #include "taskmgr.h"
-#include "kernel/kern_task.h"
 #include "hal/hal_display.h"
 #include "hal/hal_layout.h"
 #include "ui/ui_anim_row.h"
@@ -65,16 +64,16 @@ static void format_line(kern_task_t *task, char *buf, size_t size)
 {
     if (task == NULL || buf == NULL || size == 0) return;
 
-    bool is_prot = kern_task_is_protected(task);
+    bool is_prot = taskmgr_task_protected(task);
     const char *mark = is_prot ? "*" : " ";
     char size_str[16];
 
-    if (task->flags & KERN_TASK_FLAG_VIRTUAL) {
+    if (taskmgr_task_is_virtual(task)) {
         snprintf(buf, size, "%s%2d %-12s %s  n/a",
                  mark, task->pid, task->name,
                  state_str(task->state));
     } else {
-        format_size(kern_task_stack_usage(task), size_str, sizeof(size_str));
+        format_size(taskmgr_task_stack_usage(task), size_str, sizeof(size_str));
         snprintf(buf, size, "%s%2d %-12s %s  %s",
                  mark, task->pid, task->name,
                  state_str(task->state),
@@ -198,13 +197,13 @@ static uint32_t s_footer_scroll_start_ms;
  */
 static void update_footer_info(kern_task_t *t, bool is_prot)
 {
-    if (t->flags & KERN_TASK_FLAG_VIRTUAL) {
+    if (taskmgr_task_is_virtual(t)) {
         snprintf(s_footer_info, sizeof(s_footer_info), "PID:%d [V] %s",
                  t->pid, is_prot ? "PROTECTED" : "killable");
     } else {
         char used_str[16];
         char total_str[16];
-        format_size(kern_task_stack_usage(t), used_str, sizeof(used_str));
+        format_size(taskmgr_task_stack_usage(t), used_str, sizeof(used_str));
         format_size(t->stack_size, total_str, sizeof(total_str));
         snprintf(s_footer_info, sizeof(s_footer_info), "PID:%d %s  stk:%s/%s  %s",
                  t->pid, t->name,

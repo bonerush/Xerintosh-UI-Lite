@@ -11,7 +11,57 @@
 #include "kern_kmalloc.h"
 #include "kern_sched.h"
 
-/* 资源链表自旋锁（避免循环包含 kern_sync.h，直接使用编译器内置原子操作） */
+#include <string.h>
+
+/* ═══ 资源节点对象池 ═══
+ *
+ * 预分配 kern_resource_t 数组，避免 kern_resource_track() 中
+ * 频繁的 kern_kmalloc_untracked / kern_kfree_untracked 开销和堆碎片。
+ * 池耗尽时回退 kern_kmalloc_untracked。
+ */
+
+#define RES_POOL_SIZE 32  /* 预分配资源节点数 */
+
+static kern_resource_t g_res_pool[RES_POOL_SIZE];
+static uint32_t g_res_pool_bitmap;  /* 位图：bit i = 1 表示已分配 */
+
+static kern_resource_t *res_pool_alloc(void) {
+    for (int i = 0; i < RES_POOL_SIZE; i++) {
+        if (!(g_res_pool_bitmap & (1UL << i))) {
+            g_res_pool_bitmap |= (1UL << i);
+            memset(&g_res_pool[i], 0, sizeof(kern_resource_t));
+            return &g_res_pool[i];
+        }
+    }
+    return NULL;  /* 池耗尽 */
+}
+
+static void res_pool_free(kern_resource_t *r) {
+    if (r == NULL) return;
+    int idx = (int)(r - g_res_pool);
+    if (idx >= 0 && idx < RES_POOL_SIZE) {
+        g_res_pool_bitmap &= ~(1UL << idx);
+    }
+}
+
+static bool res_is_pooled(kern_resource_t *r) {
+    if (r == NULL) return false;
+    int idx = (int)(r - g_res_pool);
+    return (idx >= 0 && idx < RES_POOL_SIZE);
+}
+
+/* ═══ 内部释放辅助 ═══ */
+
+static void res_node_free(kern_resource_t *r)
+{
+    if (r == NULL) return;
+    if (res_is_pooled(r)) {
+        res_pool_free(r);
+    } else {
+        kern_kfree_untracked(r);
+    }
+}
+
 #ifdef CONFIG_SMP_ENABLED
 #define _resource_lock(task) do { \
     while (__sync_lock_test_and_set(&(task)->resource_lock, true)) { \
@@ -33,7 +83,11 @@ kern_err_t kern_resource_track(kern_task_t *task, void *ptr,
         return KERN_EINVAL;
     }
 
-    kern_resource_t *res = (kern_resource_t *)kern_kmalloc_untracked(sizeof(kern_resource_t));
+    kern_resource_t *res = res_pool_alloc();
+    if (res == NULL) {
+        /* 池耗尽：回退 kern_kmalloc_untracked */
+        res = (kern_resource_t *)kern_kmalloc_untracked(sizeof(kern_resource_t));
+    }
     if (res == NULL) {
         return KERN_ENOMEM;
     }
@@ -71,7 +125,7 @@ kern_err_t kern_resource_untrack(kern_task_t *task, void *ptr)
                 task->resource_head = cur->next;
             }
             _resource_unlock(task);
-            kern_kfree_untracked(cur);
+            res_node_free(cur);
             return KERN_OK;
         }
         prev = cur;
@@ -98,7 +152,7 @@ void kern_resource_release_all(kern_task_t *task)
             cur->release(cur->ptr);
         }
 
-        kern_kfree_untracked(cur);
+        res_node_free(cur);
         cur = next;
     }
 

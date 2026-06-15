@@ -47,8 +47,16 @@ static void xerintosh_draw_slider_overlays(void)
  * @brief 绘制列表整体外观（边框、滚动条、装饰像素）
  * @note  顶部装饰横线 + 右侧滚动指示条（显示当前选中位置比例）
  */
-static void xerintosh_draw_list_appearance()
+static void xerintosh_draw_list_appearance(int16_t selected_index, int16_t child_num)
 {
+  /* 静态缓存：selected_index 或 child_num 未变化时跳过重绘 */
+  static int16_t _last_selected_index = -1;
+  static int16_t _last_child_num = -1;
+  if (_last_selected_index == selected_index && _last_child_num == child_num)
+    return;
+  _last_selected_index = selected_index;
+  _last_child_num = child_num;
+
   g_xerintosh_draw_color = COLOR_FG;
   hal_draw_h_line(0, 1, 66, g_xerintosh_draw_color);
   hal_draw_h_line(0, 0, 67, g_xerintosh_draw_color);
@@ -80,23 +88,23 @@ static void xerintosh_draw_list_appearance()
   /* 滚动条 */
   static uint8_t _cached_child_num = 0;
   static float _cached_length = 0;
-  if (_cached_child_num != g_xerintosh_selector.selected_item->parent->child_num) {
-    _cached_child_num = g_xerintosh_selector.selected_item->parent->child_num;
+  if (_cached_child_num != child_num) {
+    _cached_child_num = child_num;
     _cached_length = ceilf((SCREEN_HEIGHT - 10.0f) / (float)_cached_child_num);
   }
   float _length_each_part = _cached_length;
-  hal_draw_fill_rect(SCREEN_WIDTH - 4, 5 + g_xerintosh_selector.selected_index * _length_each_part, 3, _length_each_part, g_xerintosh_draw_color);
+  hal_draw_fill_rect(SCREEN_WIDTH - 4, 5 + selected_index * _length_each_part, 3, _length_each_part, g_xerintosh_draw_color);
 
   /* 滚动条内部高光线 */
   g_xerintosh_draw_color = COLOR_BG;
-  hal_draw_h_line(SCREEN_WIDTH - 4, _length_each_part + (float)g_xerintosh_selector.selected_index * _length_each_part, 3, g_xerintosh_draw_color);
+  hal_draw_h_line(SCREEN_WIDTH - 4, _length_each_part + (float)selected_index * _length_each_part, 3, g_xerintosh_draw_color);
 
   if (_length_each_part >= 9)
   {
     hal_draw_h_line(SCREEN_WIDTH - 4,
-                     floorf(_length_each_part - 2.0f + (float)g_xerintosh_selector.selected_index * _length_each_part), 3, g_xerintosh_draw_color);
+                     floorf(_length_each_part - 2.0f + (float)selected_index * _length_each_part), 3, g_xerintosh_draw_color);
     hal_draw_h_line(SCREEN_WIDTH - 4,
-                     floorf(_length_each_part + 2.0f + (float)g_xerintosh_selector.selected_index * _length_each_part), 3, g_xerintosh_draw_color);
+                     floorf(_length_each_part + 2.0f + (float)selected_index * _length_each_part), 3, g_xerintosh_draw_color);
   }
 
   /* 滚动条上下端点 */
@@ -247,7 +255,8 @@ void xerintosh_draw_long_press_hint(uint32_t duration_ms, uint32_t threshold_ms)
  */
 void xerintosh_draw_list()
 {
-  xerintosh_draw_list_appearance();
+  xerintosh_draw_list_appearance(g_xerintosh_selector.selected_index,
+                                g_xerintosh_selector.selected_item->parent->child_num);
   xerintosh_draw_list_item();
   xerintosh_draw_selector();
   xerintosh_draw_slider_overlays();

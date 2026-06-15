@@ -41,6 +41,7 @@ static kern_err_t dev_fb0_write(kern_device_t *dev, const void *buf, size_t len,
     (void)dev;
     (void)offset;
 
+    if (buf == NULL) return KERN_EINVAL;
     const uint8_t *p = (const uint8_t *)buf;
     size_t pos = 0;
 

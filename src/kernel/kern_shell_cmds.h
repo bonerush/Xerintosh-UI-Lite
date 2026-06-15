@@ -16,9 +16,8 @@
 extern "C" {
 #endif
 
-/* ═══ 前向声明 ═══ */
+/* ═══ 前向声明（类型定义统一在 kern_types.h） ═══ */
 
-typedef int16_t kern_fd_t;
 
 /* ═══ 命令表条目 ═══ */
 

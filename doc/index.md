@@ -189,3 +189,30 @@ FreeRTOS 继续在底层为 WiFi/BT 协议栈服务。SMP 模式下 Xeros 在每
 - [PlatformIO 配置](../platformio.ini)
 - [编码风格规范](coding-style.md)
 - [开发者指南](developer-guide.md)
+
+## 重构历史
+
+执行两次重构轮次，按 `doc/refactor/README.md` 记录的状态推进。
+
+| 日期 | 轮次 | 分支 | 范围 | 报告 |
+|------|------|------|------|------|
+| 2026-06-15 | 第一轮 | `refactor/2026-06-15-kernel-ui` | 内核 O(1) enqueue + FD 池 + P0 ISR；UI dirty rect + XOR 批量 + 缓存 | [归档](refactor/04-archive.md) |
+| 2026-06-15 | 第二轮 | 同上 | 内核 P1-11 + O(1) 插入 + resource 池 + 设备加固；App 包装层 + getter 统一 | [归档 v2](refactor/04-archive-v2.md) |
+
+### 两轮合计内核优化
+
+- ✅ 调度器 O(1) enqueue（task_list_tail）
+- ✅ FD 对象池（16 预分配，消除 kern_open malloc）
+- ✅ P0 ISR 修复（硬件定时器仅设标志位）
+- ✅ 任务插入 O(1)（g_task_list_tail 全局尾指针）
+- ✅ 资源节点池（32 预分配，消除 resource_track malloc）
+- ✅ 设备驱动 buf NULL 加固（5 驱动）
+- ✅ 移除重复 typedef
+
+### 两轮合计 App 优化
+
+- ✅ taskmgr 包装层解耦内核 API
+- ✅ settings getter/setter 统一访问模式
+
+静态内存增加：~1KB（FD 池 448B + resource 池 512B + 尾指针 12B），
+换取消除运行时堆分配和碎片风险。

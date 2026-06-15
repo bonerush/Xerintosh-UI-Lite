@@ -34,6 +34,7 @@
 /* ═══ 全局调度状态 ═══ */
 
 kern_task_t   *g_task_list = NULL;
+kern_task_t   *g_task_list_tail = NULL;
 /* g_current_task, g_idle_task, g_sched_ticks, g_need_resched, g_last_picked
    由 kern_smp.h 以宏形式提供（映射到 g_per_cpu[]） */
 kern_pid_t     g_next_pid = 0;
@@ -58,8 +59,10 @@ kern_ctx_t     g_sched_ctx;
 
 void kern_sched_init(void)
 {
+    g_task_list_tail = NULL;  /* 每次 init 都重置尾指针，支持测试环境多次调用 */
     if (g_sched_initialized) return;
     g_sched_initialized = true;
+    g_task_list_tail = NULL;
     kern_smp_init();
 
     /* 注册默认调度类 */
@@ -95,6 +98,7 @@ void kern_sched_init(void)
 
     g_task_list = g_idle_task;
     sched_class_rr.task_list = g_task_list;
+    sched_class_rr.task_list_tail = g_idle_task;
     g_idle_task->scheduler_class_id = KERN_SCHED_CLASS_RR_ID;
     g_task_count = 1;
     g_current_task = g_idle_task;
@@ -135,6 +139,7 @@ void kern_sched_init(void) /* XEROS_NATIVE_SCHED */
 
     g_task_list = g_idle_task;
     sched_class_rr.task_list = g_task_list;
+    sched_class_rr.task_list_tail = g_idle_task;
     g_idle_task->scheduler_class_id = KERN_SCHED_CLASS_RR_ID;
     g_task_count = 1;
     g_current_task = g_idle_task;
@@ -151,8 +156,10 @@ void kern_smp_sched_loop(void *arg);
 
 void kern_sched_init(void)
 {
+    g_task_list_tail = NULL;  /* 每次 init 都重置尾指针，支持测试环境多次调用 */
     if (g_sched_initialized) return;
     g_sched_initialized = true;
+    g_task_list_tail = NULL;
     kern_smp_init();
 
     kern_port_init();
@@ -201,6 +208,7 @@ void kern_sched_init(void)
     }
 
     sched_class_rr.task_list = g_task_list;
+		sched_class_rr.task_list_tail = g_task_list;  /* SMP: idle 在队尾 */
 
     /* ── per-CPU 初始状态 ── */
     g_per_cpu[0].current_task = g_per_cpu[0].idle_task;

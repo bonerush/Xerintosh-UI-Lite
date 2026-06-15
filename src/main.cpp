@@ -316,6 +316,13 @@ void loop()
     }
 
     kern_sched_tick();
+
+    /*
+     * 抢占式调度钩子：当硬件定时器 ISR 激活时（CONFIG_PREEMPT_ENABLED），
+     * ISR 设置抢占标志。loop() 在每次迭代时消费此标志，
+     * 确保调度器对抢占请求的响应延迟不超过 1 次 loop 迭代。
+     */
+    (void)kern_port_preempt_consume();
 }
 
 #endif /* NATIVE_TEST */

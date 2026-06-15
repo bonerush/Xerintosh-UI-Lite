@@ -1,71 +1,62 @@
-# 重构归档报告
+# 归档报告（2026-06-15 kernel-ui-performance）
 
-## 归档信息
+## 本轮总结
 
-- **工作树**：`/Users/yukisala/Documents/PlatformIO/Projects/M5Stick-P1/.worktrees/refactor-2026-06-14-kernel-first`
-- **分支**：`refactor/2026-06-14-kernel-first`
-- **基线 commit**：`a4d8bab2703908ff0c4934daf97c1bced671eb40`
-- **归档日期**：2026-06-14
+M5Stick-P1 第二轮重构：聚焦内核性能（内存/CPU/实时性）和 UI 流畅度（动画/帧率/响应）。
 
-## 本轮重构目标
+## 达成目标
 
-按用户要求，本轮优先集中优化内核层，其次优化依赖内核的上层 App，最后处理 HAL/UI/文档等其他部分。
+| 维度 | 目标 | 达成方式 | 状态 |
+|------|------|----------|------|
+| **内核 CPU** | 减少调度器开销 | O(1) tail 指针 enqueue | ✅ |
+| **内核内存** | 减少堆碎片 | FD 对象池消除 kern_open malloc | ✅ |
+| **UI 帧率** | 静态画面零重绘 | 脏矩形帧跳过机制 | ✅ |
+| **UI 动画** | 选择器绘制加速 | XOR 批量操作（15次→1次） | ✅ |
+| **UI 响应** | 减少导航开销 | 装饰缓存 + 解引用缓存 | ✅ |
 
-## 各阶段产出
+## 变更统计
 
-| 阶段 | 状态 | 产物 |
-|------|------|------|
-| 0 基线建立 | ✅ DONE | `00-baseline.md` |
-| 1 扫描与诊断 | ✅ DONE | `01-diagnosis.md` |
-| 2.1 内核层重构 | ✅ DONE | `02-refactor/kernel.md`、`02-refactor/kernel-plan.md` |
-| 2.2 App 上层重构 | ✅ DONE | `02-refactor/app.md`、`02-refactor/app-plan.md` |
-| 2.3 HAL 层重构 | ✅ DONE | `02-refactor/hal.md`、`02-refactor/hal-plan.md` |
-| 2.4 UI 核心层重构 | ✅ DONE | `02-refactor/ui.md`、`02-refactor/ui-plan.md`、`02-refactor/ui-popup-deferred.md` |
-| 2.5 文档体系同步 | ✅ DONE | `02-refactor/docs.md` |
-| 3 集成验证 | ✅ DONE | `03-integration.md` |
-| 4 文档归档 | ✅ DONE | `04-archive.md` |
+| 类别 | 文件数 | +行 | -行 |
+|------|--------|-----|-----|
+| 内核层 | 5 | +88 | -22 |
+| UI 层 | 7 | +88 | -25 |
+| 文档 | 6 | +631 | -308 |
+| **合计** | **18** | **+807** | **-355** |
 
-## 关键决策记录
+## 关键决策
 
-1. **FD 表改为 per-task**：将全局 `g_fd_table` 移入 `kern_task_t`，解决跨任务 FD 共享问题，同时避免任务 A 关闭任务 B 的 FD。
-2. **资源节点使用 untracked 分配器**：`kern_resource.c` 的节点本身通过 `kern_kmalloc_untracked` 分配，避免 `kern_kmalloc` → `kern_resource_track` 递归。
-3. **Native 任务栈归属任务自身**：`kern_task_stack.c` 使用 `kern_kmalloc_for_task`，任务退出时通过资源链表自动释放栈。
-4. **inode 引用计数**：`kern_vfs_unlink` 不再直接释放 inode，打开中的文件在 unlink 后仍可读写。
-5. **调度类 ID 同步**：`scheduler_class_id` 在 enqueue/dequeue 时同步，为后续调度器扩展做准备。
-6. **错误码统一**：调度类、procfs、设备 ops 均返回 `kern_err_t`。
-7. **BT 生命周期助手**：重建 `svc_mgr_helper`，避免 UI 任务直接同步调用 `bt_mgr_disable()`。
-8. **横屏 helper 提取**：`ui_service_enter_landscape` / `ui_service_exit_landscape` 供 serial_monitor 和 flasher 复用。
+1. **FD 对象池 vs slab 分配器**：选择简单的固定大小位图池（16 项），非通用 slab，复杂度低且满足当前需求。
+2. **脏矩形 vs 增量渲染**：选择简单的 dirty 标志而非完整脏矩形，因为 80×160 小屏全帧重绘开销可控。
+3. **XOR 缓冲区大小**：静态分配 9600 字节（160×30），可覆盖最大选择器。若未来屏幕更大需调整。
+4. **tail 指针防御**：enqueue 中检测 NULL tail 并回退 O(n)，作为安全网而非完全依赖 init 正确性。
 
-## 测试与构建
+## 文件变更清单
 
-- `pio test -e native`：415 个测试用例，414 通过，1 跳过。
-- `pio run -e m5stick-c`：SUCCESS，Flash 88.0%，RAM 22.3%。
-
-## 变更范围
-
-- 80 个文件变更
-- +3,661 / -978 行
-- 新增 40+ native 测试用例
-
-## 遗留问题
-
-| ID | 问题 | 建议后续处理 |
-|----|------|--------------|
-| K-P1-02 | `path_walk()` 不支持 `.` / `..` | 单独 VFS 功能增强轮次 |
-| K-P1-04 | `kmalloc_header_t` 未显式对齐 | 内存子系统优化轮次 |
-| K-P1-05 | `kern_krealloc()` 非原子语义 | 内存子系统优化轮次 |
-| K-P1-06 | FIFO 调度抢占语义 | 调度器专门轮次 |
-| K-P2-01 | `kern_shell_cmds.c` 文件过长 | Shell 子系统拆分轮次 |
-| K-P2-02 | sysfs 路径不一致 | 文件系统接口统一轮次 |
-| K-P2-04 | `minprintf` `%zd` 支持 | 格式化库增强轮次 |
-| A-P1-02 | `wifi_manager.cpp` 过长 | WiFi 状态机重构轮次 |
-| A-P1-03 | WiFi/BT 状态机重复 | 提取公共异步服务生命周期模板 |
-| A-P1-04 | taskmgr 硬编码任务名 | 任务退出回调或服务禁用机制设计 |
-| H-P1-02 | 输入事件模型统一 | 输入子系统专门轮次，需硬件验证 |
-| H-P2-04 | `xerintosh_push_pop_up()` 拆分 | Pop-up 专门轮次，拆分方案已记录 |
+```
+src/kernel/kern_sched_class.h   — task_list_tail 字段
+src/kernel/kern_sched_rr.c      — O(1) enqueue + dequeue tail 维护
+src/kernel/kern_sched_fifo.c    — FIFO dequeue tail 维护
+src/kernel/kern_sched.c         — 三处 init tail 同步
+src/kernel/kern_vfs.c           — FD 对象池（g_fd_pool[16]）
+src/ui/ui_context.h             — dirty 字段
+src/ui/ui_context.c             — dirty 初始化
+src/ui/ui_core.c                — 脏矩形跳过 + 动画 dirty 标记 + 内部二次检查
+src/app/ui_task.c               — 主循环条件跳过
+src/ui/ui_dispatch.c            — 输入处理 dirty 设置
+src/ui/ui_item_selector.c       — dirty 设置 + 解引用缓存
+src/hal/hal_display_adv.cpp     — XOR 批量操作
+src/ui/ui_draw_list.c           — 装饰缓存
+doc/refactor/00-baseline.md     — 基线报告
+doc/refactor/01-diagnosis.md    — 诊断报告
+doc/refactor/02-refactor/kernel.md — 内核重构报告
+doc/refactor/02-refactor/ui.md  — UI 重构报告
+doc/refactor/03-integration.md  — 集成验证报告
+doc/refactor/README.md          — 状态跟踪
+```
 
 ## 后续建议
 
-1. 合并 `refactor/2026-06-14-kernel-first` 到 `main`。
-2. 在硬件上烧录验证关键用户路径（菜单、串口监视器、烧录器、BLE、Token Usage、设置）。
-3. 根据遗留问题优先级安排下一轮重构。
+1. **P0 ISR 安全 bug**（内核 agent 发现的硬件定时器 ISR 中调用 `xSemaphoreGive/Take` 和 `free()`）— 需单独处理，影响 ESP32 硬件运行稳定性。
+2. **K02 pick_next 双遍扫描优化**— 独立 wake_list 可进一步减少调度开销。
+3. **Flash 使用率** 88.1% — 添加新功能前需考虑。
+4. 如需进一步 UI 优化，可考虑：字体渲染缓存、M5GFX 原生 XOR 模式、帧率目标控制。

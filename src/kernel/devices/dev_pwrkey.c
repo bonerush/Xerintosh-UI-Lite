@@ -33,6 +33,7 @@ static kern_err_t pwrkey_read(kern_device_t *dev, void *buf, size_t len, size_t 
     (void)dev;
     (void)offset;
 
+    if (buf == NULL) return KERN_EINVAL;
     if (len < DEV_PWRKEY_EVENT_SIZE) {
         return KERN_EINVAL;
     }

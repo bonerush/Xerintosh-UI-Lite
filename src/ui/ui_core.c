@@ -48,7 +48,10 @@ void xerintosh_animation(float *_pos, float _pos_trg, float _speed)
     }
     if (_speed >= 99.0f) _speed = 99.0f;
     if (fabsf(*_pos - _pos_trg) <= 1.0f) *_pos = _pos_trg;
-    else *_pos += (_pos_trg - *_pos) / (100.0f - _speed);
+    else {
+      *_pos += (_pos_trg - *_pos) / (100.0f - _speed);
+      g_xerintosh_dirty = true;  /* 动画进行中，标记需要重绘 */
+    }
   }
 }
 
@@ -181,6 +184,7 @@ static void xerintosh_ui_update_lifecycle(void)
       user->init_function(item->user_data);
     user->in_user_item = 1;
     user->entering_user_item = false;
+    g_xerintosh_dirty = true;
   }
 
   /* 运行阶段：每帧调用 loop */
@@ -191,6 +195,7 @@ static void xerintosh_ui_update_lifecycle(void)
   if (g_xerintosh_exit_requested) {
     g_xerintosh_exit_requested = false;
     user->exiting_user_item = true;
+    g_xerintosh_dirty = true;
   }
 
   /* 退出阶段：退场动画完成后触发 exit */
@@ -200,12 +205,14 @@ static void xerintosh_ui_update_lifecycle(void)
       user->exit_function(item->user_data);
     user->in_user_item = 0;
     user->exiting_user_item = false;
+    g_xerintosh_dirty = true;
   }
 
   /* 兜底：动画已完成但标志未重置时强制清理，防止退出状态残留 */
   if (user->exiting_user_item && g_xerintosh_exit_animation_finished) {
     user->in_user_item = 0;
     user->exiting_user_item = false;
+    g_xerintosh_dirty = true;
   }
 }
 
@@ -230,6 +237,16 @@ void xerintosh_ui_main_core()
 {
   if (!g_in_xerintosh) return;
   if (g_xerintosh_selector.selected_item == NULL) return;
+
+  /* 退场动画进行中时强制重绘，确保动画不会被脏矩形跳过 */
+  if (!g_xerintosh_exit_animation_finished)
+    g_xerintosh_dirty = true;
+
+  /* 脏矩形帧跳过：静态画面无需重绘 */
+  if (!g_xerintosh_dirty) return;
+
+  /* 提前清除脏标志：后续生命周期/动画/退场动画若需要重绘，会重新设置 */
+  g_xerintosh_dirty = false;
 
   xerintosh_ui_update_lifecycle();
   xerintosh_ui_render_frame();

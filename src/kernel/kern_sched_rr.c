@@ -30,7 +30,7 @@ static inline void task_list_unlock(void) {
 #define task_list_unlock()  do {} while (0)
 #endif
 
-/* ═══ enqueue：追加到链表尾部 ═══ */
+/* ═══ enqueue：O(1) 追加到链表尾部 ═══ */
 
 static void sched_rr_enqueue(kern_task_t *task)
 {
@@ -38,20 +38,23 @@ static void sched_rr_enqueue(kern_task_t *task)
 
     task_list_lock();
 
-    /* task_list 与 g_task_list 指向同一链表，直接追加 */
-    kern_task_t **head = &sched_class_rr.task_list;
-    kern_task_t *t = *head;
-    if (t == NULL) {
-        *head = task;
-        task->next = NULL;
-        task_list_unlock();
-        return;
-    }
-    while (t->next != NULL) t = t->next;
-    t->next = task;
     task->next = NULL;
-
     task->scheduler_class_id = sched_class_rr.class_id;
+
+    if (sched_class_rr.task_list == NULL) {
+        sched_class_rr.task_list = task;
+        sched_class_rr.task_list_tail = task;
+    } else {
+        /* 防御：如果 tail 未初始化（例如 kern_sched_init 遗漏），回退 O(n) 尾追加 */
+        if (sched_class_rr.task_list_tail != NULL) {
+            sched_class_rr.task_list_tail->next = task;
+        } else {
+            kern_task_t *t = sched_class_rr.task_list;
+            while (t->next != NULL) t = t->next;
+            t->next = task;
+        }
+        sched_class_rr.task_list_tail = task;
+    }
 
     task_list_unlock();
 }
@@ -71,8 +74,14 @@ static void sched_rr_dequeue(kern_task_t *task)
         if (t == task) {
             if (prev != NULL) {
                 prev->next = t->next;
+                if (task == sched_class_rr.task_list_tail) {
+                    sched_class_rr.task_list_tail = prev;
+                }
             } else {
                 *head = t->next;
+                if (task == sched_class_rr.task_list_tail) {
+                    sched_class_rr.task_list_tail = NULL;
+                }
             }
             if (g_last_picked == task) g_last_picked = NULL;
             task->scheduler_class_id = -1;
@@ -177,4 +186,5 @@ kern_sched_class_t sched_class_rr = {
     .tick          = sched_rr_tick,
     .prio_changed  = sched_rr_prio_changed,
     .task_list     = NULL,  /* 在 kern_sched_init 中设为 g_task_list */
+    .task_list_tail = NULL,
 };

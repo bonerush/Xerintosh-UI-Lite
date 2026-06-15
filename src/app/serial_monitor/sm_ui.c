@@ -38,7 +38,7 @@ static void draw_info_bar(void)
     /* 中间信息：根据数据源显示 */
     char mid_str[20];
     if (sm_source == SM_SOURCE_SER) {
-        int32_t baud = settings_serial_baud_hw_value(g_serial_baud_rate);
+        int32_t baud = settings_serial_baud_hw_value(settings_get_baud_rate());
         snprintf(mid_str, sizeof(mid_str), "RATE:%ld", (long)baud);
     } else {
         /* BLE 模式：显示连接状态 */

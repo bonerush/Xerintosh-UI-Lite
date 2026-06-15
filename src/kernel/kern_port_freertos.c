@@ -65,10 +65,12 @@ static void kern_port_native_sched_idle(void)
     }
 }
 
-static int kern_port_native_sched_timer_set(uint32_t period_us, void (*cb)(void))
-{ (void)period_us; (void)cb; return 0; }
+static int kern_port_native_sched_timer_set(uint32_t period_us)
+{ (void)period_us; return 0; }
 
 static void kern_port_native_sched_timer_stop(void) {}
+
+static bool kern_port_native_sched_preempt_consume(void) { return false; }
 
 const kern_port_ops_t g_kern_port_ops = {
     .init                = kern_port_native_sched_init,
@@ -82,6 +84,7 @@ const kern_port_ops_t g_kern_port_ops = {
     .idle                = kern_port_native_sched_idle,
     .timer_set_periodic  = kern_port_native_sched_timer_set,
     .timer_stop          = kern_port_native_sched_timer_stop,
+    .preempt_consume     = kern_port_native_sched_preempt_consume,
 };
 
 #else /* FreeRTOS 后端（默认）*/
@@ -102,27 +105,34 @@ static SemaphoreHandle_t g_token_sem[KERN_MAX_CPUS];  /* 每核 CPU 令牌 */
 static SemaphoreHandle_t g_done_sem[KERN_MAX_CPUS];   /* 每核任务完成通知 */
 
 #ifdef CONFIG_PREEMPT_ENABLED
-static void (*g_timer_callback)(void) = NULL;
+static volatile bool g_preempt_tick_pending = false;  /* ISR → loop() 通知标志 */
 static volatile bool g_timer_active = false;
 
-/* ESP32 硬件定时器 ISR（timer_group0, timer0, 1ms 周期） */
+/*
+ * ESP32 硬件定时器 ISR（timer_group0, timer0, 1ms 周期）
+ *
+ * ═══ ISR 安全原则 ═══
+ * 本 ISR 仅执行最小化工作：设置抢占标志。
+ * 所有调度逻辑（reap_zombies、pick_next、switch_to）在 loop() 任务上下文执行。
+ * 严禁在 ISR 中调用：① xSemaphoreTake（阻塞）；② free/malloc；
+ * ③ 不可预测长度的链表遍历；④ 非 FromISR 的 FreeRTOS API。
+ */
 static bool IRAM_ATTR sched_timer_isr(void *arg)
 {
     (void)arg;
-    if (g_timer_callback != NULL) {
-        g_timer_callback();
-    }
+    g_preempt_tick_pending = true;
+
     /* 清除中断标志 */
     TIMERG0.int_clr_timers.t0 = 1;
     TIMERG0.hw_timer[0].update = 1;
-    return true;  /* 返回 true 表示需要 yield（低优先级任务需重调度） */
+    return true;
 }
 
-static int kern_port_freertos_timer_set(uint32_t period_us, void (*cb)(void))
+static int kern_port_freertos_timer_set(uint32_t period_us)
 {
     if (g_timer_active) return 0;  /* 已启动 */
 
-    g_timer_callback = cb;
+    g_preempt_tick_pending = false;
 
     timer_config_t config = {
         .divider     = 80,   /* 80MHz / 80 = 1MHz → 1 tick = 1us */
@@ -153,14 +163,28 @@ static void kern_port_freertos_timer_stop(void)
     timer_pause(TIMER_GROUP_0, TIMER_0);
     timer_isr_callback_remove(TIMER_GROUP_0, TIMER_0);
     g_timer_active = false;
-    g_timer_callback = NULL;
+    g_preempt_tick_pending = false;
+}
+
+/*
+ * @brief 检查并消费抢占 tick 请求（loop() 上下文调用）
+ * @return true 如果有待处理的抢占 tick，同时清零标志
+ */
+static bool kern_port_freertos_preempt_consume(void)
+{
+    if (!g_preempt_tick_pending) return false;
+    g_preempt_tick_pending = false;
+    return true;
 }
 #else
-static int kern_port_freertos_timer_set(uint32_t period_us, void (*cb)(void))
-{ (void)period_us; (void)cb; return 0; }
+static int kern_port_freertos_timer_set(uint32_t period_us)
+{ (void)period_us; return 0; }
 
 static void kern_port_freertos_timer_stop(void) {}
-#endif
+
+static bool kern_port_freertos_preempt_consume(void) { return false; }
+
+#endif /* CONFIG_PREEMPT_ENABLED */
 
 /* ═══ 任务包装器 ═══ */
 
@@ -358,6 +382,7 @@ const kern_port_ops_t g_kern_port_ops = {
     .idle                = kern_port_freertos_idle,
     .timer_set_periodic  = kern_port_freertos_timer_set,
     .timer_stop          = kern_port_freertos_timer_stop,
+    .preempt_consume     = kern_port_freertos_preempt_consume,
 };
 
 #endif /* defined(XEROS_NATIVE_SCHED) */
@@ -387,10 +412,12 @@ static void kern_port_native_test_task_exit(void) { while(1){} }
 
 static void kern_port_native_test_idle(void) {}
 
-static int kern_port_native_test_timer_set(uint32_t period_us, void (*cb)(void))
-{ (void)period_us; (void)cb; return 0; }
+static int kern_port_native_test_timer_set(uint32_t period_us)
+{ (void)period_us; return 0; }
 
 static void kern_port_native_test_timer_stop(void) {}
+
+static bool kern_port_native_test_preempt_consume(void) { return false; }
 
 const kern_port_ops_t g_kern_port_ops = {
     .init                = kern_port_native_test_init,
@@ -404,6 +431,7 @@ const kern_port_ops_t g_kern_port_ops = {
     .idle                = kern_port_native_test_idle,
     .timer_set_periodic  = kern_port_native_test_timer_set,
     .timer_stop          = kern_port_native_test_timer_stop,
+    .preempt_consume     = kern_port_native_test_preempt_consume,
 };
 
 #endif /* NATIVE_TEST */

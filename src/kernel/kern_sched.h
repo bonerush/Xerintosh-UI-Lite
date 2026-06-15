@@ -25,6 +25,7 @@ extern "C" {
 /* ═══ 调度器全局状态 ═══ */
 
 extern kern_task_t   *g_task_list;        /* 任务链表头 */
+extern kern_task_t   *g_task_list_tail;   /* 任务链表尾（O(1) 追加） */
 /* g_current_task, g_idle_task, g_sched_ticks, g_need_resched, g_last_picked
    由 kern_smp.h 以宏形式提供（per-CPU 访问） */
 extern kern_pid_t     g_next_pid;         /* 下一个分配的 PID */

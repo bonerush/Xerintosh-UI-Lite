@@ -41,6 +41,12 @@ kern_task_t *taskmgr_get_task(int index);
 bool         taskmgr_is_confirming(void);
 bool         taskmgr_is_task_protected(int index);
 
+/* ═══ 内核 API 包装（避免 taskmgr_ui.c 直接依赖 kern_task.h） ═══ */
+
+bool   taskmgr_task_protected(const kern_task_t *task);
+size_t taskmgr_task_stack_usage(const kern_task_t *task);
+bool   taskmgr_task_is_virtual(const kern_task_t *task);
+
 /* ═══ 动画状态访问（供 taskmgr_ui.c 使用动画坐标）═══ */
 
 const xerintosh_anim_row_list_t *taskmgr_get_anim_list(void);

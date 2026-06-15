@@ -25,6 +25,7 @@ static xerintosh_context_t g_ui_ctx = {
   .exit_animation_status = 0,
   .exit_animation_finished = true,
   .refresh_list_value = true,
+  .dirty = true,
   .draw_color = 0xFFFF,
   .anim_speed = 92,
   .cached_selector_content = NULL,
@@ -53,6 +54,7 @@ void xerintosh_context_init(void)
   g_ui_ctx.exit_animation_status = 0;
   g_ui_ctx.exit_animation_finished = true;
   g_ui_ctx.refresh_list_value = true;
+  g_ui_ctx.dirty = true;
   g_ui_ctx.draw_color = 0xFFFF;
   g_ui_ctx.anim_speed = 92;
   g_ui_ctx.cached_selector_content = NULL;

@@ -364,27 +364,34 @@ void xerintosh_dispatch_enter(xerintosh_list_item_t *item)
     if (!type_in_range(item)) return;
     if (s_dispatch[item->type].enter == NULL) return;
     s_dispatch[item->type].enter(item);
+    g_xerintosh_dirty = true;  /* 进入新项，UI 状态变化 */
 }
 
 bool xerintosh_dispatch_input_next(xerintosh_list_item_t *item)
 {
     if (!type_in_range(item)) return false;
     if (s_dispatch[item->type].input_next == NULL) return false;
-    return s_dispatch[item->type].input_next(item);
+    bool consumed = s_dispatch[item->type].input_next(item);
+    if (consumed) g_xerintosh_dirty = true;  /* 输入导致 UI 状态变化 */
+    return consumed;
 }
 
 bool xerintosh_dispatch_input_prev(xerintosh_list_item_t *item)
 {
     if (!type_in_range(item)) return false;
     if (s_dispatch[item->type].input_prev == NULL) return false;
-    return s_dispatch[item->type].input_prev(item);
+    bool consumed = s_dispatch[item->type].input_prev(item);
+    if (consumed) g_xerintosh_dirty = true;
+    return consumed;
 }
 
 bool xerintosh_dispatch_input_exit(xerintosh_list_item_t *item)
 {
     if (!type_in_range(item)) return false;
     if (s_dispatch[item->type].input_exit == NULL) return false;
-    return s_dispatch[item->type].input_exit(item);
+    bool consumed = s_dispatch[item->type].input_exit(item);
+    if (consumed) g_xerintosh_dirty = true;
+    return consumed;
 }
 
 int16_t xerintosh_dispatch_measure(xerintosh_list_item_t *item)

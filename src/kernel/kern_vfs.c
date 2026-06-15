@@ -24,6 +24,35 @@
 static kern_dentry_t g_root_dentry;
 static bool g_vfs_initialized = false;
 
+/* ═══ FD 对象池 ═══ */
+
+#define FD_POOL_SIZE 16  /* 预分配 kern_file_t 数量，全局池跨任务共享 */
+
+static kern_file_t g_fd_pool[FD_POOL_SIZE];
+static uint16_t g_fd_pool_bitmap;  /* 位图：bit i = 1 表示已分配 */
+
+/* 从池中分配一个 kern_file_t（O(1) 位扫描） */
+static kern_file_t *fd_pool_alloc(void) {
+    for (int i = 0; i < FD_POOL_SIZE; i++) {
+        if (!(g_fd_pool_bitmap & (1 << i))) {
+            g_fd_pool_bitmap |= (1 << i);
+            memset(&g_fd_pool[i], 0, sizeof(kern_file_t));
+            g_fd_pool[i].in_use = true;
+            return &g_fd_pool[i];
+        }
+    }
+    return NULL;  /* 池耗尽 */
+}
+
+/* 释放池中的一个 kern_file_t */
+static void fd_pool_free(kern_file_t *f) {
+    if (f == NULL) return;
+    int idx = (int)(f - g_fd_pool);
+    if (idx >= 0 && idx < FD_POOL_SIZE) {
+        g_fd_pool_bitmap &= ~(1 << idx);
+    }
+}
+
 /* ═══ 文件描述符表 ═══ */
 
 /* 文件描述符表已迁入 kern_task_t：每任务独立的 FD 命名空间。 */
@@ -338,12 +367,11 @@ static kern_file_t *fd_alloc(kern_fd_t *out_fd)
 
     for (kern_fd_t i = 0; i < KERN_MAX_FD_PER_TASK; i++) {
         if (cur->fd_table[i] == NULL) {
-            kern_file_t *f = (kern_file_t *)calloc(1, sizeof(kern_file_t));
+            kern_file_t *f = fd_pool_alloc();
             if (f == NULL) {
                 *out_fd = KERN_ENOMEM;
                 return NULL;
             }
-            f->in_use = true;
             cur->fd_table[i] = f;
             *out_fd = i;
             return f;
@@ -392,7 +420,7 @@ static void fd_close_raw(kern_fd_t fd)
 
     kern_inode_t *inode = f->inode;
     cur->fd_table[fd] = NULL;
-    free(f);
+    fd_pool_free(f);
     kern_inode_unref(inode);
 }
 
@@ -446,7 +474,7 @@ kern_fd_t kern_open(const char *path, unsigned int flags)
             if (cur != NULL && fd >= 0 && fd < KERN_MAX_FD_PER_TASK) {
                 cur->fd_table[fd] = NULL;
             }
-            free(f);
+            fd_pool_free(f);
             return open_rc;
         }
     }

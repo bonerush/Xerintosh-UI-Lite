@@ -33,6 +33,7 @@ static kern_err_t dev_input0_read(kern_device_t *dev, void *buf, size_t len, siz
     (void)dev;
     (void)offset;
 
+    if (buf == NULL) return KERN_EINVAL;
     if (len < DEV_INPUT_EVENT_SIZE) {
         return KERN_EINVAL;
     }

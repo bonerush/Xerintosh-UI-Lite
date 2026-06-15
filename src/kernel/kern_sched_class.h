@@ -39,6 +39,7 @@ typedef struct kern_sched_class {
                          uint8_t old_prio);         /* 任务优先级变更通知 */
 
     struct kern_task *task_list;                    /* 本 class 的任务链表头 */
+    struct kern_task *task_list_tail;               /* 本 class 的任务链表尾（O(1) 追加） */
 } kern_sched_class_t;
 
 /** 默认 Round-Robin 调度类 ID（RR 总是第一个注册） */

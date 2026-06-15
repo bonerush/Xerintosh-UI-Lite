@@ -86,8 +86,9 @@ typedef struct kern_port_ops {
     void  (*idle)(void);
 
     /* 定时器基础设施（抢占式调度用） */
-    int   (*timer_set_periodic)(uint32_t period_us, void (*callback)(void));
+    int   (*timer_set_periodic)(uint32_t period_us);
     void  (*timer_stop)(void);
+    bool  (*preempt_consume)(void);  /* 检查并消费 ISR 抢占 tick 请求 */
 } kern_port_ops_t;
 
 /**
@@ -203,15 +204,15 @@ static inline void kern_port_idle(void)
 /* ═══ 定时器基础设施 ═══ */
 
 /**
- * @brief  启动周期性硬件定时器
+ * @brief  启动周期性硬件定时器（抢占式调度 ISR 源）
  * @param  period_us 周期（微秒）
- * @param  callback  定时器回调（ISR 上下文）
  * @return 0 成功，< 0 失败
+ * @note   ISR 仅设置内部抢占标志，不执行调度逻辑。
+ *         实际调度由 loop() 中 kern_port_preempt_consume() 触发。
  */
-static inline int kern_port_timer_set_periodic(uint32_t period_us,
-                                                void (*callback)(void))
+static inline int kern_port_timer_set_periodic(uint32_t period_us)
 {
-    return g_kern_port_ops.timer_set_periodic(period_us, callback);
+    return g_kern_port_ops.timer_set_periodic(period_us);
 }
 
 /**
@@ -220,6 +221,17 @@ static inline int kern_port_timer_set_periodic(uint32_t period_us,
 static inline void kern_port_timer_stop(void)
 {
     g_kern_port_ops.timer_stop();
+}
+
+/**
+ * @brief  检查并消费硬件定时器 ISR 的抢占 tick 请求
+ * @return true 如果有待处理的抢占 tick（消费后清零）
+ * @note   在 loop() 任务上下文中调用。当抢占 tick 产生时，
+ *         loop() 应立即调用 kern_sched_tick() 执行一次调度。
+ */
+static inline bool kern_port_preempt_consume(void)
+{
+    return g_kern_port_ops.preempt_consume();
 }
 
 #ifdef __cplusplus

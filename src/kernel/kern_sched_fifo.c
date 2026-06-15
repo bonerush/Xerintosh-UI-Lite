@@ -59,8 +59,14 @@ static void sched_fifo_dequeue(kern_task_t *task)
         if (t == task) {
             if (prev != NULL) {
                 prev->next = t->next;
+                if (task == sched_class_fifo.task_list_tail) {
+                    sched_class_fifo.task_list_tail = prev;
+                }
             } else {
                 *head = t->next;
+                if (task == sched_class_fifo.task_list_tail) {
+                    sched_class_fifo.task_list_tail = NULL;
+                }
             }
             task->scheduler_class_id = -1;
             return;
@@ -130,4 +136,5 @@ kern_sched_class_t sched_class_fifo = {
     .tick          = sched_fifo_tick,
     .prio_changed  = sched_fifo_prio_changed,
     .task_list     = NULL,
+    .task_list_tail = NULL,
 };

@@ -166,6 +166,26 @@ const xerintosh_anim_row_list_t *taskmgr_get_anim_list(void)
     return &g_tm.anim_list;
 }
 
+/* ═══ 内核 API 包装 ═══ */
+
+bool taskmgr_task_protected(const kern_task_t *task)
+{
+    if (task == NULL) return true;
+    return kern_task_is_protected(task);
+}
+
+size_t taskmgr_task_stack_usage(const kern_task_t *task)
+{
+    if (task == NULL) return 0;
+    return kern_task_stack_usage(task);
+}
+
+bool taskmgr_task_is_virtual(const kern_task_t *task)
+{
+    if (task == NULL) return false;
+    return (task->flags & KERN_TASK_FLAG_VIRTUAL) != 0;
+}
+
 /* ═══ 生命周期 ═══ */
 
 void taskmgr_loop(void *ud)

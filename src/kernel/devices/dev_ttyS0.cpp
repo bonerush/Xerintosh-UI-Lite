@@ -63,6 +63,7 @@ static kern_err_t dev_ttyS0_read(kern_device_t *dev, void *buf, size_t len, size
     (void)dev;
     (void)offset;
 
+    if (buf == NULL) return KERN_EINVAL;
     char *out = (char *)buf;
 
 #ifdef NATIVE_TEST
@@ -90,6 +91,7 @@ static kern_err_t dev_ttyS0_write(kern_device_t *dev, const void *buf, size_t le
     (void)dev;
     (void)offset;
 
+    if (buf == NULL) return KERN_EINVAL;
     const char *in = (const char *)buf;
 
 #ifdef NATIVE_TEST

@@ -48,8 +48,11 @@ void ui_task_main(void *arg)
 
         app_input_process();
 
-        hal_display_clear();
-        xerintosh_ui_main_core();
+        /* 脏矩形帧跳过：静态画面跳过列表帧重绘，但信息栏/弹窗仍可独立变化 */
+        if (xerintosh_get_context()->dirty) {
+            hal_display_clear();
+            xerintosh_ui_main_core();
+        }
         xerintosh_ui_widget_core();
 
         /* 长按提示动画 */

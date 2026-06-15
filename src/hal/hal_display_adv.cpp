@@ -112,15 +112,15 @@ void hal_draw_xor_rect(int16_t x, int16_t y, int16_t w, int16_t h) {
     if (y + h > ch) h = ch - y;
     if (w <= 0 || h <= 0) return;
 
-    /* 行缓冲：最大 160×2 = 320 字节，栈安全 */
-    uint16_t row_buf[160];
+    /* 静态缓冲：一次读取整个选择器区域，XOR 后一次写回，避免逐行 readRect/pushImage */
+    static uint16_t xor_buf[160 * 30];  /* 最大 160×30 = 4800 像素，9600 字节在 .bss 段 */
+    int total = w * h;
+    if (total > (int)(sizeof(xor_buf) / sizeof(xor_buf[0]))) return;
 
-    for (int16_t row = 0; row < h; row++) {
-        g_canvas->readRect(x, y + row, w, 1, row_buf);
-        for (int16_t i = 0; i < w; i++)
-            row_buf[i] ^= 0xFFFF;
-        g_canvas->pushImage(x, y + row, w, 1, row_buf);
-    }
+    g_canvas->readRect(x, y, w, h, xor_buf);
+    for (int i = 0; i < total; i++)
+        xor_buf[i] ^= 0xFFFF;
+    g_canvas->pushImage(x, y, w, h, xor_buf);
 }
 
 /**

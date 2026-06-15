@@ -85,7 +85,7 @@ kern_pid_t kern_spawn(const char *name, void (*entry)(void *arg),
 
     kern_mpu_setup_stack_guard(task, task->stack_base, task->stack_size);
 
-    /* 挂载到任务链表尾部 */
+    /* 挂载到任务链表尾部（O(1) 尾追加） */
 #ifdef CONFIG_SMP_ENABLED
     while (__sync_lock_test_and_set(&g_task_list_lock, true)) {
         asm volatile ("nop");
@@ -93,10 +93,17 @@ kern_pid_t kern_spawn(const char *name, void (*entry)(void *arg),
 #endif
     if (g_task_list == NULL) {
         g_task_list = task;
+        g_task_list_tail = task;
     } else {
-        kern_task_t *t = g_task_list;
-        while (t->next != NULL) t = t->next;
-        t->next = task;
+        if (g_task_list_tail != NULL) {
+            g_task_list_tail->next = task;
+        } else {
+            /* 尾指针未初始化：回退 O(n) 遍历 */
+            kern_task_t *t = g_task_list;
+            while (t->next != NULL) t = t->next;
+            t->next = task;
+        }
+        g_task_list_tail = task;
     }
     g_task_count++;
 #ifdef CONFIG_SMP_ENABLED
@@ -228,7 +235,7 @@ kern_pid_t kern_spawn(const char *name, void (*entry)(void *arg),
         return KERN_ENOMEM;
     }
 
-    /* 挂载到任务链表尾部 */
+    /* 挂载到任务链表尾部（O(1) 尾追加） */
 #ifdef CONFIG_SMP_ENABLED
     while (__sync_lock_test_and_set(&g_task_list_lock, true)) {
         asm volatile ("nop");
@@ -236,10 +243,17 @@ kern_pid_t kern_spawn(const char *name, void (*entry)(void *arg),
 #endif
     if (g_task_list == NULL) {
         g_task_list = task;
+        g_task_list_tail = task;
     } else {
-        kern_task_t *t = g_task_list;
-        while (t->next != NULL) t = t->next;
-        t->next = task;
+        if (g_task_list_tail != NULL) {
+            g_task_list_tail->next = task;
+        } else {
+            /* 尾指针未初始化：回退 O(n) 遍历 */
+            kern_task_t *t = g_task_list;
+            while (t->next != NULL) t = t->next;
+            t->next = task;
+        }
+        g_task_list_tail = task;
     }
     g_task_count++;
 #ifdef CONFIG_SMP_ENABLED
@@ -515,6 +529,15 @@ void reap_zombies(void)
 #ifdef CONFIG_SMP_ENABLED
     __sync_lock_release(&g_task_list_lock);
 #endif
+
+    /* 重建全局尾指针（O(n)，仅在 zombie 回收时执行，频率极低） */
+    if (g_task_list == NULL) {
+        g_task_list_tail = NULL;
+    } else {
+        kern_task_t *tail = g_task_list;
+        while (tail->next != NULL) tail = tail->next;
+        g_task_list_tail = tail;
+    }
 }
 
 /* ═══ 任务入口蹦床（Native） ═══ */

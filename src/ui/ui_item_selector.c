@@ -50,6 +50,7 @@ bool xerintosh_bind_item_to_selector(xerintosh_list_item_t *_item)
   }
   g_xerintosh_selector.selected_index = find_item_index(_item->parent, _item);
   g_xerintosh_selector.selected_item = _item;
+  g_xerintosh_dirty = true;
 
   return true;
 }
@@ -67,16 +68,22 @@ void xerintosh_selector_go_next_item()
   if (xerintosh_dispatch_input_next(g_xerintosh_selector.selected_item)) return;
 
   g_xerintosh_refresh_list_value = true;
+  g_xerintosh_dirty = true;
+
+  /* 局部变量缓存解引用，减少重复指针链访问 */
+  xerintosh_list_item_t *parent = g_xerintosh_selector.selected_item->parent;
+  xerintosh_list_item_t **children = parent->child_list_item;
+  int16_t count = (int16_t)parent->child_num;
 
   /* 到达最末端 */
-  if (g_xerintosh_selector.selected_index == g_xerintosh_selector.selected_item->parent->child_num - 1)
+  if (g_xerintosh_selector.selected_index == count - 1)
   {
-    g_xerintosh_selector.selected_item = g_xerintosh_selector.selected_item->parent->child_list_item[0];
+    g_xerintosh_selector.selected_item = children[0];
     g_xerintosh_selector.selected_index = 0;
     return;
   }
 
-  g_xerintosh_selector.selected_item = g_xerintosh_selector.selected_item->parent->child_list_item[++g_xerintosh_selector.selected_index];
+  g_xerintosh_selector.selected_item = children[++g_xerintosh_selector.selected_index];
 }
 
 /**
@@ -90,17 +97,22 @@ void xerintosh_selector_go_prev_item()
   if (xerintosh_dispatch_input_prev(g_xerintosh_selector.selected_item)) return;
 
   g_xerintosh_refresh_list_value = true;
+  g_xerintosh_dirty = true;
+
+  /* 局部变量缓存解引用，减少重复指针链访问 */
+  xerintosh_list_item_t *parent = g_xerintosh_selector.selected_item->parent;
+  xerintosh_list_item_t **children = parent->child_list_item;
+  int16_t count = (int16_t)parent->child_num;
 
   /* 到达最前端 */
   if (g_xerintosh_selector.selected_index == 0)
   {
-    g_xerintosh_selector.selected_item = g_xerintosh_selector.selected_item->parent->child_list_item[
-      g_xerintosh_selector.selected_item->parent->child_num - 1];
-    g_xerintosh_selector.selected_index = g_xerintosh_selector.selected_item->parent->child_num - 1;
+    g_xerintosh_selector.selected_item = children[count - 1];
+    g_xerintosh_selector.selected_index = count - 1;
     return;
   }
 
-  g_xerintosh_selector.selected_item = g_xerintosh_selector.selected_item->parent->child_list_item[--g_xerintosh_selector.selected_index];
+  g_xerintosh_selector.selected_item = children[--g_xerintosh_selector.selected_index];
 }
 
 /**
@@ -112,6 +124,7 @@ void xerintosh_selector_jump_to_selected_item()
   if (!g_in_xerintosh) return;
   if (g_xerintosh_selector.selected_item == NULL) return;
   xerintosh_dispatch_enter(g_xerintosh_selector.selected_item);
+  g_xerintosh_dirty = true;
 }
 
 /**
@@ -125,6 +138,7 @@ void xerintosh_selector_exit_current_item()
   if (xerintosh_dispatch_input_exit(g_xerintosh_selector.selected_item)) return;
 
   g_xerintosh_refresh_list_value = true;
+  g_xerintosh_dirty = true;
 
   if (g_xerintosh_selector.selected_item->parent->layer == 0 && g_in_xerintosh)
   {
@@ -176,6 +190,7 @@ void ui_selector_rebuild_anchor(xerintosh_list_item_t *subtree_root,
         }
         g_xerintosh_selector.selected_item  = subtree_root;
         g_xerintosh_selector.selected_index = idx;
+        g_xerintosh_dirty = true;
     }
 }
 
@@ -194,6 +209,7 @@ void ui_selector_safety_move_out(xerintosh_list_item_t *subtree_root,
         if (fallback_parent != NULL && fallback_parent->child_num > 0) {
             g_xerintosh_selector.selected_item  = fallback_parent->child_list_item[0];
             g_xerintosh_selector.selected_index = 0;
+            g_xerintosh_dirty = true;
         }
     }
 }

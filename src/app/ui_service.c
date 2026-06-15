@@ -34,10 +34,9 @@ void ui_service_user_item_exit(void)
 
 void ui_service_enter_landscape(void)
 {
-    s_prev_landscape = g_is_landscape;
-    if (!g_is_landscape) {
-        g_is_landscape = true;
-        g_screen_rotation_level = ORIENTATION_LANDSCAPE;
+    s_prev_landscape = settings_get_landscape();
+    if (!settings_get_landscape()) {
+        settings_set_landscape(true);
         hal_display_set_rotation(1);
 #ifndef NATIVE_TEST
         hal_screen_get_size(&g_screen_width, &g_screen_height);
@@ -54,8 +53,7 @@ void ui_service_enter_landscape(void)
 void ui_service_exit_landscape(void)
 {
     if (!s_prev_landscape) {
-        g_is_landscape = false;
-        g_screen_rotation_level = ORIENTATION_PORTRAIT;
+        settings_set_landscape(false);
         hal_display_set_rotation(0);
 #ifndef NATIVE_TEST
         hal_screen_get_size(&g_screen_width, &g_screen_height);
