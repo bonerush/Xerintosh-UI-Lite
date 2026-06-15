@@ -1,8 +1,30 @@
-# 重构跟踪：app-oscilloscope（2026-06-15 第五轮）
+# 重构跟踪：app-oscilloscope（第六轮 · 2026-06-15）
 
-本轮重构聚焦：**App 层优化与问题排查 — 示波器模块性能、渲染、测量精度**。
+本轮重构聚焦：**延续第五轮，修复遗留 P1 性能问题 + P2 代码质量**
+- ADC 忙等阻塞调度 → 拆分采样批次（D12）
+- 布局缓存优化 (D28)、HOLD 模式 dirty rect (D8)
+- 文件/函数拆分 (D21/D22)、参数镜像消除 (D23)
+- 采样率上限真实性 (D18)
 
 ## 阶段状态
+
+| 阶段 | 名称 | 状态 | 负责 Agent | 产物文件 |
+|------|------|------|------------|----------|
+| 0 | 基线建立 | **DONE** | coder | `00-baseline-app-oscilloscope.md`（复用第5轮） |
+| 1 | 遗留诊断 | **DONE** | — | `01-diagnosis-app-oscilloscope.md`（复用第5轮） |
+| 2.4 | App 层重构（续） | **DONE** | coder | `02-refactor/app-oscilloscope.md` |
+| 3 | 集成验证 | **DONE** | coder | `03-integration-app-oscilloscope.md` |
+| 4 | 归档 | **DONE** | coder | `04-archive-app-oscilloscope.md` |
+
+## 本轮范围（遗留 P1 + 精选 P2）
+
+- [x] **采样调度优化（D12）**：拆分 ADC 采样为小批次，yield 给 Xeros 调度器
+- [x] **采样率上限修正（D18）**：移除不可达 50/100kHz 选项，上限 20kHz
+- [x] **HOLD 模式脏矩形（D8）**：HOLD 状态跳过冗余重绘
+- [x] **布局缓存（D28）**：scope_compute_layout 只在变化时重算
+- [x] **函数/文件拆分（D21/D22）**：oscilloscope_app.c 410→369 行（-10%），新增 oscilloscope_params.c
+- [x] **参数镜像消除（D23）**：param_decrease/increase 合并为 scope_param_adjust（-28 行）
+- [ ] **状态体分离（D24）**：scope_state_t 拆分 engine/view
 
 | 阶段 | 名称 | 状态 | 负责 Agent | 产物文件 |
 |------|------|------|------------|----------|

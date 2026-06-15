@@ -28,6 +28,12 @@ static struct {
 
 static void scope_compute_layout(void)
 {
+    static bool s_layout_valid = false;
+
+    if (s_layout_valid) {
+        return;
+    }
+
     s_layout.header_h = HAL_ROW_H();
     s_layout.footer_h = HAL_ROW_H();
     s_layout.wave_y   = HAL_HEADER_BOTTOM();
@@ -37,6 +43,8 @@ static void scope_compute_layout(void)
     if (s_layout.wave_h < 24) {
         s_layout.wave_h = 24;
     }
+
+    s_layout_valid = true;
 }
 
 static int16_t scope_map_y(uint16_t raw, uint16_t full_scale)
@@ -279,12 +287,27 @@ static void scope_draw_footer(const oscilloscope_view_state_t *state)
     hal_draw_h_line(0, HAL_FOOTER_TOP(), HAL_SCREEN_WIDTH, COLOR_FG);
 }
 
+static bool s_frame_dirty = true;
+
+void oscilloscope_ui_mark_dirty(void)
+{
+    s_frame_dirty = true;
+}
+
 void oscilloscope_ui_draw(const oscilloscope_view_state_t *state)
 {
+    if (!s_frame_dirty) {
+        return;
+    }
+
     scope_compute_layout();
     scope_draw_grid();
     scope_draw_wave(state);
     scope_draw_trigger_line(state);
     scope_draw_header(state);
     scope_draw_footer(state);
+
+    if (!state->running && !state->editing) {
+        s_frame_dirty = false;
+    }
 }

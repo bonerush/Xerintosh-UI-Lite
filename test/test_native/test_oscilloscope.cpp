@@ -83,11 +83,11 @@ TEST(OscilloscopeParamTables, LabelsNonNull)
 
 TEST(OscilloscopeParamTables, SampleRateCountAndOrder)
 {
-    EXPECT_EQ(SCOPE_SAMPLE_RATE_COUNT, 6U);
+    EXPECT_EQ(SCOPE_SAMPLE_RATE_COUNT, 4U);
     for (uint8_t i = 1; i < SCOPE_SAMPLE_RATE_COUNT; i++) {
         EXPECT_GT(g_scope_sample_rates[i].rate_hz, g_scope_sample_rates[i - 1].rate_hz);
     }
-    EXPECT_EQ(g_scope_sample_rates[SCOPE_SAMPLE_RATE_COUNT - 1].rate_hz, 100000U);
+    EXPECT_EQ(g_scope_sample_rates[SCOPE_SAMPLE_RATE_COUNT - 1].rate_hz, 20000U);
 }
 
 TEST(OscilloscopeParamTables, FilterCountAndWeights)

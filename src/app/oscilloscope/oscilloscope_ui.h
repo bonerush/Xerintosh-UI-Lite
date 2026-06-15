@@ -44,6 +44,7 @@ typedef struct {
 } oscilloscope_view_state_t;
 
 void oscilloscope_ui_draw(const oscilloscope_view_state_t *state);
+void oscilloscope_ui_mark_dirty(void);
 
 #ifdef __cplusplus
 }
