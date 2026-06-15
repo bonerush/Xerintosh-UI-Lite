@@ -13,7 +13,7 @@
 *📄 Source: [kern_version.h](../../src/kernel/kern_version.h#L20-L30)*
 
 ```c
-#define XEROS_VERSION_STRING "0.2.0"
+#define XEROS_VERSION_STRING "2.3.0"
 
 #define XEROS_DEVELOPER      "Bonerush"
 #define XEROS_CODENAME       "M5Stick-P1"
