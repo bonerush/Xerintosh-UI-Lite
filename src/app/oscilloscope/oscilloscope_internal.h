@@ -9,7 +9,7 @@ extern "C" {
 #include <stdbool.h>
 #include "oscilloscope_ui.h"
 
-#define SCOPE_SAMPLE_MAX 200
+#define SCOPE_SAMPLE_MAX 2000
 #define SCOPE_AC_OFFSET_WINDOW 32
 
 typedef struct {

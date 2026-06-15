@@ -82,10 +82,14 @@ static void scope_draw_wave(const oscilloscope_view_state_t *state)
     }
 
     uint16_t full_scale = g_scope_volt_ranges[state->volt_range_index].full_scale;
-    uint8_t spp = g_scope_time_bases[state->time_base_index].samples_per_pixel;
     uint16_t start = 0;
     if (state->trigger_index != 0xFFFF && state->trigger_index < state->sample_count) {
         start = state->trigger_index;
+    }
+
+    uint16_t window = state->sample_count;
+    if (window < 2) {
+        return;
     }
 
     hal_set_clip_rect(0, s_layout.wave_y, HAL_SCREEN_WIDTH, s_layout.wave_h);
@@ -94,7 +98,7 @@ static void scope_draw_wave(const oscilloscope_view_state_t *state)
     int16_t prev_y = scope_map_y(state->samples[start], full_scale);
 
     for (int16_t px = 1; px < HAL_SCREEN_WIDTH; px++) {
-        uint32_t idx = start + (uint32_t)px * spp;
+        uint32_t idx = start + ((uint32_t)px * (uint32_t)window) / HAL_SCREEN_WIDTH;
         if (idx >= state->sample_count) {
             break;
         }

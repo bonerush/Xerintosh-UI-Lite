@@ -56,8 +56,9 @@ TEST(OscilloscopeParamTables, TimeBaseCountMatchesArray)
 {
     EXPECT_EQ(SCOPE_TIME_BASE_COUNT, 7U);
     EXPECT_STREQ(g_scope_time_bases[0].label, "50us");
-    EXPECT_EQ(g_scope_time_bases[0].samples_per_pixel, 1U);
-    EXPECT_GT(g_scope_time_bases[0].display_rate_hz, 0U);
+    EXPECT_GT(g_scope_time_bases[0].time_per_div_us, 0U);
+    EXPECT_LT(g_scope_time_bases[0].time_per_div_us,
+              g_scope_time_bases[SCOPE_TIME_BASE_COUNT - 1].time_per_div_us);
 }
 
 TEST(OscilloscopeParamTables, VoltRangeFullScaleOrdered)

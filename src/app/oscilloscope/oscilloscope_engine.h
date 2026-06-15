@@ -22,8 +22,7 @@ typedef enum {
 
 typedef struct {
     const char *label;
-    uint8_t samples_per_pixel;
-    uint32_t display_rate_hz;
+    uint32_t time_per_div_us;   /* 每格时间，屏幕共 10 格 */
 } scope_time_base_t;
 
 extern const scope_time_base_t g_scope_time_bases[SCOPE_TIME_BASE_COUNT];

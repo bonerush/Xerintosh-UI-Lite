@@ -28,14 +28,16 @@
 
 /* ═══ 参数表（供 UI 层与测试使用）═══ */
 
+/* 屏幕横向约 10 格，time_per_div_us 为每格代表的时间。
+ * 总窗口时间 = time_per_div_us * 10；在固定 SR 下所需样本数 = 窗口 * SR。 */
 const scope_time_base_t g_scope_time_bases[SCOPE_TIME_BASE_COUNT] = {
-    { "50us",  1,   20000 },
-    { "100us", 2,   10000 },
-    { "200us", 4,    5000 },
-    { "500us", 10,   2000 },
-    { "1ms",   20,   1000 },
-    { "2ms",   40,    500 },
-    { "5ms",   100,   200 },
+    { "50us",  50 },
+    { "100us", 100 },
+    { "200us", 200 },
+    { "500us", 500 },
+    { "1ms",   1000 },
+    { "2ms",   2000 },
+    { "5ms",   5000 },
 };
 
 const scope_volt_range_t g_scope_volt_ranges[SCOPE_VOLT_RANGE_COUNT] = {
@@ -349,13 +351,20 @@ void oscilloscope_loop(void *user_data)
     (void)user_data;
 
     if (g_scope.view.running) {
-        uint8_t spp = g_scope_time_bases[g_scope.view.time_base_index].samples_per_pixel;
-        uint16_t samples_to_take = (uint16_t)(HAL_SCREEN_WIDTH * spp);
-        if (samples_to_take > SCOPE_SAMPLE_MAX) {
-            samples_to_take = SCOPE_SAMPLE_MAX;
+        uint32_t div_us = g_scope_time_bases[g_scope.view.time_base_index].time_per_div_us;
+        uint32_t sr      = g_scope.view.sample_rate_hz;
+        uint16_t samples_to_take = SCOPE_SAMPLE_MAX;
+        if (sr != 0U) {
+            uint32_t window_us = div_us * 10U;   /* 屏幕横向共 10 格 */
+            uint32_t need = (window_us * sr) / 1000000UL;
+            if (need == 0U) {
+                need = 1U;
+            }
+            if (need < SCOPE_SAMPLE_MAX) {
+                samples_to_take = (uint16_t)need;
+            }
         }
 
-        uint32_t sr = g_scope.view.sample_rate_hz;
         uint32_t period_us = (sr == 0U) ? 0U : (1000000UL / sr);
         const uint32_t adc_overhead_us = 20U;
 
@@ -365,6 +374,7 @@ void oscilloscope_loop(void *user_data)
                 delayMicroseconds((uint32_t)(period_us - adc_overhead_us));
             }
         }
+        g_scope.view.sample_count = samples_to_take;
         scope_update_trigger();
     }
 
