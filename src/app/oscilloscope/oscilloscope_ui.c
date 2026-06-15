@@ -13,8 +13,7 @@
 #define SCOPE_COL_WAVE      0x07FF  /* cyan */
 #define SCOPE_COL_WAVE_DIM  0x03A6  /* brighter cyan trail */
 #define SCOPE_COL_WAVE_PEAK 0xFFFF  /* white peak dot */
-#define SCOPE_COL_GRID      0x18E3  /* dark blue-grey */
-#define SCOPE_COL_GRID_HI   0x39E7  /* brighter grid */
+#define SCOPE_COL_GRID      0x39E7  /* brighter blue-grey grid */
 #define SCOPE_COL_TRIGGER   0xF800  /* red trigger line */
 #define SCOPE_COL_TEXT      COLOR_FG
 #define SCOPE_COL_TEXT_HI   0xFFE0  /* yellow highlight */
