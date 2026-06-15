@@ -238,17 +238,19 @@ void xerintosh_ui_main_core()
   if (!g_in_xerintosh) return;
   if (g_xerintosh_selector.selected_item == NULL) return;
 
+  /* 生命周期处理每帧必须运行（app loop 依赖它处理输入和退出检测） */
+  xerintosh_ui_update_lifecycle();
+
   /* 退场动画进行中时强制重绘，确保动画不会被脏矩形跳过 */
   if (!g_xerintosh_exit_animation_finished)
     g_xerintosh_dirty = true;
 
-  /* 脏矩形帧跳过：静态画面无需重绘 */
+  /* 脏矩形帧跳过：列表层静态画面无需重绘 */
   if (!g_xerintosh_dirty) return;
 
-  /* 提前清除脏标志：后续生命周期/动画/退场动画若需要重绘，会重新设置 */
+  /* 清除脏标志：后续动画/输入若需要重绘，会重新设置 */
   g_xerintosh_dirty = false;
 
-  xerintosh_ui_update_lifecycle();
   xerintosh_ui_render_frame();
 
   /* 退场动画遮罩（双键关机模式下跳过） */
