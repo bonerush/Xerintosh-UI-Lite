@@ -101,14 +101,14 @@ static void scope_sample_one(void)
 
 /* ═══ 触发 ═══ */
 
-uint16_t scope_find_trigger_rising(uint16_t start, uint16_t level)
+uint16_t scope_find_trigger_rising(const uint16_t *buf, uint16_t count,
+                                   uint16_t start, uint16_t level)
 {
-    if (start >= SCOPE_SAMPLE_MAX - 1U) {
+    if (buf == NULL || count == 0U || start >= count - 1U) {
         return 0xFFFF;
     }
-
-    for (uint16_t i = start + 1U; i < SCOPE_SAMPLE_MAX; i++) {
-        if (g_scope.samples[i - 1U] <= level && g_scope.samples[i] > level) {
+    for (uint16_t i = start + 1U; i < count; i++) {
+        if (buf[i - 1U] <= level && buf[i] > level) {
             return i;
         }
     }
@@ -134,7 +134,9 @@ static void scope_update_trigger(void)
         g_scope.view.trigger_index = 0;
     } else {
         uint16_t level = scope_clamp_trigger_level(g_scope.view.trigger_level);
-        uint16_t idx   = scope_find_trigger_rising(0, level);
+        uint16_t idx   = scope_find_trigger_rising(g_scope.samples,
+                                                   SCOPE_SAMPLE_MAX,
+                                                   0, level);
 
         if (idx != 0xFFFF) {
             g_scope.view.trigger_index = idx;

@@ -11,7 +11,6 @@ extern "C" {
 #define SCOPE_VOLT_RANGE_COUNT 4
 #define SCOPE_COUPLING_COUNT 3
 #define SCOPE_TRIGGER_MODE_COUNT 3
-#define SCOPE_AC_OFFSET_WINDOW 32
 
 typedef enum {
     SCOPE_TRIGGER_AUTO = 0,
@@ -36,7 +35,8 @@ extern const scope_volt_range_t g_scope_volt_ranges[SCOPE_VOLT_RANGE_COUNT];
 extern const char *g_scope_coupling_labels[SCOPE_COUPLING_COUNT];
 extern const char *g_scope_trigger_mode_labels[SCOPE_TRIGGER_MODE_COUNT];
 
-uint16_t scope_find_trigger_rising(uint16_t start, uint16_t level);
+uint16_t scope_find_trigger_rising(const uint16_t *buf, uint16_t count,
+                                   uint16_t start, uint16_t level);
 
 #ifdef __cplusplus
 }
