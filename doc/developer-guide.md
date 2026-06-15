@@ -230,32 +230,33 @@ xerintosh_list_item_t* app = xerintosh_new_user_item(
 
 **生命周期时序**：
 
+```mermaid
+stateDiagram-v2
+    [*] --> 菜单列表
+    菜单列表 --> 进入动画: 长按 A（确认）
+    state 进入动画 {
+        [*] --> 退场遮罩展开
+        退场遮罩展开 --> 遮罩到达底部
+        遮罩到达底部 --> 遮罩回缩
+    }
+    进入动画 --> init: 动画完成
+    state user_item_内部 {
+        init: init_function() · 仅一次
+        loop: loop_function() · 每帧~60fps
+        [*] --> init
+        init --> loop
+        loop --> loop: 读取输入·绘制屏幕
+    }
+    user_item_内部 --> 退出动画: 长按 B（返回）
+    退出动画 --> exit: 动画完成
+    exit: exit_function() · 仅一次
+    exit --> 菜单列表
 ```
-用户长按 A（确认）
-    │
-    ▼
-播放进入动画（exit_animation）
-    │
-    ▼
-调用 init_function()      ← 只调用一次
-    │
-    ▼
-设置 in_user_item = true
-    │
-    ▼
-每帧调用 loop_function()   ← 约 60fps
-    │
-    ▼
-用户长按 B（返回）
-    │
-    ▼
-播放退出动画
-    │
-    ▼
-调用 exit_function()       ← 只调用一次
-    │
-    ▼
-设置 in_user_item = false，返回菜单列表
+
+```text
+时序总结：
+  用户确认 → 进入动画 → init_function() [1次] → loop_function() [每帧]
+       → 用户返回 → 退出动画 → exit_function() [1次] → 菜单列表
 ```
 
 *📄 Source: [ui_core.c](../src/ui/ui_core.c#L170-L211)*
@@ -592,6 +593,38 @@ void build_main_menu(void)
 ```
 
 *📄 Source: [app_menu.c](../../src/app/app_menu.c#L32-L103)*
+
+### 典型 App 内部结构
+
+```mermaid
+flowchart TB
+    subgraph MENU["菜单层"]
+        A["主菜单"] --> B["设置"]
+        A --> C["工具<br/>(user_item App)"]
+    end
+
+    subgraph APP["App 内部 (user_item)"]
+        direction TB
+        INIT["init_function()<br/>────────────<br/>ui_service_user_item_init()<br/>初始化外设/状态变量"]
+        LOOP["loop_function()<br/>────────────<br/>hal_display_clear() 已完成<br/>自定义绘制<br/>读取按键<br/>ui_service_user_item_loop(ev_b)"]
+        EXIT["exit_function()<br/>────────────<br/>ui_service_user_item_exit()<br/>释放资源"]
+        INIT --> LOOP
+        LOOP --> LOOP
+        LOOP --> EXIT: ev_b == LONG_PRESS
+    end
+
+    subgraph SVC["可选服务"]
+        WIFI["WiFi Manager<br/>(异步扫描/连接)"]
+        BT["BT Manager<br/>(Classic SPP)"]
+        NOTIFY["通知 API<br/>push_info_bar()<br/>push_pop_up()"]
+    end
+
+    C -- "长按 A 确认" --> INIT
+    EXIT -- "返回" --> A
+    LOOP -.-> SVC
+```
+
+*📄 Source: [ui_task.c](../../src/ui/ui_task.c), [ui_service.c](../../src/app/ui_service.c)*
 
 ---
 

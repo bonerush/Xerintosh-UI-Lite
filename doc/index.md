@@ -58,6 +58,8 @@ Project Root
 │   ├── taskmgr/             ← 任务管理器 App（进程列表/终止/保护）
 │   ├── about/              ← 关于页面（版本/Logo/开发者信息）
 │   ├── token_usage/        ← Token 用量统计（DeepSeek API）
+│   ├── flasher/            ← 烧录桥接器（USB↔UART STK500/ESP32 协议）
+│   ├── shutdown/           ← 关机画面 + 电源键长按弹窗
 │   └── svc_mgr_helper.c/h  ← 系统服务懒加载助手（BT enable/disable）
 ├── [编码风格规范](coding-style.md)     ← C OOP 命名、封装、继承规范
 ├── 教程
@@ -71,34 +73,105 @@ Project Root
 
 ![Xeros 内核 v2 架构总览](assets/diagrams/kernel-v2-architecture.png)
 
+### 系统总体架构
+
+```mermaid
+graph TB
+    subgraph APP["🎨 App 层"]
+        direction LR
+        user_items["user_item Apps<br/>taskmgr · serial_monitor<br/>token_usage · flasher<br/>about · shutdown"]
+        menu["菜单树<br/>app_menu.c"]
+        inp["输入路由<br/>app_input.c"]
+    end
+
+    subgraph UI["🖼️ UI 核心层"]
+        direction LR
+        item["Item 系统<br/>ui_item.h"]
+        dispatch["类型派发表<br/>ui_dispatch.c<br/>O(1) 路由"]
+        core["核心引擎<br/>ui_core.c"]
+        drawer["渲染管线<br/>ui_drawer.c"]
+        dirty["脏矩形管理<br/>ui_dirty.c"]
+    end
+
+    subgraph KERNEL["⚙️ Xeros 内核 v2"]
+        direction LR
+        sched["可插拔调度类<br/>RR · FIFO"]
+        vfs["VFS<br/>inode/dentry/file"]
+        devfs["devfs · procfs<br/>sysfs · gpiofs"]
+        shell["Shell<br/>30+ 命令"]
+        devmodel["设备驱动模型<br/>kern_device_ops_t"]
+    end
+
+    subgraph HAL["🔌 HAL 层"]
+        direction LR
+        display["显示驱动<br/>TFT 双缓冲"]
+        input_hal["输入系统<br/>按键 FSM"]
+        sys["系统时钟<br/>tick / delay"]
+        layout["屏幕布局<br/>hal_layout.h"]
+    end
+
+    subgraph RT["📡 运行时"]
+        direction LR
+        freertos["FreeRTOS<br/>WiFi · BT 协议栈"]
+        arduino["Arduino<br/>M5Unified"]
+    end
+
+    APP --> UI
+    UI -->|"动画·渲染·选择器"| KERNEL
+    KERNEL -->|"open/read/write"| HAL
+    HAL -->|"M5GFX · tick"| RT
 ```
-┌──────────────────────────────────────────────────────────────┐
-│ App 层  (user_item, settings, wifi, bt...)                    │
-├──────────────────────────────────────────────────────────────┤
-│ UI 核心层 (item / core / drawer / context)                    │
-├──────────────────────────────────────────────────────────────┤
-│ Xeros 内核 v2 (可插拔微内核: SMP + MPU + 设备模型)            │
-│  ┌─────────┐ ┌─────────┐ ┌──────────┐ ┌───────────┐        │
-│  │Scheduler│ │   VFS   │ │  devfs   │ │  procfs   │        │
-│  │ ┌─────┐ │ │(inode)  │ │ (/dev/*) │ │(/proc/*)  │        │
-│  │ │ RR  │ │ └─────────┘ └──────────┘ └───────────┘        │
-│  │ │FIFO*│ │ ┌─────────┐ ┌──────────┐ ┌───────────┐        │
-│  │ └─────┘ │ │  sysfs  │ │  Shell   │ │  gpiofs   │        │
-│  │可插拔类 │ │(/sys/*)  │ │(30+ cmd) │ │/sys/gpio  │        │
-│  └─────────┘ └─────────┘ └──────────┘ └───────────┘        │
-│  ┌─────────┐ ┌─────────┐ ┌──────────┐ ┌───────────┐        │
-│  │   SMP   │ │Resource │ │   MPU    │ │  Device   │        │
-│  │ per-CPU │ │Tracking │ │ Stack    │ │  Model    │        │
-│  └─────────┘ └─────────┘ └──────────┘ └───────────┘        │
-│  ┌─────────┐ ┌─────────┐                                    │
-│  │spinlock │ │ kmalloc │   ← v2 新增: 同步 + 统一分配       │
-│  │& mutex  │ │(内核分配)│                                    │
-│  └─────────┘ └─────────┘                                    │
-├──────────────────────────────────────────────────────────────┤
-│ HAL 层 (display / input / system)                            │
-├──────────────────────────────────────────────────────────────┤
-│ FreeRTOS + Arduino (WiFi / BT 协议栈)                        │
-└──────────────────────────────────────────────────────────────┘
+
+### 系统启动流程
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant HW as 🔌 硬件上电
+    participant Setup as Arduino setup()
+    participant Loop as Arduino loop()
+    participant Kernel as Xeros Kernel
+    participant UI as Xerintosh UI
+
+    Note over HW: 按下电源键
+
+    HW->>Setup: boot
+    Setup->>Setup: Serial.begin(115200)
+    Setup->>Setup: M5.begin() · 初始化 TFT/IMU/PMU
+    Setup->>Setup: storage_init() · NVS 挂载
+    Setup->>Setup: settings_load_from_storage()
+    Setup->>Setup: hal_display_init() · setColorDepth + createSprite
+    Setup->>Setup: hal_input_init() · 按键 FSM 初始化
+    Setup->>Setup: boot_screen_show() · Macintosh 128K 开机动画
+    Setup->>UI: app_init_ui() · 构建菜单树
+    Setup->>Setup: app_init_managers() · WiFi/BT 管理器
+    Setup->>UI: xerintosh_init_core() · 选择器+相机绑定
+    Note over Setup: g_in_xerintosh = true
+
+    Setup-->>Loop: setup() 返回 · 看门狗已喂
+
+    rect rgb(240, 248, 255)
+        Note over Loop,Kernel: 第一帧延迟初始化
+        Loop->>Kernel: deferred_kernel_init()
+        Kernel->>Kernel: kern_init() · 日志系统
+        Kernel->>Kernel: kern_vfs_init() · VFS 根节点
+        Kernel->>Kernel: kern_devfs_init() · /dev 目录
+        Kernel->>Kernel: kern_procfs_init() · /proc 虚拟文件
+        Kernel->>Kernel: kern_sysfs_init() · /sys 配置接口
+        Kernel->>Kernel: kern_gpiofs_init() · GPIO 引脚映射
+        Kernel->>Kernel: kern_devices_init() · fb0 / input0 / ttyS0 / pwrkey
+        Kernel->>Kernel: kern_shell_init() · 启动 Shell 任务
+        Kernel->>Kernel: kern_spawn("ui", ...) · UI 渲染任务
+        Kernel->>Kernel: kern_spawn("wifi-mgr", ...) · WiFi 管理任务
+        Kernel->>Kernel: kern_spawn("bt-mgr", ...) · BT 管理任务
+    end
+
+    Loop->>UI: app_input_process() · 每帧按键处理
+    Loop->>UI: xerintosh_ui_main_core() · 选择器+列表渲染
+    Loop->>UI: xerintosh_ui_widget_core() · 弹窗+信息栏
+    Loop->>Loop: hal_display_flush() · DMA pushSprite
+    Loop->>Loop: kern_yield() · 出让 CPU
+    Note over Loop: 循环至 60fps
 ```
 
 FreeRTOS 继续在底层为 WiFi/BT 协议栈服务。SMP 模式下 Xeros 在每个 CPU 上创建 FreeRTOS 任务运行调度循环，与底层不冲突。
@@ -107,14 +180,32 @@ FreeRTOS 继续在底层为 WiFi/BT 协议栈服务。SMP 模式下 Xeros 在每
 
 ## 渲染管线（每帧顺序）
 
-1. 清除后台缓冲区
-2. 绘制背景层（列表项、控件）
-3. 绘制选择器（XOR 反色高亮）
-4. 绘制弹窗/信息栏（widget）
-5. DMA 刷新到屏幕（`pushSprite`）
-6. 交换缓冲区
+```mermaid
+flowchart LR
+    A["1. 输入处理<br/>app_input_process()"] --> B{"2. 判断渲染模式"}
+    B -->|"user_item 内部"| C["3a. 始终清屏<br/>hal_display_clear()"]
+    B -->|"菜单列表层"| D{"dirty?<br/>xerintosh_is_dirty()"}
+    D -->|"是"| C
+    D -->|"否·跳过"| E["3b. 跳过清屏<br/>（零重绘优化）"]
+    C --> F["4. UI 主循环<br/>xerintosh_ui_main_core()"]
+    E --> F
+    F --> G["5. Widget 叠层<br/>xerintosh_ui_widget_core()"]
+    G --> H["6. 长按进度提示<br/>xerintosh_draw_long_press_hint()"]
+    H --> I["7. DMA 刷新<br/>hal_display_flush()"]
+    I --> J["8. 出让 CPU<br/>kern_yield()"]
+    J --> A
 
-采用**全帧重绘**，目标 60fps。
+    subgraph "框架渲染（第4步）"
+        F1["绘制列表项背景"] --> F2["XOR 反色选择器"]
+        F2 --> F3["绘制弹窗/信息栏"]
+    end
+
+    style A fill:#e1f5fe
+    style I fill:#c8e6c9
+    style J fill:#fff3e0
+```
+
+采用**脏矩形优化**，静态画面下跳过清屏（~2ms 节省）。目标 60fps。
 
 ## 关键技术点
 

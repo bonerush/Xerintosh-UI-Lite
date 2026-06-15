@@ -6,30 +6,40 @@
 
 v2 引入了**统一设备驱动模型**（`kern_device_t`），为所有硬件驱动提供标准化的操作接口和注册机制。核心思想是将设备驱动的操作签名从 VFS 的 `kern_file_ops_t` 解耦出来，形成独立的 `kern_device_ops_t`，再通过**VFS 桥接层**将两者连接。
 
-```
-┌──────────────────────────────────────────────┐
-│  应用层 (Shell / 用户任务)                    │
-│         kern_open/read/write/close            │
-├──────────────────────────────────────────────┤
-│  VFS 层 (kern_vfs)                           │
-│         kern_file_ops_t { open, read, ... }   │
-│                │                              │
-│         ┌──────┴──────┐                       │
-│         │ Bridge fops  │  ← 唯一的共享翻译层  │
-│         │ (g_device_   │                      │
-│         │  bridge_fops)│                      │
-│         └──────┬──────┘                       │
-│                │                              │
-│         inode->private_data                   │
-│           = kern_device_t*                    │
-├──────────────────────────────────────────────┤
-│  设备驱动模型 (kern_device)                   │
-│         kern_device_ops_t { open, close,      │
-│                             read, write,      │
-│                             ioctl }           │
-├──────────────────────────────────────────────┤
-│  硬件驱动 (pwrkey, fb0 等)                    │
-└──────────────────────────────────────────────┘
+![VFS Bridge](assets/diagrams/vfs-bridge.png)
+
+### VFS 与设备桥接流程
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant App as 应用层<br/>(Shell / 用户任务)
+    participant VFS as VFS 层<br/>kern_vfs
+    participant Bridge as Bridge fops<br/>g_device_bridge_fops
+    participant Dev as 设备驱动模型<br/>kern_device_ops_t
+    participant HW as 硬件驱动<br/>(pwrkey / fb0 等)
+
+    App->>VFS: kern_open("/dev/pwrkey", O_RDONLY)
+    VFS->>VFS: kern_path_resolve() · 解析路径
+    VFS->>VFS: inode 绑定 Bridge fops
+    VFS->>VFS: fd_table[] 分配 FD
+    VFS-->>App: 返回 fd=3
+
+    App->>VFS: kern_read(fd=3, buf, len)
+    VFS->>Bridge: file->fops->read(file, buf, len)
+    Bridge->>Bridge: dev = (kern_device_t*)file->inode->private_data
+    Bridge->>Dev: dev->ops->read(dev, buf, len, &offset)
+    Dev->>HW: 驱动私有 read 实现
+    HW-->>Dev: 返回数据
+    Dev-->>Bridge: KERN_OK
+    Bridge-->>VFS: 返回字节数
+    VFS-->>App: 返回实际读取长度
+
+    App->>VFS: kern_close(fd=3)
+    VFS->>Bridge: file->fops->release(file)
+    Bridge->>Dev: dev->ops->close(dev)
+    VFS->>VFS: fd_table[] 释放 FD
+    VFS-->>App: KERN_OK
 ```
 
 ---

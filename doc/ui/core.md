@@ -424,12 +424,9 @@ Widget（信息栏 + 弹窗）的刷新独立于主渲染。它在主循环之�
 | `xerintosh_animation` | `(float*, float, float) → void` | 通用缓动动画插值 |
 | `xerintosh_is_in_user_item` | `(void) → bool` | 查询是否处于 user_item 运行态 |
 | `xerintosh_init_core` | `(void) → void` | 初始化列表、选择器、相机绑定 |
-| `xerintosh_init_list` | `(void) → void` | 重置所有根节点子项坐标（入场动画预备） |
 | `xerintosh_refresh_camera_position` | `(void) → void` | 自动调整视口保证选择器可见 |
 | `xerintosh_refresh_list_item_position` | `(void) → void` | 刷新当前菜单所有子项的Y坐标插值 |
 | `xerintosh_refresh_selector_position` | `(void) → void` | 刷新选择器Y/W/H（含宽度缓存） |
-| `xerintosh_refresh_info_bar` | `(void) → void` | 刷新信息栏Y/W插值 |
-| `xerintosh_refresh_pop_up` | `(void) → void` | 刷新弹窗Y/W插值 |
 | `xerintosh_ui_main_core` | `(void) → void` | **主循环入口**（每帧由 main.cpp 调用） |
 | `xerintosh_ui_widget_core` | `(void) → void` | Widget 刷新调度（信息栏 + 弹窗） |
 

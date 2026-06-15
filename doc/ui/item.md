@@ -14,7 +14,7 @@
 
 ### 类型层次（继承体系）
 
-*📄 Source: [ui_item_core.h](../../src/ui/ui_item_core.h#L35-L57)*
+*📄 Source: [ui_types.h](../../src/ui/ui_types.h#L58-L65)*
 
 ```c
 typedef enum

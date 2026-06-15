@@ -15,42 +15,67 @@ Xeros 是一个轻量级**抢占式微内核**，运行在 M5Stick-C (ESP32-PICO
 
 FreeRTOS 继续在底层为 WiFi/BT 协议栈服务，Xeros 运行在 Arduino `loop()` 的单一线程内（单核模式）或多 FreeRTOS 任务上（SMP 模式），不与底层冲突。
 
-## 架构图
+## Xeros 内核结构图
 
+```mermaid
+graph TB
+    subgraph USER["用户态任务"]
+        ui["ui_task · UI渲染"]
+        wifi_task["wifi_task · WiFi状态机"]
+        bt_task["bt_task · 蓝牙管理"]
+        shell_task["shell_task · 交互终端"]
+    end
+
+    subgraph CORE["调度子系统"]
+        sched_main["kern_sched · 调度主循环"]
+        rr["RR 类 · 两遍扫描"]
+        fifo["FIFO 类 · 优先级抢占"]
+    end
+
+    subgraph FS["文件子系统"]
+        vfs_core["VFS · inode/dentry/file"]
+        devfs["devfs · /dev/*"]
+        procfs["procfs · /proc/*"]
+        sysfs["sysfs · /sys/*"]
+        gpiofs["gpiofs · /sys/gpio/*"]
+    end
+
+    subgraph DEVM["设备框架"]
+        dev_model["Device Model · kern_device_ops_t"]
+        dev_fb0["/dev/fb0 · 帧缓冲"]
+        dev_input0["/dev/input0 · 按键"]
+        dev_ttyS0["/dev/ttyS0 · 串口"]
+        dev_pwrkey["/dev/pwrkey · 电源键"]
+    end
+
+    subgraph SAFETY["安全与资源"]
+        mpu["MPU · 栈守卫"]
+        res["Resource Tracking · 链表回收"]
+        kmalloc["kmalloc · 内核分配"]
+        sync["同步 · spinlock + mutex"]
+    end
+
+    subgraph TOOLS["工具与移植"]
+        shell_kern["Shell · 30+ 命令"]
+        log["日志 · 5级·自旋锁"]
+        port["可移植层 · FreeRTOS/Native"]
+    end
+
+    subgraph HW["底层运行时"]
+        freertos["FreeRTOS"]
+        arduino["Arduino · M5Unified"]
+    end
+
+    USER -->|"kern_yield/kern_sleep"| CORE
+    CORE --> FS
+    FS --> DEVM
+    DEVM --> HW
+    SAFETY --> CORE
+    SAFETY --> FS
+    TOOLS --> FS
 ```
-┌──────────────────────────────────────────────────────────────────┐
-│ 用户态任务                                                       │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐            │
-│  │ ui_task  │ │wifi_task │ │ bt_task  │ │shell_task│            │
-│  └────┬─────┘ └────┬─────┘ └────┬─────┘ └────┬─────┘            │
-│       └────────────┴────────────┴────────────┘                  │
-│              kern_yield / kern_sleep_ms / kern_exit             │
-├──────────────────────────────────────────────────────────────────┤
-│ Xeros 内核 (v2)                                                  │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐            │
-│  │Scheduler │ │   VFS    │ │  devfs   │ │  procfs  │            │
-│  │ ┌──────┐ │ │(inode)   │ │(/dev/*)  │ │(/proc/*) │            │
-│  │ │ RR   │ │ └──────────┘ └──────────┘ └──────────┘            │
-│  │ │FIFO* │ │ ┌──────────┐ ┌──────────┐ ┌──────────┐            │
-│  │ └──────┘ │ │  sysfs   │ │  Shell   │ │ gpiofs   │            │
-│  │ 可插拔   │ │(/sys/*)  │ │(30+ cmd) │ │/sys/gpio │            │
-│  └──────────┘ └──────────┘ └──────────┘ └──────────┘            │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐            │
-│  │   SMP    │ │ Resource │ │   MPU    │ │  Device  │            │
-│  │per-CPU   │ │ Tracking │ │ Stack    │ │  Model   │            │
-│  │ arrays   │ │(链表管理)│ │ Guard    │ │(统一接口)│            │
-│  └──────────┘ └──────────┘ └──────────┘ └──────────┘            │
-│  ┌───────────┐ ┌────────────┐                                    │
-│  │ Spinlock  │ │  kmalloc   │                                    │
-│  │ & Mutex   │ │(内核分配器)│                                    │
-│  └───────────┘ └────────────┘                                    │
-├──────────────────────────────────────────────────────────────────┤
-│ HAL / FreeRTOS（底层）                                           │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐            │
-│  │M5Unified │ │M5GFX     │ │WiFi Stack│ │BT Stack  │            │
-│  └──────────┘ └──────────┘ └──────────┘ └──────────┘            │
-└──────────────────────────────────────────────────────────────────┘
-```
+
+FreeRTOS 继续在底层为 WiFi/BT 协议栈服务。SMP 模式下 Xeros 在每个 CPU 上创建 FreeRTOS 任务运行调度循环，不与底层冲突。
 
 ## 模块导航
 
@@ -61,6 +86,7 @@ FreeRTOS 继续在底层为 WiFi/BT 协议栈服务，Xeros 运行在 Arduino `l
 | 类型系统 | [kern-types.md](kern-types.md) | `kern_types.h` | 错误码、PID、任务状态、日志级别、栈常量、CPU 标识 |
 | 初始化与日志 | [kern-init.md](kern-init.md) | `kern_init.c/h` | 内核启动入口、分级日志、panic 处理 |
 | 抢占式调度器 | [kern-task.md](kern-task.md) | `kern_task.c/h` | TCB、yield/sleep/exit/spawn、虚任务、动态栈 |
+| 调度主循环 | — | `kern_sched.c/h` | 调度循环入口、tick 分发、上下文切换 |
 | VFS 核心 | [kern-vfs.md](kern-vfs.md) | `kern_vfs.c/h` | inode/dentry/file 三级结构、路径解析、open/close/read/write |
 | 设备文件系统 | [kern-devfs.md](kern-devfs.md) | `kern_devfs.c/h` | /dev/ 目录创建、设备注册 |
 | /proc 与 /sys | [kern-procfs-sysfs.md](kern-procfs-sysfs.md) | `kern_procfs.c/h`, `kern_sysfs.c/h` | 内核状态信息、系统配置文件系统 |
@@ -108,7 +134,7 @@ FreeRTOS 继续在底层为 WiFi/BT 协议栈服务，Xeros 运行在 Arduino `l
 
 ### 为什么保留 FreeRTOS？
 
-ESP32 Arduino 的 WiFi（`esp_wifi`）和蓝牙（NimBLE）协议栈深度依赖 FreeRTOS。Xeros 不与 FreeRTOS 竞争——SMP 模式下，Xeros 在每个 CPU 上创建一个 FreeRTOS 任务运行调度循环，WiFi/BT 协议栈的 FreeRTOS 任务完全不受影响。
+ESP32 Arduino 的 WiFi（`esp_wifi`）和蓝牙（Classic BT SPP）协议栈深度依赖 FreeRTOS。Xeros 不与 FreeRTOS 竞争——SMP 模式下，Xeros 在每个 CPU 上创建一个 FreeRTOS 任务运行调度循环，WiFi/BT 协议栈的 FreeRTOS 任务完全不受影响。
 
 ### 为什么 VFS 不实现全部 Linux 特性？
 

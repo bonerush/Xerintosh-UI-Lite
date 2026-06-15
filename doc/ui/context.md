@@ -20,7 +20,7 @@
 
 ### 上下文结构体
 
-*📄 Source: [ui_context.h](../../src/ui/ui_context.h#L28-L57)*
+*📄 Source: [ui_context.h](../../src/ui/ui_context.h#L28-L58)*
 
 ```c
 typedef struct xerintosh_context_t
@@ -32,6 +32,7 @@ typedef struct xerintosh_context_t
   uint8_t exit_animation_status;      /* 退场动画阶段状态机 */
   bool exit_animation_finished;       /* 退场动画是否已完成 */
   bool refresh_list_value;            /* 是否需要刷新列表项显示值 */
+  bool dirty;                         /* 脏矩形标志（ui_dirty.c 管理） */
 
   /* 绘制状态 */
   uint16_t draw_color;                /* 当前前景色 */
@@ -65,6 +66,7 @@ typedef struct xerintosh_context_t
 | `exit_animation_status` | `uint8_t` | `0` | 退场动画状态机：0=展开中, 1=到达底部, 2=回缩中 |
 | `exit_animation_finished` | `bool` | `true` | 退场动画是否已完成 |
 | `refresh_list_value` | `bool` | `true` | 标记需要重新调用 switch/slider 的 init_function |
+| `dirty` | `bool` | `false` | 脏矩形标志，标记 UI 需重绘（`xerintosh_invalidate()` 设置） |
 | `draw_color` | `uint16_t` | `0xFFFF` | 当前前景色（白色） |
 | `anim_speed` | `int16_t` | `92` | 全局动画速度基准值，越大越快 |
 | `cached_selector_content` | `const char *` | `NULL` | 上次测量宽度时对应的内容字符串指针 |

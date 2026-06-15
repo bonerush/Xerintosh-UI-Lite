@@ -25,13 +25,11 @@ App 层是用户应用代码所在。每个 App 在独立子目录中，通过 `
 | 关于页面 | — | `src/app/about/` | 版本/Logo/开发者信息 |
 | 存储 | — | `src/app/storage.cpp/h` | NVS 持久化存储封装 |
 | WiFi 管理 | — | `src/app/wifi/wifi_manager.cpp/h` | WiFi 状态机（扫描/连接/密码输入） |
-| 蓝牙管理 | — | `src/app/bluetooth/bt_manager.cpp/h` | 蓝牙管理器（NimBLE 扫描/配对） |
+| 蓝牙管理 | — | `src/app/bluetooth/bt_manager.cpp/h` | 蓝牙管理器（Classic BT SPP） |
 | 蓝牙 UART | — | `src/app/bluetooth/bt_uart_service.cpp/h` | BT UART 串口服务（SPP） |
 | 串口输入 | — | `src/app/serial_input/serial_input.cpp/h` | 串口 CLI 输入（WiFi/蓝牙密码） |
 | UI 任务 | [ui-task.md](ui-task.md) | `src/app/ui_task.c` | Xerintosh UI 内核任务包装（输入→渲染→yield） |
-| Token Usage | [token-usage.md](token-usage.md) | `src/app/token_usage/` | DeepSeek API Token 用量统计 |
 | 服务管理助手 | [svc-mgr-helper.md](svc-mgr-helper.md) | `src/app/svc_mgr_helper.c/h` | 系统服务懒加载助手（BT enable/disable） |
-| UI 服务 | — | `src/app/ui_service.c/h` | 共享 UI 工具函数 |
 
 ---
 

@@ -1,3 +1,60 @@
+# 重构跟踪：docs-architecture-diagrams（2026-06-15 第四轮）
+
+本轮重构聚焦：**文档体系优化 — 添加 Mermaid 架构图 + 原子化修正文档准确性**。
+
+## 阶段状态
+
+| 阶段 | 名称 | 状态 | 负责 Agent | 产物文件 |
+|------|------|------|------------|----------|
+| 0 | 基线建立 | **DONE** | coder | `00-baseline-docs-v4.md` |
+| 1 | 文档诊断 | **DONE** | explore×2 | `01-diagnosis-docs-v4.md` |
+| 2.4 | 文档体系重构 | **DONE** | coder | 本报告 |
+| 3 | 集成验证 | **DONE** | coder | 构建 + native 测试通过 |
+| 4 | 归档 | **DONE** | coder | `04-archive-docs-v4.md` |
+
+## 本轮范围
+
+- [x] **7 个 Mermaid 架构图**：系统总览、启动流程、内核结构、VFS 桥接、UI 渲染管线、user_item 生命周期、典型 App 功能
+- [x] **文档准确性修正**：3 HIGH + 5 MEDIUM + 5 LOW 共 13 项修正
+- [x] **新增 `ui_dirty.md`** 模块文档
+- [x] **索引更新**：`doc/ui/index.md`、`doc/index.md` 补充遗漏条目
+
+## 核心改动
+
+| # | 项目 | 文件 | 效果 |
+|---|------|------|------|
+| 图1 | 系统总体架构 Mermaid | `doc/index.md` | 替换 ASCII ASCII art，六层交互可视化 |
+| 图2 | 系统启动流程 Mermaid | `doc/index.md` | 全新时序图，从 power on 到 60fps 循环 |
+| 图3 | Xeros 内核结构 Mermaid | `doc/kernel/index.md` | 替换 ASCII box art，分组可视化 |
+| 图4 | VFS 桥接 Mermaid | `doc/kernel/kern-device-model.md` | 替换 ASCII，open→read→close 完整路径 |
+| 图5 | UI 渲染管线 Mermaid | `doc/index.md` | 替换文字列表，dirty 优化分支可视化 |
+| 图6 | user_item 生命周期 Mermaid | `doc/developer-guide.md` | 状态机图，init→loop→exit 清晰表达 |
+| 图7 | 典型 App 功能 Mermaid | `doc/developer-guide.md` | 全新功能图，菜单→App→服务交互 |
+| 修正 | API 表移除 3 个 static 函数 | `doc/ui/core.md` | 消除 HIGH 级误导 |
+| 修正 | 补充 `dirty` 字段 | `doc/ui/context.md` | 结构体字段对齐源码 |
+| 修正 | 枚举源引用修正 | `doc/ui/item.md` | ui_item_core.h → ui_types.h |
+| 修正 | BT 描述修正 + 去重 | `doc/app/index.md` | NimBLE→Classic BT，移除重复行 |
+| 修正 | 补充 `kern_sched` 模块 | `doc/kernel/index.md` | 模块表完整性 |
+| 新增 | `ui_dirty.md` | `doc/ui/ui-dirty.md` | 脏矩形模块首次文档化 |
+| 补充 | flasher/shutdown 到架构树 | `doc/index.md` | 知识地图完整性 |
+
+## 验证结果
+
+| 验证项 | 状态 |
+|--------|------|
+| `pio run -e m5stick-c` | ✅ SUCCESS |
+| `pio test -e native` | ✅ 414/415 pass, 1 skipped |
+| Mermaid 图语法正确 | ✅ 7/7 |
+| 文档修正 | ✅ 13/13 |
+
+## 快速链接
+
+- 基线报告：`00-baseline-docs-v4.md`
+- 诊断报告：`01-diagnosis-docs-v4.md`
+- 新增模块文档：`src/ui/ui_dirty.h` → `doc/ui/ui-dirty.md`
+
+---
+
 # 重构跟踪：ui-dirty-rect（2026-06-15 第三轮）
 
 本轮重构聚焦：**UI 渲染管线的局部刷新与脏矩形处理统一接口**。
