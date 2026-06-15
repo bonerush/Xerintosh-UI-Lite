@@ -8,6 +8,7 @@
 
 #include "ui_item.h"
 #include "ui_core.h"
+#include "ui_dirty.h"
 #include "ui_drawer.h"
 #include "hal/hal_input.h"
 #include <stddef.h>
@@ -50,7 +51,7 @@ bool xerintosh_bind_item_to_selector(xerintosh_list_item_t *_item)
   }
   g_xerintosh_selector.selected_index = find_item_index(_item->parent, _item);
   g_xerintosh_selector.selected_item = _item;
-  g_xerintosh_dirty = true;
+  xerintosh_invalidate();
 
   return true;
 }
@@ -68,7 +69,7 @@ void xerintosh_selector_go_next_item()
   if (xerintosh_dispatch_input_next(g_xerintosh_selector.selected_item)) return;
 
   g_xerintosh_refresh_list_value = true;
-  g_xerintosh_dirty = true;
+  xerintosh_invalidate();
 
   /* 局部变量缓存解引用，减少重复指针链访问 */
   xerintosh_list_item_t *parent = g_xerintosh_selector.selected_item->parent;
@@ -97,7 +98,7 @@ void xerintosh_selector_go_prev_item()
   if (xerintosh_dispatch_input_prev(g_xerintosh_selector.selected_item)) return;
 
   g_xerintosh_refresh_list_value = true;
-  g_xerintosh_dirty = true;
+  xerintosh_invalidate();
 
   /* 局部变量缓存解引用，减少重复指针链访问 */
   xerintosh_list_item_t *parent = g_xerintosh_selector.selected_item->parent;
@@ -124,7 +125,7 @@ void xerintosh_selector_jump_to_selected_item()
   if (!g_in_xerintosh) return;
   if (g_xerintosh_selector.selected_item == NULL) return;
   xerintosh_dispatch_enter(g_xerintosh_selector.selected_item);
-  g_xerintosh_dirty = true;
+  xerintosh_invalidate();
 }
 
 /**
@@ -138,7 +139,7 @@ void xerintosh_selector_exit_current_item()
   if (xerintosh_dispatch_input_exit(g_xerintosh_selector.selected_item)) return;
 
   g_xerintosh_refresh_list_value = true;
-  g_xerintosh_dirty = true;
+  xerintosh_invalidate();
 
   if (g_xerintosh_selector.selected_item->parent->layer == 0 && g_in_xerintosh)
   {
@@ -190,7 +191,7 @@ void ui_selector_rebuild_anchor(xerintosh_list_item_t *subtree_root,
         }
         g_xerintosh_selector.selected_item  = subtree_root;
         g_xerintosh_selector.selected_index = idx;
-        g_xerintosh_dirty = true;
+        xerintosh_invalidate();
     }
 }
 
@@ -209,7 +210,7 @@ void ui_selector_safety_move_out(xerintosh_list_item_t *subtree_root,
         if (fallback_parent != NULL && fallback_parent->child_num > 0) {
             g_xerintosh_selector.selected_item  = fallback_parent->child_list_item[0];
             g_xerintosh_selector.selected_index = 0;
-            g_xerintosh_dirty = true;
+            xerintosh_invalidate();
         }
     }
 }

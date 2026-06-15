@@ -692,7 +692,7 @@ App 开发者**不需要**在 `loop` 中手动调用 `hal_display_clear()`。
 （如网络状态回调、计时器到期等），调用：
 
 ```c
-xerintosh_mark_dirty();  // 下一帧将清屏重绘
+xerintosh_invalidate();  // 下一帧将清屏重绘（推荐 API）
 ```
 
 user_item 内部通常不需要调用此函数（框架已每帧清屏）。
@@ -702,11 +702,25 @@ user_item 内部通常不需要调用此函数（框架已每帧清屏）。
 void on_wifi_status_changed(void *ud) {
     (void)ud;
     update_status_icon();
-    xerintosh_mark_dirty();  // 强制下一帧刷新
+    xerintosh_invalidate();  // 强制下一帧刷新
 }
 ```
 
-*📄 Source: [ui_core.c](../src/ui/ui_core.c#L39-L43)*
+*📄 Source: [ui_dirty.c](../src/ui/ui_dirty.c#L27-L30)*
+
+#### 脏矩形 API 参考
+
+| 函数 | 说明 | 适用场景 |
+|------|------|----------|
+| `xerintosh_invalidate()` | 标记 UI 脏状态，请求下一帧全量重绘 | ★ App 开发者主要接口 |
+| `xerintosh_is_dirty()` | 查询当前脏状态（只读） | 框架内部使用 |
+| `xerintosh_clear_dirty()` | 清除脏标志（重绘完成后调用） | 框架内部使用 |
+
+> **自动 invalidate 的场景（开发者无需手动调用）**：
+> - 按键导航（选择器移动、确认/返回）
+> - 动画播放（选择器动画、相机动画、退场动画）
+> - 文字滚动（选中项名称跑马灯）
+> - 生命周期变更（进入/退出 user_item、slider 编辑模式）
 
 ---
 
@@ -746,5 +760,5 @@ void on_wifi_status_changed(void *ud) {
 | 函数/宏 | 说明 |
 |---------|------|
 | `xerintosh_is_in_user_item()` | 当前是否在某个 user_item 内部 |
-| `xerintosh_mark_dirty()` | 标记 UI 脏状态，下一帧清屏重绘 |
+| `xerintosh_invalidate()` | 标记 UI 脏状态，下一帧清屏重绘（推荐） |
 | `g_in_xerintosh` | 全局宏：UI 是否激活（来自 ui_context.h） |

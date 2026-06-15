@@ -80,7 +80,7 @@ void xerintosh_context_init(void);
 #define g_xerintosh_exit_animation_status    (xerintosh_get_context()->exit_animation_status)
 #define g_xerintosh_exit_animation_finished  (xerintosh_get_context()->exit_animation_finished)
 #define g_xerintosh_refresh_list_value       (xerintosh_get_context()->refresh_list_value)
-#define g_xerintosh_dirty                    (xerintosh_get_context()->dirty)
+#define g_xerintosh_dirty                    (xerintosh_get_context()->dirty)  /* @deprecated Use xerintosh_invalidate() / xerintosh_is_dirty() */
 #define g_xerintosh_draw_color               (xerintosh_get_context()->draw_color)
 #define g_anim_speed                         (xerintosh_get_context()->anim_speed)
 #define g_xerintosh_cached_selector_content  (xerintosh_get_context()->cached_selector_content)

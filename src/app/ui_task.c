@@ -18,6 +18,7 @@
 #include "hal/hal_input.h"
 #include "hal/hal_system.h"
 #include "ui/ui_core.h"
+#include "ui/ui_dirty.h"
 #include "ui/ui_drawer.h"
 #include "kernel/kern_task.h"
 #include "kernel/kern_init.h"
@@ -51,7 +52,7 @@ void ui_task_main(void *arg)
         /* 屏幕刷新策略：
          * - user_item 内部：始终清屏，因为框架无法预知 App 绘制内容
          * - 菜单列表层：脏矩形优化，仅 dirty 时清屏 */
-        if (xerintosh_is_in_user_item() || xerintosh_get_context()->dirty) {
+        if (xerintosh_is_in_user_item() || xerintosh_is_dirty()) {
             hal_display_clear();
         }
         xerintosh_ui_main_core();

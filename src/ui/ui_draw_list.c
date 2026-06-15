@@ -9,6 +9,7 @@
 #include "ui_drawer.h"
 #include "ui_item.h"
 #include "ui_core.h"
+#include "ui_dirty.h"
 #include "hal/hal_system.h"
 #include <math.h>
 
@@ -162,7 +163,7 @@ static void xerintosh_draw_list_item()
         _scroll_x = xerintosh_compute_scroll_offset(_text_width, _avail_width, true, _elapsed);
 
         /* 文字滚动期间每帧都需清屏重绘，否则旧像素残留造成残影 */
-        g_xerintosh_dirty = true;
+        xerintosh_invalidate();
       } else {
         _item->is_scrolling = false;
       }

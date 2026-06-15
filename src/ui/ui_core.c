@@ -8,6 +8,7 @@
  */
 
 #include "ui_core.h"
+#include "ui_dirty.h"
 #include <stdio.h>
 #include "ui_drawer.h"
 #include <math.h>
@@ -28,16 +29,7 @@ bool xerintosh_is_in_user_item()
   return (user != NULL && user->in_user_item);
 }
 
-/**
- * @brief  标记 UI 脏状态（公开 API）
- * @note   调用后下一帧将清屏并重绘。
- *         user_item 内部因框架已强制逐帧清屏，通常无需调用。
- *         主要用于菜单模式下非动画触发的动态更新（如网络状态变化、计时器等）。
- */
-void xerintosh_mark_dirty(void)
-{
-  g_xerintosh_dirty = true;
-}
+/* xerintosh_mark_dirty() / xerintosh_invalidate() 实现已迁移到 ui_dirty.c */
 
 /* ═══ 动画工具 ═══ */
 
@@ -61,7 +53,7 @@ void xerintosh_animation(float *_pos, float _pos_trg, float _speed)
     if (fabsf(*_pos - _pos_trg) <= 1.0f) *_pos = _pos_trg;
     else {
       *_pos += (_pos_trg - *_pos) / (100.0f - _speed);
-      g_xerintosh_dirty = true;  /* 动画进行中，标记需要重绘 */
+      xerintosh_invalidate();  /* 动画进行中，标记需要重绘 */
     }
   }
 }
@@ -195,7 +187,7 @@ static void xerintosh_ui_update_lifecycle(void)
       user->init_function(item->user_data);
     user->in_user_item = 1;
     user->entering_user_item = false;
-    g_xerintosh_dirty = true;
+    xerintosh_invalidate();
   }
 
   /* 运行阶段：每帧调用 loop */
@@ -206,7 +198,7 @@ static void xerintosh_ui_update_lifecycle(void)
   if (g_xerintosh_exit_requested) {
     g_xerintosh_exit_requested = false;
     user->exiting_user_item = true;
-    g_xerintosh_dirty = true;
+    xerintosh_invalidate();
   }
 
   /* 退出阶段：退场动画完成后触发 exit */
@@ -216,14 +208,14 @@ static void xerintosh_ui_update_lifecycle(void)
       user->exit_function(item->user_data);
     user->in_user_item = 0;
     user->exiting_user_item = false;
-    g_xerintosh_dirty = true;
+    xerintosh_invalidate();
   }
 
   /* 兜底：动画已完成但标志未重置时强制清理，防止退出状态残留 */
   if (user->exiting_user_item && g_xerintosh_exit_animation_finished) {
     user->in_user_item = 0;
     user->exiting_user_item = false;
-    g_xerintosh_dirty = true;
+    xerintosh_invalidate();
   }
 }
 
@@ -254,13 +246,13 @@ void xerintosh_ui_main_core()
 
   /* 退场动画进行中时强制重绘，确保动画不会被脏矩形跳过 */
   if (!g_xerintosh_exit_animation_finished)
-    g_xerintosh_dirty = true;
+    xerintosh_invalidate();
 
   /* 脏矩形帧跳过：列表层静态画面无需重绘 */
-  if (!g_xerintosh_dirty) return;
+  if (!xerintosh_is_dirty()) return;
 
   /* 清除脏标志：后续动画/输入若需要重绘，会重新设置 */
-  g_xerintosh_dirty = false;
+  xerintosh_clear_dirty();
 
   xerintosh_ui_render_frame();
 
