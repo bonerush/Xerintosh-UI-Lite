@@ -49,14 +49,6 @@ static void xerintosh_draw_slider_overlays(void)
  */
 static void xerintosh_draw_list_appearance(int16_t selected_index, int16_t child_num)
 {
-  /* 静态缓存：selected_index 或 child_num 未变化时跳过重绘 */
-  static int16_t _last_selected_index = -1;
-  static int16_t _last_child_num = -1;
-  if (_last_selected_index == selected_index && _last_child_num == child_num)
-    return;
-  _last_selected_index = selected_index;
-  _last_child_num = child_num;
-
   g_xerintosh_draw_color = COLOR_FG;
   hal_draw_h_line(0, 1, 66, g_xerintosh_draw_color);
   hal_draw_h_line(0, 0, 67, g_xerintosh_draw_color);
@@ -168,6 +160,9 @@ static void xerintosh_draw_list_item()
         }
         uint32_t _elapsed = hal_get_ticks() - _item->scroll_start_time;
         _scroll_x = xerintosh_compute_scroll_offset(_text_width, _avail_width, true, _elapsed);
+
+        /* 文字滚动期间每帧都需清屏重绘，否则旧像素残留造成残影 */
+        g_xerintosh_dirty = true;
       } else {
         _item->is_scrolling = false;
       }
