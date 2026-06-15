@@ -12,3 +12,6 @@
 
 # 但保留 .gitignore 本身
 !.gitignore
+
+# Claude Code 项目配置（仅本地）
+CLAUDE.md
