@@ -39,6 +39,8 @@ typedef struct {
     uint16_t vpp_raw;
     uint16_t vavg_raw;
     uint32_t freq_hz;
+    uint16_t vpp_mv;
+    uint16_t vavg_mv;
 } oscilloscope_view_state_t;
 
 void oscilloscope_ui_draw(const oscilloscope_view_state_t *state);

@@ -11,7 +11,8 @@
 
 /* Colors (RGB565) */
 #define SCOPE_COL_WAVE      0x07FF  /* cyan */
-#define SCOPE_COL_WAVE_DIM  0x0144  /* dim cyan trail */
+#define SCOPE_COL_WAVE_DIM  0x03A6  /* brighter cyan trail */
+#define SCOPE_COL_WAVE_PEAK 0xFFFF  /* white peak dot */
 #define SCOPE_COL_GRID      0x18E3  /* dark blue-grey */
 #define SCOPE_COL_GRID_HI   0x39E7  /* brighter grid */
 #define SCOPE_COL_TRIGGER   0xF800  /* red trigger line */
@@ -106,8 +107,11 @@ static void scope_draw_wave(const oscilloscope_view_state_t *state)
         int16_t cur_y = scope_map_y(raw, full_scale);
         int16_t cur_x = px;
 
-        hal_draw_line(prev_x, prev_y, cur_x, cur_y, SCOPE_COL_WAVE_DIM);
-        hal_draw_pixel(cur_x, cur_y, SCOPE_COL_WAVE);
+        /* 主线更亮，轮廓辅助线更粗，增强小信号可视度 */
+        hal_draw_line(prev_x, prev_y - 1, cur_x, cur_y - 1, SCOPE_COL_WAVE_DIM);
+        hal_draw_line(prev_x, prev_y + 1, cur_x, cur_y + 1, SCOPE_COL_WAVE_DIM);
+        hal_draw_line(prev_x, prev_y, cur_x, cur_y, SCOPE_COL_WAVE);
+        hal_draw_pixel(cur_x, cur_y, SCOPE_COL_WAVE_PEAK);
 
         prev_x = cur_x;
         prev_y = cur_y;
@@ -238,16 +242,20 @@ static void scope_draw_footer(const oscilloscope_view_state_t *state)
     snprintf(buf, sizeof(buf), "%s:%s", label, value);
     int16_t param_w = hal_get_string_width(buf);
 
-    /* 右侧：测量值，固定宽度并右对齐，避免数字位数变化时抖动 */
+    /* 右侧：测量值，固定宽度并右对齐，避免数字位数变化时抖动
+     * Vpp / Vavg 显示为 mV，范围 0~3300 mV */
     char right_buf[32];
-    snprintf(right_buf, sizeof(right_buf), "V:%d F:%lu",
-             state->vpp_raw,
-             (unsigned long)state->freq_hz);
+    const char *v_label = (state->selected_param == PARAM_VOLT_RANGE) ? "Vavg" : "Vpp";
+    uint16_t v_value = (state->selected_param == PARAM_VOLT_RANGE)
+                           ? state->vavg_mv
+                           : state->vpp_mv;
+    snprintf(right_buf, sizeof(right_buf), "%s:%dmV F:%lu",
+             v_label, v_value, (unsigned long)state->freq_hz);
     int16_t right_w = hal_get_string_width(right_buf);
 
-    /* 按最坏情况预留宽度：V:4095 F:99999 */
+    /* 按最坏情况预留宽度：Vpp:3300mV F:99999 */
     char right_max[32];
-    snprintf(right_max, sizeof(right_max), "V:%d F:%lu", 4095, 99999UL);
+    snprintf(right_max, sizeof(right_max), "Vpp:3300mV F:%lu", 99999UL);
     int16_t right_w_max = hal_get_string_width(right_max);
 
     int16_t right_x = HAL_SCREEN_WIDTH - right_w_max - HAL_MARGIN_MD;

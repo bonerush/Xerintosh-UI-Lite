@@ -244,11 +244,26 @@ static const uint16_t *scope_get_display_buffer(uint8_t coupling)
 
 /* ═══ 测量 ═══ */
 
+/* ADC 满量程 4095 对应约 3.3V（含衰减），每 LSB ≈ 0.805 mV */
+#define SCOPE_MV_PER_LSB_NUM 805
+#define SCOPE_MV_PER_LSB_DEN 1000
+
+static uint16_t scope_raw_to_mv(uint16_t raw)
+{
+    uint32_t mv = ((uint32_t)raw * SCOPE_MV_PER_LSB_NUM) / SCOPE_MV_PER_LSB_DEN;
+    if (mv > 9999U) {
+        mv = 9999U;
+    }
+    return (uint16_t)mv;
+}
+
 static void scope_update_measurements(const uint16_t *buf, uint16_t count)
 {
     if (buf == NULL || count == 0U) {
         g_scope.view.vpp_raw = 0;
         g_scope.view.vavg_raw = 0;
+        g_scope.view.vpp_mv = 0;
+        g_scope.view.vavg_mv = 0;
         g_scope.view.freq_hz = 0;
         return;
     }
@@ -270,6 +285,8 @@ static void scope_update_measurements(const uint16_t *buf, uint16_t count)
 
     g_scope.view.vpp_raw = maxv - minv;
     g_scope.view.vavg_raw = (uint16_t)(sum / count);
+    g_scope.view.vpp_mv = scope_raw_to_mv(g_scope.view.vpp_raw);
+    g_scope.view.vavg_mv = scope_raw_to_mv(g_scope.view.vavg_raw);
 
     uint32_t sr = g_scope.view.sample_rate_hz;
     if (sr == 0) {
