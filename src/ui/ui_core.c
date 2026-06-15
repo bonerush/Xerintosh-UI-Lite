@@ -28,6 +28,17 @@ bool xerintosh_is_in_user_item()
   return (user != NULL && user->in_user_item);
 }
 
+/**
+ * @brief  标记 UI 脏状态（公开 API）
+ * @note   调用后下一帧将清屏并重绘。
+ *         user_item 内部因框架已强制逐帧清屏，通常无需调用。
+ *         主要用于菜单模式下非动画触发的动态更新（如网络状态变化、计时器等）。
+ */
+void xerintosh_mark_dirty(void)
+{
+  g_xerintosh_dirty = true;
+}
+
 /* ═══ 动画工具 ═══ */
 
 /**

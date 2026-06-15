@@ -48,9 +48,10 @@ void ui_task_main(void *arg)
 
         app_input_process();
 
-        /* 脏矩形优化：仅在列表层需要重绘时清屏，但主核每帧都运行
-         * （生命周期处理不能跳过，否则 app loop 停止运行） */
-        if (xerintosh_get_context()->dirty) {
+        /* 屏幕刷新策略：
+         * - user_item 内部：始终清屏，因为框架无法预知 App 绘制内容
+         * - 菜单列表层：脏矩形优化，仅 dirty 时清屏 */
+        if (xerintosh_is_in_user_item() || xerintosh_get_context()->dirty) {
             hal_display_clear();
         }
         xerintosh_ui_main_core();

@@ -77,6 +77,14 @@ extern void xerintosh_animation(float *_pos, float _pos_trg, float _speed);
  */
 extern bool xerintosh_is_in_user_item(void);
 
+/**
+ * @brief  标记 UI 脏状态，触发下一帧清屏重绘
+ * @note   App 内任何需要即时重绘的操作（数据更新、状态变化、计时器等）
+ *         调用此函数确保下一帧画布被清空。
+ *         框架内部（动画、输入事件）已自动设置脏标志，无需额外调用。
+ */
+extern void xerintosh_mark_dirty(void);
+
 #ifdef __cplusplus
 }
 #endif

@@ -667,6 +667,47 @@ power_icon      // 电源/系统
 custom_icon     // 自定义位图图标，需配合 bitmap_data 使用
 ```
 
+### 8.7 渲染与脏矩形（Dirty Flag）
+
+框架使用**脏矩形优化**来避免静态画面下不必要的全帧重绘，但该机制对 App 开发者是透明的。
+
+#### 菜单列表层（自动）
+
+菜单模式下，框架自动管理脏标志：
+- 按键导航 → 自动标记脏
+- `xerintosh_animation()` 动画进行中 → 自动标记脏
+- 文字滚动 → 自动标记脏
+- 动画完成且无交互 → 跳过低开销的清屏重绘
+
+App 开发者**无需关心**菜单层的脏标志。
+
+#### user_item 内部（自动清屏）
+
+进入 `user_item` 后，框架**每帧自动清屏**，App 的 `loop` 函数始终在干净画布上绘制。
+App 开发者**不需要**在 `loop` 中手动调用 `hal_display_clear()`。
+
+#### 手动标记脏（高级）
+
+菜单模式下，如果你在非动画代码中更新了需要即时显示的 UI 状态
+（如网络状态回调、计时器到期等），调用：
+
+```c
+xerintosh_mark_dirty();  // 下一帧将清屏重绘
+```
+
+user_item 内部通常不需要调用此函数（框架已每帧清屏）。
+
+```c
+/* 示例：WiFi 状态回调中标记脏 */
+void on_wifi_status_changed(void *ud) {
+    (void)ud;
+    update_status_icon();
+    xerintosh_mark_dirty();  // 强制下一帧刷新
+}
+```
+
+*📄 Source: [ui_core.c](../src/ui/ui_core.c#L39-L43)*
+
 ---
 
 ## 附录：常用 API 速查
@@ -705,4 +746,5 @@ custom_icon     // 自定义位图图标，需配合 bitmap_data 使用
 | 函数/宏 | 说明 |
 |---------|------|
 | `xerintosh_is_in_user_item()` | 当前是否在某个 user_item 内部 |
+| `xerintosh_mark_dirty()` | 标记 UI 脏状态，下一帧清屏重绘 |
 | `g_in_xerintosh` | 全局宏：UI 是否激活（来自 ui_context.h） |
