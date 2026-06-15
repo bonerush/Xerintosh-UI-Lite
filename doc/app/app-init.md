@@ -27,7 +27,7 @@
 
 ### app_init_ui()
 
-*📄 Source: [app_init.c](../../src/app/app_init.c#L25-L28)*
+*📄 Source: [app_init.c](../../src/app/app_init.c#L20-L23)*
 
 ```c
 void app_init_ui(void)
@@ -40,7 +40,7 @@ void app_init_ui(void)
 
 ### app_init_managers()
 
-*📄 Source: [app_init.c](../../src/app/app_init.c#L30-L46)*
+*📄 Source: [app_init.c](../../src/app/app_init.c#L25-L40)*
 
 ```c
 void app_init_managers(void)
@@ -57,7 +57,7 @@ void app_init_managers(void)
 
 ### app_input_process()
 
-*📄 Source: [app_input.c](../../src/app/app_input.c#L33-L90)*
+*📄 Source: [app_input.c](../../src/app/app_input.c#L36-L99)*
 
 ```c
 void app_input_process(void)

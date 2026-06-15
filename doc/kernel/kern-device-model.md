@@ -94,7 +94,7 @@ typedef struct kern_device_ops {
 
 ### 数据结构
 
-*📄 Source: [kern_device.c](../../src/kernel/kern_device.c#L17)*
+*📄 Source: [kern_device.c](../../src/kernel/kern_device.c#L20)*
 
 ```c
 static kern_device_t *g_device_list = NULL;   /* 单链表头指针 */
@@ -104,7 +104,7 @@ static kern_device_t *g_device_list = NULL;   /* 单链表头指针 */
 
 ### 注册与查找
 
-*📄 Source: [kern_device.c](../../src/kernel/kern_device.c#L21-L59)*
+*📄 Source: [kern_device.c](../../src/kernel/kern_device.c#L24-L94)*
 
 ```c
 kern_err_t kern_device_register(kern_device_t *dev)
@@ -195,7 +195,7 @@ kern_devfs_register_device(&g_pwrkey_dev)
 
 ### file_to_dev() —— 提取设备指针
 
-*📄 Source: [kern_device.c](../../src/kernel/kern_device.c#L72-L78)*
+*📄 Source: [kern_device.c](../../src/kernel/kern_device.c#L107-L113)*
 
 ```c
 static kern_device_t *file_to_dev(kern_file_t *f)
@@ -209,7 +209,7 @@ static kern_device_t *file_to_dev(kern_file_t *f)
 
 ### 五个 bridge 函数
 
-*📄 Source: [kern_device.c](../../src/kernel/kern_device.c#L80-L123)*
+*📄 Source: [kern_device.c](../../src/kernel/kern_device.c#L115-L158)*
 
 | Bridge 函数 | 翻译逻辑 | 空指针安全 |
 |------------|---------|-----------|
@@ -223,7 +223,7 @@ static kern_device_t *file_to_dev(kern_file_t *f)
 
 ### 共享 bridge fops 单例
 
-*📄 Source: [kern_device.c](../../src/kernel/kern_device.c#L132-L144)*
+*📄 Source: [kern_device.c](../../src/kernel/kern_device.c#L167-L179)*
 
 ```c
 static kern_file_ops_t g_device_bridge_fops = {
