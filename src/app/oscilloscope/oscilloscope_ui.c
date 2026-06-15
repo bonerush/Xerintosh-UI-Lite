@@ -51,10 +51,6 @@ static int16_t scope_map_y(uint16_t raw, uint16_t full_scale)
 
 static void scope_draw_grid(void)
 {
-    uint32_t t = hal_get_ticks() % 2000;
-    uint16_t breath = (t < 1000) ? (uint16_t)t : (uint16_t)(2000 - t);
-    uint16_t grid_col = (breath > 500) ? SCOPE_COL_GRID_HI : SCOPE_COL_GRID;
-
     int16_t grid_step_y = s_layout.wave_h / 4;
     if (grid_step_y < 8) {
         grid_step_y = 8;
@@ -68,14 +64,14 @@ static void scope_draw_grid(void)
          yy < s_layout.wave_y + s_layout.wave_h;
          yy += grid_step_y) {
         for (int16_t xx = 0; xx < HAL_SCREEN_WIDTH; xx += 4) {
-            hal_draw_pixel(xx, yy, grid_col);
+            hal_draw_pixel(xx, yy, SCOPE_COL_GRID);
         }
     }
     for (int16_t xx = grid_step_x; xx < HAL_SCREEN_WIDTH; xx += grid_step_x) {
         for (int16_t yy = s_layout.wave_y;
              yy < s_layout.wave_y + s_layout.wave_h;
              yy += 4) {
-            hal_draw_pixel(xx, yy, grid_col);
+            hal_draw_pixel(xx, yy, SCOPE_COL_GRID);
         }
     }
 }
