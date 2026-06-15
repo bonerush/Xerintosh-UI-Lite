@@ -10,6 +10,11 @@
 #include "oscilloscope.h"
 #include "oscilloscope_ui.h"
 
+#include "app/ui_service.h"
+#include "hal/hal_input.h"
+#include "hal/hal_screen.h"
+#include "ui/ui_selector.h"
+
 #include <string.h>
 
 #ifndef NATIVE_TEST
@@ -90,6 +95,12 @@ void __attribute__((weak)) analogSetPinAttenuation(uint8_t pin, int atten)
 {
     (void)pin;
     (void)atten;
+}
+
+void __attribute__((weak)) pinMode(uint8_t pin, uint8_t mode)
+{
+    (void)pin;
+    (void)mode;
 }
 #endif /* NATIVE_TEST */
 
@@ -251,19 +262,181 @@ void scope_update_measurements(const uint16_t *buf, uint16_t count)
     g_scope.view.freq_hz = ((uint32_t)crossings * sr) / (2U * count);
 }
 
-/* Stubs for lifecycle and UI drawing functions; fully implemented in Tasks 3 and 4 */
+/* ═══ 生命周期 ═══ */
+
 void oscilloscope_init(void *user_data)
 {
     (void)user_data;
-}
+    memset(&g_scope, 0, sizeof(g_scope));
 
-void oscilloscope_loop(void *user_data)
-{
-    (void)user_data;
+    g_scope.view.samples = g_scope.samples;
+    g_scope.view.sample_count = SCOPE_SAMPLE_MAX;
+    g_scope.view.trigger_index = 0xFFFF;
+    g_scope.view.sample_rate_hz = g_scope_time_bases[0].display_rate_hz;
+    g_scope.view.running = true;
+    g_scope.view.selected_param = PARAM_TIME_BASE;
+    g_scope.view.trigger_level = 2048; /* mid-scale */
+
+#ifndef NATIVE_TEST
+    pinMode(SCOPE_PIN, INPUT);
+    analogSetPinAttenuation(SCOPE_PIN, ADC_11db);
+#endif
+
+    ui_service_enter_landscape();
+    ui_service_user_item_init();
 }
 
 void oscilloscope_exit(void *user_data)
 {
     (void)user_data;
+    ui_service_user_item_exit();
+    ui_service_exit_landscape();
+}
+
+/* ═══ 参数导航/编辑 ═══ */
+
+static void scope_param_next(void)
+{
+    g_scope.view.selected_param++;
+    if (g_scope.view.selected_param >= PARAM_COUNT) {
+        g_scope.view.selected_param = 0;
+    }
+}
+
+static void scope_param_prev(void)
+{
+    if (g_scope.view.selected_param == 0) {
+        g_scope.view.selected_param = PARAM_COUNT - 1;
+    } else {
+        g_scope.view.selected_param--;
+    }
+}
+
+static void scope_param_decrease(void)
+{
+    switch (g_scope.view.selected_param) {
+    case PARAM_TIME_BASE:
+        if (g_scope.view.time_base_index > 0) {
+            g_scope.view.time_base_index--;
+        }
+        break;
+    case PARAM_VOLT_RANGE:
+        if (g_scope.view.volt_range_index > 0) {
+            g_scope.view.volt_range_index--;
+        }
+        break;
+    case PARAM_COUPLING:
+        g_scope.view.coupling_index =
+            (g_scope.view.coupling_index + SCOPE_COUPLING_COUNT - 1) % SCOPE_COUPLING_COUNT;
+        break;
+    case PARAM_TRIGGER_MODE:
+        g_scope.view.trigger_mode_index =
+            (g_scope.view.trigger_mode_index + SCOPE_TRIGGER_MODE_COUNT - 1) % SCOPE_TRIGGER_MODE_COUNT;
+        break;
+    case PARAM_TRIGGER_LEVEL:
+        if (g_scope.view.trigger_level > 100) {
+            g_scope.view.trigger_level -= 100;
+        } else {
+            g_scope.view.trigger_level = 0;
+        }
+        break;
+    default:
+        break;
+    }
+}
+
+static void scope_param_increase(void)
+{
+    switch (g_scope.view.selected_param) {
+    case PARAM_TIME_BASE:
+        if (g_scope.view.time_base_index + 1 < SCOPE_TIME_BASE_COUNT) {
+            g_scope.view.time_base_index++;
+        }
+        break;
+    case PARAM_VOLT_RANGE:
+        if (g_scope.view.volt_range_index + 1 < SCOPE_VOLT_RANGE_COUNT) {
+            g_scope.view.volt_range_index++;
+        }
+        break;
+    case PARAM_COUPLING:
+        g_scope.view.coupling_index =
+            (g_scope.view.coupling_index + 1) % SCOPE_COUPLING_COUNT;
+        break;
+    case PARAM_TRIGGER_MODE:
+        g_scope.view.trigger_mode_index =
+            (g_scope.view.trigger_mode_index + 1) % SCOPE_TRIGGER_MODE_COUNT;
+        break;
+    case PARAM_TRIGGER_LEVEL:
+        if (g_scope.view.trigger_level < 4095 - 100) {
+            g_scope.view.trigger_level += 100;
+        } else {
+            g_scope.view.trigger_level = 4095;
+        }
+        break;
+    default:
+        break;
+    }
+}
+
+static void scope_sync_time_base(void)
+{
+    g_scope.view.sample_rate_hz =
+        g_scope_time_bases[g_scope.view.time_base_index].display_rate_hz;
+}
+
+static void scope_handle_input(hal_event_t ev_a, hal_event_t ev_b)
+{
+    if (!g_scope.view.editing) {
+        if (ev_a == HAL_EVENT_SHORT_PRESS) {
+            scope_param_next();
+        } else if (ev_a == HAL_EVENT_LONG_PRESS) {
+            g_scope.view.editing = true;
+        }
+        if (ev_b == HAL_EVENT_SHORT_PRESS) {
+            g_scope.view.running = !g_scope.view.running;
+        }
+        return;
+    }
+
+    if (ev_a == HAL_EVENT_SHORT_PRESS) {
+        scope_param_decrease();
+        scope_sync_time_base();
+    } else if (ev_a == HAL_EVENT_LONG_PRESS) {
+        g_scope.view.editing = false;
+    }
+    if (ev_b == HAL_EVENT_SHORT_PRESS) {
+        scope_param_increase();
+        scope_sync_time_base();
+    }
+    /* BtnB long press is reserved by the framework for app exit. */
+}
+
+void oscilloscope_loop(void *user_data)
+{
+    (void)user_data;
+
+    if (g_scope.view.running) {
+        uint8_t spp = g_scope_time_bases[g_scope.view.time_base_index].samples_per_pixel;
+        uint16_t samples_to_take = (uint16_t)(HAL_SCREEN_WIDTH * spp);
+        if (samples_to_take > SCOPE_SAMPLE_MAX) {
+            samples_to_take = SCOPE_SAMPLE_MAX;
+        }
+        for (uint16_t i = 0; i < samples_to_take; i++) {
+            scope_sample_one();
+        }
+        scope_update_trigger();
+        scope_sync_time_base();
+    }
+
+    oscilloscope_ui_draw(&g_scope.view);
+
+    hal_event_t ev_a = hal_input_get_event(HAL_BTN_A);
+    hal_event_t ev_b = hal_input_get_event(HAL_BTN_B);
+
+    scope_handle_input(ev_a, ev_b);
+
+    if (ui_user_item_try_exit(ev_b)) {
+        return;
+    }
 }
 
