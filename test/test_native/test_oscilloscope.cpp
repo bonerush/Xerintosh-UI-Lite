@@ -95,5 +95,7 @@ TEST(OscilloscopeParamTables, FilterCountAndWeights)
     EXPECT_EQ(SCOPE_FILTER_COUNT, 4U);
     EXPECT_STREQ(g_scope_filters[0].label, "Off");
     EXPECT_EQ(g_scope_filters[0].prev_weight, 0U);
-    EXPECT_LE(g_scope_filters[SCOPE_FILTER_COUNT - 1].prev_weight, 8U);
+    EXPECT_EQ(g_scope_filters[1].prev_weight, 2U);
+    EXPECT_EQ(g_scope_filters[2].prev_weight, 4U);
+    EXPECT_EQ(g_scope_filters[3].prev_weight, 6U);
 }

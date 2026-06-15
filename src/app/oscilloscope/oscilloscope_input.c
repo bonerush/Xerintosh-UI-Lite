@@ -2,6 +2,8 @@
 #include "oscilloscope_internal.h"
 #include "oscilloscope_engine.h"
 
+#include "hal/hal_input.h"
+
 #define SCOPE_TRIGGER_LEVEL_STEP 100
 
 static void scope_param_next(void)
@@ -123,6 +125,7 @@ void scope_handle_input(hal_event_t ev_a, hal_event_t ev_b)
             scope_param_next();
         } else if (ev_a == HAL_EVENT_LONG_PRESS) {
             g_scope.view.editing = true;
+            hal_input_reset_events();
         }
         if (ev_b == HAL_EVENT_SHORT_PRESS) {
             g_scope.view.running = !g_scope.view.running;
@@ -130,15 +133,20 @@ void scope_handle_input(hal_event_t ev_a, hal_event_t ev_b)
         return;
     }
 
+    /* editing mode: A=increase, B=decrease (consistent with framework slider) */
     if (ev_a == HAL_EVENT_SHORT_PRESS) {
-        scope_param_decrease();
+        scope_param_increase();
         scope_sync_sample_rate();
     } else if (ev_a == HAL_EVENT_LONG_PRESS) {
         g_scope.view.editing = false;
+        hal_input_reset_events();
     }
     if (ev_b == HAL_EVENT_SHORT_PRESS) {
-        scope_param_increase();
+        scope_param_decrease();
         scope_sync_sample_rate();
+    } else if (ev_b == HAL_EVENT_LONG_PRESS) {
+        /* cancel editing first, then the next B long press exits the app */
+        g_scope.view.editing = false;
+        hal_input_reset_events();
     }
-    /* BtnB long press is reserved by the framework for app exit. */
 }

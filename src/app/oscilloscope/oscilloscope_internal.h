@@ -10,13 +10,11 @@ extern "C" {
 #include "oscilloscope_ui.h"
 
 #define SCOPE_SAMPLE_MAX 2000
-#define SCOPE_AC_OFFSET_WINDOW 32
 
 typedef struct {
     uint16_t samples[SCOPE_SAMPLE_MAX];
     uint16_t ac_coupled[SCOPE_SAMPLE_MAX];
     oscilloscope_view_state_t view;
-    uint16_t sample_write_pos;
     int16_t  ac_offset;
     uint16_t last_filtered;
 } scope_state_t;

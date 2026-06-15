@@ -41,10 +41,11 @@ static void scope_compute_layout(void)
 
 static int16_t scope_map_y(uint16_t raw, uint16_t full_scale)
 {
-    if (raw >= full_scale) {
-        raw = full_scale - 1;
+    if (raw > full_scale) {
+        raw = full_scale;
     }
-    int16_t py = (int16_t)(((uint32_t)raw * (uint32_t)s_layout.wave_h) / full_scale);
+    /* wave_h-1 确保 raw=full_scale 时映射到 wave 区域顶部，而不会溢出 */
+    int16_t py = (int16_t)(((uint32_t)raw * (uint32_t)(s_layout.wave_h - 1)) / full_scale);
     return (s_layout.wave_y + s_layout.wave_h - 1) - py;
 }
 
@@ -87,8 +88,8 @@ static void scope_draw_wave(const oscilloscope_view_state_t *state)
         start = state->trigger_index;
     }
 
-    uint16_t window = state->sample_count;
-    if (window < 2) {
+    uint16_t remaining = state->sample_count - start;
+    if (remaining < 2) {
         return;
     }
 
@@ -98,9 +99,9 @@ static void scope_draw_wave(const oscilloscope_view_state_t *state)
     int16_t prev_y = scope_map_y(state->samples[start], full_scale);
 
     for (int16_t px = 1; px < HAL_SCREEN_WIDTH; px++) {
-        uint32_t idx = start + ((uint32_t)px * (uint32_t)window) / HAL_SCREEN_WIDTH;
+        uint32_t idx = start + ((uint32_t)px * (uint32_t)remaining) / (uint32_t)HAL_SCREEN_WIDTH;
         if (idx >= state->sample_count) {
-            break;
+            idx = state->sample_count - 1U;
         }
         uint16_t raw = state->samples[idx];
         int16_t cur_y = scope_map_y(raw, full_scale);
@@ -224,7 +225,7 @@ static void scope_draw_header(const oscilloscope_view_state_t *state)
     }
 
     /* 分隔线 */
-    hal_draw_line(0, HAL_HEADER_BOTTOM(), HAL_SCREEN_WIDTH, HAL_HEADER_BOTTOM(), COLOR_FG);
+    hal_draw_h_line(0, HAL_HEADER_BOTTOM(), HAL_SCREEN_WIDTH, COLOR_FG);
 }
 
 static void scope_draw_footer(const oscilloscope_view_state_t *state)
@@ -266,7 +267,7 @@ static void scope_draw_footer(const oscilloscope_view_state_t *state)
             bg_w = right_x - HAL_MARGIN_MD;
         }
         hal_draw_fill_rect(HAL_MARGIN_MD - 1, HAL_FOOTER_TOP() + 1,
-                           bg_w, s_layout.footer_h - 2, SCOPE_COL_WAVE);
+                           bg_w, s_layout.footer_h - 2, COLOR_FG);
         hal_draw_string(HAL_MARGIN_MD, ty, buf, COLOR_BG);
     } else {
         hal_draw_string(HAL_MARGIN_MD, ty, buf, SCOPE_COL_TEXT);
@@ -275,7 +276,7 @@ static void scope_draw_footer(const oscilloscope_view_state_t *state)
     hal_draw_string(draw_x, ty, right_buf, SCOPE_COL_TEXT);
 
     /* 分隔线 */
-    hal_draw_line(0, HAL_FOOTER_TOP(), HAL_SCREEN_WIDTH, HAL_FOOTER_TOP(), COLOR_FG);
+    hal_draw_h_line(0, HAL_FOOTER_TOP(), HAL_SCREEN_WIDTH, COLOR_FG);
 }
 
 void oscilloscope_ui_draw(const oscilloscope_view_state_t *state)

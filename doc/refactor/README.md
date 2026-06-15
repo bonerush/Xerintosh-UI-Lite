@@ -1,3 +1,33 @@
+# 重构跟踪：app-oscilloscope（2026-06-15 第五轮）
+
+本轮重构聚焦：**App 层优化与问题排查 — 示波器模块性能、渲染、测量精度**。
+
+## 阶段状态
+
+| 阶段 | 名称 | 状态 | 负责 Agent | 产物文件 |
+|------|------|------|------------|----------|
+| 0 | 基线建立 | **DONE** | coder | `00-baseline-app-oscilloscope.md` |
+| 1 | App/示波器诊断 | **DONE** | explore×3 | `01-diagnosis-app-oscilloscope.md` |
+| 2.4 | App 层重构 | **DONE** | coder | `02-refactor/app-oscilloscope.md` |
+| 3 | 集成验证 | **DONE** | coder | `03-integration-app-oscilloscope.md` |
+| 4 | 归档 | **DONE** | coder | `04-archive-app-oscilloscope.md` |
+
+## 本轮范围
+
+- [x] **示波器引擎优化**：线性采集、AC 耦合重新居中、频率滞回、AC 窗口自适应
+- [x] **示波器 UI 优化**：像素映射修正、分隔线硬件加速、编辑高亮统一
+- [x] **输入响应性**：编辑键映射翻转、B 长按先退编辑、事件缓存清理
+- [x] **代码结构**：移除环形缓冲、sample_write_pos 清理、滤波器语义修正
+
+## 验证结果
+
+| 验证项 | 状态 |
+|--------|------|
+| `pio run -e m5stick-c` | ✅ SUCCESS |
+| `pio test -e native` | ✅ 427 pass, 1 skipped |
+
+---
+
 # 重构跟踪：docs-architecture-diagrams（2026-06-15 第四轮）
 
 本轮重构聚焦：**文档体系优化 — 添加 Mermaid 架构图 + 原子化修正文档准确性**。
