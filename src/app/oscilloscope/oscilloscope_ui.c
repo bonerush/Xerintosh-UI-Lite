@@ -1,4 +1,5 @@
 #include "oscilloscope_ui.h"
+#include "oscilloscope_engine.h"
 
 #include "hal/hal_display.h"
 #include "hal/hal_system.h"

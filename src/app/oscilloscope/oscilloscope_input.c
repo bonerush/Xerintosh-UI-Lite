@@ -1,5 +1,6 @@
 #include "oscilloscope_input.h"
 #include "oscilloscope_internal.h"
+#include "oscilloscope_engine.h"
 
 #define SCOPE_TRIGGER_LEVEL_STEP 100
 

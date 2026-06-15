@@ -8,6 +8,7 @@
  */
 
 #include "oscilloscope.h"
+#include "oscilloscope_engine.h"
 #include "oscilloscope_ui.h"
 #include "oscilloscope_internal.h"
 #include "oscilloscope_input.h"

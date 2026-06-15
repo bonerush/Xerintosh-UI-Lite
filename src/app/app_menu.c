@@ -22,6 +22,7 @@
 #include "app/token_usage/token_usage.h"
 #include "app/flasher/flasher.h"
 #include "app/flasher/flasher_menu.h"
+#include "app/oscilloscope/oscilloscope.h"
 #include "kernel/kern_init.h"
 #include "ui/ui_item.h"
 
@@ -68,6 +69,7 @@ static bool app_menu_push_checked(xerintosh_list_item_t *parent,
  *        ├── 串口监视器（user_item）
  *        ├── Token 消耗（user_item）
  *        ├── 烧录器（user_item）
+ *        ├── 示波器（user_item）
  *        └── 关于（user_item）
  */
 void app_menu_build(void)
@@ -87,6 +89,8 @@ void app_menu_build(void)
         "Token 消耗", token_usage_init, token_usage_loop, token_usage_exit, default_icon);
     xerintosh_list_item_t* flasher_item = xerintosh_new_user_item(
         "烧录器", flasher_init, flasher_loop, flasher_exit, default_icon);
+    xerintosh_list_item_t* scope_item = xerintosh_new_user_item(
+        "示波器", oscilloscope_init, oscilloscope_loop, oscilloscope_exit, default_icon);
     xerintosh_list_item_t* item4 = xerintosh_new_user_item(
         "关于", about_init, about_loop, about_exit, user_icon);
 
@@ -139,6 +143,7 @@ void app_menu_build(void)
     app_menu_push_checked(root, item3, "串口监视器");
     app_menu_push_checked(root, tu_item, "Token 消耗");
     app_menu_push_checked(root, flasher_item, "烧录器");
+    app_menu_push_checked(root, scope_item, "示波器");
     app_menu_push_checked(root, item4, "关于");  /* 关于（永远最后） */
 
     if (item1 != NULL) {
