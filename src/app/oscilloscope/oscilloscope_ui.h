@@ -38,6 +38,15 @@ typedef struct {
     uint32_t freq_hz;
 } oscilloscope_view_state_t;
 
+typedef enum {
+    PARAM_TIME_BASE = 0,
+    PARAM_VOLT_RANGE,
+    PARAM_COUPLING,
+    PARAM_TRIGGER_MODE,
+    PARAM_TRIGGER_LEVEL,
+    PARAM_COUNT
+} scope_param_t;
+
 void oscilloscope_ui_draw(const oscilloscope_view_state_t *state);
 
 /* ═══ 参数表（引擎导出，供 UI 与测试使用）═══ */
@@ -52,7 +61,6 @@ extern const scope_time_base_t g_scope_time_bases[SCOPE_TIME_BASE_COUNT];
 
 typedef struct {
     const char *label;
-    uint16_t    div_raw;
     uint16_t    full_scale;
 } scope_volt_range_t;
 

@@ -9,11 +9,13 @@
 
 #include "oscilloscope.h"
 #include "oscilloscope_ui.h"
+#include "oscilloscope_internal.h"
+#include "oscilloscope_input.h"
 
 #include "app/ui_service.h"
 #include "hal/hal_input.h"
 #include "hal/hal_screen.h"
-#include "ui/ui_selector.h"
+#include "ui/ui_item.h"
 
 #include <string.h>
 
@@ -21,8 +23,7 @@
 #include <Arduino.h>
 #endif
 
-#define SCOPE_SAMPLE_MAX 200
-#define SCOPE_PIN        36
+#define SCOPE_PIN 36
 
 /* ═══ 参数表（供 UI 层与测试使用）═══ */
 
@@ -37,50 +38,33 @@ const scope_time_base_t g_scope_time_bases[SCOPE_TIME_BASE_COUNT] = {
 };
 
 const scope_volt_range_t g_scope_volt_ranges[SCOPE_VOLT_RANGE_COUNT] = {
-    { "0.5V",  248,  2000 },
-    { "1V",    496,  4000 },
-    { "2V",    992,  4095 },
-    { "3.3V", 1640,  4095 },
+    { "0.5V",  620 },
+    { "1V",   1241 },
+    { "2V",   2482 },
+    { "3.3V", 4095 },
 };
 
 const char *g_scope_coupling_labels[SCOPE_COUPLING_COUNT] = { "DC", "AC", "GND" };
 
 const char *g_scope_trigger_mode_labels[SCOPE_TRIGGER_MODE_COUNT] = { "Auto", "Norm", "Scan" };
 
-/* ═══ 参数枚举 ═══ */
-
-typedef enum {
-    PARAM_TIME_BASE = 0,
-    PARAM_VOLT_RANGE,
-    PARAM_COUPLING,
-    PARAM_TRIGGER_MODE,
-    PARAM_TRIGGER_LEVEL,
-    PARAM_COUNT
-} scope_param_t;
-
 /* ═══ 模块状态 ═══ */
 
-static struct {
-    uint16_t samples[SCOPE_SAMPLE_MAX];
-    uint16_t ac_coupled[SCOPE_SAMPLE_MAX];
-    oscilloscope_view_state_t view;
-    uint16_t sample_write_pos;
-    int16_t  ac_offset;
-} g_scope = {
+scope_state_t g_scope = {
     .view = {
-        .trigger_index   = 0xFFFF,
-        .sample_rate_hz  = 20000,
-        .trigger_level   = 2048,
-        .time_base_index = 0,
+        .trigger_index    = 0xFFFF,
+        .sample_rate_hz   = 20000,
+        .trigger_level    = 2048,
+        .time_base_index  = 0,
         .volt_range_index = 0,
-        .coupling_index  = 0,
+        .coupling_index   = 0,
         .trigger_mode_index = 0,
         .running = true,
     }
 };
 
-const uint16_t *scope_get_display_buffer(uint8_t coupling);
-void scope_update_measurements(const uint16_t *buf, uint16_t count);
+static const uint16_t *scope_get_display_buffer(uint8_t coupling);
+static void scope_update_measurements(const uint16_t *buf, uint16_t count);
 
 /* ═══ Native 测试桩（仅测试环境）═══ */
 
@@ -106,7 +90,7 @@ void __attribute__((weak)) pinMode(uint8_t pin, uint8_t mode)
 
 /* ═══ 采样 ═══ */
 
-void scope_sample_one(void)
+static void scope_sample_one(void)
 {
     uint16_t pos = g_scope.sample_write_pos;
 
@@ -141,7 +125,7 @@ static uint16_t scope_clamp_trigger_level(int16_t level)
     return (uint16_t)level;
 }
 
-void scope_update_trigger(void)
+static void scope_update_trigger(void)
 {
     scope_trigger_mode_t mode = (scope_trigger_mode_t)g_scope.view.trigger_mode_index;
 
@@ -182,7 +166,7 @@ static int16_t scope_compute_ac_offset(void)
     return (int16_t)(sum / n);
 }
 
-const uint16_t *scope_get_display_buffer(uint8_t coupling)
+static const uint16_t *scope_get_display_buffer(uint8_t coupling)
 {
     if (coupling >= SCOPE_COUPLING_COUNT) {
         coupling = 0; /* default to DC */
@@ -215,7 +199,7 @@ const uint16_t *scope_get_display_buffer(uint8_t coupling)
 
 /* ═══ 测量 ═══ */
 
-void scope_update_measurements(const uint16_t *buf, uint16_t count)
+static void scope_update_measurements(const uint16_t *buf, uint16_t count)
 {
     if (buf == NULL || count == 0U) {
         g_scope.view.vpp_raw = 0;
@@ -293,123 +277,7 @@ void oscilloscope_exit(void *user_data)
     ui_service_exit_landscape();
 }
 
-/* ═══ 参数导航/编辑 ═══ */
-
-static void scope_param_next(void)
-{
-    g_scope.view.selected_param++;
-    if (g_scope.view.selected_param >= PARAM_COUNT) {
-        g_scope.view.selected_param = 0;
-    }
-}
-
-static void scope_param_prev(void)
-{
-    if (g_scope.view.selected_param == 0) {
-        g_scope.view.selected_param = PARAM_COUNT - 1;
-    } else {
-        g_scope.view.selected_param--;
-    }
-}
-
-static void scope_param_decrease(void)
-{
-    switch (g_scope.view.selected_param) {
-    case PARAM_TIME_BASE:
-        if (g_scope.view.time_base_index > 0) {
-            g_scope.view.time_base_index--;
-        }
-        break;
-    case PARAM_VOLT_RANGE:
-        if (g_scope.view.volt_range_index > 0) {
-            g_scope.view.volt_range_index--;
-        }
-        break;
-    case PARAM_COUPLING:
-        g_scope.view.coupling_index =
-            (g_scope.view.coupling_index + SCOPE_COUPLING_COUNT - 1) % SCOPE_COUPLING_COUNT;
-        break;
-    case PARAM_TRIGGER_MODE:
-        g_scope.view.trigger_mode_index =
-            (g_scope.view.trigger_mode_index + SCOPE_TRIGGER_MODE_COUNT - 1) % SCOPE_TRIGGER_MODE_COUNT;
-        break;
-    case PARAM_TRIGGER_LEVEL:
-        if (g_scope.view.trigger_level > 100) {
-            g_scope.view.trigger_level -= 100;
-        } else {
-            g_scope.view.trigger_level = 0;
-        }
-        break;
-    default:
-        break;
-    }
-}
-
-static void scope_param_increase(void)
-{
-    switch (g_scope.view.selected_param) {
-    case PARAM_TIME_BASE:
-        if (g_scope.view.time_base_index + 1 < SCOPE_TIME_BASE_COUNT) {
-            g_scope.view.time_base_index++;
-        }
-        break;
-    case PARAM_VOLT_RANGE:
-        if (g_scope.view.volt_range_index + 1 < SCOPE_VOLT_RANGE_COUNT) {
-            g_scope.view.volt_range_index++;
-        }
-        break;
-    case PARAM_COUPLING:
-        g_scope.view.coupling_index =
-            (g_scope.view.coupling_index + 1) % SCOPE_COUPLING_COUNT;
-        break;
-    case PARAM_TRIGGER_MODE:
-        g_scope.view.trigger_mode_index =
-            (g_scope.view.trigger_mode_index + 1) % SCOPE_TRIGGER_MODE_COUNT;
-        break;
-    case PARAM_TRIGGER_LEVEL:
-        if (g_scope.view.trigger_level < 4095 - 100) {
-            g_scope.view.trigger_level += 100;
-        } else {
-            g_scope.view.trigger_level = 4095;
-        }
-        break;
-    default:
-        break;
-    }
-}
-
-static void scope_sync_time_base(void)
-{
-    g_scope.view.sample_rate_hz =
-        g_scope_time_bases[g_scope.view.time_base_index].display_rate_hz;
-}
-
-static void scope_handle_input(hal_event_t ev_a, hal_event_t ev_b)
-{
-    if (!g_scope.view.editing) {
-        if (ev_a == HAL_EVENT_SHORT_PRESS) {
-            scope_param_next();
-        } else if (ev_a == HAL_EVENT_LONG_PRESS) {
-            g_scope.view.editing = true;
-        }
-        if (ev_b == HAL_EVENT_SHORT_PRESS) {
-            g_scope.view.running = !g_scope.view.running;
-        }
-        return;
-    }
-
-    if (ev_a == HAL_EVENT_SHORT_PRESS) {
-        scope_param_decrease();
-        scope_sync_time_base();
-    } else if (ev_a == HAL_EVENT_LONG_PRESS) {
-        g_scope.view.editing = false;
-    }
-    if (ev_b == HAL_EVENT_SHORT_PRESS) {
-        scope_param_increase();
-        scope_sync_time_base();
-    }
-    /* BtnB long press is reserved by the framework for app exit. */
-}
+/* ═══ 主循环 ═══ */
 
 void oscilloscope_loop(void *user_data)
 {
@@ -439,4 +307,3 @@ void oscilloscope_loop(void *user_data)
         return;
     }
 }
-
