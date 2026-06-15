@@ -7,3 +7,8 @@
 .playwright-mcp/
 .worktrees/
 
+# 忽略所有隐藏文件/目录
+.*
+
+# 但保留 .gitignore 本身
+!.gitignore
