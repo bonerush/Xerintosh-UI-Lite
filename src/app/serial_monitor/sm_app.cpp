@@ -109,7 +109,7 @@ void serial_monitor_init(void *ud)
     sm_bt_rx_len = 0;
     sm_bt_lazy_inited = false;
     ui_service_enter_landscape();
-    hal_input_reset_events();
+    ui_service_user_item_init();
     hal_input_set_double_click_enabled(true);
 
     /* 注册 BT 回调（BLE 模式下使用） */
@@ -249,7 +249,7 @@ void serial_monitor_exit(void *ud)
 
     ui_service_exit_landscape();
     hal_input_set_double_click_enabled(false);
-    hal_input_reset_events();
+    ui_service_user_item_exit();
 #endif
 }
 

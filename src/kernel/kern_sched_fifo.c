@@ -11,8 +11,25 @@
 #include "kern_sched_fifo.h"
 #include "kern_sched.h"
 #include "kern_task.h"
+#include "kern_smp.h"
 
 #include <stddef.h>
+
+/* ═══ SMP 自旋锁辅助 ═══ */
+
+#ifdef CONFIG_SMP_ENABLED
+static inline void task_list_lock(void) {
+    while (__sync_lock_test_and_set(&g_task_list_lock, true)) {
+        asm volatile ("nop");
+    }
+}
+static inline void task_list_unlock(void) {
+    __sync_lock_release(&g_task_list_lock);
+}
+#else
+#define task_list_lock()    do {} while (0)
+#define task_list_unlock()  do {} while (0)
+#endif
 
 /* ═══ FIFO enqueue：按优先级有序插入 ═══ */
 
@@ -80,6 +97,8 @@ static void sched_fifo_dequeue(kern_task_t *task)
 
 static kern_task_t *sched_fifo_pick_next(void)
 {
+    task_list_lock();
+
     kern_task_t *t = sched_class_fifo.task_list;
     while (t != NULL) {
         /* 唤醒到期 sleep 任务 */
@@ -87,10 +106,13 @@ static kern_task_t *sched_fifo_pick_next(void)
             t->state = KERN_TASK_READY;
         }
         if (t->state == KERN_TASK_READY) {
+            task_list_unlock();
             return t;  /* 链表按优先级排序，第一个就绪即最高优先级 */
         }
         t = t->next;
     }
+
+    task_list_unlock();
     return NULL;
 }
 
@@ -100,11 +122,14 @@ static void sched_fifo_tick(kern_task_t *current)
 {
     if (current == NULL) return;
 
+    task_list_lock();
+
     /* 检查 FIFO class 中是否有比当前任务优先级更高的就绪任务 */
     kern_task_t *t = sched_class_fifo.task_list;
     while (t != NULL) {
         if (t->state == KERN_TASK_READY && t->priority > current->priority) {
             g_need_resched = true;
+            task_list_unlock();
             return;
         }
         /* 链表按优先级排序，第一个不更优则后面都不会更优 */
@@ -113,6 +138,8 @@ static void sched_fifo_tick(kern_task_t *current)
         }
         t = t->next;
     }
+
+    task_list_unlock();
 }
 
 /* ═══ FIFO prio_changed：优先级变更时重新排序 ═══ */

@@ -18,6 +18,7 @@
 #include "kernel/kern_task.h"
 #include "kernel/kern_types.h"
 #include "hal/hal_display.h"
+#include "app/ui_service.h"
 #include "hal/hal_input.h"
 #include "hal/hal_system.h"
 #include "ui/ui_core.h"
@@ -114,7 +115,7 @@ void taskmgr_init(void *ud)
     g_tm.prev_scroll = -1;
 
 #ifndef NATIVE_TEST
-    hal_input_reset_events();
+    ui_service_user_item_init();
 #endif
 
     taskmgr_refresh_list();
@@ -291,6 +292,6 @@ void taskmgr_exit(void *ud)
     g_tm.prev_selected = -1;
     g_tm.prev_scroll = -1;
 #ifndef NATIVE_TEST
-    hal_input_reset_events();
+    ui_service_user_item_exit();
 #endif
 }

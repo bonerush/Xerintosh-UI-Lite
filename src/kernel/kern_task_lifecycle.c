@@ -460,12 +460,12 @@ kern_err_t kern_task_kill(kern_pid_t pid)
     if (task == g_current_task) return KERN_EACCES;
 
     /* 已经是 ZOMBIE 则幂等返回成功 */
-    if (task->state == KERN_TASK_ZOMBIE) return 0;
+    if (task->state == KERN_TASK_ZOMBIE) return KERN_OK;
 
     /* 虚任务：走专门的注销路径（回收 TCB，count--） */
     if (task->flags & KERN_TASK_FLAG_VIRTUAL) {
         kern_task_unregister_virtual(pid);
-        return 0;
+        return KERN_OK;
     }
 
     /* 非虚任务：先释放追踪资源，再标记 ZOMBIE */
@@ -485,7 +485,7 @@ kern_err_t kern_task_kill(kern_pid_t pid)
     }
 #endif
 
-    return 0;
+    return KERN_OK;
 }
 
 /* ═══ ZOMBIE 回收 ═══ */

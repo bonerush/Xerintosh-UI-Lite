@@ -252,6 +252,9 @@ flowchart LR
 - **[串口监视器](app/serial-monitor.md)** — 串口数据监视（入场滑入动画 + 按钮平滑过渡）
 - **[UI 任务](app/ui-task.md)** — 内核任务包装的 UI 主循环
 - **[Token Usage](app/token-usage.md)** — DeepSeek API Token 用量统计与空 key 保护
+- **[烧录器](app/flasher.md)** — USB↔UART 有线烧录桥接器（STK500/ESP32 SLIP 协议）
+- **[示波器](app/oscilloscope.md)** — ADC 波形采集与显示（时间/电压/触发参数可调）
+- **[关机模块](app/shutdown.md)** — 关机画面 + 电源键长按弹窗
 - **[服务管理助手](app/svc-mgr-helper.md)** — 系统服务懒加载助手（BT enable/disable）
 
 ### 入门教程

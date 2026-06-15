@@ -26,8 +26,10 @@ App 层是用户应用代码所在。每个 App 在独立子目录中，通过 `
 | 关于页面 | — | `src/app/about/` | 版本/Logo/开发者信息 |
 | 存储 | — | `src/app/storage.cpp/h` | NVS 持久化存储封装 |
 | WiFi 管理 | — | `src/app/wifi/wifi_manager.cpp/h` | WiFi 状态机（扫描/连接/密码输入） |
+| WiFi 菜单 | — | `src/app/wifi/wifi_menu.c/h` | 网络列表菜单构建（已保存/可用 AP 动态重建） |
 | 蓝牙管理 | — | `src/app/bluetooth/bt_manager.cpp/h` | 蓝牙管理器（Classic BT SPP） |
 | 蓝牙 UART | — | `src/app/bluetooth/bt_uart_service.cpp/h` | BT UART 串口服务（SPP） |
+| 烧录器协议 | — | `src/app/flasher/flasher_proto.c/h` | STK500/ESP32 SLIP 协议解析引擎（提取自 flasher_app.cpp） |
 | 串口输入 | — | `src/app/serial_input/serial_input.cpp/h` | 串口 CLI 输入（WiFi/蓝牙密码） |
 | UI 任务 | [ui-task.md](ui-task.md) | `src/app/ui_task.c` | Xerintosh UI 内核任务包装（输入→渲染→yield） |
 | 服务管理助手 | [svc-mgr-helper.md](svc-mgr-helper.md) | `src/app/svc_mgr_helper.c/h` | 系统服务懒加载助手（BT enable/disable） |

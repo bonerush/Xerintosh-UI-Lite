@@ -33,6 +33,7 @@ void wifi_mgr_task_main(void *arg) { (void)arg; }
 #include <esp_event.h>
 
 #include "app/wifi/wifi_manager.h"
+#include "app/wifi/wifi_menu.h"
 
 extern "C" {
 #include "app/storage/storage.h"
@@ -51,13 +52,6 @@ extern bool g_wifi_on;   /* 定义在 main.cpp */
 
 static wifi_mgr_state_t g_state           = WIFI_MGR_IDLE;    /* 状态机当前状态 */
 static bool             g_wifi_enabled    = false;            /* WiFi 是否已启用 */
-
-/* UI 菜单指针（用于动态构建/清理网络菜单） */
-static xerintosh_list_item_t *g_settings_list      = NULL;  /* "设置" 列表项 */
-static xerintosh_list_item_t *g_networks_list      = NULL;  /* "网络" 列表项（设置的子项） */
-static xerintosh_list_item_t *g_saved_container    = NULL;  /* "已保存" 容器 */
-static xerintosh_list_item_t *g_available_container = NULL; /* "可用网络" 容器 */
-static xerintosh_list_item_t *g_scan_button        = NULL;  /* "扫描" 按钮 */
 
 /* 连接状态 */
 static bool  g_connecting = false;                              /* 是否正在连接 */
@@ -145,11 +139,6 @@ extern "C" void wifi_popup_refresh(void)
 
 /* ═══ 前向声明（回调函数）═══ */
 
-static void on_network_button_pressed(void *ud);
-static void on_saved_connect_pressed(void *ud);
-static void on_saved_delete_pressed(void *ud);
-static void on_scan_pressed(void *ud);
-static void rebuild_network_list(int scan_count);
 static bool try_auto_connect(void);
 static void suppress_wifi_logs(void);
 static void restore_wifi_logs(void);
@@ -198,7 +187,7 @@ void wifi_mgr_enable(void)
         wifi_popup_request("内存不足", 2000);
         g_wifi_enabled = false;
         g_state = WIFI_MGR_IDLE;
-        rebuild_network_list(0);
+        wifi_menu_rebuild_list(0);
         return;
     }
 
@@ -219,7 +208,7 @@ void wifi_mgr_enable(void)
     g_state = WIFI_MGR_WARMUP;
     g_auto_connect_done = false;
     g_is_auto_connect = false;
-    rebuild_network_list(0);
+    wifi_menu_rebuild_list(0);
 }
 
 /* ─── 日志抑制辅助 ─── */
@@ -238,6 +227,24 @@ static void suppress_wifi_logs(void)
 static void restore_wifi_logs(void)
 {
     esp_log_level_set("wifi", ESP_LOG_WARN);
+}
+
+/* ═══ 扫描 SSID 访问器（供 wifi_menu.c 在 C 环境调用） ═══ */
+
+/**
+ * @brief  获取指定索引的扫描结果 SSID
+ * @param  index 扫描结果索引（0-based）
+ * @return SSID 字符串指针（静态缓冲区，每次调用覆盖）
+ * @note   在 C 环境中替代 WiFi.SSID() 调用。
+ *         返回指针在下一次调用本函数后失效，调用者需立即使用或复制。
+ */
+extern "C" const char *wifi_mgr_get_scan_ssid(int index)
+{
+    static char buf[33];
+    String ssid = WiFi.SSID(index);
+    strncpy(buf, ssid.c_str(), sizeof(buf) - 1);
+    buf[sizeof(buf) - 1] = '\0';
+    return buf;
 }
 
 /**
@@ -295,94 +302,12 @@ void wifi_mgr_on_switch_toggle(void *ud)
     }
 }
 
-/* ═══ 网络菜单重建 ═══ */
-
-/**
- * @brief 重建网络子菜单（已保存 + 可用网络 + 扫描按钮）
- * @param scan_count 扫描结果数量（可用网络条目数）
- * @note  每次扫描完成或启用 WiFi 时调用，动态更新菜单内容
- */
-static void rebuild_network_list(int scan_count)
-{
-    /* 首次调用时创建网络列表项 */
-    if (!g_networks_list) {
-        g_networks_list = xerintosh_new_list_item("网络", list_icon);
-        if (g_settings_list && g_networks_list) {
-            xerintosh_push_item_to_list(g_settings_list, g_networks_list);
-        }
-    }
-
-    if (!g_networks_list) {
-        return;
-    }
-
-    /* 安全处理：若选择器位于网络子树内，先将其移到网络项本身 */
-    ui_selector_rebuild_anchor(g_networks_list, g_settings_list);
-
-    xerintosh_clear_children_of_list(g_networks_list);
-
-    /* ─── 1. 已保存网络容器 ─── */
-    g_saved_container = xerintosh_new_list_item("已保存", list_icon);
-    xerintosh_push_item_to_list(g_networks_list, g_saved_container);
-
-    int saved_count = storage_wifi_get_count();
-    for (int i = 0; i < saved_count; i++) {
-        char ssid[STORAGE_SSID_MAX_LEN];
-        char pass[STORAGE_PASS_MAX_LEN];
-        if (!storage_wifi_get(i, ssid, pass)) {
-            continue;
-        }
-
-        xerintosh_list_item_t *net_item = xerintosh_new_list_item(ssid, list_icon);
-        xerintosh_list_item_t *connect_btn = xerintosh_new_button_item("连接", on_saved_connect_pressed, default_icon);
-        xerintosh_list_item_t *del_btn = xerintosh_new_button_item("删除", on_saved_delete_pressed, default_icon);
-        xerintosh_push_item_to_list(net_item, connect_btn);
-        xerintosh_push_item_to_list(net_item, del_btn);
-        xerintosh_push_item_to_list(g_saved_container, net_item);
-    }
-
-    /* ─── 2. 可用网络容器（仅显示未保存的扫描结果）─── */
-    g_available_container = xerintosh_new_list_item("可用网络", list_icon);
-    xerintosh_push_item_to_list(g_networks_list, g_available_container);
-
-    int show_count = scan_count;
-    if (show_count > 9) {
-        show_count = 9;
-    }
-    for (int i = 0; i < show_count; i++) {
-        String ssid = WiFi.SSID(i);
-        if (ssid.length() == 0) continue; /* 跳过隐藏网络 */
-        if (storage_wifi_find(ssid.c_str()) >= 0) {
-            continue; /* 跳过已保存网络 */
-        }
-        xerintosh_list_item_t *item = xerintosh_new_button_item(ssid.c_str(), on_network_button_pressed, default_icon);
-        xerintosh_push_item_to_list(g_available_container, item);
-    }
-
-    /* ─── 3. 扫描按钮 ─── */
-    g_scan_button = xerintosh_new_button_item("扫描", on_scan_pressed, default_icon);
-    xerintosh_push_item_to_list(g_networks_list, g_scan_button);
-
-    /* 重建后，若选择器位于网络项上，根据上下文移到合适的子项：
-       - 有可用网络 → 移到第一个可用网络（用户刚扫描完，想看结果）
-       - 无可用网络 → 移到 "已保存"（第一个子项） */
-    if (g_xerintosh_selector.selected_item == g_networks_list && g_networks_list->child_num > 0) {
-        if (g_available_container && g_available_container->child_num > 0) {
-            g_xerintosh_selector.selected_item = g_available_container->child_list_item[0];
-            g_xerintosh_selector.selected_index = 0;
-        } else {
-            g_xerintosh_selector.selected_item = g_networks_list->child_list_item[0];
-            g_xerintosh_selector.selected_index = 0;
-        }
-    }
-}
-
 /* ═══ 回调函数 ═══ */
 
 /**
  * @brief 可用网络按钮按下回调：请求串口输入密码并进入连接状态
  */
-static void on_network_button_pressed(void *ud)
+void wifi_menu_on_network_button_pressed(void *ud)
 {
     (void)ud;
     const char *content = g_xerintosh_selector.selected_item->content;
@@ -399,7 +324,7 @@ static void on_network_button_pressed(void *ud)
 /**
  * @brief 已保存网络"连接"按钮按下回调：读取密码并直接连接
  */
-static void on_saved_connect_pressed(void *ud)
+void wifi_menu_on_saved_connect_pressed(void *ud)
 {
     (void)ud;
     const char *content = g_xerintosh_selector.selected_item->parent->content;
@@ -433,7 +358,7 @@ static void on_saved_connect_pressed(void *ud)
 /**
  * @brief 已保存网络"删除"按钮按下回调
  */
-static void on_saved_delete_pressed(void *ud)
+void wifi_menu_on_saved_delete_pressed(void *ud)
 {
     (void)ud;
     const char *content = g_xerintosh_selector.selected_item->parent->content;
@@ -448,13 +373,13 @@ static void on_saved_delete_pressed(void *ud)
 
     wifi_popup_request("已删除", 1500);
     xerintosh_selector_exit_current_item();
-    rebuild_network_list(0);
+    wifi_menu_rebuild_list(0);
 }
 
 /**
  * @brief 扫描按钮按下回调：启动异步网络扫描
  */
-static void on_scan_pressed(void *ud)
+void wifi_menu_on_scan_pressed(void *ud)
 {
     (void)ud;
     if (g_connecting) {
@@ -586,7 +511,7 @@ void wifi_mgr_update(void)
             if (!g_initial_scan_shown) {
                 wifi_popup_dismiss();
             }
-            rebuild_network_list(0);
+            wifi_menu_rebuild_list(0);
             g_state = WIFI_MGR_SCAN_DONE;
             g_initial_scan_shown = true;
             break;
@@ -599,7 +524,7 @@ void wifi_mgr_update(void)
             if (!g_initial_scan_shown) {
                 wifi_popup_dismiss();
             }
-            rebuild_network_list(result >= 0 ? result : 0);
+            wifi_menu_rebuild_list(result >= 0 ? result : 0);
             if (result > 0 && !g_initial_scan_shown) {
                 wifi_popup_request("扫描完毕", 1500);
             }
@@ -656,7 +581,7 @@ void wifi_mgr_update(void)
                     wifi_popup_request("已连接", 1500);
                 }
                 g_state = WIFI_MGR_CONNECTED;
-                rebuild_network_list(0);
+                wifi_menu_rebuild_list(0);
             } else if (status == WL_CONNECT_FAILED ||
                        status == WL_NO_SSID_AVAIL) {
                 restore_wifi_logs();

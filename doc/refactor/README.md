@@ -1,3 +1,26 @@
+# 重构跟踪：app-docs-maint（第七轮 · 2026-06-16）
+
+本轮重构聚焦：**App 层优化 + 文档体系优化 + UI/内核维护性检查**
+- App 层：拆分 app_init.c、统一状态机模板、user_item 生命周期规范化
+- 文档体系：结构镜像检查、源链接校验、API 模板更新
+- UI 维护：派发表覆盖检查、动画公式封装、边界测试补充
+- 内核维护：错误码统一检查、资源回收路径验证
+
+## 阶段状态
+
+| 阶段 | 名称 | 状态 | 负责 Agent | 产物文件 |
+|------|------|------|------------|----------|
+| 0 | 基线建立 | **DONE** | coder | `00-baseline-app-docs-maint.md` |
+| 1 | 扫描诊断 | **DONE** | explore | `01-diagnosis-app-docs-maint.md` |
+| 2.1m | 内核维护 | **DONE** | coder | `02-refactor/kernel-maint.md` |
+| 2.3m | UI 维护 | **DONE** | coder | `02-refactor/ui-maint.md` |
+| 2.4 | App 层重构 | **DONE** | coder | `02-refactor/app.md` |
+| 2.5 | 文档体系 | **DONE** | coder | `02-refactor/docs.md` |
+| 3 | 集成验证 | **DONE** | coder | `03-integration-app-docs-maint.md` |
+| 4 | 归档 | **RUNNING** | coder | `04-archive-app-docs-maint.md` |
+
+---
+
 # 重构跟踪：app-oscilloscope（第六轮 · 2026-06-15）
 
 本轮重构聚焦：**延续第五轮，修复遗留 P1 性能问题 + P2 代码质量**

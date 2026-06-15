@@ -13,6 +13,7 @@
 #include "app/storage/storage.h"
 #include "hal/hal_input.h"
 #include "hal/hal_system.h"
+#include "app/ui_service.h"
 #include "ui/ui_item.h"
 
 /* ═══ 全局状态（文件作用域）═══ */
@@ -35,7 +36,7 @@ void token_usage_init(void *ud)
     g_last_refresh  = 0;
     g_needs_refresh = true;
 #ifndef NATIVE_TEST
-    hal_input_reset_events();
+    ui_service_user_item_init();
 #endif
 }
 
@@ -82,7 +83,7 @@ void token_usage_exit(void *ud)
 {
     (void)ud;
 #ifndef NATIVE_TEST
-    hal_input_reset_events();
+    ui_service_user_item_exit();
 #endif
     /* 当前无需清理资源 */
 }

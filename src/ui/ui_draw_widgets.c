@@ -105,22 +105,17 @@ void xerintosh_draw_pop_up()
       g_xerintosh_pop_up.is_running = false;
   }
 
-  /* 优先使用缓存高度（push 时已计算），避免每帧调用 hal_get_font_height 和乘法 */
+  /* 使用缓存高度；缓存无效时重算 */
   int16_t pop_h = g_xerintosh_pop_up.cached_pop_h;
   int16_t content_h = g_xerintosh_pop_up.cached_content_h;
-  if (pop_h == 0) {
-    /* fallback: 缓存无效时重算 */
-    pop_h = popup_compute_height(g_xerintosh_pop_up.wrap_line_count);
-    int16_t fh_fb = hal_get_font_height();
-    uint8_t n_fb = g_xerintosh_pop_up.wrap_line_count;
-    if (n_fb < 1) n_fb = 1;
-    if (n_fb > POP_UP_WRAP_LINES) n_fb = POP_UP_WRAP_LINES;
-    content_h = (int16_t)(n_fb * fh_fb + (n_fb - 1) * 2);
-  }
   int16_t fh = hal_get_font_height();
   uint8_t n = g_xerintosh_pop_up.wrap_line_count;
   if (n < 1) n = 1;
   if (n > POP_UP_WRAP_LINES) n = POP_UP_WRAP_LINES;
+  if (pop_h == 0) {
+    pop_h = popup_compute_height(n);
+    content_h = (int16_t)(n * fh + (n - 1) * 2);
+  }
 
   int16_t _x_pop_up = SCREEN_WIDTH/2 - g_xerintosh_pop_up.w_pop_up/2;
   int16_t _y_pop_up = g_xerintosh_pop_up.y_pop_up + pop_h;
