@@ -18,7 +18,6 @@
 #define SCOPE_COL_TEXT      COLOR_FG
 #define SCOPE_COL_TEXT_HI   0xFFE0  /* yellow highlight */
 
-/* 参考 taskmgr_ui.c / sm_ui.c：使用标准行高 */
 static struct {
     int16_t header_h;
     int16_t wave_y;
@@ -147,48 +146,73 @@ static const char *scope_get_param_value(const oscilloscope_view_state_t *state,
     }
 }
 
-/* 参考 sm_ui.c：居中绘制字符串，自动计算间距 */
+static const char *scope_get_param_label(scope_param_t param)
+{
+    switch (param) {
+    case PARAM_TIME_BASE:     return "T";
+    case PARAM_VOLT_RANGE:    return "V";
+    case PARAM_COUPLING:      return "C";
+    case PARAM_TRIGGER_MODE:  return "Tr";
+    case PARAM_TRIGGER_LEVEL: return "Lv";
+    default:                  return "";
+    }
+}
+
+static void scope_format_rate(char *buf, size_t size, uint32_t sr)
+{
+    if (sr >= 1000000) {
+        snprintf(buf, size, "%luMHz", (unsigned long)(sr / 1000000));
+    } else if (sr >= 1000) {
+        if (sr % 1000 == 0) {
+            snprintf(buf, size, "%lukHz", (unsigned long)(sr / 1000));
+        } else {
+            snprintf(buf, size, "%lu.%lukHz",
+                     (unsigned long)(sr / 1000),
+                     (unsigned long)((sr % 1000) / 100));
+        }
+    } else {
+        snprintf(buf, size, "%luHz", (unsigned long)sr);
+    }
+}
+
 static void scope_draw_header(const oscilloscope_view_state_t *state)
 {
     char buf[32];
-    int16_t fh = hal_get_font_height();
-    int16_t ty = HAL_TEXT_BASELINE(HAL_HEADER_TOP()) - 2;
+    int16_t ty = HAL_TEXT_BASELINE(HAL_HEADER_TOP());
 
     const char *run_str = state->running ? "RUN" : "HOLD";
     uint16_t run_col = state->running ? COLOR_ACCENT : COLOR_RED;
 
-    /* 右侧：耦合方式 */
-    snprintf(buf, sizeof(buf), "%s", g_scope_coupling_labels[state->coupling_index]);
-    int16_t right_w = hal_get_string_width(buf);
-    int16_t right_x = HAL_SCREEN_WIDTH - right_w - HAL_MARGIN_MD;
+    /* 四个字段，从左到右：RUN | 采样率 | 触发模式 | 耦合 */
+    scope_format_rate(buf, sizeof(buf), state->sample_rate_hz);
+    int16_t w_rate = hal_get_string_width(buf);
 
-    /* 中间：采样率 */
-    uint32_t sr = state->sample_rate_hz;
-    if (sr >= 1000) {
-        snprintf(buf, sizeof(buf), "%lu.%lukHz",
-                 (unsigned long)(sr / 1000),
-                 (unsigned long)((sr % 1000) / 100));
-    } else {
-        snprintf(buf, sizeof(buf), "%luHz", (unsigned long)sr);
-    }
-    int16_t mid_w = hal_get_string_width(buf);
+    int16_t w_run = hal_get_string_width(run_str);
+    int16_t w_trig = hal_get_string_width(g_scope_trigger_mode_labels[state->trigger_mode_index]);
+    int16_t w_cpl = hal_get_string_width(g_scope_coupling_labels[state->coupling_index]);
 
-    int16_t total_w = hal_get_string_width(run_str) + mid_w + right_w;
-    int16_t spacing = (HAL_SCREEN_WIDTH - HAL_MARGIN_MD * 2 - total_w) / 2;
+    int16_t total_w = w_run + w_rate + w_trig + w_cpl;
+    int16_t avail = HAL_SCREEN_WIDTH - HAL_MARGIN_MD * 2;
+    int16_t spacing = (avail - total_w) / 3;
     if (spacing < HAL_MARGIN_SM) {
         spacing = HAL_MARGIN_SM;
     }
 
-    int16_t run_x = HAL_MARGIN_MD;
-    int16_t mid_x = run_x + hal_get_string_width(run_str) + spacing;
-    if (mid_x + mid_w > right_x - HAL_MARGIN_SM) {
-        /* 中间太宽，居中绘制并裁剪 */
-        mid_x = HAL_CENTER_X(mid_w);
-    }
+    int16_t x = HAL_MARGIN_MD;
+    hal_draw_string(x, ty, run_str, run_col);
+    x += w_run + spacing;
 
-    hal_draw_string(run_x, ty, run_str, run_col);
-    hal_draw_string(mid_x, ty, buf, SCOPE_COL_TEXT);
-    hal_draw_string(right_x, ty, g_scope_coupling_labels[state->coupling_index], SCOPE_COL_TEXT);
+    hal_draw_string(x, ty, buf, SCOPE_COL_TEXT);
+    x += w_rate + spacing;
+
+    hal_draw_string(x, ty, g_scope_trigger_mode_labels[state->trigger_mode_index], SCOPE_COL_TEXT);
+    x += w_trig + spacing;
+
+    /* 右侧对齐耦合，避免超出 */
+    int16_t cpl_x = HAL_SCREEN_WIDTH - w_cpl - HAL_MARGIN_MD;
+    if (cpl_x > x) {
+        hal_draw_string(cpl_x, ty, g_scope_coupling_labels[state->coupling_index], SCOPE_COL_TEXT);
+    }
 
     /* 分隔线 */
     hal_draw_line(0, HAL_HEADER_BOTTOM(), HAL_SCREEN_WIDTH, HAL_HEADER_BOTTOM(), COLOR_FG);
@@ -198,41 +222,31 @@ static void scope_draw_footer(const oscilloscope_view_state_t *state)
 {
     char buf[32];
     char val_buf[16];
-    int16_t fh = hal_get_font_height();
-    int16_t ty = HAL_TEXT_BASELINE(HAL_FOOTER_TOP()) - 2;
+    int16_t ty = HAL_TEXT_BASELINE(HAL_FOOTER_TOP());
 
     /* 左侧：当前选中参数（编辑时反色） */
-    const char *label = NULL;
-    switch (state->selected_param) {
-    case PARAM_TIME_BASE:     label = "Tbase"; break;
-    case PARAM_VOLT_RANGE:    label = "Vdiv";  break;
-    case PARAM_COUPLING:      label = "Cpl";   break;
-    case PARAM_TRIGGER_MODE:  label = "Trig";  break;
-    case PARAM_TRIGGER_LEVEL: label = "Lvl";   break;
-    default:                  label = "";      break;
-    }
+    const char *label = scope_get_param_label((scope_param_t)state->selected_param);
     const char *value = scope_get_param_value(state,
                                               (scope_param_t)state->selected_param,
                                               val_buf, sizeof(val_buf));
     snprintf(buf, sizeof(buf), "%s:%s", label, value);
+    int16_t param_w = hal_get_string_width(buf);
 
-    /* 右侧：触发模式 + 测量值 */
+    /* 右侧：测量值，尽量简短 */
     char right_buf[32];
-    snprintf(right_buf, sizeof(right_buf), "T:%s V:%d F:%lu",
-             g_scope_trigger_mode_labels[state->trigger_mode_index],
+    snprintf(right_buf, sizeof(right_buf), "V:%d F:%lu",
              state->vpp_raw,
              (unsigned long)state->freq_hz);
     int16_t right_w = hal_get_string_width(right_buf);
     int16_t right_x = HAL_SCREEN_WIDTH - right_w - HAL_MARGIN_MD;
 
-    int16_t param_w = hal_get_string_width(buf);
     if (state->editing) {
-        int16_t bg_x = HAL_MARGIN_MD - 1;
         int16_t bg_w = param_w + HAL_MARGIN_MD;
         if (bg_w > right_x - HAL_MARGIN_MD) {
             bg_w = right_x - HAL_MARGIN_MD;
         }
-        hal_draw_fill_rect(bg_x, HAL_FOOTER_TOP() + 1, bg_w, s_layout.footer_h - 2, SCOPE_COL_WAVE);
+        hal_draw_fill_rect(HAL_MARGIN_MD - 1, HAL_FOOTER_TOP() + 1,
+                           bg_w, s_layout.footer_h - 2, SCOPE_COL_WAVE);
         hal_draw_string(HAL_MARGIN_MD, ty, buf, COLOR_BG);
     } else {
         hal_draw_string(HAL_MARGIN_MD, ty, buf, SCOPE_COL_TEXT);
