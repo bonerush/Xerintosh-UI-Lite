@@ -18,6 +18,7 @@ typedef struct {
     oscilloscope_view_state_t view;
     uint16_t sample_write_pos;
     int16_t  ac_offset;
+    uint16_t last_filtered;
 } scope_state_t;
 
 extern scope_state_t g_scope;

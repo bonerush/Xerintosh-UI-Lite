@@ -49,6 +49,16 @@ static void scope_param_decrease(void)
             g_scope.view.trigger_level = 0;
         }
         break;
+    case PARAM_SAMPLE_RATE:
+        if (g_scope.view.sample_rate_index > 0) {
+            g_scope.view.sample_rate_index--;
+        }
+        break;
+    case PARAM_FILTER:
+        if (g_scope.view.filter_index > 0) {
+            g_scope.view.filter_index--;
+        }
+        break;
     default:
         break;
     }
@@ -82,15 +92,28 @@ static void scope_param_increase(void)
             g_scope.view.trigger_level = 4095;
         }
         break;
+    case PARAM_SAMPLE_RATE:
+        if (g_scope.view.sample_rate_index + 1 < SCOPE_SAMPLE_RATE_COUNT) {
+            g_scope.view.sample_rate_index++;
+        }
+        break;
+    case PARAM_FILTER:
+        if (g_scope.view.filter_index + 1 < SCOPE_FILTER_COUNT) {
+            g_scope.view.filter_index++;
+        }
+        break;
     default:
         break;
     }
 }
 
-void scope_sync_time_base(void)
+void scope_sync_sample_rate(void)
 {
-    g_scope.view.sample_rate_hz =
-        g_scope_time_bases[g_scope.view.time_base_index].display_rate_hz;
+    uint8_t idx = g_scope.view.sample_rate_index;
+    if (idx >= SCOPE_SAMPLE_RATE_COUNT) {
+        idx = 0;
+    }
+    g_scope.view.sample_rate_hz = g_scope_sample_rates[idx].rate_hz;
 }
 
 void scope_handle_input(hal_event_t ev_a, hal_event_t ev_b)
@@ -109,13 +132,13 @@ void scope_handle_input(hal_event_t ev_a, hal_event_t ev_b)
 
     if (ev_a == HAL_EVENT_SHORT_PRESS) {
         scope_param_decrease();
-        scope_sync_time_base();
+        scope_sync_sample_rate();
     } else if (ev_a == HAL_EVENT_LONG_PRESS) {
         g_scope.view.editing = false;
     }
     if (ev_b == HAL_EVENT_SHORT_PRESS) {
         scope_param_increase();
-        scope_sync_time_base();
+        scope_sync_sample_rate();
     }
     /* BtnB long press is reserved by the framework for app exit. */
 }

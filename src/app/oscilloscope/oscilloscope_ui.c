@@ -141,6 +141,10 @@ static const char *scope_get_param_value(const oscilloscope_view_state_t *state,
     case PARAM_TRIGGER_LEVEL:
         snprintf(buf, buf_size, "%d", state->trigger_level);
         return buf;
+    case PARAM_SAMPLE_RATE:
+        return g_scope_sample_rates[state->sample_rate_index].label;
+    case PARAM_FILTER:
+        return g_scope_filters[state->filter_index].label;
     default:
         return "";
     }
@@ -154,6 +158,8 @@ static const char *scope_get_param_label(scope_param_t param)
     case PARAM_COUPLING:      return "C";
     case PARAM_TRIGGER_MODE:  return "Tr";
     case PARAM_TRIGGER_LEVEL: return "Lv";
+    case PARAM_SAMPLE_RATE:   return "SR";
+    case PARAM_FILTER:        return "Flt";
     default:                  return "";
     }
 }
@@ -232,13 +238,20 @@ static void scope_draw_footer(const oscilloscope_view_state_t *state)
     snprintf(buf, sizeof(buf), "%s:%s", label, value);
     int16_t param_w = hal_get_string_width(buf);
 
-    /* 右侧：测量值，尽量简短 */
+    /* 右侧：测量值，固定宽度并右对齐，避免数字位数变化时抖动 */
     char right_buf[32];
     snprintf(right_buf, sizeof(right_buf), "V:%d F:%lu",
              state->vpp_raw,
              (unsigned long)state->freq_hz);
     int16_t right_w = hal_get_string_width(right_buf);
-    int16_t right_x = HAL_SCREEN_WIDTH - right_w - HAL_MARGIN_MD;
+
+    /* 按最坏情况预留宽度：V:4095 F:99999 */
+    char right_max[32];
+    snprintf(right_max, sizeof(right_max), "V:%d F:%lu", 4095, 99999UL);
+    int16_t right_w_max = hal_get_string_width(right_max);
+
+    int16_t right_x = HAL_SCREEN_WIDTH - right_w_max - HAL_MARGIN_MD;
+    int16_t draw_x = right_x + (right_w_max - right_w);
 
     if (state->editing) {
         int16_t bg_w = param_w + HAL_MARGIN_MD;
@@ -252,7 +265,7 @@ static void scope_draw_footer(const oscilloscope_view_state_t *state)
         hal_draw_string(HAL_MARGIN_MD, ty, buf, SCOPE_COL_TEXT);
     }
 
-    hal_draw_string(right_x, ty, right_buf, SCOPE_COL_TEXT);
+    hal_draw_string(draw_x, ty, right_buf, SCOPE_COL_TEXT);
 
     /* 分隔线 */
     hal_draw_line(0, HAL_FOOTER_TOP(), HAL_SCREEN_WIDTH, HAL_FOOTER_TOP(), COLOR_FG);

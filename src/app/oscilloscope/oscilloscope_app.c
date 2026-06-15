@@ -49,19 +49,39 @@ const char *g_scope_coupling_labels[SCOPE_COUPLING_COUNT] = { "DC", "AC", "GND" 
 
 const char *g_scope_trigger_mode_labels[SCOPE_TRIGGER_MODE_COUNT] = { "Auto", "Norm", "Scan" };
 
+const scope_sample_rate_t g_scope_sample_rates[SCOPE_SAMPLE_RATE_COUNT] = {
+    { "1kHz",   1000 },
+    { "5kHz",   5000 },
+    { "10kHz", 10000 },
+    { "20kHz", 20000 },
+    { "50kHz", 50000 },
+    { "100kHz", 100000 },
+};
+
+/* prev_weight: 历史值权重，当前原始值权重 = 8 - prev_weight
+ * 0=OFF, 1=LOW(7/8 prev), 2=MED(6/8 prev), 3=HI(4/8 prev) */
+const scope_filter_t g_scope_filters[SCOPE_FILTER_COUNT] = {
+    { "Off", 0 },
+    { "Low", 6 },
+    { "Med", 4 },
+    { "Hi",  2 },
+};
+
 /* ═══ 模块状态 ═══ */
 
 scope_state_t g_scope = {
     .view = {
-        .trigger_index    = 0xFFFF,
-        .sample_rate_hz   = 20000,
-        .trigger_level    = 2048,
-        .time_base_index  = 0,
-        .volt_range_index = 0,
-        .coupling_index   = 0,
+        .trigger_index      = 0xFFFF,
+        .trigger_level      = 2048,
+        .time_base_index    = 0,
+        .volt_range_index   = 0,
+        .coupling_index     = 0,
         .trigger_mode_index = 0,
+        .sample_rate_index  = 3,   /* 20kHz */
+        .filter_index       = 1,   /* Low EMA */
         .running = true,
-    }
+    },
+    .last_filtered = 2048,
 };
 
 static const uint16_t *scope_get_display_buffer(uint8_t coupling);
@@ -87,6 +107,11 @@ void __attribute__((weak)) pinMode(uint8_t pin, uint8_t mode)
     (void)pin;
     (void)mode;
 }
+
+void __attribute__((weak)) delayMicroseconds(uint32_t us)
+{
+    (void)us;
+}
 #endif /* NATIVE_TEST */
 
 /* ═══ 采样 ═══ */
@@ -94,8 +119,25 @@ void __attribute__((weak)) pinMode(uint8_t pin, uint8_t mode)
 static void scope_sample_one(void)
 {
     uint16_t pos = g_scope.sample_write_pos;
+    uint16_t raw = (uint16_t)analogRead(SCOPE_PIN);
 
-    g_scope.samples[pos] = (uint16_t)analogRead(SCOPE_PIN);
+    uint8_t fidx = g_scope.view.filter_index;
+    if (fidx >= SCOPE_FILTER_COUNT) {
+        fidx = 0;
+    }
+
+    uint8_t prev_w = g_scope_filters[fidx].prev_weight;
+    uint16_t filtered;
+    if (prev_w == 0U) {
+        filtered = raw;
+    } else {
+        uint8_t cur_w = 8U - prev_w;
+        filtered = (uint16_t)(((uint32_t)g_scope.last_filtered * prev_w +
+                               (uint32_t)raw * cur_w) / 8U);
+    }
+
+    g_scope.last_filtered = filtered;
+    g_scope.samples[pos] = filtered;
     g_scope.sample_write_pos = (pos + 1U) % SCOPE_SAMPLE_MAX;
 }
 
@@ -259,10 +301,13 @@ void oscilloscope_init(void *user_data)
     g_scope.view.samples = g_scope.samples;
     g_scope.view.sample_count = SCOPE_SAMPLE_MAX;
     g_scope.view.trigger_index = 0xFFFF;
-    g_scope.view.sample_rate_hz = g_scope_time_bases[0].display_rate_hz;
     g_scope.view.running = true;
     g_scope.view.selected_param = PARAM_TIME_BASE;
     g_scope.view.trigger_level = 2048; /* mid-scale */
+    g_scope.view.sample_rate_index = 3; /* 20kHz */
+    g_scope.view.filter_index = 1;      /* Low EMA */
+    g_scope.last_filtered = 2048;
+    scope_sync_sample_rate();
 
 #ifndef NATIVE_TEST
     pinMode(SCOPE_PIN, INPUT);
@@ -292,11 +337,18 @@ void oscilloscope_loop(void *user_data)
         if (samples_to_take > SCOPE_SAMPLE_MAX) {
             samples_to_take = SCOPE_SAMPLE_MAX;
         }
+
+        uint32_t sr = g_scope.view.sample_rate_hz;
+        uint32_t period_us = (sr == 0U) ? 0U : (1000000UL / sr);
+        const uint32_t adc_overhead_us = 20U;
+
         for (uint16_t i = 0; i < samples_to_take; i++) {
             scope_sample_one();
+            if (period_us > adc_overhead_us + 5U) {
+                delayMicroseconds((uint32_t)(period_us - adc_overhead_us));
+            }
         }
         scope_update_trigger();
-        scope_sync_time_base();
     }
 
     oscilloscope_ui_draw(&g_scope.view);

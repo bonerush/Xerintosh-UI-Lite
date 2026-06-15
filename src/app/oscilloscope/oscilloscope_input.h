@@ -8,7 +8,7 @@ extern "C" {
 #include <stdint.h>
 #include "hal/hal_input.h"
 
-void scope_sync_time_base(void);
+void scope_sync_sample_rate(void);
 void scope_handle_input(hal_event_t ev_a, hal_event_t ev_b);
 
 #ifdef __cplusplus

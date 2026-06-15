@@ -79,3 +79,20 @@ TEST(OscilloscopeParamTables, LabelsNonNull)
         EXPECT_NE(g_scope_trigger_mode_labels[i], nullptr);
     }
 }
+
+TEST(OscilloscopeParamTables, SampleRateCountAndOrder)
+{
+    EXPECT_EQ(SCOPE_SAMPLE_RATE_COUNT, 6U);
+    for (uint8_t i = 1; i < SCOPE_SAMPLE_RATE_COUNT; i++) {
+        EXPECT_GT(g_scope_sample_rates[i].rate_hz, g_scope_sample_rates[i - 1].rate_hz);
+    }
+    EXPECT_EQ(g_scope_sample_rates[SCOPE_SAMPLE_RATE_COUNT - 1].rate_hz, 100000U);
+}
+
+TEST(OscilloscopeParamTables, FilterCountAndWeights)
+{
+    EXPECT_EQ(SCOPE_FILTER_COUNT, 4U);
+    EXPECT_STREQ(g_scope_filters[0].label, "Off");
+    EXPECT_EQ(g_scope_filters[0].prev_weight, 0U);
+    EXPECT_LE(g_scope_filters[SCOPE_FILTER_COUNT - 1].prev_weight, 8U);
+}

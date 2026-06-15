@@ -16,6 +16,8 @@ typedef enum {
     PARAM_COUPLING,
     PARAM_TRIGGER_MODE,
     PARAM_TRIGGER_LEVEL,
+    PARAM_SAMPLE_RATE,
+    PARAM_FILTER,
     PARAM_COUNT
 } scope_param_t;
 
@@ -28,6 +30,8 @@ typedef struct {
     uint8_t volt_range_index;
     uint8_t coupling_index;
     uint8_t trigger_mode_index;
+    uint8_t sample_rate_index;
+    uint8_t filter_index;
     int16_t trigger_level;
     bool running;
     bool editing;
