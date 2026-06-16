@@ -7,8 +7,8 @@
  *          透传流程：
  *              1. 用户进入烧录器，显示全屏进度条 UI ("BRIDGE...")
  *              2. 长按 A 或首次 USB 数据触发 DTR 脉冲（G0 LOW 50ms）
- *              3. 等待 500ms 让 bootloader 初始化 UART
- *              4. 进入 IDLE 阶段，USB ↔ UART 双向透传
+ *              3. 等待 80ms 让目标 bootloader 初始化 UART（DTR 期间 USB 数据暂存缓冲）
+ *              4. 进入 IDLE 阶段，先转发暂存数据 → USB ↔ UART 双向透传
  *              5. 用户运行 avrdude / esptool 烧录目标板
  *              6. 自动识别 STK500/ESP32 SLIP 协议，实时显示烧录进度
  *
@@ -42,6 +42,11 @@ typedef enum {
     PT_PHASE_BOOTLOADER_WAIT     /* DTR 已完成，等待目标 bootloader 就绪 */
 } pt_phase_t;
 
+/* DTR 后等待目标 bootloader 就绪的时间（ESP32: ~10ms, 留余量） */
+#define FLASHER_BOOT_WAIT_MS  80
+/* DTR 等待期间 USB 数据暂存区（避免 esptool 同步帧溢出丢失） */
+#define FLASHER_USB_DEFER_MAX  256
+
 /* ═══ 状态变量 ═══ */
 static flasher_ui_state_t      s_ui;
 static uint32_t                s_pt_tx_bytes = 0;
@@ -52,6 +57,10 @@ static uint32_t                s_pt_phase_until_ms = 0;
 static bool                    s_pt_first_data = false;
 static bool                    s_running = false;
 static float                   s_entry_offset = 0.0f;
+
+/* DTR 等待期间暂存 USB→UART 数据，进入 IDLE 后一次性转发 */
+static uint8_t                 s_usb_deferred[FLASHER_USB_DEFER_MAX];
+static int                     s_usb_deferred_len = 0;
 
 /* 全局标志：有线桥接激活时，内核 Shell 不消费 Serial 数据 */
 bool g_flasher_bridge_active = false;
@@ -74,6 +83,7 @@ void flasher_init(void *ud)
     s_pt_phase = PT_PHASE_IDLE;
     s_pt_phase_until_ms = 0;
     s_pt_first_data = false;
+    s_usb_deferred_len = 0;
     s_entry_offset = (float)SCREEN_HEIGHT;
 
     flasher_ui_init(&s_ui);
@@ -120,12 +130,13 @@ void flasher_loop(void *ud)
                 hal_delay_ms(50);
                 flasher_set_dtr(false);
                 s_pt_phase = PT_PHASE_BOOTLOADER_WAIT;
-                s_pt_phase_until_ms = hal_get_ticks() + 500;
+                s_pt_phase_until_ms = hal_get_ticks() + FLASHER_BOOT_WAIT_MS;
                 flasher_proto_reset();
                 flasher_ui_set_progress(&s_ui, 0);
                 flasher_ui_set_status(&s_ui, FLASHER_UI_FLASHING);
 #if FLASHER_DBG_ENABLED
-                Serial.printf("[FLASHER] DTR done, waiting bootloader 500ms\n");
+                Serial.printf("[FLASHER] DTR done, waiting bootloader %ums\n",
+                              (unsigned)FLASHER_BOOT_WAIT_MS);
                 Serial.flush();
 #endif
             }
@@ -133,6 +144,16 @@ void flasher_loop(void *ud)
         case PT_PHASE_BOOTLOADER_WAIT:
             if (hal_get_ticks() >= s_pt_phase_until_ms) {
                 s_pt_phase = PT_PHASE_IDLE;
+                /* 转发 DTR 等待期间暂存的 USB 数据到目标板 */
+                if (s_usb_deferred_len > 0) {
+                    for (int i = 0; i < s_usb_deferred_len; i++) {
+                        flasher_proto_feed(s_usb_deferred[i]);
+                    }
+                    flasher_uart_write(s_usb_deferred, s_usb_deferred_len);
+                    s_pt_tx_bytes += (uint32_t)s_usb_deferred_len;
+                    s_pt_last_tx_ms = hal_get_ticks();
+                    s_usb_deferred_len = 0;
+                }
 #if FLASHER_DBG_ENABLED
                 Serial.printf("[FLASHER] bootloader wait done, BRIDGE ACTIVE\n");
                 Serial.flush();
@@ -149,15 +170,17 @@ void flasher_loop(void *ud)
     /* ── 长按 A：手动复位 ── */
     if (event_a == HAL_EVENT_LONG_PRESS) {
 #if FLASHER_DBG_ENABLED
-        Serial.printf("[FLASHER] manual reset: DTR 50ms + wait 500ms\n");
+        Serial.printf("[FLASHER] manual reset: DTR 50ms + wait %ums\n",
+                      (unsigned)FLASHER_BOOT_WAIT_MS);
         Serial.flush();
 #endif
         flasher_set_dtr(true);
         hal_delay_ms(50);
         flasher_set_dtr(false);
         s_pt_phase = PT_PHASE_BOOTLOADER_WAIT;
-        s_pt_phase_until_ms = hal_get_ticks() + 500;
+        s_pt_phase_until_ms = hal_get_ticks() + FLASHER_BOOT_WAIT_MS;
         s_pt_first_data = true;
+        s_usb_deferred_len = 0;
         flasher_proto_reset();
         flasher_ui_set_progress(&s_ui, 0);
         flasher_ui_set_status(&s_ui, FLASHER_UI_FLASHING);
@@ -183,7 +206,9 @@ void flasher_loop(void *ud)
                 s_pt_phase = PT_PHASE_DTR_WAIT;
                 s_pt_phase_until_ms = hal_get_ticks() + 1;
             }
-        } else if (s_pt_phase == PT_PHASE_IDLE) {
+        }
+
+        if (s_pt_phase == PT_PHASE_IDLE) {
             /* 协议自动识别 + 进度解析 */
             for (int i = 0; i < usb_len; i++) {
                 flasher_proto_feed(usb_buf[i]);
@@ -191,6 +216,12 @@ void flasher_loop(void *ud)
             flasher_uart_write(usb_buf, usb_len);
             s_pt_tx_bytes += (uint32_t)usb_len;
             s_pt_last_tx_ms = hal_get_ticks();
+        } else {
+            /* DTR 等待期间暂存 USB 数据，避免 esptool 同步帧因
+             * Serial 缓冲区溢出而丢失。进入 IDLE 后一次性转发 */
+            for (int i = 0; i < usb_len && s_usb_deferred_len < FLASHER_USB_DEFER_MAX; i++) {
+                s_usb_deferred[s_usb_deferred_len++] = usb_buf[i];
+            }
         }
     }
 

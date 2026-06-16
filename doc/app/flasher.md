@@ -55,14 +55,42 @@ flasher_pin_mapping_t g_flasher_pins[FLASHER_AVAILABLE_PINS] = {
    - G36 (RX) → 目标板 TX
 2. **进入烧录器 App**：在主菜单选择 **烧录器**
 3. **桥接激活**：App 启动后自动进入桥接模式，屏幕显示全屏进度条，文字 "BRIDGE..."
-4. **运行 avrdude/esptool**：在 PC 端运行烧录命令
-5. **自动复位**：首次 USB 数据到达时自动触发 DTR 脉冲（G0 LOW 50ms）复位目标板进入 bootloader
+4. **运行烧录工具**（avrdude / esptool / stm32flash，详见下方各平台说明）
+5. **自动复位**：首次 USB 数据到达时自动触发 DTR 脉冲（G0 LOW 50ms，等 80ms 让目标 bootloader 就绪），DTR 期间 PC 数据暂存缓冲、就绪后一次性转发
 6. **观察进度**：全屏进度条实时显示烧录进度
    - BRIDGE...：桥接就绪，等待 PC 端开始烧录
    - FLASHING...：正在烧录（跑马灯动画）
    - SUCCESS!：烧录完成（绿色）
 7. **手动复位**：长按 **BtnA** 可随时手动触发 DTR 复位
 8. **退出**：长按 **BtnB** 退出 App
+
+### ⚠️ ESP32 目标板特别注意
+
+**问题**：M5Stick-C 自身是 ESP32-PICO，PC 端 esptool 打开串口时自动翻转
+DTR/RTS，通过自动下载电路（CP2104: DTR→EN, RTS→GPIO0）将 **M5Stick-C 自身**
+复位进入下载模式，而非目标板。
+
+**解决办法：禁用 esptool 自动复位**，由烧录器负责目标板的 DTR 时序：
+
+```bash
+# 命令行
+esptool.py --before no_reset --after no_reset \
+  --chip esp32 -p /dev/cu.usbserial-xxx write_flash 0x1000 firmware.bin
+```
+
+**PlatformIO 项目**在目标板的 `platformio.ini` 中添加：
+
+```ini
+upload_flags =
+    --before=no_reset
+    --after=no_reset
+```
+
+**操作流程：**
+1. M5Stick-C 进入烧录器桥接模式（显示 "BRIDGE..."）
+2. 长按 **BtnA** 手动触发 DTR → 目标板 ESP32 进入下载模式
+3. 立即在 PC 端运行 esptool（带 `--before no_reset`）
+4. 观察进度条 → FLASHING... → SUCCESS!
 
 ## 进度条设计
 
@@ -111,7 +139,7 @@ UART→USB 方向的数据仅在最近 **2 秒** 内有 USB→UART 转发时才�
 - **波特率**：115200（`flasher_init_pins(115200U)`）
 - **透传方向**：USB (PC) ↔ UART (目标板)
 - **协议**：STK500v1 / ESP32 SLIP（由 avrdude/esptool 在 PC 端实现，M5Stick 仅做桥接）
-- **DTR 时序**：首次 USB 数据到达 → 设置 `PT_PHASE_DTR_WAIT` → 1ms 后 G0 LOW 50ms → HIGH → 等待 500ms bootloader 初始化 → 进入 IDLE 透传
+- **DTR 时序**：首次 USB 数据到达 → 设置 `PT_PHASE_DTR_WAIT` → 1ms 后 G0 LOW 50ms → HIGH → 等待 80ms bootloader 初始化（期间 USB 数据暂存）→ 进入 IDLE 透传（先转发暂存数据）
 
 ## 文件结构
 
