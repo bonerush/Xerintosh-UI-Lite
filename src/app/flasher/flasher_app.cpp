@@ -15,7 +15,8 @@
  *          协议自动识别：
  *              - STK500: 检测到 0x55 (LOAD_ADDR) 或 0x64 (PROG_PAGE) 后确认
  *              - ESP32 SLIP: 检测到 0xC0 帧头 + FLASH_BEGIN(0x02) 或 SYNC(0x08) 后确认
- *              - 两种解析器同时运行，谁先匹配就以谁为准
+ *              - STM32 USART: 检测到 0x7F 自动波特率 或 0x31 0xCE (Write Memory) 后确认
+ *              - 三种解析器同时运行，谁先匹配就以谁为准
  *
  *          RX 噪音过滤：
  *              UART→USB 数据仅在最近 2s 内有 USB→UART 转发时才回传。
