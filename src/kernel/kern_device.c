@@ -9,6 +9,7 @@
 
 #include "kern_device.h"
 #include "kern_init.h"
+#include "kern_sync.h"
 #include "kern_vfs.h"
 
 #include <string.h>
@@ -18,8 +19,21 @@
 /* ═══ 全局设备链表 ═══ */
 
 static kern_device_t *g_device_list = NULL;
+static mutex_t        g_device_list_mutex;
+static bool           g_device_list_initialized = false;
 
-/* ═══ 设备注册 / 查找 ═══ */
+/* ═══ 设备注册表初始化 ═══ */
+
+void kern_device_init(void)
+{
+    if (g_device_list_initialized) {
+        return;
+    }
+    mutex_init(&g_device_list_mutex);
+    g_device_list_initialized = true;
+}
+
+/* ═══ 设备注册 / 查找 / 反注册 ═══ */
 
 kern_err_t kern_device_register(kern_device_t *dev)
 {
@@ -30,9 +44,20 @@ kern_err_t kern_device_register(kern_device_t *dev)
         return KERN_EINVAL;
     }
 
+    mutex_lock(&g_device_list_mutex);
+
     /* 检查同名设备是否已注册 */
-    kern_device_t *existing = kern_device_find(dev->name);
+    kern_device_t *existing = NULL;
+    kern_device_t *cur = g_device_list;
+    while (cur != NULL) {
+        if (strcmp(cur->name, dev->name) == 0) {
+            existing = cur;
+            break;
+        }
+        cur = cur->next;
+    }
     if (existing != NULL) {
+        mutex_unlock(&g_device_list_mutex);
         /* 同一设备指针多次注册视为幂等 */
         if (existing == dev) {
             return KERN_OK;
@@ -50,6 +75,7 @@ kern_err_t kern_device_register(kern_device_t *dev)
     if (written < 0 || (size_t)written >= sizeof(path)) {
         g_device_list = dev->next;
         dev->next = NULL;
+        mutex_unlock(&g_device_list_mutex);
         return KERN_ENOSPC;
     }
 
@@ -57,6 +83,7 @@ kern_err_t kern_device_register(kern_device_t *dev)
     if (inode == NULL) {
         g_device_list = dev->next;
         dev->next = NULL;
+        mutex_unlock(&g_device_list_mutex);
         return KERN_ENOMEM;
     }
 
@@ -69,9 +96,11 @@ kern_err_t kern_device_register(kern_device_t *dev)
         free(inode);
         g_device_list = dev->next;
         dev->next = NULL;
+        mutex_unlock(&g_device_list_mutex);
         return rc;
     }
 
+    mutex_unlock(&g_device_list_mutex);
     kern_log(KERN_LOG_INFO, "device registered: %s", path);
     return KERN_OK;
 }
@@ -82,15 +111,56 @@ kern_device_t *kern_device_find(const char *name)
         return NULL;
     }
 
+    mutex_lock(&g_device_list_mutex);
     kern_device_t *cur = g_device_list;
     while (cur != NULL) {
         if (strcmp(cur->name, name) == 0) {
+            mutex_unlock(&g_device_list_mutex);
             return cur;
         }
         cur = cur->next;
     }
+    mutex_unlock(&g_device_list_mutex);
 
     return NULL;
+}
+
+kern_err_t kern_device_unregister(kern_device_t *dev)
+{
+    if (dev == NULL || dev->name[0] == '\0') {
+        return KERN_EINVAL;
+    }
+
+    mutex_lock(&g_device_list_mutex);
+
+    kern_device_t *prev = NULL;
+    kern_device_t *cur  = g_device_list;
+    while (cur != NULL) {
+        if (cur == dev) {
+            if (prev == NULL) {
+                g_device_list = cur->next;
+            } else {
+                prev->next = cur->next;
+            }
+            cur->next = NULL;
+            break;
+        }
+        prev = cur;
+        cur  = cur->next;
+    }
+
+    mutex_unlock(&g_device_list_mutex);
+
+    if (cur == NULL) {
+        return KERN_ENOENT;
+    }
+
+    char path[KERN_PATH_MAX];
+    int written = snprintf(path, sizeof(path), "/dev/%s", dev->name);
+    if (written > 0 && (size_t)written < sizeof(path)) {
+        kern_vfs_unlink(path);
+    }
+    return KERN_OK;
 }
 
 /* ═══ VFS 桥接函数 ═══
@@ -112,6 +182,7 @@ static kern_device_t *file_to_dev(kern_file_t *f)
     return (kern_device_t *)f->inode->private_data;
 }
 
+/* open 缺失时默认返回 KERN_OK，表示设备无需初始化即可访问 */
 static int bridge_open(kern_file_t *f, unsigned int flags)
 {
     kern_device_t *dev = file_to_dev(f);
@@ -121,6 +192,7 @@ static int bridge_open(kern_file_t *f, unsigned int flags)
     return dev->ops->open(dev, (int)flags);
 }
 
+/* read/write 缺失时返回 KERN_EINVAL，表示该操作不被支持 */
 static ssize_t bridge_read(kern_file_t *f, char *buf, size_t len)
 {
     kern_device_t *dev = file_to_dev(f);

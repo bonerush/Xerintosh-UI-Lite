@@ -207,7 +207,10 @@ static void deferred_kernel_init(void)
     kern_sysfs_init();
 
     /* ── GPIO 文件系统 ── */
-    kern_gpiofs_init();
+    kern_err_t gpio_rc = kern_gpiofs_init();
+    if (gpio_rc != KERN_OK) {
+        kern_log(KERN_LOG_ERROR, "gpiofs init failed: %d", gpio_rc);
+    }
 
     /* ── sysfs → 硬件双向绑定 ── */
 

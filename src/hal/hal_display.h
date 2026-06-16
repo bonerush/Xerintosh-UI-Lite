@@ -52,6 +52,12 @@ extern void hal_display_deinit(void);
 extern void hal_display_clear(void);
 
 /**
+ * @brief 清屏（填充指定颜色）
+ * @param color 16 位 RGB565 颜色
+ */
+extern void hal_display_clear_color(uint16_t color);
+
+/**
  * @brief 将离屏缓冲区内容刷新到物理屏幕
  */
 extern void hal_display_flush(void);

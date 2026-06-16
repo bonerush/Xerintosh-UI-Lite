@@ -1,7 +1,7 @@
 /**
  * @file   kern_devices.h
  * @brief  物理设备初始化头文件
- * @details 注册 /dev/fb0, /dev/input0, /dev/ttyS0 到 VFS。
+ * @details 注册 /dev/fb0, /dev/input0, /dev/ttyS0, /dev/pwrkey 到 VFS。
  *
  * @copyright Copyright (c) 2026
  */

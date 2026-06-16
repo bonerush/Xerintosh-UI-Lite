@@ -26,6 +26,12 @@ extern "C" {
 extern kern_device_t g_ttyS0_dev;
 
 /**
+ * @brief 设置烧录器有线桥接模式是否激活
+ * @note  由 App 层在启动/停止桥接时调用；保留对旧 g_flasher_bridge_active 的兼容。
+ */
+extern void dev_ttyS0_set_bridge_active(bool active);
+
+/**
  * @brief 设备轮询：将数据从硬件串口传输到环形缓冲区（仅 ESP32）
  * @note  必须在主 loop() 中调用，线程安全（单核操作）。
  */

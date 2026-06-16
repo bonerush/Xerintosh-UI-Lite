@@ -109,6 +109,58 @@ TEST_F(KernelDevicesTest, Fb0WriteClearFillsBlack)
     kern_close(fd);
 }
 
+TEST_F(KernelDevicesTest, Fb0WriteClearWithColor)
+{
+    kern_devices_init();
+    kern_fd_t fd = kern_open("/dev/fb0", KERN_O_WRONLY);
+    ASSERT_GE(fd, 0);
+
+    uint8_t clear_cmd[3];
+    clear_cmd[0] = DEV_FB_CMD_CLEAR;
+    uint16_t bg = 0xF800;  /* 红色 */
+    memcpy(clear_cmd + 1, &bg, 2);
+    write_fb_cmd(fd, clear_cmd, sizeof(clear_cmd));
+
+    EXPECT_EQ(hal_test_fb_read(0, 0), 0xF800);
+    EXPECT_EQ(hal_test_fb_read(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2), 0xF800);
+
+    kern_close(fd);
+}
+
+TEST_F(KernelDevicesTest, Fb0InvalidRotation)
+{
+    kern_devices_init();
+    kern_fd_t fd = kern_open("/dev/fb0", KERN_O_WRONLY);
+    ASSERT_GE(fd, 0);
+
+    int rc = kern_ioctl(fd, DEV_FB_IOCTL_SET_ROTATION, 5);
+    EXPECT_LT(rc, 0);
+
+    kern_close(fd);
+}
+
+TEST_F(KernelDevicesTest, Fb0InvalidFillRect)
+{
+    kern_devices_init();
+    kern_fd_t fd = kern_open("/dev/fb0", KERN_O_WRONLY);
+    ASSERT_GE(fd, 0);
+
+    uint8_t cmd[11];
+    cmd[0] = DEV_FB_CMD_FILL_RECT;
+    int16_t x = 5, y = 10, w = 0, h = 15;
+    uint16_t color = 0x07E0;
+    memcpy(cmd + 1, &x, 2);
+    memcpy(cmd + 3, &y, 2);
+    memcpy(cmd + 5, &w, 2);
+    memcpy(cmd + 7, &h, 2);
+    memcpy(cmd + 9, &color, 2);
+
+    ssize_t n = kern_write(fd, (const char *)cmd, sizeof(cmd));
+    EXPECT_LT(n, 0);
+
+    kern_close(fd);
+}
+
 TEST_F(KernelDevicesTest, Fb0WriteFlushDoesNotCrash)
 {
     kern_devices_init();
@@ -247,6 +299,33 @@ TEST_F(KernelDevicesTest, Input0ReadLongPress)
     kern_close(fd);
 }
 
+TEST_F(KernelDevicesTest, Input0MultipleEventsNotLost)
+{
+    kern_devices_init();
+    kern_fd_t fd = kern_open("/dev/input0", KERN_O_RDONLY);
+    ASSERT_GE(fd, 0);
+
+    hal_test_inject_event(HAL_BTN_A, HAL_EVENT_SHORT_PRESS);
+    hal_test_inject_event(HAL_BTN_B, HAL_EVENT_LONG_PRESS);
+
+    uint8_t buf[DEV_INPUT_EVENT_SIZE];
+    dev_input_event_t ev;
+
+    ssize_t n1 = kern_read(fd, (char *)buf, sizeof(buf));
+    EXPECT_EQ(n1, (ssize_t)DEV_INPUT_EVENT_SIZE);
+    memcpy(&ev, buf, DEV_INPUT_EVENT_SIZE);
+    EXPECT_EQ(ev.button, (uint8_t)HAL_BTN_A);
+    EXPECT_EQ(ev.event, (uint8_t)HAL_EVENT_SHORT_PRESS);
+
+    ssize_t n2 = kern_read(fd, (char *)buf, sizeof(buf));
+    EXPECT_EQ(n2, (ssize_t)DEV_INPUT_EVENT_SIZE);
+    memcpy(&ev, buf, DEV_INPUT_EVENT_SIZE);
+    EXPECT_EQ(ev.button, (uint8_t)HAL_BTN_B);
+    EXPECT_EQ(ev.event, (uint8_t)HAL_EVENT_LONG_PRESS);
+
+    kern_close(fd);
+}
+
 TEST_F(KernelDevicesTest, Input0ReadNoEventReturnsNone)
 {
     kern_devices_init();
@@ -343,6 +422,37 @@ TEST_F(KernelDevicesTest, TtyS0ReadEmptyReturnsZero)
     char buf[32];
     ssize_t n = kern_read(fd, buf, sizeof(buf));
     EXPECT_EQ(n, 0);
+
+    kern_close(fd);
+}
+
+TEST_F(KernelDevicesTest, TtyS0ConcurrentReadWrite)
+{
+    kern_devices_init();
+    kern_fd_t fd = kern_open("/dev/ttyS0", KERN_O_RDWR);
+    ASSERT_GE(fd, 0);
+
+    const int total = 256;
+    char write_buf[total];
+    for (int i = 0; i < total; i++) {
+        write_buf[i] = (char)(i % 251);
+    }
+
+    ssize_t written = kern_write(fd, write_buf, total);
+    EXPECT_EQ(written, total);
+
+    char read_buf[total];
+    int read_total = 0;
+    while (read_total < total) {
+        ssize_t n = kern_read(fd, read_buf + read_total, total - read_total);
+        ASSERT_GE(n, 0);
+        if (n == 0) {
+            break;
+        }
+        read_total += (int)n;
+    }
+    EXPECT_EQ(read_total, total);
+    EXPECT_EQ(memcmp(write_buf, read_buf, total), 0);
 
     kern_close(fd);
 }

@@ -13,6 +13,33 @@
 
 #include <string.h>
 
+/* ═══ 事件队列 ═══ */
+
+#define INPUT0_EVENT_QUEUE_SIZE 8
+
+static dev_input_event_t g_event_queue[INPUT0_EVENT_QUEUE_SIZE];
+static uint8_t g_event_head = 0;
+static uint8_t g_event_tail = 0;
+static uint8_t g_event_count = 0;
+
+static void input0_poll_events(void)
+{
+    for (int btn = 0; btn < HAL_BTN_COUNT; btn++) {
+        hal_event_t e = hal_input_get_event((hal_button_t)btn);
+        if (e == HAL_EVENT_NONE) {
+            continue;
+        }
+        if (g_event_count >= INPUT0_EVENT_QUEUE_SIZE) {
+            break;
+        }
+        g_event_queue[g_event_head].button    = (uint8_t)btn;
+        g_event_queue[g_event_head].event     = (uint8_t)e;
+        g_event_queue[g_event_head].timestamp = hal_get_ticks();
+        g_event_head = (uint8_t)((g_event_head + 1) % INPUT0_EVENT_QUEUE_SIZE);
+        g_event_count++;
+    }
+}
+
 /* ═══ 设备回调 ═══ */
 
 static kern_err_t dev_input0_open(kern_device_t *dev, int flags)
@@ -38,18 +65,15 @@ static kern_err_t dev_input0_read(kern_device_t *dev, void *buf, size_t len, siz
         return KERN_EINVAL;
     }
 
-    /* 轮询两个按键，返回第一个检测到的事件 */
+    input0_poll_events();
+
     dev_input_event_t ev;
     memset(&ev, 0, sizeof(ev));
 
-    for (int btn = 0; btn < HAL_BTN_COUNT; btn++) {
-        hal_event_t e = hal_input_get_event((hal_button_t)btn);
-        if (e != HAL_EVENT_NONE) {
-            ev.button    = (uint8_t)btn;
-            ev.event     = (uint8_t)e;
-            ev.timestamp = hal_get_ticks();
-            break;
-        }
+    if (g_event_count > 0) {
+        ev = g_event_queue[g_event_tail];
+        g_event_tail = (uint8_t)((g_event_tail + 1) % INPUT0_EVENT_QUEUE_SIZE);
+        g_event_count--;
     }
 
     memcpy(buf, &ev, DEV_INPUT_EVENT_SIZE);

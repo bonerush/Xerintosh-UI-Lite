@@ -68,6 +68,7 @@ static kern_err_t dev_fb0_write(kern_device_t *dev, const void *buf, size_t len,
             memcpy(&w,     p + pos, 2); pos += 2;
             memcpy(&h,     p + pos, 2); pos += 2;
             memcpy(&color, p + pos, 2); pos += 2;
+            if (w <= 0 || h <= 0) return KERN_EINVAL;
             hal_draw_fill_rect(x, y, w, h, color);
             break;
         }
@@ -75,8 +76,7 @@ static kern_err_t dev_fb0_write(kern_device_t *dev, const void *buf, size_t len,
             if (pos + 2 > len) return KERN_EINVAL;
             uint16_t color;
             memcpy(&color, p + pos, 2); pos += 2;
-            (void)color;
-            hal_display_clear();
+            hal_display_clear_color(color);
             break;
         }
         case DEV_FB_CMD_FLUSH:
@@ -101,6 +101,7 @@ static kern_err_t dev_fb0_ioctl(kern_device_t *dev, unsigned int cmd, unsigned l
     case DEV_FB_IOCTL_GET_HEIGHT:
         return (kern_err_t)SCREEN_HEIGHT;
     case DEV_FB_IOCTL_SET_ROTATION:
+        if (arg > 3) return KERN_EINVAL;
         hal_display_set_rotation((int)arg);
         return KERN_OK;
     default:
