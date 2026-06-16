@@ -10,6 +10,8 @@
 #ifndef KERN_GPIOFS_H
 #define KERN_GPIOFS_H
 
+#include "kern_types.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -21,7 +23,7 @@ extern "C" {
  * @note  创建 /sys/gpio 目录，注册各引脚文件。
  *        需在 VFS 和 sysfs 初始化之后调用。
  */
-extern void kern_gpiofs_init(void);
+extern kern_err_t kern_gpiofs_init(void);
 
 #ifdef __cplusplus
 }

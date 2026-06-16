@@ -54,10 +54,20 @@ uint8_t hal_display_get_brightness(void) {
 }
 
 /**
- * @brief 清屏
+ * @brief 清屏（填充指定颜色）
+ * @param color 16 位 RGB565 颜色
+ */
+void hal_display_clear_color(uint16_t color) {
+    for (size_t i = 0; i < sizeof(g_framebuffer) / sizeof(g_framebuffer[0]); i++) {
+        g_framebuffer[i] = color;
+    }
+}
+
+/**
+ * @brief 清屏（填充背景色）
  */
 void hal_display_clear(void) {
-    memset(g_framebuffer, 0, sizeof(g_framebuffer));
+    hal_display_clear_color(COLOR_BG);
 }
 
 /**
@@ -137,12 +147,20 @@ uint8_t hal_display_get_brightness(void) {
 }
 
 /**
+ * @brief 清屏（填充指定颜色）
+ * @param color 16 位 RGB565 颜色
+ */
+void hal_display_clear_color(uint16_t color) {
+    if (g_canvas) {
+        g_canvas->fillScreen(color);
+    }
+}
+
+/**
  * @brief 清屏（填充背景色）
  */
 void hal_display_clear(void) {
-    if (g_canvas) {
-        g_canvas->fillScreen(COLOR_BG);
-    }
+    hal_display_clear_color(COLOR_BG);
 }
 
 /**

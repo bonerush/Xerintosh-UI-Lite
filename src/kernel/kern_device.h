@@ -32,6 +32,11 @@ typedef struct kern_device kern_device_t;
 /**
  * @brief 设备操作函数表
  * @note  每个设备实现自己的操作表，kernel 通过 bridge 桥接到 VFS
+ *
+ * read/write 返回规范：
+ * - 成功时返回实际传输字节数（read 返回 0 表示 EOF）
+ * - 失败时返回负的错误码（如 KERN_EINVAL）
+ * - bridge 层直接透传该值给 VFS
  */
 typedef struct kern_device_ops {
     kern_err_t  (*open)(kern_device_t *dev, int flags);
@@ -70,6 +75,20 @@ extern kern_err_t kern_device_register(kern_device_t *dev);
  * @return 设备描述符指针，未找到时返回 NULL
  */
 extern kern_device_t *kern_device_find(const char *name);
+
+/**
+ * @brief 初始化设备注册表（含互斥锁）
+ * @note  必须在首次调用 kern_device_register / kern_device_find 前执行
+ */
+extern void kern_device_init(void);
+
+/**
+ * @brief  从注册表反注册设备，并移除 /dev/<name> 节点
+ * @param  dev 已注册设备描述符
+ * @return KERN_OK 成功；KERN_EINVAL 参数错误；KERN_ENOENT 未找到
+ * @note   仅应在无打开 FD 时调用；用于初始化失败回滚
+ */
+extern kern_err_t kern_device_unregister(kern_device_t *dev);
 
 /* ═══ VFS 桥接 ═══ */
 

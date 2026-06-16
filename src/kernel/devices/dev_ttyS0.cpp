@@ -1,5 +1,5 @@
 /**
- * @file   dev_ttyS0.c
+ * @file   dev_ttyS0.cpp
  * @brief  /dev/ttyS0 串口设备实现（统一设备模型）
  * @details 通过环形缓冲区将硬件串口映射为 kern_device_ops_t 回调。
  *
@@ -17,31 +17,39 @@
 #include <string.h>
 
 /* 烧录器有线桥接激活时，Shell 跳过 Serial RX，避免竞争 */
+/* TODO(phase 2.4): 迁移到 app/flasher/flasher.h 声明或改用 dev_ttyS0_set_bridge_active */
 extern bool g_flasher_bridge_active;
-
-#ifdef NATIVE_TEST
-#define TTY_BUF_SIZE  512
-
-static char  g_tty_buf[TTY_BUF_SIZE];
-static int   g_tty_head = 0;
-static int   g_tty_tail = 0;
-static int   g_tty_count = 0;
-#else
-#include <Arduino.h>
+static bool s_ttyS0_bridge_active = false;
 
 #define TTY_RX_BUF_SIZE  512
 #define TTY_TX_BUF_SIZE  512
 
 static char  g_rx_buf[TTY_RX_BUF_SIZE];
-static volatile int g_rx_head = 0;
-static volatile int g_rx_tail = 0;
-static volatile int g_rx_count = 0;
+static volatile uint16_t g_rx_head = 0;
+static volatile uint16_t g_rx_tail = 0;
+static volatile uint16_t g_rx_count = 0;
 
 static char  g_tx_buf[TTY_TX_BUF_SIZE];
-static volatile int g_tx_head = 0;
-static volatile int g_tx_tail = 0;
-static volatile int g_tx_count = 0;
+static volatile uint16_t g_tx_head = 0;
+static volatile uint16_t g_tx_tail = 0;
+static volatile uint16_t g_tx_count = 0;
+
+#ifndef NATIVE_TEST
+#include <Arduino.h>
+static portMUX_TYPE g_ttyS0_mux = portMUX_INITIALIZER_UNLOCKED;
+#define TTY_ENTER_CRITICAL() portENTER_CRITICAL(&g_ttyS0_mux)
+#define TTY_EXIT_CRITICAL()  portEXIT_CRITICAL(&g_ttyS0_mux)
+#else
+#define TTY_ENTER_CRITICAL() do {} while (0)
+#define TTY_EXIT_CRITICAL()  do {} while (0)
 #endif
+
+/* ═══ 桥接状态迁移辅助 ═══ */
+
+void dev_ttyS0_set_bridge_active(bool active)
+{
+    s_ttyS0_bridge_active = active;
+}
 
 /* ═══ 设备回调 ═══ */
 
@@ -66,24 +74,19 @@ static kern_err_t dev_ttyS0_read(kern_device_t *dev, void *buf, size_t len, size
     if (buf == NULL) return KERN_EINVAL;
     char *out = (char *)buf;
 
-#ifdef NATIVE_TEST
-    if (g_tty_count == 0) return 0;
-    size_t total = 0;
-    while (total < len && g_tty_count > 0) {
-        out[total++] = g_tty_buf[g_tty_tail];
-        g_tty_tail = (g_tty_tail + 1) % TTY_BUF_SIZE;
-        g_tty_count--;
-    }
-    return (kern_err_t)total;
-#else
+    TTY_ENTER_CRITICAL();
     size_t total = 0;
     while (total < len && g_rx_count > 0) {
         out[total++] = g_rx_buf[g_rx_tail];
-        g_rx_tail = (g_rx_tail + 1) % TTY_RX_BUF_SIZE;
+        g_rx_tail = (uint16_t)((g_rx_tail + 1) % TTY_RX_BUF_SIZE);
+        #ifndef NATIVE_TEST
         __atomic_fetch_sub(&g_rx_count, 1, __ATOMIC_RELAXED);
+        #else
+        g_rx_count--;
+        #endif
     }
+    TTY_EXIT_CRITICAL();
     return (kern_err_t)total;
-#endif
 }
 
 static kern_err_t dev_ttyS0_write(kern_device_t *dev, const void *buf, size_t len, size_t *offset)
@@ -94,25 +97,32 @@ static kern_err_t dev_ttyS0_write(kern_device_t *dev, const void *buf, size_t le
     if (buf == NULL) return KERN_EINVAL;
     const char *in = (const char *)buf;
 
-#ifdef NATIVE_TEST
-    size_t total = 0;
-    while (total < len) {
-        if (g_tty_count >= TTY_BUF_SIZE) break;
-        g_tty_buf[g_tty_head] = in[total++];
-        g_tty_head = (g_tty_head + 1) % TTY_BUF_SIZE;
-        g_tty_count++;
-    }
-    return (kern_err_t)total;
-#else
+    TTY_ENTER_CRITICAL();
     size_t total = 0;
     while (total < len && g_tx_count < TTY_TX_BUF_SIZE) {
         g_tx_buf[g_tx_head] = in[total];
-        g_tx_head = (g_tx_head + 1) % TTY_TX_BUF_SIZE;
+        g_tx_head = (uint16_t)((g_tx_head + 1) % TTY_TX_BUF_SIZE);
+        #ifndef NATIVE_TEST
         __atomic_fetch_add(&g_tx_count, 1, __ATOMIC_RELAXED);
+        #else
+        g_tx_count++;
+        #endif
         total++;
     }
+
+    #ifdef NATIVE_TEST
+    /* native 环境没有硬件串口，将写入数据复制到 rx buffer 供 loopback 测试 */
+    size_t rx_total = 0;
+    while (rx_total < total && g_rx_count < TTY_RX_BUF_SIZE) {
+        g_rx_buf[g_rx_head] = in[rx_total];
+        g_rx_head = (uint16_t)((g_rx_head + 1) % TTY_RX_BUF_SIZE);
+        g_rx_count++;
+        rx_total++;
+    }
+    #endif
+
+    TTY_EXIT_CRITICAL();
     return (kern_err_t)total;
-#endif
 }
 
 static kern_err_t dev_ttyS0_ioctl(kern_device_t *dev, unsigned int cmd, unsigned long arg)
@@ -137,7 +147,9 @@ static kern_device_ops_t g_ttyS0_ops = {
 
 kern_device_t g_ttyS0_dev;
 
-/* C++17 不支持 C99 designated initializers，用全局对象构造函数完成初始化 */
+/* C++17 不支持 C99 designated initializers，用全局对象构造函数完成初始化。
+ * 该初始化与 g_ttyS0_dev 定义在同一编译单元，顺序确定；
+ * 实际使用点 kern_devices_init() 在 main() 中调用，此时已完成构造。 */
 static struct TtyS0DevInitializer {
     TtyS0DevInitializer() {
         memset(&g_ttyS0_dev, 0, sizeof(g_ttyS0_dev));
@@ -164,14 +176,17 @@ void dev_ttyS0_poll(void)
      * Shell 和 serial_input/serial_monitor/flasher 会竞争同一份数据。
      */
     int rx_limit = 32;
-    if (!serial_input_is_waiting() && !serial_monitor_is_active() && !g_flasher_bridge_active) {
+    TTY_ENTER_CRITICAL();
+    if (!serial_input_is_waiting() && !serial_monitor_is_active() &&
+        !s_ttyS0_bridge_active && !g_flasher_bridge_active) {
         while (rx_limit > 0 && Serial.available() > 0 && g_rx_count < TTY_RX_BUF_SIZE) {
             g_rx_buf[g_rx_head] = (char)Serial.read();
-            g_rx_head = (g_rx_head + 1) % TTY_RX_BUF_SIZE;
+            g_rx_head = (uint16_t)((g_rx_head + 1) % TTY_RX_BUF_SIZE);
             __atomic_fetch_add(&g_rx_count, 1, __ATOMIC_RELAXED);
             rx_limit--;
         }
     }
+    TTY_EXIT_CRITICAL();
 
     /*
      * TX: 从环形缓冲区读取任务写入的数据，发送到硬件串口。
@@ -179,9 +194,16 @@ void dev_ttyS0_poll(void)
      */
     int tx_limit = 64;
     while (tx_limit > 0 && g_tx_count > 0) {
-        Serial.write((uint8_t)g_tx_buf[g_tx_tail]);
-        g_tx_tail = (g_tx_tail + 1) % TTY_TX_BUF_SIZE;
+        TTY_ENTER_CRITICAL();
+        if (g_tx_count == 0) {
+            TTY_EXIT_CRITICAL();
+            break;
+        }
+        char ch = g_tx_buf[g_tx_tail];
+        g_tx_tail = (uint16_t)((g_tx_tail + 1) % TTY_TX_BUF_SIZE);
         __atomic_fetch_sub(&g_tx_count, 1, __ATOMIC_RELAXED);
+        TTY_EXIT_CRITICAL();
+        Serial.write((uint8_t)ch);
         tx_limit--;
     }
 }

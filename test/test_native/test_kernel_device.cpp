@@ -169,6 +169,38 @@ TEST(KernelDeviceTest, FindNonexistentReturnsNull)
     EXPECT_EQ(found, nullptr);
 }
 
+/* ═══ 设备反注册测试 ═══ */
+
+TEST(KernelDeviceTest, UnregisterDevice)
+{
+    static kern_device_ops_t dummy_ops = { 0 };
+    static kern_device_t dummy_dev = {
+        .name = "dummy_unregister",
+        .type = KERN_DEV_CHAR,
+        .ops  = &dummy_ops,
+    };
+
+    kern_init();
+    kern_vfs_init();
+    kern_devfs_init();
+
+    EXPECT_EQ(kern_device_register(&dummy_dev), KERN_OK);
+    EXPECT_NE(kern_path_resolve("/dev/dummy_unregister"), nullptr);
+
+    EXPECT_EQ(kern_device_unregister(&dummy_dev), KERN_OK);
+    EXPECT_EQ(kern_path_resolve("/dev/dummy_unregister"), nullptr);
+}
+
+TEST(KernelDeviceTest, UnregisterNonexistentReturnsEnoent)
+{
+    static kern_device_t dummy_dev = {
+        .name = "dummy_not_found",
+        .type = KERN_DEV_CHAR,
+    };
+
+    EXPECT_EQ(kern_device_unregister(&dummy_dev), KERN_ENOENT);
+}
+
 /* ═══ VFS Bridge 测试 ═══ */
 
 TEST(KernelDeviceTest, CreateFopsReturnsNonNull)
