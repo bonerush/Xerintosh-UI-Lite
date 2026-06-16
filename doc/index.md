@@ -292,6 +292,7 @@ flowchart LR
 |------|------|------|------|------|
 | 2026-06-15 | 第一轮 | `refactor/2026-06-15-kernel-ui` | 内核 O(1) enqueue + FD 池 + P0 ISR；UI dirty rect + XOR 批量 + 缓存 | [归档](refactor/04-archive.md) |
 | 2026-06-15 | 第二轮 | 同上 | 内核 P1-11 + O(1) 插入 + resource 池 + 设备加固；App 包装层 + getter 统一 | [归档 v2](refactor/04-archive-v2.md) |
+| 2026-06-16 | 第八轮 | `refactor/2026-06-16-app-transition-device-optimizations` | 内核设备优化（设备注册表加锁、`/dev/ttyS0`/`fb0`/`input0`、`/sys/gpio`）；UI/App 过渡动画已回滚 | [内核设备优化报告](refactor/02-refactor/kernel-device-optimizations.md) |
 
 ### 两轮合计内核优化
 
@@ -310,3 +311,15 @@ flowchart LR
 
 静态内存增加：~1KB（FD 池 448B + resource 池 512B + 尾指针 12B），
 换取消除运行时堆分配和碎片风险。
+
+### 第八轮内核设备优化（2026-06-16，回滚后保留）
+
+- ✅ 设备注册表加锁与失败回滚（`kern_device.c`）
+- ✅ `/dev/ttyS0` 临界区保护 + 统一 ring buffer + 显式初始化
+- ✅ `/dev/fb0` 清屏颜色协议修复 + rotation/fill_rect 参数校验
+- ✅ `/dev/input0` 小型事件环形队列，避免事件丢失
+- ✅ `/sys/gpio` 临界区 + 方向缓存 + 引脚边界检查
+- ✅ 新增 `hal_display_clear_color()` HAL 抽象
+- ✅ 新增 Native 测试：`test_kernel_device.cpp` / `test_kernel_devices.cpp` / `test_kernel_gpiofs.cpp`
+
+验证结果：`pio run -e m5stick-c` ✅（RAM 28.1%，Flash 88.9%）；`pio test -e native` ✅ 442 passed，1 skipped。
