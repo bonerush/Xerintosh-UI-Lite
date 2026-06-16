@@ -296,7 +296,8 @@ void oscilloscope_ui_mark_dirty(void)
 
 void oscilloscope_ui_draw(const oscilloscope_view_state_t *state)
 {
-    if (!s_frame_dirty) {
+    /* 运行态根据脏标志跳帧；暂停态始终绘制（框架已清屏，不绘制则全黑） */
+    if (!s_frame_dirty && state->running) {
         return;
     }
 
