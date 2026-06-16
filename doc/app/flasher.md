@@ -6,9 +6,9 @@
 
 ## 功能概述
 
-M5Stick-C 作为 USB↔UART 有线桥接器，将 PC 端的 USB 串口数据透传到目标板（Arduino/AVR/ESP32）的 UART。
+M5Stick-C 作为 USB↔UART 有线桥接器，将 PC 端的 USB 串口数据透传到目标板（Arduino/AVR/ESP32/STM32）的 UART。
 
-进入烧录器 App 后，自动激活桥接模式，PC 端运行 avrdude / esptool 即可烧录目标板。
+进入烧录器 App 后，自动激活桥接模式，PC 端运行 avrdude / esptool / stm32flash 即可烧录目标板。
 
 ## 引脚映射
 
@@ -55,7 +55,7 @@ flasher_pin_mapping_t g_flasher_pins[FLASHER_AVAILABLE_PINS] = {
    - G36 (RX) → 目标板 TX
 2. **进入烧录器 App**：在主菜单选择 **烧录器**
 3. **桥接激活**：App 启动后自动进入桥接模式，屏幕显示全屏进度条，文字 "BRIDGE..."
-4. **运行 avrdude/esptool**：在 PC 端运行烧录命令
+4. **运行 avrdude/esptool/stm32flash**：在 PC 端运行烧录命令
 5. **自动复位**：首次 USB 数据到达时自动触发 DTR 脉冲（G0 LOW 50ms）复位目标板进入 bootloader
 6. **观察进度**：全屏进度条实时显示烧录进度
    - BRIDGE...：桥接就绪，等待 PC 端开始烧录
@@ -79,7 +79,11 @@ flasher_pin_mapping_t g_flasher_pins[FLASHER_AVAILABLE_PINS] = {
 - ESP32 SLIP（esptool）：解析 `FLASH_BEGIN(0x02)` 获取总块数
   - 解析 `FLASH_DATA(0x03)` 统计已发送块数
   - 进度 = 已发送块数 / 总块数 × 100
-- 协议自动识别：双解析器同时运行，谁先匹配就以谁为准
+- STM32 USART Bootloader（stm32flash）：解析 Write Memory 命令 (`0x31 0xCE`)
+  - 读入 4 字节大端地址 + 计数值，统计已写入块数
+  - 进度 = 已写入字节数 / 预估总字节数 × 100
+  - 预测方法：预估总容量 = 已见最大相对地址 × 2（与 STK500 相同的启发性公式）
+- 协议自动识别：三种解析器同时运行，谁先匹配就以谁为准
 
 ## RX 噪音过滤
 
@@ -102,7 +106,7 @@ flasher_pin_mapping_t g_flasher_pins[FLASHER_AVAILABLE_PINS] = {
 
 UART→USB 方向的数据仅在最近 **2 秒** 内有 USB→UART 转发时才回传给 PC，避免 Serial1 RX 悬空噪声被误认为目标板响应。
 
-进度计算只解析 USB→UART 方向的 STK500/SLIP 命令，不受 UART RX 噪音影响。
+进度计算只解析 USB→UART 方向的 STK500/SLIP/STM32 命令，不受 UART RX 噪音影响。
 
 ## 透传协议
 
@@ -110,7 +114,7 @@ UART→USB 方向的数据仅在最近 **2 秒** 内有 USB→UART 转发时才�
 
 - **波特率**：115200（`flasher_init_pins(115200U)`）
 - **透传方向**：USB (PC) ↔ UART (目标板)
-- **协议**：STK500v1 / ESP32 SLIP（由 avrdude/esptool 在 PC 端实现，M5Stick 仅做桥接）
+- **协议**：STK500v1 / ESP32 SLIP / STM32 USART Bootloader（由 avrdude/esptool/stm32flash 在 PC 端实现，M5Stick 仅做桥接）
 - **DTR 时序**：首次 USB 数据到达 → 设置 `PT_PHASE_DTR_WAIT` → 1ms 后 G0 LOW 50ms → HIGH → 等待 500ms bootloader 初始化 → 进入 IDLE 透传
 
 ## 文件结构
@@ -118,7 +122,8 @@ UART→USB 方向的数据仅在最近 **2 秒** 内有 USB→UART 转发时才�
 | 文件 | 职责 |
 |------|------|
 | `src/app/flasher/flasher.h` | 公共 App API（init/loop/exit） |
-| `src/app/flasher/flasher_app.cpp` | user_item 生命周期、USB↔UART 透传、STK500/ESP32 SLIP 协议自动识别与进度解析 |
+| `src/app/flasher/flasher_app.cpp` | user_item 生命周期、USB↔UART 透传、STK500/ESP32 SLIP/STM32 USART 协议自动识别与进度解析 |
+| `src/app/flasher/flasher_proto.c/h` | 协议自动识别引擎（STK500/ESP32 SLIP/STM32 USART 三解析器） |
 | `src/app/flasher/flasher_ui.cpp/h` | 全屏进度条 UI 渲染（反色文字、跑马灯） |
 | `src/app/flasher/flasher_gpio.cpp/h` | GPIO 引脚映射管理、UART 配置、DTR 时序 |
 
