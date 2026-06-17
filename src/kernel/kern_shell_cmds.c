@@ -128,22 +128,23 @@ static void cmd_ps(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_
         }
 
         /*
-         * 分步格式化：用多个小 snprintf 替代单个复杂格式串，
-         * 降低 minprintf 实现 bug 的风险，也避免 task->name
-         * 在 yield 后被释放导致悬空指针。
+         * 手动左对齐格式化（避免依赖 minprintf 不支持的对齐标志）。
          */
-        char pid_buf[8];
-        snprintf(pid_buf, sizeof(pid_buf), "%4d", (int)task->pid);
-        kern_shell_print(tty, pid_buf);
+        /* PID: 左对齐 4 字符 */
+        char pid_str[8];
+        int pid_len = snprintf(pid_str, sizeof(pid_str), "%d", (int)task->pid);
+        kern_shell_print(tty, pid_str);
+        for (int p = pid_len; p < 4; p++) kern_shell_print(tty, " ");
         kern_shell_print(tty, " ");
 
         kern_shell_print(tty, state_str);
         kern_shell_print(tty, " ");
 
-        char name_buf[KERN_TASK_NAME_LEN + 4];
-        snprintf(name_buf, sizeof(name_buf), "%12s",
-                 task->name[0] != '\0' ? task->name : "?");
-        kern_shell_print(tty, name_buf);
+        /* 名称: 左对齐 12 字符 */
+        const char *nm = task->name[0] != '\0' ? task->name : "?";
+        kern_shell_print(tty, nm);
+        int nm_len = (int)strlen(nm);
+        for (int n = nm_len; n < 12; n++) kern_shell_print(tty, " ");
         kern_shell_print(tty, " ");
 
         char stack_buf[32];

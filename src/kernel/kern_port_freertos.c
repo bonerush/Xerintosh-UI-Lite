@@ -299,10 +299,9 @@ static size_t kern_port_freertos_thread_stack_usage(kern_port_thread_t thread)
 {
     if (thread == KERN_PORT_THREAD_NULL) return 0;
     TaskHandle_t handle = (TaskHandle_t)thread;
-    uint32_t high_water = uxTaskGetStackHighWaterMark(handle);
-    /* FreeRTOS 返回剩余字数，转换为已使用字节数（近似） */
-    (void)high_water;
-    return 0;  /* 调用者从 TCB 获取 stack_size，此处返回 0 表示"由 FreeRTOS 管理" */
+    UBaseType_t high_water = uxTaskGetStackHighWaterMark(handle);
+    /* 返回剩余栈字数（供调用者乘以 sizeof(StackType_t) 转换为字节） */
+    return (size_t)high_water;
 }
 
 /* ═══ 上下文切换 ═══ */

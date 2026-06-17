@@ -123,14 +123,19 @@ size_t kern_task_stack_usage(kern_task_t *task)
     return (used > 0) ? used : 1;
 }
 
-#else /* ESP32: FreeRTOS 管理栈，无法直接扫描 0xAA */
+#else /* ESP32: FreeRTOS 管理栈，通过 uxTaskGetStackHighWaterMark 查询 */
 
 size_t kern_task_stack_usage(kern_task_t *task)
 {
     if (task == NULL) return 0;
-    /* 通过可移植层查询栈使用量 */
+    /* 通过可移植层查询剩余栈字数，转换为已使用字节 */
     if (task->port_thread != KERN_PORT_THREAD_NULL) {
-        return kern_port_thread_stack_usage(task->port_thread);
+        size_t free_words = kern_port_thread_stack_usage(task->port_thread);
+        /* ESP32 上 sizeof(StackType_t) == 4 */
+        size_t free_bytes = free_words * 4;
+        return (task->stack_size > free_bytes)
+               ? (task->stack_size - free_bytes)
+               : 0;
     }
     return 0;
 }
