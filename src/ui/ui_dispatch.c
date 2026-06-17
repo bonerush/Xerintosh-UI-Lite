@@ -66,6 +66,12 @@ static void dispatch_enter_list(xerintosh_list_item_t *item)
         item->child_list_item[i]->y_list_item = 0;
     g_xerintosh_selector.selected_index = 0;
     g_xerintosh_selector.selected_item = item->child_list_item[0];
+
+    /* 弹簧动画：进入子菜单时清零速度，保证入场和回退动画从零弹起 */
+    g_xerintosh_selector.v_y_selector = 0.0f;
+    g_xerintosh_selector.v_w_selector = 0.0f;
+    g_xerintosh_selector.v_h_selector = 0.0f;
+
     if (item->init_function) {
         item->init_function(item->user_data);
     }
