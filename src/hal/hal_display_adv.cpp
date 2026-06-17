@@ -112,10 +112,13 @@ void hal_draw_xor_rect(int16_t x, int16_t y, int16_t w, int16_t h) {
     if (y + h > ch) h = ch - y;
     if (w <= 0 || h <= 0) return;
 
-    /* 静态缓冲：一次读取整个选择器区域，XOR 后一次写回，避免逐行 readRect/pushImage */
-    static uint16_t xor_buf[160 * 30];  /* 最大 160×30 = 4800 像素，9600 字节在 .bss 段 */
+    /* 静态缓冲：一次读取整个选择器区域，XOR 后一次写回，避免逐行 readRect/pushImage
+     * 最大尺寸：横屏下选择器宽度 ≤160，高度 ≤22（字体+边距），160×22 = 3520 像素 = 7040 字节
+     * 竖屏下只需 80×22 = 1760 像素。比之前的 160×30(9600B) 节省最多 2560B */
+    #define XOR_BUF_MAX_PX 3520
+    static uint16_t xor_buf[XOR_BUF_MAX_PX];
     int total = w * h;
-    if (total > (int)(sizeof(xor_buf) / sizeof(xor_buf[0]))) return;
+    if (total > XOR_BUF_MAX_PX) return;
 
     g_canvas->readRect(x, y, w, h, xor_buf);
     for (int i = 0; i < total; i++)

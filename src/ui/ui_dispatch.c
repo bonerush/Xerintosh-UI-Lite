@@ -16,6 +16,28 @@
 
 #include <stdio.h>
 
+/* ═══ 工具函数 ═══ */
+
+/**
+ * @brief 轻量级 int16_t → 字符串转换，替代 sprintf 减少代码体积
+ * @param val  待转换的值
+ * @param buf  输出缓冲区（至少 7 字节："-32768\0"）
+ * @return     输出缓冲区指针
+ * @note   热路径（每帧渲染滑块时调用），避免 snprintf 的格式解析开销
+ */
+static char *dispatch_itoa(int16_t val, char *buf)
+{
+    char *p = buf;
+    if (val < 0) { *p++ = '-'; val = (int16_t)(-val); }
+    if (val >= 10000) { *p++ = (char)('0' + val / 10000); val %= 10000; }
+    if (val >= 1000)  { *p++ = (char)('0' + val / 1000);  val %= 1000;  }
+    if (val >= 100)   { *p++ = (char)('0' + val / 100);   val %= 100;   }
+    if (val >= 10)    { *p++ = (char)('0' + val / 10);    val %= 10;    }
+    *p++ = (char)('0' + val);
+    *p = '\0';
+    return buf;
+}
+
 /* ═══ enter ═══ */
 
 static void dispatch_enter_user(xerintosh_list_item_t *item)
@@ -232,7 +254,7 @@ static void dispatch_draw_slider(xerintosh_list_item_t *item, int16_t x, int16_t
     if (!sl->is_confirmed)
     {
         char value_str[10] = {};
-        sprintf(value_str, "%d", *sl->value);
+        dispatch_itoa(*sl->value, value_str);
         int16_t value_width = hal_get_string_width(value_str);
         int16_t x_value = SCREEN_WIDTH - LIST_ITEM_RIGHT_MARGIN - value_width + 2;
         g_xerintosh_draw_color = COLOR_FG;
@@ -249,7 +271,7 @@ static void dispatch_draw_overlay_slider(xerintosh_list_item_t *item)
     if (!xerintosh_is_item_visible(y)) return;
 
     char value_str[10] = {};
-    sprintf(value_str, "%d", *sl->value);
+    dispatch_itoa(*sl->value, value_str);
     int16_t value_width = hal_get_string_width(value_str);
     int16_t x_value = SCREEN_WIDTH - LIST_ITEM_RIGHT_MARGIN - value_width + 2;
 

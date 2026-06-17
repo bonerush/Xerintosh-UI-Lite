@@ -29,7 +29,7 @@ void xerintosh_draw_info_bar()
   /* 超时后向屏幕上方移出 */
   if (g_xerintosh_info_bar.time - g_xerintosh_info_bar.time_start >= g_xerintosh_info_bar.span)
   {
-    g_xerintosh_info_bar.y_info_bar_trg = 0 - 2 * INFO_BAR_HEIGHT;
+    g_xerintosh_info_bar.y_info_bar_trg = -2 * INFO_BAR_HEIGHT;
     if (g_xerintosh_info_bar.y_info_bar == g_xerintosh_info_bar.y_info_bar_trg)
       g_xerintosh_info_bar.is_running = false;
   }
@@ -100,7 +100,7 @@ void xerintosh_draw_pop_up()
   /* 超时后向上移出 */
   if (g_xerintosh_pop_up.time - g_xerintosh_pop_up.time_start >= g_xerintosh_pop_up.span)
   {
-    g_xerintosh_pop_up.y_pop_up_trg = 0 - 2 * POP_UP_HEIGHT;
+    g_xerintosh_pop_up.y_pop_up_trg = -2 * POP_UP_HEIGHT;
     if (g_xerintosh_pop_up.y_pop_up == g_xerintosh_pop_up.y_pop_up_trg)
       g_xerintosh_pop_up.is_running = false;
   }

@@ -71,9 +71,9 @@ static const char *resolve_path(const char *cwd, const char *arg,
 
 /* ═══ 命令历史（环形缓冲区）═══ */
 
-#define HISTORY_SIZE 16
+#define HISTORY_SIZE 8
 
-static char g_history[HISTORY_SIZE][128]; /* 最多 16 条命令，各 128 字节 */
+static char g_history[HISTORY_SIZE][64]; /* 最多 8 条命令，各 64 字节 */
 static int  g_hist_count = 0;            /* 历史条数 */
 static int  g_hist_index = 0;            /* 写入位置（环形） */
 
@@ -87,7 +87,7 @@ void shell_history_add(const char *cmd)
     int last = (g_hist_count > 0) ? ((g_hist_count - 1) % HISTORY_SIZE) : -1;
     if (last >= 0 && strcmp(g_history[last], cmd) == 0) return;
 
-    strncpy(g_history[g_hist_index], cmd, 127);
+    strncpy(g_history[g_hist_index], cmd, 63);
     g_history[g_hist_index][127] = '\0';
     g_hist_index = (g_hist_index + 1) % HISTORY_SIZE;
     if (g_hist_count < HISTORY_SIZE) g_hist_count++;

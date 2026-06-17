@@ -35,10 +35,3 @@ void xerintosh_clear_dirty(void)
 {
     xerintosh_get_context()->dirty = false;
 }
-
-/* ═══ 向后兼容 ═══ */
-
-void xerintosh_mark_dirty(void)
-{
-    xerintosh_invalidate();
-}

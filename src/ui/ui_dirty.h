@@ -57,13 +57,6 @@ bool xerintosh_is_dirty(void);
  */
 void xerintosh_clear_dirty(void);
 
-/* ═══ 向后兼容（已弃用，新代码请使用 xerintosh_invalidate()）═══ */
-
-/**
- * @deprecated 使用 xerintosh_invalidate() 替代
- */
-void xerintosh_mark_dirty(void);
-
 #ifdef __cplusplus
 }
 #endif

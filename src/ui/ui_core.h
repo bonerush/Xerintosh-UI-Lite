@@ -111,16 +111,9 @@ extern bool xerintosh_is_in_user_item(void);
 /**
  * @brief  标记 UI 脏状态，触发下一帧清屏重绘
  * @note   App 内任何需要即时重绘的操作（数据更新、状态变化、计时器等）
- *         调用此函数确保下一帧画布被清空。
- *         框架内部（动画、输入事件）已自动设置脏标志，无需额外调用。
- * @deprecated 使用 xerintosh_invalidate() 替代
- */
-extern void xerintosh_mark_dirty(void);
-
 /**
  * @brief  标记 UI 为脏状态，请求下一帧全量重绘
- * @note   与 xerintosh_mark_dirty() 功能相同，命名更规范。
- *         user_item 内部不需要调用（框架每帧自动清屏）。
+ * @note   user_item 内部不需要调用（框架每帧自动清屏）。
  *         菜单模式下非动画触发状态变化时调用。
  */
 extern void xerintosh_invalidate(void);

@@ -30,8 +30,6 @@ bool xerintosh_is_in_user_item()
   return (user != NULL && user->in_user_item);
 }
 
-/* xerintosh_mark_dirty() / xerintosh_invalidate() 实现已迁移到 ui_dirty.c */
-
 /* ═══ 动画工具 ═══ */
 
 /**
