@@ -24,6 +24,7 @@ extern "C" {
 typedef struct xerintosh_selector_t
 {
   float y_selector, y_selector_trg, w_selector, w_selector_trg, h_selector, h_selector_trg;  /* 位置与尺寸 */
+  float v_y_selector, v_w_selector, v_h_selector;  /* 弹簧动画速度状态 */
   uint8_t selected_index;        /* 当前选中索引 */
   xerintosh_list_item_t *selected_item;  /* 当前选中项指针 */
 } xerintosh_selector_t;

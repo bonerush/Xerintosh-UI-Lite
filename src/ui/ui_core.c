@@ -58,6 +58,48 @@ void xerintosh_animation(float *_pos, float _pos_trg, float _speed)
   }
 }
 
+/* ═══ 弹簧动画（二阶欠阻尼系统） ═══ */
+
+/**
+ * @brief  弹簧动画函数
+ * @details 基于自动控制理论二阶弹簧-阻尼器离散模型（additive damping）：
+ *          force = stiffness * (target - pos) - damping * velocity
+ *          velocity += force
+ *          position += velocity
+ *
+ *          当 stiffness=0.10, damping=0.30 时（ζ≈0.47），产生约18%超调
+ *          和1-2次可见弹跳后稳定，形成"QQ弹弹"的视觉效果。
+ *
+ * @param  _pos      当前位置指针（会被直接更新）
+ * @param  _vel      当前速度指针（会被直接更新）
+ * @param  _pos_trg  目标位置
+ * @param  _stiffness 刚度系数（越大响应越快，典型 0.05-0.20）
+ * @param  _damping  粘性阻尼系数（越大衰减越快，典型 0.20-0.50）
+ */
+void xerintosh_spring_animation(float *_pos, float *_vel, float _pos_trg,
+                                 float _stiffness, float _damping)
+{
+  if (!g_anim_enabled) {
+    *_pos = _pos_trg;
+    *_vel = 0.0f;
+    return;
+  }
+
+  /* F = k*(target - x) - c*v */
+  float force = _stiffness * (_pos_trg - *_pos) - _damping * (*_vel);
+  *_vel += force;
+  *_pos += *_vel;
+
+  /* 靠近目标且速度足够小时吸附并清零速度 */
+  if (fabsf(*_pos - _pos_trg) < 0.5f && fabsf(*_vel) < 0.5f) {
+    *_pos = _pos_trg;
+    *_vel = 0.0f;
+    return;
+  }
+
+  xerintosh_invalidate();  /* 动画进行中，标记需要重绘 */
+}
+
 /* ═══ 控件位置刷新 ═══ */
 
 /**
@@ -150,9 +192,15 @@ void xerintosh_refresh_selector_position()
   g_xerintosh_selector.y_selector_trg = g_xerintosh_selector.selected_item->y_list_item_trg - hal_get_font_height() + 1;
   g_xerintosh_selector.w_selector_trg = xerintosh_dispatch_measure(g_xerintosh_selector.selected_item);
   g_xerintosh_selector.h_selector_trg = hal_get_font_height() + 4;
-  xerintosh_animation(&g_xerintosh_selector.y_selector, g_xerintosh_selector.y_selector_trg, ANIM_SPEED_SELECTOR);
-  xerintosh_animation(&g_xerintosh_selector.w_selector, g_xerintosh_selector.w_selector_trg, ANIM_SPEED_SELECTOR);
-  xerintosh_animation(&g_xerintosh_selector.h_selector, g_xerintosh_selector.h_selector_trg, ANIM_SPEED_SELECTOR_H);
+  xerintosh_spring_animation(&g_xerintosh_selector.y_selector, &g_xerintosh_selector.v_y_selector,
+                              g_xerintosh_selector.y_selector_trg,
+                              SPRING_STIFFNESS_SELECTOR, SPRING_DAMPING_SELECTOR);
+  xerintosh_spring_animation(&g_xerintosh_selector.w_selector, &g_xerintosh_selector.v_w_selector,
+                              g_xerintosh_selector.w_selector_trg,
+                              SPRING_STIFFNESS_SELECTOR, SPRING_DAMPING_SELECTOR);
+  xerintosh_spring_animation(&g_xerintosh_selector.h_selector, &g_xerintosh_selector.v_h_selector,
+                              g_xerintosh_selector.h_selector_trg,
+                              SPRING_STIFFNESS_SELECTOR, SPRING_DAMPING_SELECTOR);
 }
 
 /* ═══ 主循环 ═══ */

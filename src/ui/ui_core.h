@@ -69,6 +69,22 @@ extern void xerintosh_refresh_camera_position(void);
  */
 extern void xerintosh_animation(float *_pos, float _pos_trg, float _speed);
 
+/**
+ * @brief  弹簧动画函数（二阶欠阻尼系统）
+ * @param  _pos      当前位置指针（会被直接更新）
+ * @param  _vel      当前速度指针（会被直接更新）
+ * @param  _pos_trg  目标位置
+ * @param  _stiffness 刚度系数（越大回弹越快，典型 0.05-0.20）
+ * @param  _damping  粘性阻尼系数（越大衰减越快，典型 0.20-0.50）
+ * @note   基于自动控制理论二阶弹簧-阻尼器模型（additive damping）：
+ *         force = k*(target-x) - c*v; v += force; x += v
+ * @note   当 stiffness=0.10, damping=0.30 时 ζ≈0.47，产生约18%超调弹性效果
+ * @note   当 g_anim_enabled 为 false 时直接跳转到目标位置
+ * @note   靠近目标(<0.5px)且速度足够小(<0.5px/frame)时自动吸附
+ */
+extern void xerintosh_spring_animation(float *_pos, float *_vel, float _pos_trg,
+                                        float _stiffness, float _damping);
+
 /* ═══ 状态查询 ═══ */
 
 /**

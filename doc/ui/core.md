@@ -321,6 +321,75 @@ void xerintosh_animation(float *_pos, float _pos_trg, float _speed)
 | `ANIM_SPEED_POP_UP_W` | `speed + 4` | 96 | 弹窗宽度 |
 | `ANIM_SPEED_EXIT` | `speed + 2` | 94 | 退场遮罩高度 |
 
+### 弹簧动画（Spring Animation）
+
+*📄 Source: [ui_core.c](../../src/ui/ui_core.c#L63-L88)*
+
+自 Round 10 起，选择器（selector）的 Y/W/H 动画从一阶指数衰减升级为**二阶弹簧-阻尼器模型**，产生"QQ弹弹"的弹性过渡效果。
+
+```c
+void xerintosh_spring_animation(float *_pos, float *_vel, float _pos_trg,
+                                 float _stiffness, float _damping)
+{
+  if (!g_anim_enabled) {
+    *_pos = _pos_trg;
+    *_vel = 0.0f;
+    return;
+  }
+
+  /* F = k*(target - x) - c*v   （二阶弹簧-阻尼器离散模型） */
+  float force = _stiffness * (_pos_trg - *_pos) - _damping * (*_vel);
+  *_vel += force;
+  *_pos += *_vel;
+
+  /* 靠近目标(<0.5px)且速度足够小(<0.5px/frame)时吸附到位 */
+  if (fabsf(*_pos - _pos_trg) < 0.5f && fabsf(*_vel) < 0.5f) {
+    *_pos = _pos_trg;
+    *_vel = 0.0f;
+  }
+}
+```
+
+#### 中文伪代码拆解
+
+```
+函数 弹簧动画(当前位置, 当前速度, 目标位置, 刚度k, 阻尼c) {
+    if (动画全局禁用) {
+        当前位置 = 目标位置
+        当前速度 = 0
+        return
+    }
+
+    // 弹簧力 + 阻尼力 = 合外力
+    合力 = k * (目标 - 当前位置) - c * 当前速度
+    当前速度 += 合力     // 加速度积分
+    当前位置 += 当前速度  // 速度积分
+
+    // 吸附：当接近目标且速度很小时，直接锁定
+    if (|当前位置 - 目标| < 0.5 且 |当前速度| < 0.5) {
+        当前位置 = 目标位置
+        当前速度 = 0
+    }
+}
+```
+
+#### 参数选择与效果
+
+| 参数 | 值 | ζ（阻尼比） | 超调量 | 稳定帧数 | 视觉效果 |
+|------|-----|-----------|--------|---------|---------|
+| `SPRING_STIFFNESS_SELECTOR` | 0.10 | — | — | — | 控制回弹"硬度" |
+| `SPRING_DAMPING_SELECTOR` | 0.30 | ζ ≈ 0.47 | ~18% | ~25帧 | 1-2次可见弹跳 |
+
+**核心思想**：基于经典控制理论的二阶弹簧-阻尼器模型：
+- `stiffness` (k)：刚度系数，越大系统响应越快、振荡频率越高
+- `damping` (c)：粘性阻尼系数，越大能量衰减越快、弹跳越少
+- 阻尼比 ζ = c / (2√k) ≈ 0.47 < 1，产生欠阻尼响应（有弹性）
+- 当前参数组合经过手动逐帧仿真验证，在 80x160 屏幕上产生舒适的弹性过渡
+
+**与一阶动画的关系**：
+- **弹簧动画**：仅用于选择器（高亮框 Y/W/H），提供弹性过渡
+- **一阶动画 `xerintosh_animation()`**：用于列表项、相机、信息栏、弹窗、退场动画，保持平滑无弹跳
+
 ---
 
 ## 相机系统
@@ -374,7 +443,7 @@ void xerintosh_refresh_camera_position()
 
 ## 选择器位置刷新（含宽度缓存）
 
-*📄 Source: [ui_core.c](../../src/ui/ui_core.c#L133-L151)*
+*📄 Source: [ui_core.c](../../src/ui/ui_core.c#L138-L153)*
 
 ```c
 void xerintosh_refresh_selector_position()
@@ -385,11 +454,19 @@ void xerintosh_refresh_selector_position()
   g_xerintosh_selector.y_selector_trg = g_xerintosh_selector.selected_item->y_list_item_trg - hal_get_font_height() + 1;
   g_xerintosh_selector.w_selector_trg = xerintosh_dispatch_measure(g_xerintosh_selector.selected_item);
   g_xerintosh_selector.h_selector_trg = hal_get_font_height() + 4;
-  xerintosh_animation(&g_xerintosh_selector.y_selector, g_xerintosh_selector.y_selector_trg, ANIM_SPEED_SELECTOR);
-  xerintosh_animation(&g_xerintosh_selector.w_selector, g_xerintosh_selector.w_selector_trg, ANIM_SPEED_SELECTOR);
-  xerintosh_animation(&g_xerintosh_selector.h_selector, g_xerintosh_selector.h_selector_trg, ANIM_SPEED_SELECTOR_H);
+  xerintosh_spring_animation(&g_xerintosh_selector.y_selector, &g_xerintosh_selector.v_y_selector,
+                              g_xerintosh_selector.y_selector_trg,
+                              SPRING_STIFFNESS_SELECTOR, SPRING_DAMPING_SELECTOR);
+  xerintosh_spring_animation(&g_xerintosh_selector.w_selector, &g_xerintosh_selector.v_w_selector,
+                              g_xerintosh_selector.w_selector_trg,
+                              SPRING_STIFFNESS_SELECTOR, SPRING_DAMPING_SELECTOR);
+  xerintosh_spring_animation(&g_xerintosh_selector.h_selector, &g_xerintosh_selector.v_h_selector,
+                              g_xerintosh_selector.h_selector_trg,
+                              SPRING_STIFFNESS_SELECTOR, SPRING_DAMPING_SELECTOR);
 }
 ```
+
+> **Round 10 变更**：选择器动画从 `xerintosh_animation()`（一阶指数衰减）升级为 `xerintosh_spring_animation()`（二阶弹簧-阻尼器）。速度状态 `v_y/w/h_selector` 存储在 `xerintosh_selector_t` 结构体中，标记到新目标时自动清零。
 
 ### 选择器宽度缓存机制
 

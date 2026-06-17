@@ -51,6 +51,12 @@ bool xerintosh_bind_item_to_selector(xerintosh_list_item_t *_item)
   }
   g_xerintosh_selector.selected_index = find_item_index(_item->parent, _item);
   g_xerintosh_selector.selected_item = _item;
+
+  /* 弹簧动画：切换目标时清零速度，防止旧速度影响新目标 */
+  g_xerintosh_selector.v_y_selector = 0.0f;
+  g_xerintosh_selector.v_w_selector = 0.0f;
+  g_xerintosh_selector.v_h_selector = 0.0f;
+
   xerintosh_invalidate();
 
   return true;
@@ -83,6 +89,10 @@ void xerintosh_selector_go_next_item()
   {
     g_xerintosh_selector.selected_item = children[0];
     g_xerintosh_selector.selected_index = 0;
+    /* 弹簧动画：边界跳转时清零速度 */
+    g_xerintosh_selector.v_y_selector = 0.0f;
+    g_xerintosh_selector.v_w_selector = 0.0f;
+    g_xerintosh_selector.v_h_selector = 0.0f;
     return;
   }
 
@@ -114,6 +124,10 @@ void xerintosh_selector_go_prev_item()
   {
     g_xerintosh_selector.selected_item = children[count - 1];
     g_xerintosh_selector.selected_index = count - 1;
+    /* 弹簧动画：边界跳转时清零速度 */
+    g_xerintosh_selector.v_y_selector = 0.0f;
+    g_xerintosh_selector.v_w_selector = 0.0f;
+    g_xerintosh_selector.v_h_selector = 0.0f;
     return;
   }
 
