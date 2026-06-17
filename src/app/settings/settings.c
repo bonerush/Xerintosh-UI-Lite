@@ -10,6 +10,7 @@
 #include "settings.h"
 
 #include "app/storage/storage.h"
+#include "ui/ui_types.h"  /* g_spring_anim_mode, g_spring_stiffness_selector, g_spring_damping_selector */
 
 /* ═══ 全局状态定义 ═══ */
 
@@ -18,6 +19,8 @@ int16_t g_anim_speed_level       = 5;                        /* 默认动画速�
 int16_t g_screen_rotation_level  = ORIENTATION_LANDSCAPE;    /* 默认横屏 */
 bool    g_is_landscape           = true;                     /* 默认横屏 */
 int16_t g_serial_baud_rate       = 5;                        /* 默认波特率等级 5 = 115200 */
+int16_t g_spring_stiffness_level  = 5;                        /* 默认弹簧硬度等级 5 → 0.20 */
+int16_t g_spring_damping_level    = 9;                        /* 默认弹簧阻尼等级 9 → 0.36 */
 
 /* ═══ 从存储加载 ═══ */
 
@@ -75,6 +78,25 @@ void settings_load_from_storage(void)
     } else {
         g_serial_baud_rate = 5; /* 默认 115200 */
     }
+
+    /* 弹簧动画风格（true=动弹, false=普通） */
+    g_spring_anim_mode = storage_get_spring_mode();
+
+    /* 弹簧硬度等级（1-10） */
+    int16_t saved_stiff = storage_get_spring_stiffness();
+    if (saved_stiff >= 1 && saved_stiff <= 10) {
+        g_spring_stiffness_level = saved_stiff;
+    }
+
+    /* 弹簧阻尼等级（1-10） */
+    int16_t saved_damp = storage_get_spring_damping();
+    if (saved_damp >= 1 && saved_damp <= 10) {
+        g_spring_damping_level = saved_damp;
+    }
+
+    /* 同步弹簧参数到 UI 全局变量 */
+    g_spring_stiffness_selector = settings_spring_stiffness_hw_value(g_spring_stiffness_level);
+    g_spring_damping_selector   = settings_spring_damping_hw_value(g_spring_damping_level);
 }
 
 /* ═══ Getter/Setter ═══ */
@@ -163,5 +185,49 @@ int32_t settings_serial_baud_hw_value(int16_t level)
         return s_baud_rate_table[BAUD_RATE_TABLE_SIZE - 1]; /* 最大值 */
     }
     return s_baud_rate_table[level - 1];
+}
+
+/* ═══ 弹簧动画值转换 ═══ */
+
+/**
+ * @brief 将弹簧硬度等级转换为实际浮点值
+ * @param  level 等级 1-10
+ * @return 浮点刚度值（level * 0.04，范围 0.04-0.40）
+ */
+float settings_spring_stiffness_hw_value(int16_t level)
+{
+    if (level < 1) level = 5;
+    if (level > 10) level = 10;
+    return (float)level * 0.04f;
+}
+
+/**
+ * @brief 将弹簧阻尼等级转换为实际浮点值
+ * @param  level 等级 1-10
+ * @return 浮点阻尼值（level * 0.04，范围 0.04-0.40）
+ */
+float settings_spring_damping_hw_value(int16_t level)
+{
+    if (level < 1) level = 9;
+    if (level > 10) level = 10;
+    return (float)level * 0.04f;
+}
+
+/* ═══ 弹簧硬度/阻尼 Getter/Setter ═══ */
+
+int16_t settings_get_spring_stiffness(void) { return g_spring_stiffness_level; }
+void settings_set_spring_stiffness(int16_t level) {
+    if (level < 1) level = 1;
+    if (level > 10) level = 10;
+    g_spring_stiffness_level = level;
+    g_spring_stiffness_selector = settings_spring_stiffness_hw_value(level);
+}
+
+int16_t settings_get_spring_damping(void) { return g_spring_damping_level; }
+void settings_set_spring_damping(int16_t level) {
+    if (level < 1) level = 1;
+    if (level > 10) level = 10;
+    g_spring_damping_level = level;
+    g_spring_damping_selector = settings_spring_damping_hw_value(level);
 }
 

@@ -115,6 +115,44 @@ bool     storage_get_anim_enabled(void);
  */
 void     storage_set_anim_enabled(bool val);
 
+/* ═══ 弹簧动画设置（Round 10+） ═══ */
+
+/**
+ * @brief  从存储读取弹簧动画模式（true=动弹弹簧, false=普通一阶）
+ * @return 模式值；未设置时默认返回 true
+ */
+bool     storage_get_spring_mode(void);
+
+/**
+ * @brief  保存弹簧动画模式到存储
+ * @param  val 模式值
+ */
+void     storage_set_spring_mode(bool val);
+
+/**
+ * @brief  从存储读取弹簧刚度等级（1-10）
+ * @return 等级值；未设置时默认返回 5
+ */
+int16_t  storage_get_spring_stiffness(void);
+
+/**
+ * @brief  保存弹簧刚度等级到存储
+ * @param  val 等级值（1-10）
+ */
+void     storage_set_spring_stiffness(int16_t val);
+
+/**
+ * @brief  从存储读取弹簧阻尼等级（1-10）
+ * @return 等级值；未设置时默认返回 9
+ */
+int16_t  storage_get_spring_damping(void);
+
+/**
+ * @brief  保存弹簧阻尼等级到存储
+ * @param  val 等级值（1-10）
+ */
+void     storage_set_spring_damping(int16_t val);
+
 /* ═══ 屏幕旋转 ═══ */
 
 /**

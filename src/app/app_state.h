@@ -29,6 +29,9 @@ extern void on_anim_speed_change_cb(void *ud);
 extern void on_anim_enabled_change_cb(void *ud);
 extern void on_screen_rotation_change_cb(void *ud);
 extern void on_serial_baud_change_cb(void *ud);
+extern void on_spring_mode_change_cb(void *ud);
+extern void on_spring_stiffness_change_cb(void *ud);
+extern void on_spring_damping_change_cb(void *ud);
 
 #ifdef __cplusplus
 }

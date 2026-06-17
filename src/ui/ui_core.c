@@ -192,15 +192,21 @@ void xerintosh_refresh_selector_position()
   g_xerintosh_selector.y_selector_trg = g_xerintosh_selector.selected_item->y_list_item_trg - hal_get_font_height() + 1;
   g_xerintosh_selector.w_selector_trg = xerintosh_dispatch_measure(g_xerintosh_selector.selected_item);
   g_xerintosh_selector.h_selector_trg = hal_get_font_height() + 4;
-  xerintosh_spring_animation(&g_xerintosh_selector.y_selector, &g_xerintosh_selector.v_y_selector,
-                              g_xerintosh_selector.y_selector_trg,
-                              SPRING_STIFFNESS_SELECTOR, SPRING_DAMPING_SELECTOR);
-  xerintosh_spring_animation(&g_xerintosh_selector.w_selector, &g_xerintosh_selector.v_w_selector,
-                              g_xerintosh_selector.w_selector_trg,
-                              SPRING_STIFFNESS_SELECTOR, SPRING_DAMPING_SELECTOR);
-  xerintosh_spring_animation(&g_xerintosh_selector.h_selector, &g_xerintosh_selector.v_h_selector,
-                              g_xerintosh_selector.h_selector_trg,
-                              SPRING_STIFFNESS_SELECTOR, SPRING_DAMPING_SELECTOR);
+  if (g_spring_anim_mode) {
+    xerintosh_spring_animation(&g_xerintosh_selector.y_selector, &g_xerintosh_selector.v_y_selector,
+                                g_xerintosh_selector.y_selector_trg,
+                                g_spring_stiffness_selector, g_spring_damping_selector);
+    xerintosh_spring_animation(&g_xerintosh_selector.w_selector, &g_xerintosh_selector.v_w_selector,
+                                g_xerintosh_selector.w_selector_trg,
+                                g_spring_stiffness_selector, g_spring_damping_selector);
+    xerintosh_spring_animation(&g_xerintosh_selector.h_selector, &g_xerintosh_selector.v_h_selector,
+                                g_xerintosh_selector.h_selector_trg,
+                                g_spring_stiffness_selector, g_spring_damping_selector);
+  } else {
+    xerintosh_animation(&g_xerintosh_selector.y_selector, g_xerintosh_selector.y_selector_trg, ANIM_SPEED_SELECTOR);
+    xerintosh_animation(&g_xerintosh_selector.w_selector, g_xerintosh_selector.w_selector_trg, ANIM_SPEED_SELECTOR);
+    xerintosh_animation(&g_xerintosh_selector.h_selector, g_xerintosh_selector.h_selector_trg, ANIM_SPEED_SELECTOR_H);
+  }
 }
 
 /* ═══ 主循环 ═══ */

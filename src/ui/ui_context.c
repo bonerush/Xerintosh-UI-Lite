@@ -8,6 +8,12 @@
 
 #include "ui_context.h"
 #include "ui_item.h"   /* for xerintosh_selector_t, xerintosh_camera_t 等完整类型 */
+#include "ui_types.h"
+
+/* ═══ 选择器弹簧动画参数（运行时可调） ═══ */
+float g_spring_stiffness_selector = SPRING_STIFFNESS_SELECTOR_DEFAULT;
+float g_spring_damping_selector   = SPRING_DAMPING_SELECTOR_DEFAULT;
+bool  g_spring_anim_mode          = true;  /* 默认动弹（弹簧动画） */
 
 /* ═══ 内部存储（不再暴露为全局符号）═══ */
 

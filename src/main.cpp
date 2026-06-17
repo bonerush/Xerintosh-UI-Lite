@@ -89,6 +89,33 @@ extern "C" void on_anim_enabled_change_cb(void *ud)
 }
 
 /**
+ * @brief 弹簧动画风格变更回调（动弹/普通）
+ */
+extern "C" void on_spring_mode_change_cb(void *ud)
+{
+    (void)ud;
+    storage_set_spring_mode(g_spring_anim_mode);
+}
+
+/**
+ * @brief 弹簧硬度变更回调
+ */
+extern "C" void on_spring_stiffness_change_cb(void *ud)
+{
+    (void)ud;
+    storage_set_spring_stiffness(g_spring_stiffness_level);
+}
+
+/**
+ * @brief 弹簧阻尼变更回调
+ */
+extern "C" void on_spring_damping_change_cb(void *ud)
+{
+    (void)ud;
+    storage_set_spring_damping(g_spring_damping_level);
+}
+
+/**
  * @brief 波特率变更回调
  * @note  保存新波特率等级到 NVS，并重新初始化 Serial
  */

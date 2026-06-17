@@ -81,6 +81,14 @@ static void build_settings_items(xerintosh_list_item_t *root)
     xerintosh_list_item_t *sl_anim = xerintosh_new_slider_item(
         "动画速度", &g_anim_speed_level, 1, 1, 10,
         NULL, on_anim_speed_change_cb, default_icon);
+    xerintosh_list_item_t *sw_spring = xerintosh_new_switch_item(
+        "动画风格", &g_spring_anim_mode, NULL, on_spring_mode_change_cb, default_icon);
+    xerintosh_list_item_t *sl_stiff = xerintosh_new_slider_item(
+        "弹簧硬度", &g_spring_stiffness_level, 1, 1, 10,
+        NULL, on_spring_stiffness_change_cb, default_icon);
+    xerintosh_list_item_t *sl_damp = xerintosh_new_slider_item(
+        "反弹力度", &g_spring_damping_level, 1, 1, 10,
+        NULL, on_spring_damping_change_cb, default_icon);
     xerintosh_list_item_t *sw_rot = xerintosh_new_switch_item(
         "横屏/竖屏", &g_is_landscape, NULL, on_screen_rotation_change_cb, default_icon);
 
@@ -95,6 +103,9 @@ static void build_settings_items(xerintosh_list_item_t *root)
     app_menu_push_checked(root, sl1, "亮度");
     app_menu_push_checked(root, sw_anim, "动画效果");
     app_menu_push_checked(root, sl_anim, "动画速度");
+    app_menu_push_checked(root, sw_spring, "动画风格");
+    app_menu_push_checked(root, sl_stiff, "弹簧硬度");
+    app_menu_push_checked(root, sl_damp, "反弹力度");
     app_menu_push_checked(root, sw_rot, "横屏/竖屏");
     app_menu_push_checked(root, flasher_pin_menu, "烧录器引脚");
     app_menu_push_checked(root, baud_menu, "波特率");

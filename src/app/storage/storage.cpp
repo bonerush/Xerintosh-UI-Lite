@@ -30,6 +30,12 @@ uint8_t  storage_get_anim_speed(void) { return 92; }
 void     storage_set_anim_speed(uint8_t val) { (void)val; }
 bool     storage_get_anim_enabled(void) { return true; }
 void     storage_set_anim_enabled(bool val) { (void)val; }
+bool     storage_get_spring_mode(void) { return true; }
+void     storage_set_spring_mode(bool val) { (void)val; }
+int16_t  storage_get_spring_stiffness(void) { return 5; }
+void     storage_set_spring_stiffness(int16_t val) { (void)val; }
+int16_t  storage_get_spring_damping(void) { return 9; }
+void     storage_set_spring_damping(int16_t val) { (void)val; }
 uint8_t  storage_get_screen_rotation(void) { return 2; }
 void     storage_set_screen_rotation(uint8_t val) { (void)val; }
 int16_t  storage_get_serial_baud_rate(void) { return 5; }
@@ -331,6 +337,71 @@ void storage_set_anim_enabled(bool val) {
     Preferences prefs;
     prefs.begin(NVS_NAMESPACE, false);
     prefs.putBool("anim_enabled", val);
+    prefs.end();
+}
+
+/* ═══ 弹簧动画设置（Round 10+） ═══ */
+
+bool storage_get_spring_mode(void) {
+    Preferences prefs;
+    prefs.begin(NVS_NAMESPACE, true);
+
+    if (!prefs.isKey("spring_mode")) {
+        prefs.end();
+        return true; /* 默认动弹 */
+    }
+
+    bool val = prefs.getBool("spring_mode", true);
+    prefs.end();
+    return val;
+}
+
+void storage_set_spring_mode(bool val) {
+    Preferences prefs;
+    prefs.begin(NVS_NAMESPACE, false);
+    prefs.putBool("spring_mode", val);
+    prefs.end();
+}
+
+int16_t storage_get_spring_stiffness(void) {
+    Preferences prefs;
+    prefs.begin(NVS_NAMESPACE, true);
+
+    if (!prefs.isKey("spring_stiff")) {
+        prefs.end();
+        return 5; /* 默认刚度等级 5 → 0.20 */
+    }
+
+    int16_t val = (int16_t)prefs.getUChar("spring_stiff", 5);
+    prefs.end();
+    return val;
+}
+
+void storage_set_spring_stiffness(int16_t val) {
+    Preferences prefs;
+    prefs.begin(NVS_NAMESPACE, false);
+    prefs.putUChar("spring_stiff", (uint8_t)val);
+    prefs.end();
+}
+
+int16_t storage_get_spring_damping(void) {
+    Preferences prefs;
+    prefs.begin(NVS_NAMESPACE, true);
+
+    if (!prefs.isKey("spring_damp")) {
+        prefs.end();
+        return 9; /* 默认阻尼等级 9 → 0.36 */
+    }
+
+    int16_t val = (int16_t)prefs.getUChar("spring_damp", 9);
+    prefs.end();
+    return val;
+}
+
+void storage_set_spring_damping(int16_t val) {
+    Preferences prefs;
+    prefs.begin(NVS_NAMESPACE, false);
+    prefs.putUChar("spring_damp", (uint8_t)val);
     prefs.end();
 }
 

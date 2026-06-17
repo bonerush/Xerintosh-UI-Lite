@@ -30,20 +30,13 @@ extern "C" {
 #define ANIM_SPEED_CAMERA       (g_anim_speed + 4) /* 相机动画速度 */
 #define ANIM_SPEED_EXIT         (g_anim_speed + 2) /* 退出动画速度 */
 
-/* ═══ 弹簧动画参数常量 ═══ */
+/* ═══ 弹簧动画参数（运行时可调） ═══ */
+extern float g_spring_stiffness_selector;  /* 弹簧刚度，默认 0.20f（设置>弹簧硬度） */
+extern float g_spring_damping_selector;    /* 弹簧阻尼，默认 0.35f（设置>反弹力度） */
+extern bool  g_spring_anim_mode;           /* true=动弹弹力, false=普通一阶 */
 
-/**
- * @brief 选择器弹簧刚度（控制回弹速度）
- * @note  值越大回弹越快，0.10 配合 damping=0.30 产生 ~18% 超调弹性效果
- */
-#define SPRING_STIFFNESS_SELECTOR  0.10f
-
-/**
- * @brief 选择器弹簧粘性阻尼系数（控制振荡衰减速度）
- * @note  damping/(2*sqrt(stiffness)) = 0.30/0.632 = 0.474 (欠阻尼 ζ≈0.47)
- *        产生约 1-2 次可见弹跳后稳定到目标
- */
-#define SPRING_DAMPING_SELECTOR    0.30f
+#define SPRING_STIFFNESS_SELECTOR_DEFAULT  0.20f
+#define SPRING_DAMPING_SELECTOR_DEFAULT    0.35f
 
 /* ═══ 字体 ═══ */
 
