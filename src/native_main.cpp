@@ -39,12 +39,113 @@ void on_spring_damping_change_cb(void *ud) { (void)ud; }
  */
 TEST(AnimationTest, EasingConverges)
 {
+    xerintosh_context_init();
+    g_anim_enabled = true;
     float pos = 0.0f;
     float target = 100.0f;
     for (int i = 0; i < 200; i++) {
         xerintosh_animation(&pos, target, 92.0f);
     }
     EXPECT_FLOAT_EQ(pos, target);
+}
+
+/**
+ * @brief 测试动画靠近目标时的吸附行为（diff <= threshold 直接跳转）
+ */
+TEST(AnimationTest, SnapsWhenClose)
+{
+    xerintosh_context_init();
+    g_anim_enabled = true;
+    float pos = 99.5f;
+    float target = 100.0f;
+    xerintosh_animation(&pos, target, 50.0f);
+    EXPECT_FLOAT_EQ(pos, target) << "Should snap to target when within 1.0f";
+}
+
+/**
+ * @brief 测试动画禁用时直接跳转到目标
+ */
+TEST(AnimationTest, InstantJumpWhenDisabled)
+{
+    xerintosh_context_init();
+    g_anim_enabled = false;
+    float pos = 0.0f;
+    float target = 100.0f;
+    xerintosh_animation(&pos, target, 50.0f);
+    EXPECT_FLOAT_EQ(pos, target) << "Should instant-jump when disabled";
+}
+
+/**
+ * @brief 测试 speed 超过上限时被裁剪到 ANIM_SPEED_MAX
+ */
+TEST(AnimationTest, SpeedClampedToMax)
+{
+    xerintosh_context_init();
+    g_anim_enabled = true;
+    float pos1 = 0.0f, pos2 = 0.0f;
+    float target = 100.0f;
+    /* speed=99.9 被裁剪到 99.0，行为应与 speed=99 一致（步进最大） */
+    for (int i = 0; i < 20; i++) {
+        xerintosh_animation(&pos1, target, 99.0f);
+        xerintosh_animation(&pos2, target, 150.0f);  /* 应被裁剪到 99 */
+    }
+    EXPECT_FLOAT_EQ(pos1, pos2) << "Speed beyond max should be clamped";
+}
+
+/**
+ * @brief 测试 speed 低于下限时被裁剪
+ */
+TEST(AnimationTest, SpeedClampedToMin)
+{
+    xerintosh_context_init();
+    g_anim_enabled = true;
+    float pos1 = 0.0f, pos2 = 0.0f;
+    float target = 100.0f;
+    for (int i = 0; i < 20; i++) {
+        xerintosh_animation(&pos1, target, 0.0f);
+        xerintosh_animation(&pos2, target, -50.0f);  /* 应被裁剪到 0 */
+    }
+    EXPECT_FLOAT_EQ(pos1, pos2) << "Negative speed should be clamped to zero";
+}
+
+/**
+ * @brief 测试负方向移动
+ */
+TEST(AnimationTest, MovesTowardNegativeTarget)
+{
+    xerintosh_context_init();
+    g_anim_enabled = true;
+    float pos = 100.0f;
+    float target = 0.0f;
+    for (int i = 0; i < 80; i++) {
+        xerintosh_animation(&pos, target, 92.0f);
+    }
+    EXPECT_LT(pos, 1.0f) << "Should move toward negative target";
+}
+
+/**
+ * @brief 测试返回值：动画进行中返回 false
+ */
+TEST(AnimationTest, ReturnsFalseWhileAnimating)
+{
+    xerintosh_context_init();
+    g_anim_enabled = true;
+    float pos = 0.0f;
+    bool settled = xerintosh_animation(&pos, 100.0f, 92.0f);
+    EXPECT_FALSE(settled) << "Should return false while still animating";
+}
+
+/**
+ * @brief 测试返回值：已稳定时返回 true
+ */
+TEST(AnimationTest, ReturnsTrueWhenSettled)
+{
+    xerintosh_context_init();
+    g_anim_enabled = true;
+    float pos = 50.0f;
+    float target = 50.0f;
+    bool settled = xerintosh_animation(&pos, target, 92.0f);
+    EXPECT_TRUE(settled) << "Should return true when already at target";
 }
 
 /* ═══ 列表项测试 ═══ */

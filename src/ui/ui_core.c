@@ -11,6 +11,7 @@
 #include "ui_dirty.h"
 #include <stdio.h>
 #include "ui_drawer.h"
+#include "ui_types.h"
 #include <math.h>
 #include "app/shutdown/power_key_popup.h"
 
@@ -37,25 +38,34 @@ bool xerintosh_is_in_user_item()
  * @brief  通用缓动动画函数
  * @param  _pos     当前位置指针（会被直接更新）
  * @param  _pos_trg 目标位置
- * @param  _speed   动画速度（0~99，越大越快）
+ * @param  _speed   动画速度（自动裁剪到 ANIM_SPEED_MIN..ANIM_SPEED_MAX）
+ * @return true  位置已稳定在目标
+ * @return false 动画进行中（位置已更新）
  * @note   公式：current += (target - current) / (100 - speed)
- * @note   当 g_anim_enabled 为 false 时直接跳转到目标位置
+ * @note   速度越大动画越快。speed=0 最慢，speed=99 最快。
+ * @note   当 g_anim_enabled 为 false 时直接跳转到目标位置。
+ * @note   diff <= ANIM_SNAP_THRESHOLD 时直接吸附到目标。
  */
-void xerintosh_animation(float *_pos, float _pos_trg, float _speed)
+bool xerintosh_animation(float *_pos, float _pos_trg, float _speed)
 {
   if (*_pos != _pos_trg)
   {
     if (!g_anim_enabled) {
       *_pos = _pos_trg;
-      return;
+      return true;
     }
-    if (_speed >= 99.0f) _speed = 99.0f;
-    if (fabsf(*_pos - _pos_trg) <= 1.0f) *_pos = _pos_trg;
-    else {
-      *_pos += (_pos_trg - *_pos) / (100.0f - _speed);
-      xerintosh_invalidate();  /* 动画进行中，标记需要重绘 */
+    /* 速度边界裁剪 */
+    if (_speed > ANIM_SPEED_MAX) _speed = ANIM_SPEED_MAX;
+    if (_speed < ANIM_SPEED_MIN) _speed = ANIM_SPEED_MIN;
+    if (fabsf(*_pos - _pos_trg) <= ANIM_SNAP_THRESHOLD) {
+      *_pos = _pos_trg;
+      return true;
     }
+    *_pos += (_pos_trg - *_pos) / (100.0f - _speed);
+    xerintosh_invalidate();  /* 动画进行中，标记需要重绘 */
+    return false;
   }
+  return true;
 }
 
 /* ═══ 弹簧动画（二阶欠阻尼系统） ═══ */
@@ -69,6 +79,12 @@ void xerintosh_animation(float *_pos, float _pos_trg, float _speed)
  *
  *          当 stiffness=0.10, damping=0.30 时（ζ≈0.47），产生约18%超调
  *          和1-2次可见弹跳后稳定，形成"QQ弹弹"的视觉效果。
+ *
+ *          稳定性分析（Euler 积分离散化）：
+ *          状态转移矩阵特征值 |λ| = sqrt(1 - damping) < 1（∀ damping > 0）
+ *          系统绝对收敛，永不发散。当前参数范围 stiffness∈[0.04,0.40]、
+ *          damping∈[0.04,0.40] 均满足该条件。吸附阈值 0.5px 保证
+ *          最终精确到位。
  *
  * @param  _pos      当前位置指针（会被直接更新）
  * @param  _vel      当前速度指针（会被直接更新）

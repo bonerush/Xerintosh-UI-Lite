@@ -47,16 +47,21 @@ bool xerintosh_anim_row_list_update(xerintosh_anim_row_list_t *list, float speed
     for (int i = 0; i < list->visible_count && i < ANIM_ROW_MAX; i++) {
         xerintosh_animation(&list->rows[i].y, list->rows[i].y_trg, speed);
         xerintosh_animation(&list->rows[i].w, list->rows[i].w_trg, speed);
-        if (fabsf(list->rows[i].y - list->rows[i].y_trg) > 0.5f)
+        /* 同时检查 y 和 w 两个维度的稳定状态 */
+        if (fabsf(list->rows[i].y - list->rows[i].y_trg) > 0.5f
+            || fabsf(list->rows[i].w - list->rows[i].w_trg) > 0.5f)
             all_settled = false;
     }
 
     xerintosh_animation(&list->highlight.y, list->highlight.y_trg, speed);
     xerintosh_animation(&list->highlight.w, list->highlight.w_trg, speed);
-    if (fabsf(list->highlight.y - list->highlight.y_trg) > 0.5f)
+    if (fabsf(list->highlight.y - list->highlight.y_trg) > 0.5f
+        || fabsf(list->highlight.w - list->highlight.w_trg) > 0.5f)
         all_settled = false;
 
     xerintosh_animation(&list->scroll_offset, list->scroll_offset_trg, speed);
+    if (fabsf(list->scroll_offset - list->scroll_offset_trg) > 0.5f)
+        all_settled = false;
 
     return all_settled;
 }

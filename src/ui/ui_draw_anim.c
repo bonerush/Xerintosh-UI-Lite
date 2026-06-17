@@ -131,10 +131,10 @@ void xerintosh_draw_exit_animation()
 
     /* 屏幕方向/尺寸切换时，防止目标值残留旧尺寸 */
     if (g_xerintosh_exit_anim_prev_screen_h != SCREEN_HEIGHT) {
-        float max_h = SCREEN_HEIGHT + 8;
+        float max_h = (float)SCREEN_HEIGHT + 8.0f;
         if (g_xerintosh_exit_anim_temp_h > max_h) g_xerintosh_exit_anim_temp_h = max_h;
         if (g_xerintosh_exit_animation_status == 0) g_xerintosh_exit_anim_temp_h_trg = max_h;
-        g_xerintosh_exit_anim_prev_screen_h = SCREEN_HEIGHT;
+        g_xerintosh_exit_anim_prev_screen_h = (int16_t)SCREEN_HEIGHT;
     }
 
     /* 绘制全屏黑色遮罩 */

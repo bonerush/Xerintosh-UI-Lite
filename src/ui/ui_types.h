@@ -30,6 +30,11 @@ extern "C" {
 #define ANIM_SPEED_CAMERA       (g_anim_speed + 4) /* 相机动画速度 */
 #define ANIM_SPEED_EXIT         (g_anim_speed + 2) /* 退出动画速度 */
 
+/* ═══ 动画内部常量（供 xerintosh_animation 使用）═══ */
+#define ANIM_SPEED_MAX          99.0f   /* 速度上限（防止分母过小） */
+#define ANIM_SPEED_MIN          0.0f    /* 速度下限 */
+#define ANIM_SNAP_THRESHOLD     1.0f    /* 吸附阈值：diff < 此值时直接跳转到目标 */
+
 /* ═══ 弹簧动画参数（运行时可调） ═══ */
 extern float g_spring_stiffness_selector;  /* 弹簧刚度，默认 0.20f（设置>弹簧硬度） */
 extern float g_spring_damping_selector;    /* 弹簧阻尼，默认 0.35f（设置>反弹力度） */

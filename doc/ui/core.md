@@ -305,7 +305,9 @@ void xerintosh_animation(float *_pos, float _pos_trg, float _speed)
 }
 ```
 
-**核心思想**：这是一个**指数衰减缓动**。每次调用只移动剩余距离的一个比例，比例由 `speed` 控制。`speed` 越接近 100，除数越小，移动越快。速度上限为 99，保证除数至少为 1，避免除零。
+**核心思想**：这是一个**指数衰减缓动**。每次调用只移动剩余距离的一个比例，比例由 `speed` 控制。`speed` 越接近 ANIM_SPEED_MAX(99.0f)，除数越小，移动越快。速度上限为 ANIM_SPEED_MAX，保证除数至少为 1，避免除零。速度下限为 ANIM_SPEED_MIN(0.0f)，防止异常负值导致反向运动。
+
+**返回值**：`true` 表示位置已稳定在目标（已到位或已吸附），`false` 表示动画仍在进行中。调用方可据此判断是否需要继续重绘。
 
 ### 动画速度参考表
 
@@ -320,6 +322,16 @@ void xerintosh_animation(float *_pos, float _pos_trg, float _speed)
 | `ANIM_SPEED_POP_UP_Y` | `speed + 2` | 94 | 弹窗Y坐标 |
 | `ANIM_SPEED_POP_UP_W` | `speed + 4` | 96 | 弹窗宽度 |
 | `ANIM_SPEED_EXIT` | `speed + 2` | 94 | 退场遮罩高度 |
+
+### 动画内部常量
+
+*📄 Source: [ui_types.h](../../src/ui/ui_types.h#L33-L35)*
+
+| 常量 | 值 | 用途 |
+|------|-----|------|
+| `ANIM_SPEED_MAX` | 99.0f | 速度上限（防止分母趋零） |
+| `ANIM_SPEED_MIN` | 0.0f | 速度下限（防负值反向） |
+| `ANIM_SNAP_THRESHOLD` | 1.0f | 吸附阈值（diff < 此值时直接跳转） |
 
 ### 弹簧动画（Spring Animation）
 

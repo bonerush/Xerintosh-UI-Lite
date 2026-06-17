@@ -61,13 +61,16 @@ extern void xerintosh_refresh_camera_position(void);
 
 /**
  * @brief  通用缓动动画函数
- * @param  _pos    当前位置指针（会被直接更新）
+ * @param  _pos     当前位置指针（会被直接更新）
  * @param  _pos_trg 目标位置
- * @param  _speed   动画速度（0~99，越大越快）
+ * @param  _speed   动画速度（自动裁剪到 ANIM_SPEED_MIN..ANIM_SPEED_MAX）
+ * @return true  位置已稳定在目标（已到位或已吸附）
+ * @return false 动画仍在进行中
  * @note   公式：current += (target - current) / (100 - speed)
- * @note   当 g_anim_enabled 为 false 时直接跳转到目标位置
+ * @note   当 g_anim_enabled 为 false 时直接跳转到目标位置。
+ * @note   diff <= ANIM_SNAP_THRESHOLD (1.0f) 时直接吸附到目标。
  */
-extern void xerintosh_animation(float *_pos, float _pos_trg, float _speed);
+extern bool xerintosh_animation(float *_pos, float _pos_trg, float _speed);
 
 /**
  * @brief  弹簧动画函数（二阶欠阻尼系统）
