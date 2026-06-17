@@ -94,6 +94,9 @@ FreeRTOS 继续在底层为 WiFi/BT 协议栈服务。SMP 模式下 Xeros 在每
 | GPIO 桥接 | [kern-gpiofs.md](kern-gpiofs.md) | `kern_gpiofs.c/h` | /sys/gpio 引脚状态映射与读写 |
 | 版本信息 | [kern-version.md](kern-version.md) | `kern_version.h` | 版本号与开发者信息集中管理 |
 | 物理设备 | [kern-devices.md](kern-devices.md) | `devices/kern_devices.c` 等 | `/dev/fb0` 帧缓冲、`/dev/input0` 按键、`/dev/ttyS0` 串口 |
+| — `/dev/fb0` | [dev-fb0.md](dev-fb0.md) | `devices/dev_fb0.c/h` | 帧缓冲设备（清屏/填充/旋转） |
+| — `/dev/input0` | [dev-input0.md](dev-input0.md) | `devices/dev_input0.c/h` | 按键输入设备（事件环形队列） |
+| — `/dev/ttyS0` | [dev-ttys0.md](dev-ttys0.md) | `devices/dev_ttyS0.cpp/h` | 串口 UART 设备（ring buffer + 临界区保护） |
 | Shell 命令 | [kern-shell-cmds.md](kern-shell-cmds.md) | `kern_shell_cmds.c/h` | 30+ 内置命令实现与动态注册 |
 | Shell 解析器 | [kern-shell-parser.md](kern-shell-parser.md) | `kern_shell_parser.c/h` | 输入行解析（引号支持、参数分割） |
 

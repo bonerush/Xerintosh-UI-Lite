@@ -20,9 +20,9 @@ App 层是用户应用代码所在。每个 App 在独立子目录中，通过 `
 | 串口监视器 | [serial-monitor.md](serial-monitor.md) | `src/app/serial_monitor/` | 串口监视器 App（SER/BLE 双数据源 + 入场滑入动画 + 按钮平滑过渡） |
 | 烧录器 | [flasher.md](flasher.md) | `src/app/flasher/` | USB↔UART 有线桥接器（STK500/ESP32 协议自动识别 + GPIO 引脚映射 + 全屏进度条） |
 | 开机画面 | — | `src/app/boot/` | Macintosh 128K 风格开机动画 |
-| 关机屏幕 | — | `src/app/shutdown/` | 关机画面 + 电源键长按弹窗 |
+| 关机屏幕 | [shutdown.md](shutdown.md) | `src/app/shutdown/` | 关机画面 + 电源键长按弹窗 |
 | 示波器 | [oscilloscope.md](oscilloscope.md) | `src/app/oscilloscope/` | G36 单通道示波器 App |
-| Token Usage | — | `src/app/token_usage/` | Token 用量统计 |
+| Token Usage | [token-usage.md](token-usage.md) | `src/app/token_usage/` | Token 用量统计 |
 | 关于页面 | — | `src/app/about/` | 版本/Logo/开发者信息 |
 | 存储 | — | `src/app/storage.cpp/h` | NVS 持久化存储封装 |
 | WiFi 管理 | — | `src/app/wifi/wifi_manager.cpp/h` | WiFi 状态机（扫描/连接/密码输入） |

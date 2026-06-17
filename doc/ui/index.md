@@ -17,6 +17,10 @@ UI 核心层是 Xerintosh 菜单框架的主体，纯 C 实现。它提供菜单
 | 类型派发表 | [dispatch.md](dispatch.md) | `src/ui/ui_dispatch.c` | 函数指针数组替代内联 switch，O(1) 类型路由 |
 | 全局上下文 | [context.md](context.md) | `src/ui/ui_context.c/h` | 单例状态容器、向后兼容宏、退场动画状态迁移 |
 | 绘制管线 | [drawer.md](drawer.md) | `src/ui/ui_draw_*.c`, `ui_drawer.h` | 列表外观、选择器 XOR 高亮、弹窗与信息栏、退场动画、图标 |
+| — 列表绘制 | [draw-list.md](draw-list.md) | `src/ui/ui_draw_list.c` | 列表项背景、文字、滚动条、跑马灯 |
+| — 退场动画 | [draw-anim.md](draw-anim.md) | `src/ui/ui_draw_anim.c` | 退场遮罩渲染（沙漏 + 扫描线） |
+| — 弹窗与信息栏 | [draw-widgets.md](draw-widgets.md) | `src/ui/ui_draw_widgets.c` | pop-up 弹窗、info bar 信息栏渲染 |
+| — 图标渲染 | [draw-icons.md](draw-icons.md) | `src/ui/ui_draw_icons.c` | XBM 位图图标绘制 |
 | 行列表动画 | [ui-anim-row.md](ui-anim-row.md) | `src/ui/ui_anim_row.c/h` | 可复用行列表动画工具（入场滑入 + 高亮平滑过渡） |
 | 脏矩形管理 | [ui-dirty.md](ui-dirty.md) | `src/ui/ui_dirty.c/h` | 统一 invalidate / is_dirty / clear_dirty API |
 

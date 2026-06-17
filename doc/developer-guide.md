@@ -624,7 +624,7 @@ flowchart TB
     LOOP -.-> SVC
 ```
 
-*📄 Source: [ui_task.c](../../src/ui/ui_task.c), [ui_service.c](../../src/app/ui_service.c)*
+*📄 Source: [ui_task.c](../../src/app/ui_task.c), [ui_service.c](../../src/app/ui_service.c)*
 
 ---
 

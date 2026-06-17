@@ -96,7 +96,7 @@ bool xerintosh_dispatch_has_right_control(xerintosh_list_item_t *item);
 
 ### dispatch_enter_list — 进入子菜单
 
-*📄 Source: [ui_dispatch.c](../../src/ui/ui_dispatch.c-L64)*
+*📄 Source: [ui_dispatch.c](../../src/ui/ui_dispatch.c#L64)*
 
 ```c
 static void dispatch_enter_list(xerintosh_list_item_t *item)
@@ -136,7 +136,7 @@ static void dispatch_enter_list(xerintosh_list_item_t *item)
 
 ### dispatch_enter_user — 进入全屏 App
 
-*📄 Source: [ui_dispatch.c](../../src/ui/ui_dispatch.c-L25)*
+*📄 Source: [ui_dispatch.c](../../src/ui/ui_dispatch.c#L25)*
 
 ```c
 static void dispatch_enter_user(xerintosh_list_item_t *item)
@@ -176,7 +176,7 @@ static void dispatch_enter_user(xerintosh_list_item_t *item)
 
 ### dispatch_enter_switch — 切换开关
 
-*📄 Source: [ui_dispatch.c](../../src/ui/ui_dispatch.c-L32)*
+*📄 Source: [ui_dispatch.c](../../src/ui/ui_dispatch.c#L32)*
 
 ```c
 static void dispatch_enter_switch(xerintosh_list_item_t *item)
@@ -191,7 +191,7 @@ static void dispatch_enter_switch(xerintosh_list_item_t *item)
 
 ### dispatch_enter_slider — 滑条确认/退出编辑
 
-*📄 Source: [ui_dispatch.c](../../src/ui/ui_dispatch.c-L51)*
+*📄 Source: [ui_dispatch.c](../../src/ui/ui_dispatch.c#L51)*
 
 ```c
 static void dispatch_enter_slider(xerintosh_list_item_t *item)
@@ -218,7 +218,7 @@ static void dispatch_enter_slider(xerintosh_list_item_t *item)
 
 ### dispatch_enter_button — 触发按钮回调
 
-*📄 Source: [ui_dispatch.c](../../src/ui/ui_dispatch.c-L39)*
+*📄 Source: [ui_dispatch.c](../../src/ui/ui_dispatch.c#L39)*
 
 ```c
 static void dispatch_enter_button(xerintosh_list_item_t *item)

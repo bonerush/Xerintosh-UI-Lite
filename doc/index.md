@@ -40,7 +40,13 @@ Project Root
 │   ├── [核心引擎](ui/core.md)          ← 动画插值、生命周期管理、主循环调度
 │   ├── [类型派发表](ui/dispatch.md)    ← 函数指针数组 O(1) 类型路由（替代内联 switch）
 │   ├── [全局上下文](ui/context.md)     ← 单例状态容器、向后兼容宏、退场动画状态
-│   └── [行列表动画工具](ui/ui-anim-row.md) ← 可复用行列表动画（入场滑入+高亮过渡）
+│   ├── [绘制管线](ui/drawer.md)        ← 列表外观、选择器 XOR 高亮、弹窗与信息栏、图标
+│   ├── [— 列表绘制](ui/draw-list.md)   ← 列表项背景、文字、滚动条、跑马灯
+│   ├── [— 退场动画](ui/draw-anim.md)   ← 退场遮罩渲染（沙漏 + 扫描线）
+│   ├── [— 弹窗与信息栏](ui/draw-widgets.md) ← pop-up 弹窗、info bar 信息栏渲染
+│   ├── [— 图标渲染](ui/draw-icons.md)  ← XBM 位图图标绘制
+│   ├── [行列表动画工具](ui/ui-anim-row.md) ← 可复用行列表动画（入场滑入+高亮过渡）
+│   └── [脏矩形管理](ui/ui-dirty.md)    ← 统一 invalidate / is_dirty / clear_dirty API
 ├── App 层（每个 App 独立子目录）
 │   ├── app_init.c/h        ← 入口封装（委托给 app_menu/app_input）
 │   ├── app_menu.c/h        ← 菜单树构建

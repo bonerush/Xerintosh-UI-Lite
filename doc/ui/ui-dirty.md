@@ -100,7 +100,7 @@ typedef struct {
 
 渲染管线在每帧检查这个标志，决定是否清屏：
 
-*📄 Source: [ui_task.c](../../src/ui/ui_task.c#L56-L58)*
+*📄 Source: [ui_task.c](../../src/app/ui_task.c#L56-L58)*
 
 ```c
 if (xerintosh_is_in_user_item() || xerintosh_is_dirty()) {
