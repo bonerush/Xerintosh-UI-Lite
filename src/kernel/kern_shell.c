@@ -48,7 +48,7 @@ static void kern_shell_print_prompt(kern_fd_t tty, const char *cwd)
  */
 static char vt100_parse_arrow(const char *seq, int len)
 {
-    if (len >= 3 && seq[0] == '\x1b' && seq[1] == '[') {
+    if (len >= 3 && seq[0] == '\x1b' && (seq[1] == '[' || seq[1] == 'O')) {
         if (seq[2] == 'A' || seq[2] == 'B') return seq[2];
     }
     return 0;
@@ -85,16 +85,25 @@ static void shell_task_main(void *arg)
         /* ═══ VT100 转义序列处理 ═══ */
 
         if (ch == '\x1b') {
-            /* 读取转义序列其余部分 */
+            /*
+             * VT100/ANSI 转义序列处理
+             * 方向键格式：CSI (\x1b[) 或 SS3 (\x1bO) + 大写字母
+             * 串口字节到达有延迟 → 用 retry + kern_yield() 等待后续字节
+             */
             char seq[4] = { '\x1b', 0, 0, 0 };
             int seq_len = 1;
 
             for (int i = 1; i < 4; i++) {
-                ssize_t n2 = kern_read(tty, &seq[i], 1);
+                ssize_t n2 = 0;
+                for (int retry = 0; retry < 3; retry++) {
+                    n2 = kern_read(tty, &seq[i], 1);
+                    if (n2 > 0) break;
+                    kern_yield();  /* 让 dev_ttyS0_poll() 有机会填补环形缓冲区 */
+                }
                 if (n2 <= 0) break;
                 seq_len++;
-                /* '[' 后跟大写字母是方向键的标准格式 */
-                if (i == 1 && seq[1] != '[') break;
+                /* CSI (\x1b[) 或 SS3 (\x1bO) 后跟大写字母 = 方向键 */
+                if (i == 1 && seq[1] != '[' && seq[1] != 'O') break;
                 if (i >= 2 && seq[i] >= 'A' && seq[i] <= 'Z') break;
             }
 

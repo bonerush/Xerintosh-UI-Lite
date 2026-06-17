@@ -132,6 +132,7 @@ static void cmd_ps(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_
                  (int)task->pid, state_str, task->name,
                  kern_task_stack_usage(task), task->stack_size);
         kern_shell_println(tty, line);
+        kern_yield();  /* 防止长时间输出触发看门狗 */
         task = task->next;
     }
 }
@@ -184,6 +185,7 @@ static void cmd_ls(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_
         char line[80];
         snprintf(line, sizeof(line), "  %s %s", type_str, child->name);
         kern_shell_println(tty, line);
+        kern_yield();  /* 防止长时间列表触发看门狗 */
     }
 }
 
@@ -258,6 +260,7 @@ static void cmd_cat(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd
     ssize_t n;
     while ((n = kern_read(fd, buf, sizeof(buf))) > 0) {
         kern_write(tty, buf, (size_t)n);
+        kern_yield();  /* 防止大文件读取触发看门狗 */
     }
     kern_close(fd);
 }
@@ -279,6 +282,7 @@ static void cmd_cp(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_
     ssize_t n;
     while ((n = kern_read(src, buf, sizeof(buf))) > 0) {
         kern_write(dst, buf, (size_t)n);
+        kern_yield();  /* 防止大文件复制触发看门狗 */
     }
     kern_close(dst);
     kern_close(src);
@@ -395,6 +399,7 @@ static void cmd_help(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cw
     for (int i = 0; i < count; i++) {
         snprintf(line, sizeof(line), "  %-12s - %s", cmds[i].name, cmds[i].help);
         kern_shell_println(tty, line);
+        kern_yield();  /* 防止长命令列表触发看门狗 */
     }
 }
 
@@ -479,6 +484,7 @@ static void count_dentries(kern_dentry_t *root, int *dentries, int *inodes)
     if (root->inode != NULL) (*inodes)++;
 
     for (uint8_t i = 0; i < root->child_count; i++) {
+        kern_yield();  /* 防止深层递归触发看门狗 */
         count_dentries(root->children[i], dentries, inodes);
     }
 }
@@ -588,6 +594,7 @@ static void cmd_hexdump(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t
 
         kern_shell_println(tty, line);
         offset += (uint32_t)n;
+        kern_yield();  /* 防止大文件 hexdump 触发看门狗 */
     }
     kern_close(fd);
 }
@@ -924,6 +931,8 @@ static void tree_recurse(kern_fd_t tty, kern_dentry_t *dir, int depth, const cha
         snprintf(indent + off, sizeof(indent) - off, "%s%s",
                  branch, child->name);
         kern_shell_println(tty, indent);
+
+        kern_yield();  /* 防止深层递归触发看门狗 */
 
         /* 目录则递归 */
         if (child->inode != NULL && child->inode->type == KERN_FILE_DIR) {
