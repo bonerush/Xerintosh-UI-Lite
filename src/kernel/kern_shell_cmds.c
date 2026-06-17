@@ -133,16 +133,15 @@ static void cmd_ps(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_
          * 在 yield 后被释放导致悬空指针。
          */
         char pid_buf[8];
-        snprintf(pid_buf, sizeof(pid_buf), "%-4d", (int)task->pid);
+        snprintf(pid_buf, sizeof(pid_buf), "%4d", (int)task->pid);
         kern_shell_print(tty, pid_buf);
         kern_shell_print(tty, " ");
 
         kern_shell_print(tty, state_str);
         kern_shell_print(tty, " ");
 
-        /* 防御性复制任务名称到栈缓冲区 */
         char name_buf[KERN_TASK_NAME_LEN + 4];
-        snprintf(name_buf, sizeof(name_buf), "%-12s",
+        snprintf(name_buf, sizeof(name_buf), "%12s",
                  task->name[0] != '\0' ? task->name : "?");
         kern_shell_print(tty, name_buf);
         kern_shell_print(tty, " ");
@@ -418,7 +417,7 @@ static void cmd_help(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cw
     int count = kern_shell_get_builtin_count();
     char line[96];
     for (int i = 0; i < count; i++) {
-        snprintf(line, sizeof(line), "  %-12s - %s", cmds[i].name, cmds[i].help);
+        snprintf(line, sizeof(line), "  %s - %s", cmds[i].name, cmds[i].help);
         kern_shell_println(tty, line);
         kern_yield();  /* 防止长命令列表触发看门狗 */
     }

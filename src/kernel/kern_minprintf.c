@@ -133,8 +133,9 @@ int __wrap_vsnprintf(char *buf, size_t size, const char *fmt, va_list args)
 
         /* 解析标志 */
         char pad = ' ';
-        if (*fmt == '0') {
-            pad = '0';
+        while (*fmt == '0' || *fmt == '-') {
+            if (*fmt == '0') pad = '0';
+            /* '-' 左对齐标志——当前不支持，仅跳过以防被误认为格式说明符 */
             fmt++;
         }
 

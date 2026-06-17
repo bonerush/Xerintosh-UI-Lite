@@ -69,12 +69,12 @@ static void format_line(kern_task_t *task, char *buf, size_t size)
     char size_str[16];
 
     if (taskmgr_task_is_virtual(task)) {
-        snprintf(buf, size, "%s%2d %-12s %s  n/a",
+        snprintf(buf, size, "%s%2d %s %s  n/a",
                  mark, task->pid, task->name,
                  state_str(task->state));
     } else {
         format_size(taskmgr_task_stack_usage(task), size_str, sizeof(size_str));
-        snprintf(buf, size, "%s%2d %-12s %s  %s",
+        snprintf(buf, size, "%s%2d %s %s  %s",
                  mark, task->pid, task->name,
                  state_str(task->state),
                  size_str);
