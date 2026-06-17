@@ -114,7 +114,7 @@ static void cmd_ps(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_
 
     kern_task_t *task = kern_task_list_head();
 
-    kern_shell_println(tty, "PID  STATE     NAME          STACK");
+    kern_shell_println(tty, "PID  STATE     NAME           STACK");
 
     while (task != NULL) {
         const char *state_str;
@@ -128,7 +128,8 @@ static void cmd_ps(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_
         }
 
         /*
-         * 手动左对齐格式化（避免依赖 minprintf 不支持的对齐标志）。
+         * 手动左对齐格式化。
+         * PID 左对齐 4 字符，名称按终端显示宽度左对齐 14 列。
          */
         /* PID: 左对齐 4 字符 */
         char pid_str[8];
@@ -140,17 +141,30 @@ static void cmd_ps(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_
         kern_shell_print(tty, state_str);
         kern_shell_print(tty, " ");
 
-        /* 名称: 左对齐 12 字符 */
+        /* 名称: 按终端显示宽度左对齐（ASCII=1列, 多字节UTF-8=2列） */
         const char *nm = task->name[0] != '\0' ? task->name : "?";
         kern_shell_print(tty, nm);
-        int nm_len = (int)strlen(nm);
-        for (int n = nm_len; n < 12; n++) kern_shell_print(tty, " ");
+        int dw = 0;  /* 显示宽度 */
+        for (const char *s = nm; *s != '\0'; ) {
+            if ((*s & 0x80) == 0)      { dw++;  s++; }
+            else if ((*s & 0xE0) == 0xC0) { dw += 2; s += 2; }
+            else                       { dw += 2; s += 3; }  /* 中/日/韩 */
+        }
+        for (int n = dw; n < 14; n++) kern_shell_print(tty, " ");
         kern_shell_print(tty, " ");
 
-        char stack_buf[32];
-        snprintf(stack_buf, sizeof(stack_buf), "%zu/%zu",
-                 kern_task_stack_usage(task), task->stack_size);
-        kern_shell_println(tty, stack_buf);
+        /* 栈: 虚任务无独立栈，实任务显示 已用/总量（字节） */
+        {
+            if (task->port_thread == KERN_PORT_THREAD_NULL) {
+                kern_shell_println(tty, "shrd");  /* 共享 ui 线程栈 */
+            } else {
+                size_t used = kern_task_stack_usage(task);
+                size_t total = task->stack_size * 4;  /* 字数→字节 */
+                char stack_buf[32];
+                snprintf(stack_buf, sizeof(stack_buf), "%zu/%zu", used, total);
+                kern_shell_println(tty, stack_buf);
+            }
+        }
 
         kern_task_t *next = task->next;  /* 先保存 next 再 yield */
         kern_yield();
