@@ -1,8 +1,9 @@
 /**
  * @file   ui_anim_row.c
  * @brief  公共行列表动画工具实现
- * @details 封装 xerintosh_animation() 循环，提供行列表动画的
+ * @details 封装 xerintosh_animate_unified() 循环，提供行列表动画的
  *          初始化、逐帧更新、目标刷新三个核心操作。
+ *          支持弹簧模式与缓动模式自动切换（跟随 g_spring_anim_mode）。
  *
  * @copyright Copyright (c) 2026
  */
@@ -27,15 +28,20 @@ void xerintosh_anim_row_list_init(xerintosh_anim_row_list_t *list,
         list->rows[i].y_trg = (float)(list_top + i * row_height);
         list->rows[i].w = (float)SCREEN_WIDTH;
         list->rows[i].w_trg = (float)SCREEN_WIDTH;
+        list->rows[i].v_y = 0.0f;
+        list->rows[i].v_w = 0.0f;
     }
 
     list->highlight.y = (float)SCREEN_HEIGHT;
     list->highlight.y_trg = (float)list_top;
     list->highlight.w = (float)SCREEN_WIDTH;
     list->highlight.w_trg = (float)SCREEN_WIDTH;
+    list->highlight.v_y = 0.0f;
+    list->highlight.v_w = 0.0f;
 
     list->scroll_offset = 0.0f;
     list->scroll_offset_trg = 0.0f;
+    list->v_scroll_offset = 0.0f;
 }
 
 /* ═══ 逐帧更新 ═══ */
@@ -45,21 +51,26 @@ bool xerintosh_anim_row_list_update(xerintosh_anim_row_list_t *list, float speed
     bool all_settled = true;
 
     for (int i = 0; i < list->visible_count && i < ANIM_ROW_MAX; i++) {
-        xerintosh_animation(&list->rows[i].y, list->rows[i].y_trg, speed);
-        xerintosh_animation(&list->rows[i].w, list->rows[i].w_trg, speed);
+        xerintosh_animate_unified(&list->rows[i].y, &list->rows[i].v_y,
+                                   list->rows[i].y_trg, speed);
+        xerintosh_animate_unified(&list->rows[i].w, &list->rows[i].v_w,
+                                   list->rows[i].w_trg, speed);
         /* 同时检查 y 和 w 两个维度的稳定状态 */
         if (fabsf(list->rows[i].y - list->rows[i].y_trg) > 0.5f
             || fabsf(list->rows[i].w - list->rows[i].w_trg) > 0.5f)
             all_settled = false;
     }
 
-    xerintosh_animation(&list->highlight.y, list->highlight.y_trg, speed);
-    xerintosh_animation(&list->highlight.w, list->highlight.w_trg, speed);
+    xerintosh_animate_unified(&list->highlight.y, &list->highlight.v_y,
+                               list->highlight.y_trg, speed);
+    xerintosh_animate_unified(&list->highlight.w, &list->highlight.v_w,
+                               list->highlight.w_trg, speed);
     if (fabsf(list->highlight.y - list->highlight.y_trg) > 0.5f
         || fabsf(list->highlight.w - list->highlight.w_trg) > 0.5f)
         all_settled = false;
 
-    xerintosh_animation(&list->scroll_offset, list->scroll_offset_trg, speed);
+    xerintosh_animate_unified(&list->scroll_offset, &list->v_scroll_offset,
+                               list->scroll_offset_trg, speed);
     if (fabsf(list->scroll_offset - list->scroll_offset_trg) > 0.5f)
         all_settled = false;
 

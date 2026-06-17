@@ -20,7 +20,7 @@ extern "C" {
 /* ═══ 动画速度常量 ═══ */
 /* g_anim_speed 由 ui_context.h 的向后兼容宏提供 */
 
-#define ANIM_SPEED_LIST_ITEM    (g_anim_speed - 8) /* 列表项动画速度，适当慢于选择器 */
+#define ANIM_SPEED_LIST_ITEM    (g_anim_speed - 2) /* 列表项动画速度，适当慢于选择器 */
 #define ANIM_SPEED_SELECTOR     (g_anim_speed)     /* 选择器动画速度 */
 #define ANIM_SPEED_SELECTOR_H   (g_anim_speed + 1) /* 选择器高度动画稍快 */
 #define ANIM_SPEED_INFO_BAR     (g_anim_speed + 2) /* 信息栏动画速度 */

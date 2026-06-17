@@ -58,6 +58,7 @@ static uint32_t                s_pt_phase_until_ms = 0;
 static bool                    s_pt_first_data = false;
 static bool                    s_running = false;
 static float                   s_entry_offset = 0.0f;
+static float                   s_entry_vel    = 0.0f;
 
 /* DTR 等待期间暂存 USB→UART 数据，进入 IDLE 后一次性转发 */
 static uint8_t                 s_usb_deferred[FLASHER_USB_DEFER_MAX];
@@ -86,6 +87,7 @@ void flasher_init(void *ud)
     s_pt_first_data = false;
     s_usb_deferred_len = 0;
     s_entry_offset = (float)SCREEN_HEIGHT;
+    s_entry_vel    = 0.0f;
 
     flasher_ui_init(&s_ui);
     flasher_proto_reset();
@@ -187,7 +189,7 @@ void flasher_loop(void *ud)
         flasher_ui_set_status(&s_ui, FLASHER_UI_FLASHING);
     }
 
-    xerintosh_animation(&s_entry_offset, 0.0f, ANIM_SPEED_EXIT);
+    xerintosh_animate_unified(&s_entry_offset, &s_entry_vel, 0.0f, ANIM_SPEED_EXIT);
 
     /*
      * ═══ 有线桥接：USB ↔ UART 双向透传 ═══

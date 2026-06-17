@@ -116,6 +116,35 @@ void xerintosh_spring_animation(float *_pos, float *_vel, float _pos_trg,
   xerintosh_invalidate();  /* 动画进行中，标记需要重绘 */
 }
 
+/**
+ * @brief  统一动画调度：根据全局设置自动选择弹簧或缓动动画
+ * @param  _pos     当前位置指针（会被直接更新）
+ * @param  _vel     当前速度指针（弹簧模式使用，可为 NULL 强制缓动）
+ * @param  _target  目标位置
+ * @param  _speed   动画速度（0~99，仅缓动模式使用）
+ * @return true  已稳定在目标
+ * @return false 动画进行中
+ * @note   当 g_anim_enabled == false 时直接跳转到目标。
+ * @note   当 g_spring_anim_mode == true 且 _vel != NULL 时使用弹簧动画，
+ *         刚度/阻尼参数使用 g_spring_stiffness_selector / g_spring_damping_selector。
+ * @note   弹簧模式下返回值恒为 false（调用方需自行判断 settled）。
+ */
+bool xerintosh_animate_unified(float *_pos, float *_vel, float _target, float _speed)
+{
+    if (!g_anim_enabled) {
+        *_pos = _target;
+        if (_vel) *_vel = 0.0f;
+        return true;
+    }
+    if (g_spring_anim_mode && _vel) {
+        xerintosh_spring_animation(_pos, _vel, _target,
+                                    g_spring_stiffness_selector,
+                                    g_spring_damping_selector);
+        return false; /* 弹簧不返回 settled，调用方自行判断 */
+    }
+    return xerintosh_animation(_pos, _target, _speed);
+}
+
 /* ═══ 控件位置刷新 ═══ */
 
 /**

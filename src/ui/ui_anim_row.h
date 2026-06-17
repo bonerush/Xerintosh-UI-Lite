@@ -32,6 +32,8 @@ typedef struct {
     float y_trg;     /* 目标 Y */
     float w;         /* 当前动画宽度（高亮框用） */
     float w_trg;     /* 目标宽度 */
+    float v_y;       /* Y 轴弹簧速度 */
+    float v_w;       /* 宽度弹簧速度 */
 } xerintosh_anim_row_t;
 
 /**
@@ -42,6 +44,7 @@ typedef struct {
     xerintosh_anim_row_t highlight;           /* 高亮框动画状态 */
     float   scroll_offset;                    /* 当前滚动偏移 */
     float   scroll_offset_trg;                /* 目标滚动偏移 */
+    float   v_scroll_offset;                  /* 滚动偏移弹簧速度 */
     int     visible_count;                    /* 可见行数 */
     int16_t row_height;                       /* 行高 */
     int16_t list_top;                         /* 列表顶部 Y */

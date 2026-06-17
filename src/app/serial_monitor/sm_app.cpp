@@ -32,8 +32,11 @@ sm_buffer_t sm_buffer;
 
 /* 动画状态 */
 float       sm_entry_offset = 0.0f;
-static float       sm_btn_alpha_0 = 1.0f;
-float       sm_btn_alpha_1 = 0.0f;
+static float       sm_entry_vel    = 0.0f;
+float       sm_btn_alpha_0  = 100.0f;
+float       sm_btn_alpha_1  = 0.0f;
+static float       sm_btn_vel_0    = 0.0f;
+static float       sm_btn_vel_1    = 0.0f;
 
 #ifndef NATIVE_TEST
 #include <Arduino.h>
@@ -101,8 +104,11 @@ void serial_monitor_init(void *ud)
 
     /* 初始化动画状态 */
     sm_entry_offset = (float)SCREEN_HEIGHT;
-    sm_btn_alpha_0 = 100.0f;
-    sm_btn_alpha_1 = 0.0f;
+    sm_entry_vel    = 0.0f;
+    sm_btn_alpha_0  = 100.0f;
+    sm_btn_alpha_1  = 0.0f;
+    sm_btn_vel_0    = 0.0f;
+    sm_btn_vel_1    = 0.0f;
 
 #ifndef NATIVE_TEST
     sm_rx_len = 0;
@@ -185,13 +191,13 @@ void serial_monitor_loop(void *ud)
     /* ── 动画更新 ── */
 
     /* 入场滑入动画 */
-    xerintosh_animation(&sm_entry_offset, 0.0f, ANIM_SPEED_EXIT);
+    xerintosh_animate_unified(&sm_entry_offset, &sm_entry_vel, 0.0f, ANIM_SPEED_EXIT);
 
-    /* 按钮选中平滑过渡（[0,100] 范围确保 xerintosh_animation 差值 > 1.0，触发逐帧动画） */
+    /* 按钮选中平滑过渡（[0,100] 范围确保动画差值 > 1.0，触发逐帧动画） */
     float trg0 = (sm_selected == 0) ? 100.0f : 0.0f;
     float trg1 = (sm_selected == 1) ? 100.0f : 0.0f;
-    xerintosh_animation(&sm_btn_alpha_0, trg0, ANIM_SPEED_SELECTOR);
-    xerintosh_animation(&sm_btn_alpha_1, trg1, ANIM_SPEED_SELECTOR);
+    xerintosh_animate_unified(&sm_btn_alpha_0, &sm_btn_vel_0, trg0, ANIM_SPEED_SELECTOR);
+    xerintosh_animate_unified(&sm_btn_alpha_1, &sm_btn_vel_1, trg1, ANIM_SPEED_SELECTOR);
 
     /* 保留闪烁相位更新（向后兼容，供 draw_button 的阈值判断使用） */
     uint32_t now = hal_get_ticks();

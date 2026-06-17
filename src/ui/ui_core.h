@@ -88,6 +88,18 @@ extern bool xerintosh_animation(float *_pos, float _pos_trg, float _speed);
 extern void xerintosh_spring_animation(float *_pos, float *_vel, float _pos_trg,
                                         float _stiffness, float _damping);
 
+/**
+ * @brief  统一动画调度：根据 g_spring_anim_mode 自动选择弹簧或缓动动画
+ * @param  _pos     当前位置指针（会被直接更新）
+ * @param  _vel     当前速度指针（弹簧模式使用，可为 NULL 强制使用缓动）
+ * @param  _target  目标位置
+ * @param  _speed   动画速度（0~99，仅缓动模式使用）
+ * @return true  已稳定在目标（缓动模式）/ false 动画进行中
+ * @note   当 g_anim_enabled == false 时直接跳转到目标。
+ * @note   当 g_spring_anim_mode == true 且 _vel != NULL 时使用弹簧动画。
+ */
+extern bool xerintosh_animate_unified(float *_pos, float *_vel, float _target, float _speed);
+
 /* ═══ 状态查询 ═══ */
 
 /**
