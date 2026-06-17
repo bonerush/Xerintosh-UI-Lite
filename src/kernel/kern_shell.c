@@ -142,9 +142,74 @@ static void shell_task_main(void *arg)
             continue;
         }
 
-        /* ═══ 普通字符处理 ═══ */
+        /* ═══ 退格处理（拦截在回显之前，发送擦除序列）═══ */
+        if (ch == '\b' || ch == 0x7F) {
+            if (pos > 0) {
+                pos--;
+                kern_shell_print(tty, "\b \b");  /* 擦除屏幕字符 */
+                hist_browse = -1;
+            }
+            continue;
+        }
 
-        /* 回显 */
+        /* ═══ Tab 命令补全 ═══ */
+        if (ch == '\t') {
+            /* 只在输入第一个单词时补全命令名 */
+            bool first_word = true;
+            for (size_t i = 0; i < pos; i++) {
+                if (line[i] == ' ') {
+                    first_word = false;
+                    break;
+                }
+            }
+
+            if (first_word && pos > 0) {
+                line[pos] = '\0';  /* 临时终结以进行字符串匹配 */
+                const kern_shell_cmd_t *cmds = kern_shell_get_builtin_cmds();
+                int count = kern_shell_get_builtin_count();
+
+                /* 收集前缀匹配项 */
+                const char *matches[SHELL_MAX_BUILTIN_CMDS];
+                int match_count = 0;
+                for (int mi = 0; mi < count && match_count < SHELL_MAX_BUILTIN_CMDS; mi++) {
+                    if (strncmp(cmds[mi].name, line, pos) == 0) {
+                        matches[match_count++] = cmds[mi].name;
+                    }
+                }
+
+                if (match_count == 1) {
+                    /* 单个匹配：自动补全 + 空格 */
+                    const char *suffix = matches[0] + pos;
+                    kern_shell_print(tty, suffix);
+                    kern_shell_print(tty, " ");
+                    /* 将补全部分拷贝到 line 缓冲区 */
+                    int suffix_len = (int)strlen(suffix);
+                    int copy_len = suffix_len;
+                    if (pos + copy_len >= SHELL_BUF_SIZE - 1)
+                        copy_len = SHELL_BUF_SIZE - 2 - (int)pos;
+                    memcpy(&line[pos], suffix, (size_t)copy_len);
+                    pos += (size_t)copy_len;
+                    if (pos < SHELL_BUF_SIZE - 1) {
+                        line[pos++] = ' ';
+                        line[pos] = '\0';
+                    }
+                    hist_browse = -1;
+                } else if (match_count > 1) {
+                    /* 多个匹配：列出所有选项 */
+                    kern_shell_print(tty, "\r\n");
+                    for (int mi = 0; mi < match_count; mi++) {
+                        kern_shell_print(tty, "  ");
+                        kern_shell_print(tty, matches[mi]);
+                        kern_shell_print(tty, "\r\n");
+                    }
+                    kern_shell_print_prompt(tty, cwd);
+                    kern_shell_print(tty, line);
+                }
+            }
+            continue;
+        }
+
+        /* ═══ 普通字符回显 ═══ */
         kern_write(tty, &ch, 1);
 
         if (ch == '\r' || ch == '\n') {
@@ -166,9 +231,6 @@ static void shell_task_main(void *arg)
             kern_shell_print_prompt(tty, cwd);
             pos = 0;
             hist_browse = -1;
-        } else if (ch == '\b' || ch == 0x7F) {
-            if (pos > 0) pos--;
-            hist_browse = -1;  /* 编辑后离开历史浏览 */
         } else if (pos < SHELL_BUF_SIZE - 1) {
             line[pos++] = ch;
             hist_browse = -1;

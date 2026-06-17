@@ -878,6 +878,85 @@ static void cmd_dskey(kern_fd_t tty, int argc, char *argv[],
     kern_shell_println(tty, "DeepSeek API key saved. Reboot or re-enter Token Usage to apply.");
 }
 
+/* ═══ meminfo — 详细内存信息 ═══ */
+
+static void cmd_meminfo(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_size)
+{
+    (void)argc; (void)argv; (void)cwd; (void)cwd_size;
+#ifndef NATIVE_TEST
+    char line[128];
+    snprintf(line, sizeof(line), "Total DRAM:    %" PRIu32 " bytes", heap_caps_get_total_size(MALLOC_CAP_8BIT));
+    kern_shell_println(tty, line);
+    snprintf(line, sizeof(line), "Free DRAM:     %" PRIu32 " bytes", heap_caps_get_free_size(MALLOC_CAP_8BIT));
+    kern_shell_println(tty, line);
+    snprintf(line, sizeof(line), "Largest block: %" PRIu32 " bytes", heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
+    kern_shell_println(tty, line);
+    snprintf(line, sizeof(line), "Min free ever: %" PRIu32 " bytes", esp_get_minimum_free_heap_size());
+    kern_shell_println(tty, line);
+    uint32_t iram_free = heap_caps_get_free_size(MALLOC_CAP_32BIT) - heap_caps_get_free_size(MALLOC_CAP_8BIT);
+    snprintf(line, sizeof(line), "IRAM free:     %" PRIu32 " bytes", iram_free);
+    kern_shell_println(tty, line);
+#else
+    kern_shell_println(tty, "meminfo: N/A (native mode)");
+#endif
+}
+
+/* ═══ tree — 递归目录树 ═══ */
+
+static void tree_recurse(kern_fd_t tty, kern_dentry_t *dir, int depth, const char *prefix)
+{
+    if (dir == NULL) return;
+
+    for (uint8_t i = 0; i < dir->child_count; i++) {
+        kern_dentry_t *child = dir->children[i];
+        if (child == NULL) continue;
+
+        bool is_last = (i == dir->child_count - 1);
+        const char *branch = is_last ? "└── " : "├── ";
+        const char *cont   = is_last ? "    " : "│   ";
+
+        /* 构建缩进前缀 */
+        char indent[64];
+        int off = 0;
+        if (depth > 0) {
+            off = snprintf(indent, sizeof(indent), "%s", prefix);
+        }
+        snprintf(indent + off, sizeof(indent) - off, "%s%s",
+                 branch, child->name);
+        kern_shell_println(tty, indent);
+
+        /* 目录则递归 */
+        if (child->inode != NULL && child->inode->type == KERN_FILE_DIR) {
+            char new_prefix[64];
+            if (depth > 0) {
+                snprintf(new_prefix, sizeof(new_prefix), "%s%s", prefix, cont);
+            } else {
+                snprintf(new_prefix, sizeof(new_prefix), "%s", cont);
+            }
+            tree_recurse(tty, child, depth + 1, new_prefix);
+        }
+    }
+}
+
+static void cmd_tree(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_size)
+{
+    (void)cwd_size;
+    const char *path_arg = (argc > 1) ? argv[1] : NULL;
+
+    char abs_path[KERN_PATH_MAX];
+    const char *target = resolve_path(cwd, path_arg, abs_path, sizeof(abs_path));
+    if (target == NULL) { kern_shell_println(tty, "tree: path too long"); return; }
+
+    kern_dentry_t *root = kern_path_resolve(target);
+    if (root == NULL) {
+        kern_shell_println(tty, "tree: no such directory");
+        return;
+    }
+
+    kern_shell_println(tty, target);
+    tree_recurse(tty, root, 0, "");
+}
+
 /* ═══ 内置命令表 ═══ */
 
 static const kern_shell_cmd_t g_builtin_cmds[] = {
@@ -923,6 +1002,12 @@ static const kern_shell_cmd_t g_builtin_cmds[] = {
 
     /* ── App 配置命令 ── */
     { "dskey",     cmd_dskey,     "set/view DeepSeek API key" },
+
+    /* ── 新增 Shell 增强命令 ── */
+    { "meminfo",   cmd_meminfo,   "detailed memory info (DRAM/IRAM)" },
+    { "tree",      cmd_tree,      "recursive directory tree" },
+    { "tasks",     cmd_ps,        "list tasks (alias: ps)" },
+    { "uptime",    cmd_date,      "show uptime (alias: date)" },
 };
 
 #define BUILTIN_COUNT (sizeof(g_builtin_cmds) / sizeof(g_builtin_cmds[0]))
