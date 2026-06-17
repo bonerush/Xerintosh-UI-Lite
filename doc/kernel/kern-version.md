@@ -13,7 +13,7 @@
 *📄 Source: [kern_version.h](../../src/kernel/kern_version.h#L20-L30)*
 
 ```c
-#define XEROS_VERSION_STRING "2.3.0"
+#define XEROS_VERSION_STRING "2.4.0"
 
 #define XEROS_DEVELOPER      "Bonerush"
 #define XEROS_CODENAME       "M5Stick-P1"
@@ -25,9 +25,9 @@
 #endif
 ```
 
-**当前版本 `0.2.0`** 表示：
-- **0**: 实验阶段（API 不稳定）
-- **2**: kernel-v2 架构引入（SMP 多核、资源追踪、MPU 内存保护、设备驱动模型）
+**当前版本 `2.4.0`** 表示：
+- **2**: Xerintosh v2 架构（SMP 多核、资源追踪、MPU 内存保护、设备驱动模型）
+- **4**: 第四个功能迭代（可插拔调度类、可移植层、内核分配器等）
 - **0**: 无已发布的补丁
 
 **平台自动切换**：`XEROS_PLATFORM` 通过 `#ifdef NATIVE_TEST` 在编译时自动选择，无需手动修改。Native 测试环境下显示 `"native (x86_64)"`，硬件编译时显示 `"ESP32-PICO"`。

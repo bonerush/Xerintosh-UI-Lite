@@ -10,82 +10,44 @@
 
 ## 动画状态机
 
-*📄 Source: [ui_draw_anim.c](../../src/ui/ui_draw_anim.c#L21-L135)*
+*📄 Source: [ui_draw_anim.c](../../src/ui/ui_draw_anim.c#L122-L158)*
 
-退场动画分为 3 个阶段，由 `g_xerintosh_exit_animation_status` 状态机控制。注意：重构后（Task 9）所有状态已从函数局部 `static` 变量迁移到 `ui_context`：
+退场动画分为 3 个阶段，由 `g_xerintosh_exit_animation_status` 状态机控制。重构后（Task 9）所有状态已从函数局部 `static` 变量迁移到 `ui_context`。主入口 `xerintosh_draw_exit_animation()` 委托给三个子阶段函数：
 
 ```c
 void xerintosh_draw_exit_animation()
 {
-  /* 每次新动画开始时强制重置状态，避免残留导致卡死 */
-  if (g_xerintosh_exit_anim_last_finished && !g_xerintosh_exit_animation_finished)
-  {
-    g_xerintosh_exit_anim_temp_h = -8;
-    g_xerintosh_exit_anim_temp_h_trg = SCREEN_HEIGHT + 8;
-    g_xerintosh_exit_animation_status = 0;
-  }
-  g_xerintosh_exit_anim_last_finished = g_xerintosh_exit_animation_finished;
+    /* 每次新动画开始时强制重置状态，避免残留导致卡死 */
+    if (g_xerintosh_exit_anim_last_finished && !g_xerintosh_exit_animation_finished) {
+        g_xerintosh_exit_anim_temp_h = -8;
+        g_xerintosh_exit_anim_temp_h_trg = SCREEN_HEIGHT + 8;
+        g_xerintosh_exit_animation_status = 0;
+    }
+    g_xerintosh_exit_anim_last_finished = g_xerintosh_exit_animation_finished;
 
-  /* 屏幕方向/尺寸切换时，防止残留旧尺寸的目标值导致动画异常 */
-  if (g_xerintosh_exit_anim_prev_screen_h != SCREEN_HEIGHT)
-  {
-    float max_h = SCREEN_HEIGHT + 8;
-    if (g_xerintosh_exit_anim_temp_h > max_h) g_xerintosh_exit_anim_temp_h = max_h;
-    if (g_xerintosh_exit_animation_status == 0) g_xerintosh_exit_anim_temp_h_trg = max_h;
-    g_xerintosh_exit_anim_prev_screen_h = SCREEN_HEIGHT;
-  }
-
-  /* 绘制全屏黑色遮罩，高度由 g_xerintosh_exit_anim_temp_h 控制 */
-  g_xerintosh_draw_color = COLOR_BG;
-  hal_draw_fill_rect(0, 0, SCREEN_WIDTH, g_xerintosh_exit_anim_temp_h, g_xerintosh_draw_color);
-  g_xerintosh_draw_color = COLOR_FG;
-
-  /* 沙漏绘制（像素艺术风格） */
-  uint8_t _x_hourglass_offset = SCREEN_WIDTH / 2 - 8;
-  int8_t _y_hourglass = g_xerintosh_exit_anim_temp_h - SCREEN_HEIGHT / 2 - 18;
-  if (_y_hourglass + 20 >= 0)
-  {
-    /* 沙漏上半部分、中间填充、下半部分、颗粒点 */
-    hal_draw_fill_rect(_x_hourglass_offset, _y_hourglass + 2, 13, 3, ...);
-    /* ... 详细像素绘制 ... */
-  }
-
-  /* 底部扫描线和交错像素效果 */
-  if (g_xerintosh_exit_anim_temp_h + 3 >= 0)
-    for (uint8_t i = 0; i <= 3; ++i)
-      hal_draw_h_line(0, g_xerintosh_exit_anim_temp_h + i, SCREEN_WIDTH, g_xerintosh_draw_color);
-
-  for (int16_t i = 0; i <= SCREEN_WIDTH; i += 2)
-    for (int16_t j = g_xerintosh_exit_anim_temp_h - 5; j <= g_xerintosh_exit_anim_temp_h - 1; j++)
-    {
-      if (j % 2 == 0) hal_draw_pixel(i + 1, j, g_xerintosh_draw_color);
-      if (j % 2 == 1) hal_draw_pixel(i, j, g_xerintosh_draw_color);
+    /* 屏幕方向/尺寸切换时，防止目标值残留旧尺寸 */
+    if (g_xerintosh_exit_anim_prev_screen_h != SCREEN_HEIGHT) {
+        float max_h = (float)SCREEN_HEIGHT + 8.0f;
+        if (g_xerintosh_exit_anim_temp_h > max_h) g_xerintosh_exit_anim_temp_h = max_h;
+        if (g_xerintosh_exit_animation_status == 0) g_xerintosh_exit_anim_temp_h_trg = max_h;
+        g_xerintosh_exit_anim_prev_screen_h = (int16_t)SCREEN_HEIGHT;
     }
 
-  /* 缓动动画 */
-  xerintosh_animation(&g_xerintosh_exit_anim_temp_h, g_xerintosh_exit_anim_temp_h_trg, ANIM_SPEED_EXIT);
+    /* 绘制全屏黑色遮罩 */
+    g_xerintosh_draw_color = COLOR_BG;
+    hal_draw_fill_rect(0, 0, SCREEN_WIDTH, g_xerintosh_exit_anim_temp_h, g_xerintosh_draw_color);
 
-  /* 状态机转换：使用范围判断代替浮点精确相等，避免多次循环后卡死 */
-  if (g_xerintosh_exit_animation_status == 0 && g_xerintosh_exit_anim_temp_h >= SCREEN_HEIGHT + 8 - 1.0f)
-  {
-    g_xerintosh_exit_anim_temp_h = SCREEN_HEIGHT + 8;
-    g_xerintosh_exit_animation_status = 1;
-    return;
-  }
-  if (g_xerintosh_exit_animation_status == 1)
-  {
-    g_xerintosh_exit_anim_temp_h_trg = -8;
-    g_xerintosh_exit_animation_status = 2;
-    return;
-  }
-  if (g_xerintosh_exit_animation_status == 2 && g_xerintosh_exit_anim_temp_h <= -8 + 1.0f)
-  {
-    g_xerintosh_exit_animation_finished = true;
-    g_xerintosh_exit_animation_status = 0;
-    g_xerintosh_exit_anim_temp_h = -8;
-    g_xerintosh_exit_anim_temp_h_trg = SCREEN_HEIGHT + 8;
-    return;
-  }
+    /* 委托子阶段函数 */
+    uint8_t _x_hourglass_offset = SCREEN_WIDTH / 2 - 8;
+    int8_t _y_hourglass = g_xerintosh_exit_anim_temp_h - SCREEN_HEIGHT / 2 - 18;
+    if (_y_hourglass + 20 >= 0)
+        draw_hourglass(_x_hourglass_offset, _y_hourglass);  /* 沙漏图案 */
+
+    draw_scanlines();         /* 底部扫描线和交错像素 */
+
+    xerintosh_animation(&g_xerintosh_exit_anim_temp_h, g_xerintosh_exit_anim_temp_h_trg, ANIM_SPEED_EXIT);
+
+    update_exit_anim_state(); /* 状态机转换 */
 }
 ```
 
@@ -158,7 +120,34 @@ void xerintosh_draw_exit_animation()
 
 ## 状态机详解
 
-| 状态 | 名称 | 条件 | 行为 |
+*📄 Source: [ui_draw_anim.c](../../src/ui/ui_draw_anim.c#L91-L113)*
+
+状态机逻辑已提取为独立函数 `update_exit_anim_state()`，使用范围判断代替浮点精确相等，避免多次循环后卡死：
+
+```c
+static void update_exit_anim_state(void)
+{
+    if (g_xerintosh_exit_animation_status == 0 && g_xerintosh_exit_anim_temp_h >= SCREEN_HEIGHT + 8 - 1.0f) {
+        g_xerintosh_exit_anim_temp_h = SCREEN_HEIGHT + 8;
+        g_xerintosh_exit_animation_status = 1;
+        return;
+    }
+    if (g_xerintosh_exit_animation_status == 1) {
+        g_xerintosh_exit_anim_temp_h_trg = -8;
+        g_xerintosh_exit_animation_status = 2;
+        return;
+    }
+    if (g_xerintosh_exit_animation_status == 2 && g_xerintosh_exit_anim_temp_h <= -8 + 1.0f) {
+        g_xerintosh_exit_animation_finished = true;
+        g_xerintosh_exit_animation_status = 0;
+        g_xerintosh_exit_anim_temp_h = -8;
+        g_xerintosh_exit_anim_temp_h_trg = SCREEN_HEIGHT + 8;
+        return;
+    }
+}
+```
+
+状态机由 3 个阶段控制：
 |------|------|------|------|
 | 0 | 展开 | `g_xerintosh_exit_anim_temp_h` 从 -8 向 `SCREEN_HEIGHT+8` 增长 | 遮罩向下展开，沙漏和扫描线跟随 |
 | 1 | 到达底部 | `g_xerintosh_exit_anim_temp_h >= SCREEN_HEIGHT+8-1` | 切换目标为 -8，立即进入状态2 |
@@ -174,9 +163,9 @@ void xerintosh_draw_exit_animation()
 
 ## 沙漏绘制
 
-*📄 Source: [ui_draw_anim.c](../../src/ui/ui_draw_anim.c#L52-L93)*
+*📄 Source: [ui_draw_anim.c](../../src/ui/ui_draw_anim.c#L20-L64)*
 
-沙漏采用**像素艺术（pixel art）**风格，由多个精确的矩形和线条拼接而成：
+沙漏绘制已提取为独立函数 `draw_hourglass()`，采用**像素艺术（pixel art）**风格，由多个精确的矩形和线条拼接而成：
 
 ```c
 uint8_t _x_hourglass_offset = SCREEN_WIDTH / 2 - 8;
@@ -223,9 +212,9 @@ const uint8_t _points[][2] = {
 
 ## 扫描线效果
 
-*📄 Source: [ui_draw_anim.c](../../src/ui/ui_draw_anim.c#L95-L108)*
+*📄 Source: [ui_draw_anim.c](../../src/ui/ui_draw_anim.c#L69-L86)*
 
-两种扫描效果叠加在遮罩边缘：
+扫描线绘制已提取为独立函数 `draw_scanlines()`，两种扫描效果叠加在遮罩边缘：
 
 1. **底部扫描线**：遮罩底部绘制 4 条水平白线
 2. **交错像素扫描**：遮罩顶部附近 5 像素行，以棋盘格模式绘制像素，营造"数字消散"效果

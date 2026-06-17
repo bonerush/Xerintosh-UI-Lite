@@ -19,7 +19,7 @@
 
 ### 任务控制块（TCB）
 
-*📄 Source: [kern_task.h](../../src/kernel/kern_task.h#L44-L86)*
+*📄 Source: [kern_task.h](../../src/kernel/kern_task.h#L48-L94)*
 
 ```c
 typedef struct kern_task {

@@ -304,7 +304,7 @@ void my_stopwatch_exit(void *user_data)
 
 在 `app_menu_build()` 函数中，添加以下代码：
 
-*📄 Source: [app_menu.c](../../src/app/app_menu.c#L32-L103)*
+*📄 Source: [app_menu.c](../../src/app/app_menu.c#L157-L184)*
 
 ```c
 void app_menu_build(void)
@@ -664,7 +664,7 @@ void my_stopwatch_exit(void *user_data)
 }
 ```
 
-### 注册到菜单（在 app_init.c 中）
+### 注册到菜单（在 app_menu.c 中）
 
 ```c
 #include "my_stopwatch.h"

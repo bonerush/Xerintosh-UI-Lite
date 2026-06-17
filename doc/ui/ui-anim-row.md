@@ -11,7 +11,7 @@
 - **复用优先**：任务管理器、串口监视器和未来所有行列表 App 共享同一套动画逻辑
 - **与菜单引擎一致**：使用相同的缓动公式和速度分级常量
 
-*📄 Source: [ui_anim_row.h](../../src/ui/ui_anim_row.h), [ui_anim_row.c](../../src/ui/ui_anim_row.c)*
+*📄 Source: [ui_anim_row.h](../../src/ui/ui_anim_row.h), [ui_anim_row.c](../../src/ui/ui_anim_row.c#L18-L106)*
 
 ---
 
@@ -27,10 +27,12 @@ typedef struct {
     float y_trg;     // 目标 Y 坐标
     float w;         // 当前动画宽度（高亮框）
     float w_trg;     // 目标宽度
+    float v_y;       // Y 轴弹簧速度
+    float v_w;       // 宽度弹簧速度
 } xerintosh_anim_row_t;
 ```
 
-每行独立维护一对 `(当前值, 目标值)`，由 `xerintosh_animation()` 每帧驱动 `当前值` 向 `目标值` 平滑逼近。
+每行独立维护 `(当前值, 目标值, 速度)` 三元组。弹簧模式下由 `xerintosh_spring_animation()` 驱动，缓动模式下由 `xerintosh_animation()` 驱动。
 
 #### 列表动画上下文 — `xerintosh_anim_row_list_t`
 
@@ -42,6 +44,7 @@ typedef struct {
     xerintosh_anim_row_t highlight;           // 高亮框动画状态
     float   scroll_offset;                    // 当前滚动偏移
     float   scroll_offset_trg;                // 目标滚动偏移
+    float   v_scroll_offset;                  // 滚动偏移弹簧速度
     int     visible_count;                    // 可见行数
     int16_t row_height;                       // 每行高度（含间距）
     int16_t list_top;                         // 列表区域顶部 Y 坐标

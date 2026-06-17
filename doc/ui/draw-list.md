@@ -275,41 +275,25 @@ void xerintosh_draw_selector()
 
 ## 滑块数值覆盖层
 
-*📄 Source: [ui_draw_list.c](../../src/ui/ui_draw_list.c#L95-L122)*
+*📄 Source: [ui_draw_list.c](../../src/ui/ui_draw_list.c#L29-L43)*
 
-已确认的滑块项（处于编辑状态）在选择器 XOR 反色之后绘制，使用反色圆角矩形作为背景，避免 XOR 反色导致数值不可读：
+已确认的滑块项（处于编辑状态）在选择器 XOR 反色之后绘制。实际实现通过 `xerintosh_dispatch_draw_overlay()` 派发表路由，不再内联遍历和类型检查：
 
 ```c
 static void xerintosh_draw_slider_overlays(void)
 {
-  xerintosh_list_item_t *parent = g_xerintosh_selector.selected_item->parent;
-  if (!parent) return;
+  xerintosh_list_item_t *sel = g_xerintosh_selector.selected_item;
+  if (sel == NULL || sel->parent == NULL) return;
 
+  xerintosh_list_item_t *parent = sel->parent;
   for (uint8_t i = 0; i < parent->child_num; i++)
   {
-    xerintosh_list_item_t *_item = parent->child_list_item[i];
-    if (_item->type != slider_item) continue;
-
-    xerintosh_slider_item_t *_slider = xerintosh_to_slider_item(_item);
-    if (!_slider->is_confirmed) continue;
-
-    int16_t _y = _item->y_list_item + g_xerintosh_camera.y_camera - hal_get_font_height()/2;
-    if (!is_item_visible(_y)) continue;
-
-    char _value_str[10] = {};
-    sprintf(_value_str, "%d", *_slider->value);
-    int16_t _value_width = hal_get_string_width(_value_str);
-    int16_t _x_value = SCREEN_WIDTH - LIST_ITEM_RIGHT_MARGIN - _value_width + 2;
-
-    /* 反色背景框 */
-    g_xerintosh_draw_color = COLOR_BG;
-    hal_draw_fill_round_rect(_x_value, _y - 2, _value_width + 4,
-                             hal_get_font_height() - 2, 1, g_xerintosh_draw_color);
-    g_xerintosh_draw_color = COLOR_FG;
-    hal_draw_string(_x_value + 2, _y + hal_get_font_height() / 2, _value_str, ...);
+    xerintosh_dispatch_draw_overlay(parent->child_list_item[i]);
   }
 }
 ```
+
+各类型的覆盖层绘制逻辑由 `ui_dispatch.c` 的派发表中的 `draw_overlay` 函数指针处理。slider_item 的覆盖层使用反色圆角矩形作为背景，避免 XOR 反色导致数值不可读。
 
 ---
 

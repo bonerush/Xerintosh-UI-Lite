@@ -1,6 +1,6 @@
 # Token Usage App
 
-> **Parent:** [App 层索引](index.md) | **Related:** [UI 公共服务](ui-service.md), [存储模块](../../src/app/storage/storage.h)
+> **Parent:** [App 层索引](index.md) | **Related:** [UI 公共服务](ui-service.md), [设置模块](settings.md)
 
 ## 概述
 

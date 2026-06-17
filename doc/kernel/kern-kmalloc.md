@@ -70,13 +70,21 @@ static void kmem_release(void *ptr)
 
 ### kern_kmalloc — 分配内存
 
-*📄 Source: [kern_kmalloc.c](../../src/kernel/kern_kmalloc.c#L50-L76)*
+*📄 Source: [kern_kmalloc.c](../../src/kernel/kern_kmalloc.c#L83-L86)（包装层）/ [L51-L79](../../src/kernel/kern_kmalloc.c#L51-L79)（内部实现 `kern_kmalloc_impl`）*
 
 ```c
+/* 公共 API — 薄包装层 */
 void *kern_kmalloc(size_t size)
+{
+    return kern_kmalloc_impl(size, kern_task_current(), true);
+}
+
+/* 内部实现 — 所有分配变体共用 */
+static void *kern_kmalloc_impl(size_t size, kern_task_t *owner, bool track)
 {
     if (size == 0) return NULL;
 
+    /* 防止溢出 */
     size_t total = sizeof(kmalloc_header_t) + size;
     if (total < size) return NULL;  /* 溢出检查 */
 
@@ -84,20 +92,26 @@ void *kern_kmalloc(size_t size)
     if (hdr == NULL) return NULL;
 
     hdr->size = size;
-    hdr->owner = kern_task_current();
+    hdr->owner = owner;
 
     void *user_ptr = (void *)((uint8_t *)hdr + sizeof(kmalloc_header_t));
 
-    /* 追踪到当前任务 */
-    int ret = kern_resource_track(hdr->owner, user_ptr, KERN_RES_MEMORY, kmem_release);
-    if (ret != KERN_OK) {
-        free(hdr);       /* 追踪失败，回滚分配 */
-        return NULL;
+    if (track) {
+        /* 追踪到当前任务 */
+        int ret = kern_resource_track(owner, user_ptr,
+                                      KERN_RES_MEMORY, kmem_release);
+        if (ret != KERN_OK) {
+            /* 追踪失败，释放分配（兼容性保护） */
+            free(hdr);
+            return NULL;
+        }
     }
 
     return user_ptr;
 }
 ```
+
+`kern_kmalloc()` 是薄包装层，固定传入 `kern_task_current()` 作为 owner 并启用追踪。`kern_kmalloc_impl()` 是所有分配变体（`kern_kmalloc`、`kern_kmalloc_for_task`、`kern_kmalloc_untracked`）的共享实现。
 
 #### 中文伪代码拆解
 
@@ -131,7 +145,7 @@ void *kern_kmalloc(size_t size)
 
 ### kern_kcalloc — 分配清零
 
-*📄 Source: [kern_kmalloc.c](../../src/kernel/kern_kmalloc.c#L78-L91)*
+*📄 Source: [kern_kmalloc.c](../../src/kernel/kern_kmalloc.c#L99-L112)*
 
 ```c
 void *kern_kcalloc(size_t nmemb, size_t size)
@@ -151,7 +165,7 @@ void *kern_kcalloc(size_t nmemb, size_t size)
 
 ### kern_kfree — 释放内存
 
-*📄 Source: [kern_kmalloc.c](../../src/kernel/kern_kmalloc.c#L93-L106)*
+*📄 Source: [kern_kmalloc.c](../../src/kernel/kern_kmalloc.c#L114-L127)*
 
 ```c
 void kern_kfree(void *ptr)
@@ -192,7 +206,7 @@ void kern_kfree(void *ptr)
 
 ### kern_krealloc — 重新分配
 
-*📄 Source: [kern_kmalloc.c](../../src/kernel/kern_kmalloc.c#L108-L154)*
+*📄 Source: [kern_kmalloc.c](../../src/kernel/kern_kmalloc.c#L139-L185)*
 
 这是最复杂的 API。`krealloc` 需要在「取消旧追踪 → 调用标准 realloc → 重新追踪」三条路径中正确处理失败场景。
 
@@ -325,7 +339,7 @@ sequenceDiagram
 
 ## 便捷宏
 
-*📄 Source: [kern_kmalloc.h](../../src/kernel/kern_kmalloc.h#L53-L54)*
+*📄 Source: [kern_kmalloc.h](../../src/kernel/kern_kmalloc.h#L79-L80)*
 
 ```c
 #define kmalloc(sz)  kern_kmalloc(sz)

@@ -28,7 +28,7 @@
 
 ### 屏幕参数
 
-*📄 Source: [hal_display.h](../../src/hal/hal_display.h#L21-L35) / [hal_screen.h](../../src/hal/hal_screen.h#L19-L36)*
+*📄 Source: [hal_display.h](../../src/hal/hal_display.h#L22-L33) / [hal_screen.h](../../src/hal/hal_screen.h#L19-L36)*
 
 ```c
 #ifdef NATIVE_TEST
@@ -47,7 +47,7 @@
 
 ### 双缓冲架构（真机）
 
-*📄 Source: [hal_display_fb.cpp](../../src/hal/hal_display_fb.cpp#L84-L105)*
+*📄 Source: [hal_display_fb.cpp](../../src/hal/hal_display_fb.cpp#L86-L115)*
 
 ```c
 M5Canvas* g_canvas = nullptr;       /* 离屏画布 */
@@ -89,7 +89,7 @@ void hal_display_init(void) {
 
 **关键顺序**：`setColorDepth(8)` 必须**在** `createSprite()` 之前调用。若顺序颠倒，alpha=0 会导致所有绘制不可见（黑屏）。该顺序已封装到 `hal_display_create_sprite()` helper 中，由调用方统一保证，避免人工维护时顺序被颠倒。8-bit RGB332 相比 16-bit 节省 12.8KB 内存，确保 ESP32-PICO 无 PSRAM 时也能同时运行 Classic BT SPP + UI 渲染。
 
-*📄 Source: [hal_display_fb.cpp](../../src/hal/hal_display_fb.cpp#L113-L116)*
+*📄 Source: [hal_display_fb.cpp](../../src/hal/hal_display_fb.cpp#L122-L126)*
 
 ```c
 void hal_display_deinit(void) {
@@ -143,7 +143,7 @@ Native 环境下所有复杂图形（线、圆、圆角矩形）都通过**软�
 
 上层不再直接调用 `M5.Display.setRotation()` / `setBrightness()`。HAL 提供统一配置接口：
 
-*📄 Source: [hal_display.h](../../src/hal/hal_display.h#L238-L256)*
+*📄 Source: [hal_display.h](../../src/hal/hal_display.h#L238-L262)*
 
 ```c
 void hal_display_set_rotation(int rotation);
@@ -152,7 +152,7 @@ void hal_display_set_brightness(uint8_t level);
 uint8_t hal_display_get_brightness(void);
 ```
 
-*📄 Source: [hal_display_fb.cpp](../../src/hal/hal_display_fb.cpp#L107-L126)*
+*📄 Source: [hal_display_fb.cpp](../../src/hal/hal_display_fb.cpp#L128-L147)*
 
 ```c
 void hal_display_set_rotation(int rotation) {
@@ -175,7 +175,7 @@ void hal_display_set_brightness(uint8_t level) {
 
 TFT 不支持 OLED 的 `draw_color(2)` 反色模式。我们采用**像素级 XOR** 实现选择器高亮。
 
-*📄 Source: [hal_display_adv.cpp](../../src/hal/hal_display_adv.cpp#L103-L124)*
+*📄 Source: [hal_display_adv.cpp](../../src/hal/hal_display_adv.cpp#L103-L127)*
 
 ```c
 void hal_draw_xor_rect(int16_t x, int16_t y, int16_t w, int16_t h) {
@@ -190,15 +190,18 @@ void hal_draw_xor_rect(int16_t x, int16_t y, int16_t w, int16_t h) {
     if (y + h > ch) h = ch - y;
     if (w <= 0 || h <= 0) return;
 
-    /* 行缓冲：最大 160×2 = 320 字节，栈安全 */
-    uint16_t row_buf[160];
+    /* 静态缓冲：一次读取整个选择器区域，XOR 后一次写回，避免逐行 readRect/pushImage
+     * 最大尺寸：横屏下选择器宽度 ≤160，高度 ≤22（字体+边距），160×22 = 3520 像素 = 7040 字节
+     * 竖屏下只需 80×22 = 1760 像素。比之前的 160×30(9600B) 节省最多 2560B */
+    #define XOR_BUF_MAX_PX 3520
+    static uint16_t xor_buf[XOR_BUF_MAX_PX];
+    int total = w * h;
+    if (total > XOR_BUF_MAX_PX) return;
 
-    for (int16_t row = 0; row < h; row++) {
-        g_canvas->readRect(x, y + row, w, 1, row_buf);
-        for (int16_t i = 0; i < w; i++)
-            row_buf[i] ^= 0xFFFF;
-        g_canvas->pushImage(x, y + row, w, 1, row_buf);
-    }
+    g_canvas->readRect(x, y, w, h, xor_buf);
+    for (int i = 0; i < total; i++)
+        xor_buf[i] ^= 0xFFFF;
+    g_canvas->pushImage(x, y, w, h, xor_buf);
 }
 ```
 
@@ -206,19 +209,21 @@ void hal_draw_xor_rect(int16_t x, int16_t y, int16_t w, int16_t h) {
 
 ```
 函数 绘制XOR反色矩形(x, y, 宽, 高) {
-    for (行 = 0; 行 < 高; 行++) {
-        读取一行像素到 行缓冲[160]
-        for (列 = 0; 列 < 宽; 列++) {
-            行缓冲[列] = 行缓冲[列] XOR 0xFFFF   // RGB565 全通道翻转
-        }
-        推送一行像素回画布
+    裁剪到画布边界
+    计算总像素数 = 宽 × 高
+    if (总像素数 > 3520) return   // 超出静态缓冲容量
+
+    一次性读取整个矩形区域到 静态缓冲[3520]
+    for (i = 0; i < 总像素数; i++) {
+        静态缓冲[i] = 静态缓冲[i] XOR 0xFFFF   // RGB565 全通道翻转
     }
+    一次性推送整个矩形区域回画布
 }
 ```
 
 **核心思想**：将目标矩形区域内的每个像素与 `0xFFFF` 做按位异或。对于 RGB565 格式，这等价于把每个颜色通道取反，从而实现“黑变白、白变黑”的反色效果。
 
-硬件实现使用 `readRect`/`pushImage` 逐行操作，栈上固定 `row_buf[160]`（320 字节），无需 `malloc`。Native 实现则直接逐像素异或帧缓冲。
+硬件实现使用**批量读写**：`readRect` 一次性读取整个选择器区域到静态 `xor_buf[3520]`（7040 字节），XOR 后 `pushImage` 一次性写回，相比逐行操作减少 SPI 调用次数。Native 实现则直接逐像素异或帧缓冲。
 
 ### 字体与文本
 
@@ -245,7 +250,7 @@ int16_t hal_get_font_height(void) {
 }
 ```
 
-*📄 Source: [hal_display.h](../../src/hal/hal_display.h#L169-L183)*
+*📄 Source: [hal_display.h](../../src/hal/hal_display.h#L169-L188)*
 
 ```c
 /* hal_draw_utf8 是 hal_draw_string 的别名（M5GFX drawString 本身即 UTF-8 兼容） */
@@ -261,7 +266,7 @@ Native 测试环境提供**固定宽度 ASCII 字体模拟**（6×8 位图字体
 - `hal_get_string_width(str)` 返回 `strlen(str) * 7`（含 1px 字间距）
 - `hal_draw_string()` 将字符写入独立的字体层，最终通过 `hal_test_fb_read()` 与帧缓冲叠加输出
 
-*📄 Source: [hal_display_font.cpp](../../src/hal/hal_display_font.cpp#L185-L214)*
+*📄 Source: [hal_display_font.cpp](../../src/hal/hal_display_font.cpp#L195-L214)*
 
 ```c
 void hal_draw_string(int16_t x, int16_t y, const char* str, uint16_t color) {
@@ -282,6 +287,10 @@ int16_t hal_get_string_width(const char* str) {
     return (int16_t)(len * (FONT_W + 1));
 }
 ```
+
+`hal_get_cn_font()` 返回项目子集中文字体指针（U8G2 格式，仅包含源码使用的 844 个汉字），供 `hal_set_font()` 切换中文字体渲染。Native 测试环境返回 `NULL`（桩实现）。
+
+*📄 Source: [hal_display.h](../../src/hal/hal_display.h#L196-L200) / [hal_display_adv.cpp](../../src/hal/hal_display_adv.cpp#L151-L157)（硬件实现） / [hal_display_font.cpp](../../src/hal/hal_display_font.cpp#L223-L228)（native 桩）*
 
 ### 测试钩子
 

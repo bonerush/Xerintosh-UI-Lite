@@ -113,6 +113,7 @@ FreeRTOS 继续在底层为 WiFi/BT 协议栈服务。SMP 模式下 Xeros 在每
 | 资源追踪 | [kern-resource.md](kern-resource.md) | `kern_resource.h/c` | 资源链表、track/untrack/release_all |
 | 内核分配器 | [kern-kmalloc.md](kern-kmalloc.md) | `kern_kmalloc.h/c` | kmalloc/kfree/kcalloc/krealloc |
 | 设备驱动模型 | [kern-device-model.md](kern-device-model.md) | `kern_device.h/c` | 统一设备操作表 + VFS bridge |
+| 可移植层 | [kern-port.md](kern-port.md) | `kern_port.h/c` | 可移植层 — FreeRTOS/Native 多后端调度原语 |
 
 ## 关键设计决策
 

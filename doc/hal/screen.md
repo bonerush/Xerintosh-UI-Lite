@@ -1,6 +1,6 @@
 # 屏幕尺寸（HAL Screen）
 
-> **Parent:** [HAL 层索引](index.md) | **Related:** [显示驱动](display.md)
+> **Parent:** [知识地图](../index.md) | **Related:** [显示驱动](display.md)
 
 ## 概述
 

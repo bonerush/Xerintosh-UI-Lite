@@ -6,7 +6,7 @@
 
 v2 引入了**统一设备驱动模型**（`kern_device_t`），为所有硬件驱动提供标准化的操作接口和注册机制。核心思想是将设备驱动的操作签名从 VFS 的 `kern_file_ops_t` 解耦出来，形成独立的 `kern_device_ops_t`，再通过**VFS 桥接层**将两者连接。
 
-![VFS Bridge](assets/diagrams/vfs-bridge.png)
+![VFS Bridge](../assets/diagrams/vfs-bridge.png)
 
 ### VFS 与设备桥接流程
 

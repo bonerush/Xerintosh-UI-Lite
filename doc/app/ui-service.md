@@ -35,7 +35,7 @@ void ui_service_exit_landscape(void);
 
 ### ui_service_enter_landscape()
 
-*📄 Source: [ui_service.c](../../src/app/ui_service.c#L35-L52)*
+*📄 Source: [ui_service.c](../../src/app/ui_service.c#L35-L46)*
 
 进入全屏 App 前临时切换到横屏。该函数会：
 
@@ -47,7 +47,7 @@ void ui_service_exit_landscape(void);
 
 ### ui_service_exit_landscape()
 
-*📄 Source: [ui_service.c](../../src/app/ui_service.c#L54-L70)*
+*📄 Source: [ui_service.c](../../src/app/ui_service.c#L48-L58)*
 
 退出全屏 App 时恢复之前保存的屏幕方向。仅当进入前不是横屏时才会切回竖屏，避免不必要的显示重初始化。
 

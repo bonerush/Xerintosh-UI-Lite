@@ -324,7 +324,7 @@ void xerintosh_draw_pop_up()
 
 ### 信息栏（Info Bar）
 
-信息栏与弹窗结构几乎一致，区别仅在于尺寸更小（`INFO_BAR_HEIGHT = 15` vs `POP_UP_HEIGHT = 20`）和默认位置不同。
+信息栏与弹窗结构几乎一致，区别仅在于尺寸更小（`INFO_BAR_HEIGHT = 15` vs `POP_UP_HEIGHT = 48`）和默认位置不同。
 
 *📄 Source: [ui_draw_widgets.c](../../src/ui/ui_draw_widgets.c#L20-L72)*
 

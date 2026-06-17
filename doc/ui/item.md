@@ -14,7 +14,7 @@
 
 ### 类型层次（继承体系）
 
-*📄 Source: [ui_types.h](../../src/ui/ui_types.h#L58-L65)*
+*📄 Source: [ui_types.h](../../src/ui/ui_types.h#L71-L78)*
 
 ```c
 typedef enum
@@ -256,16 +256,17 @@ bool xerintosh_push_item_to_list(xerintosh_list_item_t *_parent, xerintosh_list_
 typedef struct xerintosh_selector_t
 {
   float y_selector, y_selector_trg, w_selector, w_selector_trg, h_selector, h_selector_trg;
+  float v_y_selector, v_w_selector, v_h_selector;  /* 弹簧动画速度状态 */
   uint8_t selected_index;
   xerintosh_list_item_t *selected_item;
 } xerintosh_selector_t;
 ```
 
-选择器是一个“浮动高亮框”，它有当前坐标（`y/w/h`）和目标坐标（`y_trg/w_trg/h_trg`）。每帧通过 `xerintosh_animation()` 插值实现平滑移动。
+选择器是一个“浮动高亮框”，它有当前坐标（`y/w/h`）和目标坐标（`y_trg/w_trg/h_trg`）。每帧通过 `xerintosh_spring_animation()` 或 `xerintosh_animation()` 插值实现平滑移动，由 `g_spring_anim_mode` 全局标志决定使用哪种动画模式。
 
 ### 导航函数
 
-*📄 Source: [ui_item_selector.c](../../src/ui/ui_item_selector.c#L65-L91)*
+*📄 Source: [ui_item_selector.c](../../src/ui/ui_item_selector.c#L72-L100)*
 
 ```c
 void xerintosh_selector_go_next_item()
@@ -315,7 +316,7 @@ void xerintosh_selector_go_next_item()
 
 确认操作在重构后已大幅简化。原来的 ~60 行内联 `if/else if` 链被替换为一行派发调用：
 
-*📄 Source: [ui_item_selector.c](../../src/ui/ui_item_selector.c#L150-L153)*
+*📄 Source: [ui_item_selector.c](../../src/ui/ui_item_selector.c#L141-L147)*
 
 ```c
 void xerintosh_selector_jump_to_selected_item()
@@ -340,7 +341,7 @@ void xerintosh_selector_jump_to_selected_item()
 
 ### 回退操作
 
-*📄 Source: [ui_item_selector.c](../../src/ui/ui_item_selector.c#L164-L196)*
+*📄 Source: [ui_item_selector.c](../../src/ui/ui_item_selector.c#L154-L183)*
 
 ```c
 void xerintosh_selector_exit_current_item()
@@ -415,7 +416,7 @@ static void recalc_child_y_positions(xerintosh_list_item_t *_parent)
 
 `xerintosh_is_item_visible()` 原是 `ui_draw_list.c` 中的 `static` 函数。重构中将其提取为公开 API，方便绘制代码和测试代码复用。
 
-*📄 Source: [ui_types.h](../../src/ui/ui_types.h#L96-L102)*
+*📄 Source: [ui_types.h](../../src/ui/ui_types.h#L109-L115)*
 
 ```c
 /**

@@ -37,6 +37,8 @@ extern int16_t g_anim_speed_level;       /* 动画速度等级 1-10 */
 extern int16_t g_screen_rotation_level;  /* 屏幕方向 1=竖屏, 2=横屏 */
 extern bool    g_is_landscape;           /* 横屏开关：true=横屏, false=竖屏 */
 extern int16_t g_serial_baud_rate;       /* 串口波特率等级 1-6 */
+extern int16_t g_spring_stiffness_level;  /* 弹簧硬度等级 1-10（默认 5） */
+extern int16_t g_spring_damping_level;    /* 弹簧阻尼等级 1-10（默认 9） */
 ```
 
 *📄 Source: [settings.c](../../src/app/settings/settings.c#L17-L21)*
@@ -47,6 +49,8 @@ int16_t g_anim_speed_level       = 5;                        /* 默认动画速�
 int16_t g_screen_rotation_level  = ORIENTATION_LANDSCAPE;    /* 默认横屏 */
 bool    g_is_landscape           = true;                     /* 默认横屏 */
 int16_t g_serial_baud_rate       = 5;                        /* 默认波特率等级 5 = 115200 */
+int16_t g_spring_stiffness_level  = 5;                        /* 默认弹簧硬度等级 5 → 0.20 */
+int16_t g_spring_damping_level    = 9;                        /* 默认弹簧阻尼等级 9 → 0.36 */
 ```
 
 ### 中文伪代码拆解
@@ -83,10 +87,12 @@ int16_t g_serial_baud_rate       = 5;                        /* 默认波特率�
 | `settings_get_rotation()` / `settings_set_rotation(level)` | 屏幕方向 1=竖屏, 2=横屏；非法值回退到横屏 |
 | `settings_get_landscape()` / `settings_set_landscape(landscape)` | 横屏布尔开关 |
 | `settings_get_baud_rate()` / `settings_set_baud_rate(level)` | 波特率档位 1-6 |
+| `settings_get_spring_stiffness()` / `settings_set_spring_stiffness(level)` | 弹簧硬度档位 1-10 |
+| `settings_get_spring_damping()` / `settings_set_spring_damping(level)` | 弹簧阻尼档位 1-10 |
 
 ### 屏幕方向输入校验
 
-*📄 Source: [settings.c](../../src/app/settings/settings.c#L97-L103)*
+*📄 Source: [settings.c](../../src/app/settings/settings.c#L119-L125)*
 
 ```c
 void settings_set_rotation(int16_t level) {
@@ -102,7 +108,7 @@ void settings_set_rotation(int16_t level) {
 
 ### 从存储加载
 
-*📄 Source: [settings.c](../../src/app/settings/settings.c#L32-L79)*
+*📄 Source: [settings.c](../../src/app/settings/settings.c#L34-L100)*
 
 ```c
 void settings_load_from_storage(void);
@@ -117,12 +123,14 @@ void settings_load_from_storage(void);
 
 ### 值转换
 
-*📄 Source: [settings.c](../../src/app/settings/settings.c#L118-L164)*
+*📄 Source: [settings.c](../../src/app/settings/settings.c#L140-L214)*
 
 ```c
-int16_t settings_brightness_hw_value(void);      /* 亮度档位 → 0-255 硬件值 */
-int16_t settings_anim_speed_value(void);         /* 速度档位 → 45-95 实际速度 */
-int32_t settings_serial_baud_hw_value(int16_t);  /* 波特率档位 → 实际波特率数值 */
+int16_t settings_brightness_hw_value(void);          /* 亮度档位 → 0-255 硬件值 */
+int16_t settings_anim_speed_value(void);             /* 速度档位 → 45-95 实际速度 */
+int32_t settings_serial_baud_hw_value(int16_t);      /* 波特率档位 → 实际波特率数值 */
+float   settings_spring_stiffness_hw_value(int16_t); /* 弹簧硬度档位 → 0.04-0.40 浮点值 */
+float   settings_spring_damping_hw_value(int16_t);   /* 弹簧阻尼档位 → 0.04-0.40 浮点值 */
 ```
 
 ## 初始化流程

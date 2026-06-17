@@ -12,7 +12,7 @@
 
 ### 错误码体系
 
-*📄 Source: [kern_types.h](../../src/kernel/kern_types.h#L24-L37)*
+*📄 Source: [kern_types.h](../../src/kernel/kern_types.h#L24-L38)*
 
 ```c
 #define KERN_OK         0       /* 成功 */
@@ -29,6 +29,7 @@
 #define KERN_EBADF      (-9)    /* 无效文件描述符 */
 #define KERN_ENOTTY     (-25)   /* 不支持的 ioctl */
 #define KERN_ENOTEMPTY  (-39)   /* 目录非空 */
+#define KERN_EPERM      (-40)   /* 操作不允许（如非 owner 解锁 mutex） */
 ```
 
 #### 中文伪代码拆解
@@ -51,7 +52,7 @@
 
 ### 任务相关常量
 
-*📄 Source: [kern_types.h](../../src/kernel/kern_types.h#L41-L46)*
+*📄 Source: [kern_types.h](../../src/kernel/kern_types.h#L45-L50)*
 
 ```c
 typedef int16_t kern_pid_t;
@@ -75,7 +76,7 @@ typedef int16_t kern_pid_t;
 
 ### 任务状态枚举
 
-*📄 Source: [kern_types.h](../../src/kernel/kern_types.h#L51-L57)*
+*📄 Source: [kern_types.h](../../src/kernel/kern_types.h#L55-L61)*
 
 ```c
 typedef enum {
@@ -104,7 +105,7 @@ typedef enum {
 
 ### 日志级别
 
-*📄 Source: [kern_types.h](../../src/kernel/kern_types.h#L61-L67)*
+*📄 Source: [kern_types.h](../../src/kernel/kern_types.h#L65-L71)*
 
 ```c
 typedef enum {
@@ -120,7 +121,7 @@ typedef enum {
 
 ### 文件类型与描述符
 
-*📄 Source: [kern_types.h](../../src/kernel/kern_types.h#L71-L83)*
+*📄 Source: [kern_types.h](../../src/kernel/kern_types.h#L75-L87)*
 
 ```c
 typedef enum {
@@ -139,7 +140,7 @@ typedef int16_t kern_fd_t;
 
 ### 栈管理常量
 
-*📄 Source: [kern_types.h](../../src/kernel/kern_types.h#L87-L90)*
+*📄 Source: [kern_types.h](../../src/kernel/kern_types.h#L91-L94)*
 
 ```c
 #define KERN_STACK_MIN      1024  /* 初始栈大小（字节） */
@@ -159,7 +160,7 @@ typedef int16_t kern_fd_t;
 
 ### 路径常量
 
-*📄 Source: [kern_types.h](../../src/kernel/kern_types.h#L94-L95)*
+*📄 Source: [kern_types.h](../../src/kernel/kern_types.h#L98-L99)*
 
 ```c
 #define KERN_PATH_MAX       64    /* 最大路径长度 */

@@ -20,7 +20,7 @@
 
 ### 重构后的三层结构
 
-*📄 Source: [ui_core.c](../../src/ui/ui_core.c#L230-L240)*
+*📄 Source: [ui_core.c](../../src/ui/ui_core.c#L336-L359)*
 
 ```c
 void xerintosh_ui_main_core()
@@ -63,7 +63,7 @@ main.cpp loop()
 
 ### 四阶段状态机
 
-*📄 Source: [ui_core.c](../../src/ui/ui_core.c#L170-L211)*
+*📄 Source: [ui_core.c](../../src/ui/ui_core.c#L272-L317)*
 
 ```c
 static void xerintosh_ui_update_lifecycle(void)
@@ -207,7 +207,7 @@ static void xerintosh_ui_update_lifecycle(void)
 
 ### 渲染分支
 
-*📄 Source: [ui_core.c](../../src/ui/ui_core.c#L216-L224)*
+*📄 Source: [ui_core.c](../../src/ui/ui_core.c#L322-L330)*
 
 ```c
 static void xerintosh_ui_render_frame(void)
@@ -241,7 +241,7 @@ static void xerintosh_ui_render_frame(void)
 
 ### user_item 状态查询
 
-*📄 Source: [ui_core.c](../../src/ui/ui_core.c#L22-L27)*
+*📄 Source: [ui_core.c](../../src/ui/ui_core.c#L24-L31)*
 
 ```c
 bool xerintosh_is_in_user_item()
@@ -266,21 +266,29 @@ bool xerintosh_is_in_user_item()
 
 ### 缓动公式
 
-*📄 Source: [ui_core.c](../../src/ui/ui_core.c#L39-L51)*
+*📄 Source: [ui_core.c](../../src/ui/ui_core.c#L47-L67)*
 
 ```c
-void xerintosh_animation(float *_pos, float _pos_trg, float _speed)
+bool xerintosh_animation(float *_pos, float _pos_trg, float _speed)
 {
   if (*_pos != _pos_trg)
   {
     if (!g_anim_enabled) {
       *_pos = _pos_trg;
-      return;
+      return true;
     }
-    if (_speed >= 99.0f) _speed = 99.0f;
-    if (fabsf(*_pos - _pos_trg) <= 1.0f) *_pos = _pos_trg;
-    else *_pos += (_pos_trg - *_pos) / (100.0f - _speed);
+    /* 速度边界裁剪 */
+    if (_speed > ANIM_SPEED_MAX) _speed = ANIM_SPEED_MAX;
+    if (_speed < ANIM_SPEED_MIN) _speed = ANIM_SPEED_MIN;
+    if (fabsf(*_pos - _pos_trg) <= ANIM_SNAP_THRESHOLD) {
+      *_pos = _pos_trg;
+      return true;
+    }
+    *_pos += (_pos_trg - *_pos) / (100.0f - _speed);
+    xerintosh_invalidate();  /* 动画进行中，标记需要重绘 */
+    return false;
   }
+  return true;
 }
 ```
 
@@ -301,6 +309,7 @@ void xerintosh_animation(float *_pos, float _pos_trg, float _speed)
         // 指数衰减缓动（exponential ease-out）
         // 距离越远移动越快，越近移动越慢
         当前位置 += (目标 - 当前) / (100 - 速度)
+        xerintosh_invalidate()    // 副作用：标记 UI 需重绘，驱动下一帧刷新
     }
 }
 ```
@@ -313,7 +322,7 @@ void xerintosh_animation(float *_pos, float _pos_trg, float _speed)
 
 | 宏常量 | 计算 | 典型值 (g_anim_speed=92) | 用途 |
 |--------|------|--------------------------|------|
-| `ANIM_SPEED_LIST_ITEM` | `speed - 8` | 84 | 列表项Y坐标插值 |
+| `ANIM_SPEED_LIST_ITEM` | `speed - 2` | 90 | 列表项Y坐标插值 |
 | `ANIM_SPEED_SELECTOR` | `speed` | 92 | 选择器Y/W移动 |
 | `ANIM_SPEED_SELECTOR_H` | `speed + 1` | 93 | 选择器高度变化 |
 | `ANIM_SPEED_CAMERA` | `speed + 4` | 96 | 相机视口滚动 |
@@ -325,7 +334,7 @@ void xerintosh_animation(float *_pos, float _pos_trg, float _speed)
 
 ### 动画内部常量
 
-*📄 Source: [ui_types.h](../../src/ui/ui_types.h#L33-L35)*
+*📄 Source: [ui_types.h](../../src/ui/ui_types.h#L34-L36)*
 
 | 常量 | 值 | 用途 |
 |------|-----|------|
@@ -335,7 +344,7 @@ void xerintosh_animation(float *_pos, float _pos_trg, float _speed)
 
 ### 弹簧动画（Spring Animation）
 
-*📄 Source: [ui_core.c](../../src/ui/ui_core.c#L63-L88)*
+*📄 Source: [ui_core.c](../../src/ui/ui_core.c#L93-L115)*
 
 自 Round 10 起，选择器（selector）的 Y/W/H 动画从一阶指数衰减升级为**二阶弹簧-阻尼器模型**，产生"QQ弹弹"的弹性过渡效果。
 
@@ -389,13 +398,15 @@ void xerintosh_spring_animation(float *_pos, float *_vel, float _pos_trg,
 
 | 参数 | 值 | ζ（阻尼比） | 超调量 | 稳定帧数 | 视觉效果 |
 |------|-----|-----------|--------|---------|---------|
-| `SPRING_STIFFNESS_SELECTOR` | 0.10 | — | — | — | 控制回弹"硬度" |
-| `SPRING_DAMPING_SELECTOR` | 0.30 | ζ ≈ 0.47 | ~18% | ~25帧 | 1-2次可见弹跳 |
+| `g_spring_stiffness_selector` | 0.20f | — | — | — | 控制回弹"硬度" |
+| `g_spring_damping_selector` | 0.35f | ζ ≈ 0.39 | ~20% | ~17帧 | 1-2次可见弹跳 |
+
+**注意**：这两个参数是**运行时可调全局变量**（`extern float`），而非 `#define` 编译期常量。默认值由 `SPRING_STIFFNESS_SELECTOR_DEFAULT`（0.20f）和 `SPRING_DAMPING_SELECTOR_DEFAULT`（0.35f）定义，用户可在 设置 > 弹簧硬度 / 反弹力度 中实时调整。
 
 **核心思想**：基于经典控制理论的二阶弹簧-阻尼器模型：
 - `stiffness` (k)：刚度系数，越大系统响应越快、振荡频率越高
 - `damping` (c)：粘性阻尼系数，越大能量衰减越快、弹跳越少
-- 阻尼比 ζ = c / (2√k) ≈ 0.47 < 1，产生欠阻尼响应（有弹性）
+- 阻尼比 ζ = c / (2√k) = 0.35 / (2√0.20) ≈ 0.39 < 1，产生欠阻尼响应（有弹性）
 - 当前参数组合经过手动逐帧仿真验证，在 80x160 屏幕上产生舒适的弹性过渡
 
 **与一阶动画的关系**：
@@ -408,7 +419,7 @@ void xerintosh_spring_animation(float *_pos, float *_vel, float _pos_trg,
 
 ### 视口滚动算法
 
-*📄 Source: [ui_core.c](../../src/ui/ui_core.c#L77-L88)*
+*📄 Source: [ui_core.c](../../src/ui/ui_core.c#L170-L184)*
 
 ```c
 void xerintosh_refresh_camera_position()
@@ -455,7 +466,7 @@ void xerintosh_refresh_camera_position()
 
 ## 选择器位置刷新（含宽度缓存）
 
-*📄 Source: [ui_core.c](../../src/ui/ui_core.c#L138-L153)*
+*📄 Source: [ui_core.c](../../src/ui/ui_core.c#L230-L253)*
 
 ```c
 void xerintosh_refresh_selector_position()
@@ -466,19 +477,25 @@ void xerintosh_refresh_selector_position()
   g_xerintosh_selector.y_selector_trg = g_xerintosh_selector.selected_item->y_list_item_trg - hal_get_font_height() + 1;
   g_xerintosh_selector.w_selector_trg = xerintosh_dispatch_measure(g_xerintosh_selector.selected_item);
   g_xerintosh_selector.h_selector_trg = hal_get_font_height() + 4;
-  xerintosh_spring_animation(&g_xerintosh_selector.y_selector, &g_xerintosh_selector.v_y_selector,
-                              g_xerintosh_selector.y_selector_trg,
-                              SPRING_STIFFNESS_SELECTOR, SPRING_DAMPING_SELECTOR);
-  xerintosh_spring_animation(&g_xerintosh_selector.w_selector, &g_xerintosh_selector.v_w_selector,
-                              g_xerintosh_selector.w_selector_trg,
-                              SPRING_STIFFNESS_SELECTOR, SPRING_DAMPING_SELECTOR);
-  xerintosh_spring_animation(&g_xerintosh_selector.h_selector, &g_xerintosh_selector.v_h_selector,
-                              g_xerintosh_selector.h_selector_trg,
-                              SPRING_STIFFNESS_SELECTOR, SPRING_DAMPING_SELECTOR);
+  if (g_spring_anim_mode) {
+    xerintosh_spring_animation(&g_xerintosh_selector.y_selector, &g_xerintosh_selector.v_y_selector,
+                                g_xerintosh_selector.y_selector_trg,
+                                g_spring_stiffness_selector, g_spring_damping_selector);
+    xerintosh_spring_animation(&g_xerintosh_selector.w_selector, &g_xerintosh_selector.v_w_selector,
+                                g_xerintosh_selector.w_selector_trg,
+                                g_spring_stiffness_selector, g_spring_damping_selector);
+    xerintosh_spring_animation(&g_xerintosh_selector.h_selector, &g_xerintosh_selector.v_h_selector,
+                                g_xerintosh_selector.h_selector_trg,
+                                g_spring_stiffness_selector, g_spring_damping_selector);
+  } else {
+    xerintosh_animation(&g_xerintosh_selector.y_selector, g_xerintosh_selector.y_selector_trg, ANIM_SPEED_SELECTOR);
+    xerintosh_animation(&g_xerintosh_selector.w_selector, g_xerintosh_selector.w_selector_trg, ANIM_SPEED_SELECTOR);
+    xerintosh_animation(&g_xerintosh_selector.h_selector, g_xerintosh_selector.h_selector_trg, ANIM_SPEED_SELECTOR_H);
+  }
 }
 ```
 
-> **Round 10 变更**：选择器动画从 `xerintosh_animation()`（一阶指数衰减）升级为 `xerintosh_spring_animation()`（二阶弹簧-阻尼器）。速度状态 `v_y/w/h_selector` 存储在 `xerintosh_selector_t` 结构体中，标记到新目标时自动清零。
+> **Round 10 变更**：选择器动画根据 `g_spring_anim_mode` 全局标志动态选择——`true` 时使用 `xerintosh_spring_animation()`（二阶弹簧-阻尼器），`false` 时回退到 `xerintosh_animation()`（一阶指数衰减）。速度状态 `v_y/w/h_selector` 存储在 `xerintosh_selector_t` 结构体中。宽度计算由 `xerintosh_dispatch_measure()` 派发，不再使用旧版缓存。
 
 ### 选择器宽度缓存机制
 
@@ -490,7 +507,7 @@ void xerintosh_refresh_selector_position()
 
 ## Widget 刷新
 
-*📄 Source: [ui_core.c](../../src/ui/ui_core.c#L158-L164)*
+*📄 Source: [ui_core.c](../../src/ui/ui_core.c#L260-L266)*
 
 ```c
 void xerintosh_ui_widget_core()
@@ -510,12 +527,14 @@ Widget（信息栏 + 弹窗）的刷新独立于主渲染。它在主循环之�
 
 | 函数 | 签名 | 说明 |
 |------|------|------|
-| `xerintosh_animation` | `(float*, float, float) → void` | 通用缓动动画插值 |
+| `xerintosh_animation` | `(float*, float, float) → bool` | 通用缓动动画插值（true=已到位，false=进行中） |
+| `xerintosh_spring_animation` | `(float*, float*, float, float, float) → void` | 二阶弹簧-阻尼器动画（位置+速度状态） |
+| `xerintosh_animate_unified` | `(float*, float*, float, float) → bool` | 统一动画调度，根据 `g_spring_anim_mode` 自动选择弹簧或缓动 |
 | `xerintosh_is_in_user_item` | `(void) → bool` | 查询是否处于 user_item 运行态 |
 | `xerintosh_init_core` | `(void) → void` | 初始化列表、选择器、相机绑定 |
 | `xerintosh_refresh_camera_position` | `(void) → void` | 自动调整视口保证选择器可见 |
 | `xerintosh_refresh_list_item_position` | `(void) → void` | 刷新当前菜单所有子项的Y坐标插值 |
-| `xerintosh_refresh_selector_position` | `(void) → void` | 刷新选择器Y/W/H（含宽度缓存） |
+| `xerintosh_refresh_selector_position` | `(void) → void` | 刷新选择器Y/W/H（弹簧或缓动，按模式选择） |
 | `xerintosh_ui_main_core` | `(void) → void` | **主循环入口**（每帧由 main.cpp 调用） |
 | `xerintosh_ui_widget_core` | `(void) → void` | Widget 刷新调度（信息栏 + 弹窗） |
 

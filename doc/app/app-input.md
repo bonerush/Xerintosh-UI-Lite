@@ -49,4 +49,4 @@
 
 ---
 
-> **See Also:** [App 初始化](app-init.md) | [输入系统](../hal/input.md) | [电源键弹窗](../app/power-key-popup.md)
+> **See Also:** [App 初始化](app-init.md) | [输入系统](../hal/input.md) | [电源键弹窗](shutdown.md)

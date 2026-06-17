@@ -42,7 +42,7 @@ typedef void (*xerintosh_cb_t)(void *user_data);
 
 **用途**：创建子菜单、作为其他 item 的容器。
 
-*📄 Source: [app_menu.c](../../src/app/app_menu.c#L35-L36)*
+*📄 Source: [app_menu.c](../../src/app/app_menu.c#L74-L76)*
 ```c
 /* 1. 创建父容器 */
 xerintosh_list_item_t *parent = xerintosh_new_list_item("设置", list_icon);

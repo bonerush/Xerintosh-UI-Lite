@@ -55,7 +55,7 @@
 
 ### 架构
 
-*📄 Source: [taskmgr.h](../../src/app/taskmgr/taskmgr.h#L18-L22), [taskmgr_app.c](../../src/app/taskmgr/taskmgr_app.c#L42-L52)*
+*📄 Source: [taskmgr.h](../../src/app/taskmgr/taskmgr.h#L17-L22), [taskmgr_app.c](../../src/app/taskmgr/taskmgr_app.c#L42-L52)*
 
 任务管理器使用 `ui_anim_row` 公共动画工具：
 
@@ -111,7 +111,7 @@ taskmgr_draw() → draw_list()
 
 ### 横屏布局
 
-*📄 Source: [taskmgr.h](../../src/app/taskmgr/taskmgr.h#L18-L22)*
+*📄 Source: [taskmgr.h](../../src/app/taskmgr/taskmgr.h#L17-L22)*
 
 ```c
 #define TASKMGR_LEFT_MARGIN  HAL_LEFT_X()         /* 标准左缩进 = 4 */

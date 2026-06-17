@@ -26,7 +26,7 @@ xerintosh_invalidate()          ← App 开发者 / 框架自动
   xerintosh_clear_dirty()        ← 框架自动
 ```
 
-*📄 Source: [ui_dirty.c](../../src/ui/ui_dirty.c#L18-L44)*
+*📄 Source: [ui_dirty.c](../../src/ui/ui_dirty.c#L18-L37)*
 
 ---
 
@@ -44,7 +44,7 @@ xerintosh_invalidate()          ← App 开发者 / 框架自动
 
 | 函数 | 说明 |
 |------|------|
-| `xerintosh_mark_dirty()` | `xerintosh_invalidate()` 的别名，已弃用 |
+| `xerintosh_mark_dirty()` | `xerintosh_invalidate()` 的旧别名，**已从源码移除** |
 
 *📄 Source: [ui_dirty.h](../../src/ui/ui_dirty.h#L27-L65)*
 
@@ -65,7 +65,7 @@ void on_wifi_status_changed(void *user_data) {
 }
 ```
 
-*📄 Source: [ui_dirty.h](../../src/ui/ui_dirty.h#L36-L42)*
+*📄 Source: [ui_dirty.h](../../src/ui/ui_dirty.h#L43-L58)*
 
 ### 框架自动 invalidate 的场景
 

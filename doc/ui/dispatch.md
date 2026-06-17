@@ -34,7 +34,7 @@
 
 ### 函数指针类型
 
-*📄 Source: [ui_dispatch.c](../../src/ui/ui_dispatch.c)*
+*📄 Source: [ui_dispatch.c](../../src/ui/ui_dispatch.c#L314-L324)*
 
 ```c
 typedef struct {
@@ -56,7 +56,7 @@ typedef struct {
 
 ### 派发表定义
 
-*📄 Source: [ui_dispatch.c](../../src/ui/ui_dispatch.c)*
+*📄 Source: [ui_dispatch.c](../../src/ui/ui_dispatch.c#L326-L382)*
 
 ```c
 static const xerintosh_dispatch_vtable_t s_dispatch[] = {
@@ -72,7 +72,7 @@ static const xerintosh_dispatch_vtable_t s_dispatch[] = {
 
 ### 公开派发函数
 
-*📄 Source: [ui_dispatch.c](../../src/ui/ui_dispatch.c)*
+*📄 Source: [ui_dispatch.c](../../src/ui/ui_dispatch.c#L384-L459)*
 
 ```c
 void xerintosh_dispatch_enter(xerintosh_list_item_t *item);

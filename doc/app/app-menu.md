@@ -17,6 +17,9 @@
 │   ├── 亮度（slider_item，1-10）
 │   ├── 动画效果（switch_item）
 │   ├── 动画速度（slider_item，1-10）
+│   ├── 动画风格（switch_item）
+│   ├── 弹动硬度（slider_item，1-10）
+│   ├── 反弹力度（slider_item，1-10）
 │   ├── 横屏/竖屏（switch_item）
 │   ├── 烧录器引脚（子菜单，由 flasher_menu.c 提供）
 │   └── 波特率（子菜单）
@@ -33,13 +36,13 @@
 
 ### app_menu_build()
 
-*📄 Source: [app_menu.c](../../src/app/app_menu.c#L73-L153)*
+*📄 Source: [app_menu.c](../../src/app/app_menu.c#L157-L184)*
 
 构建完整菜单树并挂载到根节点。该函数内部调用 `flasher_menu_init()` 与 `flasher_menu_get_root()` 获取烧录器引脚子菜单。
 
 ### app_menu_push_checked()
 
-*📄 Source: [app_menu.c](../../src/app/app_menu.c#L39-L52)*
+*📄 Source: [app_menu.c](../../src/app/app_menu.c#L122-L135)*
 
 ```c
 static bool app_menu_push_checked(xerintosh_list_item_t *parent,
@@ -77,7 +80,7 @@ phase 2.5 重构新增此 helper，避免菜单构建过程中因某个子项创
 
 波特率子菜单使用 `button_item`，每个选项的 `user_data` 保存目标档位。
 
-*📄 Source: [app_menu.c](../../src/app/app_menu.c#L108-L116)*
+*📄 Source: [app_menu.c](../../src/app/app_menu.c#L190-L196)*
 
 ```c
 static void on_baud_selected_cb(void *ud)
@@ -107,4 +110,4 @@ xerintosh_push_item_to_list(item1, flasher_pin_menu);
 
 ---
 
-> **See Also:** [App 初始化](app-init.md) | [烧录器菜单](../app/flasher-menu.md) | [项目系统](../ui/item.md)
+> **See Also:** [App 初始化](app-init.md) | [烧录器](flasher.md) | [项目系统](../ui/item.md)

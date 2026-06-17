@@ -28,7 +28,12 @@ void ui_task_main(void *arg)
 
         app_input_process();
 
-        hal_display_clear();
+        /* 屏幕刷新策略：
+         * - user_item 内部：始终清屏，因为框架无法预知 App 绘制内容
+         * - 菜单列表层：脏矩形优化，仅 dirty 时清屏 */
+        if (xerintosh_is_in_user_item() || xerintosh_is_dirty()) {
+            hal_display_clear();
+        }
         xerintosh_ui_main_core();
         xerintosh_ui_widget_core();
 
@@ -52,7 +57,7 @@ void ui_task_main(void *arg)
          * 确保 TG1 系统看门狗能被及时喂狗。
          * 内核任务和 Arduino loop 都在优先级 1，
          * 若无此让步则 idle 任务会被永久饿死。 */
-        delay(1);
+        hal_delay_ms(1);
 #endif
 
         /* 让出 CPU */
@@ -79,8 +84,10 @@ void ui_task_main(void *arg)
         // 第一步：处理输入
         应用输入处理()    // 读取按键，映射到UI导航
 
-        // 第二步：清除后台缓冲区
-        显示清屏()
+        // 第二步：条件清屏（脏矩形优化）
+        if (在user_item内 || 屏幕脏标记) {
+            显示清屏()    // 仅在需要时清屏，菜单列表层跳过无变化帧
+        }
 
         // 第三步：UI核心渲染
         UI主循环核心()    // 列表渲染 或 user_item App 渲染
@@ -99,7 +106,7 @@ void ui_task_main(void *arg)
         if (前5帧) 记录日志: "第N帧刷新完成，准备让出"
 
         // 第六步：喂狗延时（仅硬件）
-        延时(1ms)         // 确保 FreeRTOS idle 任务有机会喂看门狗
+        hal_delay_ms(1ms) // 确保 FreeRTOS idle 任务有机会喂看门狗
 
         // 第七步：让出CPU
         内核让出()        // 切换到下一个内核任务
@@ -109,7 +116,7 @@ void ui_task_main(void *arg)
 }
 ```
 
-**核心思想**：UI 任务是一个永不退出的无限循环任务。每帧执行“输入→清屏→渲染→刷新→delay(1)→yield”六步，通过 `kern_yield()` 主动让出 CPU，使 WiFi/BT/Shell 等其他任务获得执行机会。硬件环境下的 `delay(1)` 至关重要，可防止 FreeRTOS idle 任务饿死导致 TG1 看门狗复位。
+**核心思想**：UI 任务是一个永不退出的无限循环任务。每帧执行"输入→条件清屏→渲染→刷新→hal_delay_ms(1)→yield"六步，通过 `kern_yield()` 主动让出 CPU，使 WiFi/BT/Shell 等其他任务获得执行机会。清屏采用脏矩形优化：`user_item` 内部始终清屏（框架无法预知 App 绘制内容），菜单列表层仅在 `xerintosh_is_dirty()` 为真时清屏。硬件环境下的 `hal_delay_ms(1)` 至关重要，可防止 FreeRTOS idle 任务饿死导致 TG1 看门狗复位。
 
 ---
 
@@ -118,12 +125,12 @@ void ui_task_main(void *arg)
 ```
 ┌─────────────────────────────────────────┐
 │ 1. app_input_process()                  │  ← 读取按键事件
-│ 2. hal_display_clear()                  │  ← 清除 M5Canvas 后台缓冲区
+│ 2. hal_display_clear()    [条件]      │  ← 脏矩形：仅 user_item 或 dirty 时清屏
 │ 3. xerintosh_ui_main_core()             │  ← 列表/user_item 渲染
 │ 4. xerintosh_ui_widget_core()           │  ← 信息栏/弹窗渲染
 │ 5. xerintosh_draw_long_press_hint()     │  ← 可选：长按进度条
 │ 6. hal_display_flush()                  │  ← pushSprite DMA 刷新
-│ 7. delay(1)   [硬件环境]                │  ← 喂狗避让
+│ 7. hal_delay_ms(1)  [硬件环境]         │  ← 喂狗避让
 │ 8. kern_yield()                         │  ← 让出 CPU
 └─────────────────────────────────────────┘
 ```
@@ -159,7 +166,7 @@ kern_spawn("ui", ui_task_main, NULL, 4096);   /* 4KB 栈 */
 
 3. **前5帧日志**：启动初期会打印详细的帧生命周期日志，帮助调试调度问题。5 帧后停止，避免日志洪水。
 
-4. **delay(1) 的必要性**：硬件环境中 `delay(1)` 释放 CPU 给 FreeRTOS idle 任务（优先级 0），确保 ESP32 的 TG1 系统看门狗能被及时喂狗。若无此延时，idle 任务会被永久饿死，约 1 秒后触发看门狗复位。
+4. **hal_delay_ms(1) 的必要性**：硬件环境中 `hal_delay_ms(1)` 释放 CPU 给 FreeRTOS idle 任务（优先级 0），确保 ESP32 的 TG1 系统看门狗能被及时喂狗。若无此延时，idle 任务会被永久饿死，约 1 秒后触发看门狗复位。
 
 ---
 

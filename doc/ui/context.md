@@ -32,9 +32,9 @@ typedef struct xerintosh_context_t
   uint8_t exit_animation_status;      /* 退场动画阶段状态机 */
   bool exit_animation_finished;       /* 退场动画是否已完成 */
   bool refresh_list_value;            /* 是否需要刷新列表项显示值 */
-  bool dirty;                         /* 脏矩形标志（ui_dirty.c 管理） */
 
   /* 绘制状态 */
+  bool dirty;                         /* 脏矩形标志（ui_dirty.c 管理） */
   uint16_t draw_color;                /* 当前前景色 */
   int16_t anim_speed;                 /* 全局动画速度基准值 */
 
@@ -66,7 +66,7 @@ typedef struct xerintosh_context_t
 | `exit_animation_status` | `uint8_t` | `0` | 退场动画状态机：0=展开中, 1=到达底部, 2=回缩中 |
 | `exit_animation_finished` | `bool` | `true` | 退场动画是否已完成 |
 | `refresh_list_value` | `bool` | `true` | 标记需要重新调用 switch/slider 的 init_function |
-| `dirty` | `bool` | `false` | 脏矩形标志，标记 UI 需重绘（`xerintosh_invalidate()` 设置） |
+| `dirty` | `bool` | `true` | 脏矩形标志，标记 UI 需重绘（`xerintosh_invalidate()` 设置） |
 | `draw_color` | `uint16_t` | `0xFFFF` | 当前前景色（白色） |
 | `anim_speed` | `int16_t` | `92` | 全局动画速度基准值，越大越快 |
 | `cached_selector_content` | `const char *` | `NULL` | 上次测量宽度时对应的内容字符串指针 |
@@ -78,7 +78,7 @@ typedef struct xerintosh_context_t
 
 ### 单例模式
 
-*📄 Source: [ui_context.c](../../src/ui/ui_context.c#L21-L40)*
+*📄 Source: [ui_context.c](../../src/ui/ui_context.c#L27-L47)*
 
 ```c
 static xerintosh_context_t g_ui_ctx = {
@@ -88,6 +88,7 @@ static xerintosh_context_t g_ui_ctx = {
   .exit_animation_status = 0,
   .exit_animation_finished = true,
   .refresh_list_value = true,
+  .dirty = true,
   .draw_color = 0xFFFF,
   .anim_speed = 92,
   .cached_selector_content = NULL,
@@ -116,7 +117,7 @@ xerintosh_context_t *xerintosh_get_context(void)
 
 ### 初始化函数
 
-*📄 Source: [ui_context.c](../../src/ui/ui_context.c#L47-L76)*
+*📄 Source: [ui_context.c](../../src/ui/ui_context.c#L54-L84)*
 
 ```c
 void xerintosh_context_init(void)
@@ -128,6 +129,7 @@ void xerintosh_context_init(void)
   g_ui_ctx.exit_animation_status = 0;
   g_ui_ctx.exit_animation_finished = true;
   g_ui_ctx.refresh_list_value = true;
+  g_ui_ctx.dirty = true;
   g_ui_ctx.draw_color = 0xFFFF;
   g_ui_ctx.anim_speed = 92;
   g_ui_ctx.cached_selector_content = NULL;
@@ -159,7 +161,7 @@ void xerintosh_context_init(void)
 
 ### 向后兼容宏
 
-*📄 Source: [ui_context.h](../../src/ui/ui_context.h#L76-L89)*
+*📄 Source: [ui_context.h](../../src/ui/ui_context.h#L77-L91)*
 
 ```c
 #define g_in_xerintosh                       (xerintosh_get_context()->in_xerintosh)
@@ -261,7 +263,7 @@ if (g_xerintosh_exit_anim_prev_screen_h != SCREEN_HEIGHT)
 
 ### 选择器宽度缓存
 
-*📄 Source: [ui_core.c](../../src/ui/ui_core.c#L141-L145)*
+*📄 Source: [ui_dispatch.c](../../src/ui/ui_dispatch.c#L190-L198)*
 
 ```c
 if (g_xerintosh_cached_selector_content != g_xerintosh_selector.selected_item->content) {

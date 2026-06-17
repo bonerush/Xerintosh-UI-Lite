@@ -21,12 +21,13 @@
 ```
 ┌─────────────────┐     ┌─────────────────────┐
 │  NATIVE_TEST    │     │    硬件环境         │
-│  所有函数空桩   │     │  M5Unified + 状态机 │
-│  返回 NONE    │     │  返回 SHORT/LONG/DC │
+│  测试注入桩     │     │  M5Unified + 状态机 │
+│  优先返回注入   │     │  返回 SHORT/LONG/DC │
+│  事件，否则 NONE│     │                     │
 └─────────────────┘     └─────────────────────┘
 ```
 
-Native 测试环境下所有输入函数返回空状态，便于在桌面端运行 UI 逻辑单元测试而不依赖真实硬件。
+Native 测试环境下输入函数支持**测试事件注入**：测试代码通过 `hal_test_inject_event()` 注入按键事件，`hal_input_get_event()` 优先返回注入的事件，否则返回 `HAL_EVENT_NONE`。`hal_input_init()` / `hal_input_update()` 为空操作，`hal_input_is_pressed()` 始终返回 `false`。
 
 ### 事件类型
 
