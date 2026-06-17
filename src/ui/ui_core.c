@@ -202,17 +202,6 @@ void xerintosh_refresh_selector_position()
     xerintosh_spring_animation(&g_xerintosh_selector.h_selector, &g_xerintosh_selector.v_h_selector,
                                 g_xerintosh_selector.h_selector_trg,
                                 g_spring_stiffness_selector, g_spring_damping_selector);
-
-    /* 屏幕边界反弹：超调超出屏幕时反转速度，产生可见的"撞墙弹回"效果 */
-    float y_max = (float)(SCREEN_HEIGHT - (int16_t)g_xerintosh_selector.h_selector);
-    if (y_max < 0.0f) y_max = 0.0f;
-    if (g_xerintosh_selector.y_selector < 0.0f) {
-      g_xerintosh_selector.y_selector = 0.0f;
-      g_xerintosh_selector.v_y_selector *= -0.35f;
-    } else if (g_xerintosh_selector.y_selector > y_max) {
-      g_xerintosh_selector.y_selector = y_max;
-      g_xerintosh_selector.v_y_selector *= -0.35f;
-    }
   } else {
     xerintosh_animation(&g_xerintosh_selector.y_selector, g_xerintosh_selector.y_selector_trg, ANIM_SPEED_SELECTOR);
     xerintosh_animation(&g_xerintosh_selector.w_selector, g_xerintosh_selector.w_selector_trg, ANIM_SPEED_SELECTOR);
