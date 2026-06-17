@@ -46,7 +46,7 @@ extern "C" {
 
 /* ═══ 外部全局变量 ═══ */
 
-extern bool g_wifi_on;   /* 定义在 main.cpp */
+extern bool g_wifi_on;   /* 定义在 app/app_state.c */
 
 /* ═══ 模块状态 ═══ */
 
@@ -94,6 +94,10 @@ static volatile bool     g_popup_active = false;   /* 弹窗是否激活 */
 static volatile uint16_t g_popup_span   = 0;        /* 显示时长（毫秒） */
 static uint32_t          g_popup_start  = 0;        /* 弹窗激活时的 tick */
 static char              g_popup_content[48] = {0};  /* 弹窗文本 */
+/* TODO(P1): g_popup_content 由 WiFi 任务写入，UI 任务读取，无锁保护。
+ * strncpy 在 SMP 下非原子操作，可能读到半写状态产生乱码。
+ * 建议改用 FreeRTOS 队列或 portMUX_TYPE 保护。当前通过 volatile
+ * g_popup_active 标志提供部分保护，窗口较小但未完全消除。 */
 
 /**
  * @brief 请求显示弹窗（可从任意任务调用）

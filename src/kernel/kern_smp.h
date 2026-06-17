@@ -23,7 +23,7 @@ extern "C" {
 /* ═══ 常量 ═══ */
 
 #define KERN_MAX_CPUS  2     /* ESP32: PRO_CPU=0, APP_CPU=1 */
-#define KERN_CPU_ANY   0xFF  /* 自动分配到负载最低的 CPU */
+/* KERN_CPU_ANY 定义在 kern_types.h（避免重复定义） */
 
 /* ═══ Per-CPU 数据结构 ═══ */
 

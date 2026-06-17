@@ -12,13 +12,13 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#include "app_state.h"
-#include "settings/settings.h"
-#include "wifi/wifi_manager.h"
-#include "bluetooth/bt_manager.h"
-#include "serial_monitor/serial_monitor.h"
-#include "taskmgr/taskmgr.h"
-#include "about/about.h"
+#include "app/app_state.h"
+#include "app/settings/settings.h"
+#include "app/wifi/wifi_manager.h"
+#include "app/bluetooth/bt_manager.h"
+#include "app/serial_monitor/serial_monitor.h"
+#include "app/taskmgr/taskmgr.h"
+#include "app/about/about.h"
 #include "app/token_usage/token_usage.h"
 #include "app/flasher/flasher.h"
 #include "app/flasher/flasher_menu.h"

@@ -26,7 +26,7 @@ extern "C" {
 /**
  * @brief 初始化 /proc 虚拟文件系统
  * @note  创建 /proc 目录，注册 /proc/tasks、/proc/uptime、
- *         /proc/version 三个只读文件。
+ *         /proc/version、/proc/meminfo、/proc/developer 五个只读文件。
  *        需在 VFS 和调度器初始化之后调用。
  */
 extern void kern_procfs_init(void);

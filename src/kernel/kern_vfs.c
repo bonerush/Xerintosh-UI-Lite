@@ -31,7 +31,7 @@ static bool g_vfs_initialized = false;
 static kern_file_t g_fd_pool[FD_POOL_SIZE];
 static uint16_t g_fd_pool_bitmap;  /* 位图：bit i = 1 表示已分配 */
 
-/* 从池中分配一个 kern_file_t（O(1) 位扫描） */
+/* 从池中分配一个 kern_file_t（O(n) 线性扫描，n=FD_POOL_SIZE=16） */
 static kern_file_t *fd_pool_alloc(void) {
     for (int i = 0; i < FD_POOL_SIZE; i++) {
         if (!(g_fd_pool_bitmap & (1 << i))) {
@@ -445,7 +445,7 @@ kern_fd_t kern_open(const char *path, unsigned int flags)
         return KERN_ENOENT;
     }
     if (dentry->inode == NULL) {
-        return KERN_EISDIR;  /* 打开了目录 */
+        return KERN_EISDIR;  /* dentry 无 inode → 可能为目录（未挂载文件） */
     }
 
     kern_task_t *cur = kern_task_current();

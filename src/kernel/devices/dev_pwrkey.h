@@ -34,7 +34,7 @@ typedef struct {
 
 /**
  * @brief /dev/pwrkey 设备实例（统一设备模型）
- * @note  通过 kern_devfs_register_device(&g_pwrkey_dev) 注册
+ * @note  通过 kern_device_register(&g_pwrkey_dev) 注册
  */
 extern kern_device_t g_pwrkey_dev;
 

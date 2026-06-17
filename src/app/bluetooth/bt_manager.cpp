@@ -74,7 +74,7 @@ extern "C" {
 #include "kernel/kern_task.h"
 }
 
-extern bool g_bt_on;  /* 定义在 main.cpp */
+extern bool g_bt_on;  /* 定义在 app/app_state.c */
 
 static bool g_bt_enabled = false;
 static bool g_wifi_was_on = false;  /* BT 启用前 WiFi 是否处于开启状态 */

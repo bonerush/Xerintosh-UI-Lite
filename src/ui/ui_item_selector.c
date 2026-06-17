@@ -73,8 +73,10 @@ void xerintosh_selector_go_next_item()
 
   /* 局部变量缓存解引用，减少重复指针链访问 */
   xerintosh_list_item_t *parent = g_xerintosh_selector.selected_item->parent;
+  if (parent == NULL) return;  /* 根节点无父项，防御性返回 */
   xerintosh_list_item_t **children = parent->child_list_item;
   int16_t count = (int16_t)parent->child_num;
+  if (count == 0) return;  /* 子项被清空后不能导航 */
 
   /* 到达最末端 */
   if (g_xerintosh_selector.selected_index == count - 1)
@@ -102,8 +104,10 @@ void xerintosh_selector_go_prev_item()
 
   /* 局部变量缓存解引用，减少重复指针链访问 */
   xerintosh_list_item_t *parent = g_xerintosh_selector.selected_item->parent;
+  if (parent == NULL) return;  /* 根节点无父项，防御性返回 */
   xerintosh_list_item_t **children = parent->child_list_item;
   int16_t count = (int16_t)parent->child_num;
+  if (count == 0) return;  /* 子项被清空后不能导航 */
 
   /* 到达最前端 */
   if (g_xerintosh_selector.selected_index == 0)
@@ -141,6 +145,7 @@ void xerintosh_selector_exit_current_item()
   g_xerintosh_refresh_list_value = true;
   xerintosh_invalidate();
 
+  if (g_xerintosh_selector.selected_item->parent == NULL) return;  /* 根节点无法退出 */
   if (g_xerintosh_selector.selected_item->parent->layer == 0 && g_in_xerintosh)
   {
     return;  /* 主菜单没有上一级，不允许退出 */

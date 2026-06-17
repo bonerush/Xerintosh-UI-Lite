@@ -174,8 +174,7 @@ static void shell_task_main(void *arg)
             hist_browse = -1;
         }
     }
-
-    kern_close(tty);
+    /* 理论上不可达：shell 任务无退出路径，tty 由任务清理钩子释放 */
 }
 
 /* ═══ 公开接口 ═══ */

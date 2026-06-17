@@ -7,7 +7,7 @@
  * @copyright Copyright (c) 2026
  */
 
-#include "kernel/devices/dev_input0.h"
+#include "dev_input0.h"
 #include "hal/hal_input.h"
 #include "hal/hal_system.h"
 

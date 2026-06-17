@@ -7,7 +7,8 @@
  * @copyright Copyright (c) 2026
  */
 
-#pragma once
+#ifndef WIFI_MENU_H
+#define WIFI_MENU_H
 
 #include "ui/ui_item.h"
 
@@ -52,3 +53,5 @@ void wifi_menu_rebuild_list(int scan_count);
 #ifdef __cplusplus
 }
 #endif
+
+#endif /* WIFI_MENU_H */

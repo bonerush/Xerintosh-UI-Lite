@@ -1,4 +1,5 @@
-#pragma once
+#ifndef TU_API_H
+#define TU_API_H
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -26,3 +27,5 @@ void tu_data_init(tu_data_t *data);
 #ifdef __cplusplus
 }
 #endif
+
+#endif /* TU_API_H */

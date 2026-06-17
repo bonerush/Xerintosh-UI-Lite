@@ -226,9 +226,9 @@ static void xerintosh_ui_render_frame(void)
 {
   if (xerintosh_is_in_user_item()) return; /* user_item 自行绘制 */
 
-  xerintosh_refresh_camera_position();
   xerintosh_refresh_list_item_position();
   xerintosh_refresh_selector_position();
+  xerintosh_refresh_camera_position();   /* 在所有位置更新完成后计算（避免使用上一帧的 y_selector_trg） */
   xerintosh_draw_list();
 }
 

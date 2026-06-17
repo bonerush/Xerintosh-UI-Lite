@@ -24,7 +24,7 @@ bool     storage_wifi_add(const char *ssid, const char *pass) {
     (void)ssid; (void)pass; return false;
 }
 bool     storage_wifi_remove(int index) { (void)index; return false; }
-int16_t  storage_get_brightness(void) { return 50; }
+int16_t  storage_get_brightness(void) { return -1; }  /* 模拟 NVS 中无保存值 */
 void     storage_set_brightness(int16_t val) { (void)val; }
 uint8_t  storage_get_anim_speed(void) { return 92; }
 void     storage_set_anim_speed(uint8_t val) { (void)val; }

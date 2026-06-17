@@ -40,11 +40,6 @@ void ui_service_enter_landscape(void)
         hal_display_set_rotation(1);
 #ifndef NATIVE_TEST
         hal_screen_get_size(&g_screen_width, &g_screen_height);
-#else
-        {
-            int16_t w, h;
-            hal_screen_get_size(&w, &h);
-        }
 #endif
         hal_display_init();
     }
@@ -57,11 +52,6 @@ void ui_service_exit_landscape(void)
         hal_display_set_rotation(0);
 #ifndef NATIVE_TEST
         hal_screen_get_size(&g_screen_width, &g_screen_height);
-#else
-        {
-            int16_t w, h;
-            hal_screen_get_size(&w, &h);
-        }
 #endif
         hal_display_init();
     }
