@@ -172,6 +172,11 @@ void xerintosh_selector_exit_current_item()
   g_xerintosh_selector.selected_index = find_item_index(
     g_xerintosh_selector.selected_item->parent->parent, g_xerintosh_selector.selected_item->parent);
   g_xerintosh_selector.selected_item = g_xerintosh_selector.selected_item->parent;
+
+  /* 弹簧动画：切换父菜单时清零速度，保证回退动画从头弹起 */
+  g_xerintosh_selector.v_y_selector = 0.0f;
+  g_xerintosh_selector.v_w_selector = 0.0f;
+  g_xerintosh_selector.v_h_selector = 0.0f;
 }
 
 /* ═══ 公共 Helper ═══ */
@@ -210,6 +215,9 @@ void ui_selector_rebuild_anchor(xerintosh_list_item_t *subtree_root,
         }
         g_xerintosh_selector.selected_item  = subtree_root;
         g_xerintosh_selector.selected_index = idx;
+        g_xerintosh_selector.v_y_selector = 0.0f;  /* 弹簧动画：锚点重建时清零速度 */
+        g_xerintosh_selector.v_w_selector = 0.0f;
+        g_xerintosh_selector.v_h_selector = 0.0f;
         xerintosh_invalidate();
     }
 }
@@ -229,6 +237,9 @@ void ui_selector_safety_move_out(xerintosh_list_item_t *subtree_root,
         if (fallback_parent != NULL && fallback_parent->child_num > 0) {
             g_xerintosh_selector.selected_item  = fallback_parent->child_list_item[0];
             g_xerintosh_selector.selected_index = 0;
+            g_xerintosh_selector.v_y_selector = 0.0f;  /* 弹簧动画：安全移出时清零速度 */
+            g_xerintosh_selector.v_w_selector = 0.0f;
+            g_xerintosh_selector.v_h_selector = 0.0f;
             xerintosh_invalidate();
         }
     }
