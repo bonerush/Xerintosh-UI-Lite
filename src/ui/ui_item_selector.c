@@ -173,6 +173,9 @@ void xerintosh_selector_exit_current_item()
     g_xerintosh_selector.selected_item->parent->parent, g_xerintosh_selector.selected_item->parent);
   g_xerintosh_selector.selected_item = g_xerintosh_selector.selected_item->parent;
 
+  /* 重置选择器到 y=0，与列表项同步从顶部滑入，避免子菜单残留位置导致的动画突变 */
+  g_xerintosh_selector.y_selector = 0.0f;
+
   /* 弹簧动画：切换父菜单时清零速度，保证回退动画从头弹起 */
   g_xerintosh_selector.v_y_selector = 0.0f;
   g_xerintosh_selector.v_w_selector = 0.0f;
