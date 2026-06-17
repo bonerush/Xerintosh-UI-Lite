@@ -13,6 +13,7 @@
 #include "app/settings/settings.h"
 #include "app/app_init.h"
 #include "app/app_state.h"
+#include "ui/ui_widget.h"  /* xerintosh_push_pop_up */
 
 extern "C" {
 void wifi_mgr_task_main(void *arg);
@@ -86,6 +87,7 @@ extern "C" void on_anim_enabled_change_cb(void *ud)
 {
     (void)ud;
     storage_set_anim_enabled(g_anim_enabled);
+    xerintosh_push_pop_up(g_anim_enabled ? "动画已开启" : "动画已关闭", 1000);
 }
 
 /**
@@ -95,6 +97,7 @@ extern "C" void on_spring_mode_change_cb(void *ud)
 {
     (void)ud;
     storage_set_spring_mode(g_spring_anim_mode);
+    xerintosh_push_pop_up(g_spring_anim_mode ? "已切换为动弹" : "已切换为普通", 1000);
 }
 
 /**
