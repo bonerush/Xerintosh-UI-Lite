@@ -106,6 +106,7 @@ extern "C" void on_spring_mode_change_cb(void *ud)
 extern "C" void on_spring_stiffness_change_cb(void *ud)
 {
     (void)ud;
+    settings_set_spring_stiffness(g_spring_stiffness_level);  /* 即时生效 */
     storage_set_spring_stiffness(g_spring_stiffness_level);
 }
 
@@ -115,6 +116,7 @@ extern "C" void on_spring_stiffness_change_cb(void *ud)
 extern "C" void on_spring_damping_change_cb(void *ud)
 {
     (void)ud;
+    settings_set_spring_damping(g_spring_damping_level);  /* 即时生效 */
     storage_set_spring_damping(g_spring_damping_level);
 }
 
