@@ -113,7 +113,6 @@ static void cmd_ps(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_
     (void)argc; (void)argv; (void)cwd; (void)cwd_size;
 
     kern_task_t *task = kern_task_list_head();
-    char line[100];
 
     kern_shell_println(tty, "PID  STATE     NAME          STACK");
 
@@ -128,12 +127,34 @@ static void cmd_ps(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_
         default:                 state_str = "?????    "; break;
         }
 
-        snprintf(line, sizeof(line), "%-4d %s %-12s %zu/%zu",
-                 (int)task->pid, state_str, task->name,
+        /*
+         * 分步格式化：用多个小 snprintf 替代单个复杂格式串，
+         * 降低 minprintf 实现 bug 的风险，也避免 task->name
+         * 在 yield 后被释放导致悬空指针。
+         */
+        char pid_buf[8];
+        snprintf(pid_buf, sizeof(pid_buf), "%-4d", (int)task->pid);
+        kern_shell_print(tty, pid_buf);
+        kern_shell_print(tty, " ");
+
+        kern_shell_print(tty, state_str);
+        kern_shell_print(tty, " ");
+
+        /* 防御性复制任务名称到栈缓冲区 */
+        char name_buf[KERN_TASK_NAME_LEN + 4];
+        snprintf(name_buf, sizeof(name_buf), "%-12s",
+                 task->name[0] != '\0' ? task->name : "?");
+        kern_shell_print(tty, name_buf);
+        kern_shell_print(tty, " ");
+
+        char stack_buf[32];
+        snprintf(stack_buf, sizeof(stack_buf), "%zu/%zu",
                  kern_task_stack_usage(task), task->stack_size);
-        kern_shell_println(tty, line);
-        kern_yield();  /* 防止长时间输出触发看门狗 */
-        task = task->next;
+        kern_shell_println(tty, stack_buf);
+
+        kern_task_t *next = task->next;  /* 先保存 next 再 yield */
+        kern_yield();
+        task = next;
     }
 }
 
