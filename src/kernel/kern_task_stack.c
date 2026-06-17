@@ -128,14 +128,17 @@ size_t kern_task_stack_usage(kern_task_t *task)
 size_t kern_task_stack_usage(kern_task_t *task)
 {
     if (task == NULL) return 0;
-    /* 通过可移植层查询剩余栈字数，转换为已使用字节 */
+    /* 通过可移植层查询剩余栈字数，转为已使用字节 */
     if (task->port_thread != KERN_PORT_THREAD_NULL) {
         size_t free_words = kern_port_thread_stack_usage(task->port_thread);
-        /* ESP32 上 sizeof(StackType_t) == 4 */
-        size_t free_bytes = free_words * 4;
-        return (task->stack_size > free_bytes)
-               ? (task->stack_size - free_bytes)
-               : 0;
+        /*
+         * FreeRTOS: task->stack_size 和 uxTaskGetStackHighWaterMark
+         * 均以 sizeof(StackType_t) (4 字节) 为单位。
+         * used = (总字数 - 剩余字数) × 4
+         */
+        if (free_words > 0 && task->stack_size > free_words)
+            return (task->stack_size - free_words) * 4;
+        return 0;
     }
     return 0;
 }
