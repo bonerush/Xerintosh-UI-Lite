@@ -88,7 +88,7 @@ void shell_history_add(const char *cmd)
     if (last >= 0 && strcmp(g_history[last], cmd) == 0) return;
 
     strncpy(g_history[g_hist_index], cmd, 63);
-    g_history[g_hist_index][127] = '\0';
+    g_history[g_hist_index][63] = '\0';
     g_hist_index = (g_hist_index + 1) % HISTORY_SIZE;
     if (g_hist_count < HISTORY_SIZE) g_hist_count++;
 }
@@ -155,6 +155,14 @@ static void cmd_ps(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_
 
         /* 栈: 虚任务无独立栈，实任务显示 已用/总量（字节） */
         {
+#if defined(NATIVE_TEST)
+            /* Native: 栈由 Xeros 管理（字节），无 port_thread 字段 */
+            size_t used = kern_task_stack_usage(task);
+            size_t total = task->stack_size;
+            char stack_buf[32];
+            snprintf(stack_buf, sizeof(stack_buf), "%zu/%zu", used, total);
+            kern_shell_println(tty, stack_buf);
+#else
             if (task->port_thread == KERN_PORT_THREAD_NULL) {
                 kern_shell_println(tty, "shrd");  /* 共享 ui 线程栈 */
             } else {
@@ -164,6 +172,7 @@ static void cmd_ps(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_
                 snprintf(stack_buf, sizeof(stack_buf), "%zu/%zu", used, total);
                 kern_shell_println(tty, stack_buf);
             }
+#endif
         }
 
         kern_task_t *next = task->next;  /* 先保存 next 再 yield */
