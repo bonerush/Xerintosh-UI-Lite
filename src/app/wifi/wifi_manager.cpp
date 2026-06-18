@@ -164,10 +164,18 @@ bool wifi_mgr_is_waiting_input(void)
  */
 void wifi_mgr_init(void)
 {
-    /* 设置是根节点的第一个子项 */
+    /* 按名称查找"设置"菜单项（Round 7 重构后，"设置"不再是
+     * root->child_list_item[0]，因为 user items 先于"设置"挂载） */
     xerintosh_list_item_t *root = xerintosh_get_root_list();
-    if (root && root->child_num > 0) {
-        g_settings_list = root->child_list_item[0];  /* "设置" */
+    if (root) {
+        for (int i = 0; i < root->child_num; i++) {
+            if (root->child_list_item[i] &&
+                root->child_list_item[i]->content &&
+                strcmp(root->child_list_item[i]->content, "设置") == 0) {
+                g_settings_list = root->child_list_item[i];
+                break;
+            }
+        }
     }
 
     /* 注意：自动连接已移除。WiFi 默认关闭（g_wifi_on = false）。

@@ -94,7 +94,7 @@ typedef enum {
 
 /* ═══ 列表项布局常量 ═══ */
 
-#define MAX_LIST_CHILD_NUM 10   /* 每个父节点最多子项数 */
+#define MAX_LIST_CHILD_NUM 12   /* 每个父节点最多子项数（+8 字节/项） */
 #define MAX_LIST_LAYER 10       /* 菜单树最大深度 */
 #define LIST_ITEM_SPACING 18    /* 列表项纵向间距 */
 #define LIST_ITEM_LEFT_MARGIN 4 /* 列表项左边距 */
