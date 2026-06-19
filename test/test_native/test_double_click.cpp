@@ -176,3 +176,25 @@ TEST(DoubleClickTest, TwoConsecutiveDoubleClicks)
     EXPECT_EQ(hal_input_dc_process(&st, true, false, 600), HAL_EVENT_NONE);
     EXPECT_EQ(hal_input_dc_process(&st, false, true, 650), HAL_EVENT_DOUBLE_CLICK);
 }
+
+/**
+ * @brief 窗口超时的同一帧出现新按下：不应丢失按下事件
+ * @note P1-1 回归：旧实现先检查超时并提前返回 SHORT_PRESS，导致本帧按下被丢弃。
+ */
+TEST(DoubleClickTest, PressAtWindowTimeoutDoesNotDropEvent)
+{
+    hal_input_dc_state_t st;
+    hal_input_dc_init(&st);
+
+    /* 第一次短按 */
+    EXPECT_EQ(hal_input_dc_process(&st, true, false, 0), HAL_EVENT_NONE);
+    EXPECT_EQ(hal_input_dc_process(&st, false, true, 100), HAL_EVENT_NONE);
+
+    /* 窗口期刚好超时的同一帧出现第二次按下：
+     * 应先返回上一次短按，并记录本次按下。 */
+    EXPECT_EQ(hal_input_dc_process(&st, true, false, 401), HAL_EVENT_SHORT_PRESS);
+
+    /* 本次按下释放后形成新的短按 */
+    EXPECT_EQ(hal_input_dc_process(&st, false, true, 500), HAL_EVENT_NONE);
+    EXPECT_EQ(hal_input_dc_process(&st, false, false, 801), HAL_EVENT_SHORT_PRESS);
+}

@@ -87,15 +87,9 @@ hal_event_t hal_input_dc_process(hal_input_dc_state_t *st,
                                   bool was_released,
                                   uint32_t now_ms)
 {
-    /* 第一步：检查是否有超时等待的短按 */
-    if (st->pending_short_press &&
-        (now_ms - st->last_release_ms) > DOUBLE_CLICK_WINDOW_MS) {
-        st->pending_short_press = false;
-        st->last_release_ms = 0;
-        return HAL_EVENT_SHORT_PRESS;
-    }
-
-    /* 第二步：处理按下边沿 */
+    /* 第一步：处理按下边沿（P1-1）
+     * 必须在超时检查之前处理，否则窗口超时的同一帧出现新按下时，
+     * 按下事件会被丢弃，导致用户感觉按键丢失。 */
     if (was_pressed) {
         /* 如果在窗口期内再次按下，进入双击序列 */
         if (st->pending_short_press &&
@@ -131,6 +125,14 @@ hal_event_t hal_input_dc_process(hal_input_dc_state_t *st,
             st->in_double_click_sequence = false;
             st->last_release_ms = 0;
         }
+    }
+
+    /* 第三步：检查是否有超时等待的短按 */
+    if (st->pending_short_press &&
+        (now_ms - st->last_release_ms) > DOUBLE_CLICK_WINDOW_MS) {
+        st->pending_short_press = false;
+        st->last_release_ms = 0;
+        return HAL_EVENT_SHORT_PRESS;
     }
 
     /* 第四步：检测长按 */
