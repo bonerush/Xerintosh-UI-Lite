@@ -76,7 +76,7 @@ static bt_uart_ringbuf_t         g_tx_buf;
 static bt_uart_ringbuf_t         g_rx_buf;
 static bt_uart_rx_callback_t     g_rx_cb     = NULL;
 static bt_uart_connect_callback_t g_conn_cb  = NULL;
-static bool                      g_connected  = false;
+static volatile bool             g_connected  = false;
 
 #ifdef NATIVE_TEST
 
@@ -205,7 +205,7 @@ uint16_t bt_uart_test_consume_tx(uint16_t len)
 
 static BluetoothSerial g_bt_serial;
 static bool g_initialized    = false;
-static bool g_prev_connected = false;
+static volatile bool g_prev_connected = false;
 
 /* RX 数据跨任务传递队列（主任务写入，UI 任务消费） */
 #define BT_RX_QUEUE_SIZE 512

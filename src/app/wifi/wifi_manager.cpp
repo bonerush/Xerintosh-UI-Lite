@@ -50,7 +50,7 @@ extern "C" {
 
 /* ═══ 外部全局变量 ═══ */
 
-extern bool g_wifi_on;   /* 定义在 app/app_state.c */
+#include "app/app_state.h"
 
 /* ═══ 模块状态 ═══ */
 

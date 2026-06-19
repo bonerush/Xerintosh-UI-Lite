@@ -64,10 +64,9 @@ static int16_t brightness = 50;  /* 当前硬件亮度缓存 */
 extern "C" void on_brightness_change_cb(void *ud)
 {
     (void)ud;
-    brightness = g_brightness_level * 10;
-    uint8_t hw = (uint8_t)settings_brightness_hw_value();
-    hal_display_set_brightness(hw);
-    storage_set_brightness(brightness);
+    brightness = settings_brightness_hw_value();
+    hal_display_set_brightness((uint8_t)brightness);
+    storage_set_brightness(settings_get_brightness());
 }
 
 /**
@@ -188,8 +187,8 @@ void setup()
     settings_load_from_storage();
     Serial.println("[  OK  ] Settings loaded from NVS");
 
-    brightness = g_brightness_level * 10;
-    hal_display_set_brightness((uint8_t)settings_brightness_hw_value());
+    brightness = settings_brightness_hw_value();
+    hal_display_set_brightness((uint8_t)brightness);
     g_anim_speed = settings_anim_speed_value();
 
     /* M5StickC 实测 rotation 效果：

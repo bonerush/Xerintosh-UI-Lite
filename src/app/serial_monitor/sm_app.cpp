@@ -20,6 +20,9 @@
 #include "ui/ui_core.h"
 #include "ui/ui_item.h"
 
+/* 串口监视器调试开关：0=禁用每帧调试日志，1=启用 */
+#define SM_DBG_ENABLED 0
+
 /* ═══ 状态变量 ═══ */
 
 bool        sm_running = false;
@@ -81,9 +84,11 @@ static void sm_on_bt_rx(const uint8_t *data, uint16_t len)
  */
 static void sm_on_bt_connect(bool connected)
 {
+#if SM_DBG_ENABLED
     Serial.printf("[SM-DBG] sm_on_bt_connect(%d) from core=%d ms=%lu\n",
                   (int)connected, (int)xPortGetCoreID(), (unsigned long)millis());
     Serial.flush();
+#endif
     sm_bt_connected = connected;
 }
 #endif
@@ -148,7 +153,7 @@ void serial_monitor_loop(void *ud)
         } else {
             /* 切换数据源 SER ↔ BLE */
             if (sm_source == SM_SOURCE_SER) {
-#ifndef NATIVE_TEST
+#if !defined(NATIVE_TEST) && SM_DBG_ENABLED
                 Serial.printf("[SM-DBG] switching to BLE mode, bt_enabled=%d ms=%lu\n",
                               (int)bt_mgr_is_enabled(), (unsigned long)millis());
                 Serial.flush();
@@ -157,13 +162,13 @@ void serial_monitor_loop(void *ud)
                 svc_mgr_bt_request_enable(&sm_bt_lazy_inited);
                 sm_source = SM_SOURCE_BLE;
                 sm_bt_connected = bt_uart_is_connected();
-#ifndef NATIVE_TEST
+#if !defined(NATIVE_TEST) && SM_DBG_ENABLED
                 Serial.printf("[SM-DBG] BLE mode set, connected=%d\n", (int)sm_bt_connected);
                 Serial.flush();
 #endif
             } else {
                 sm_source = SM_SOURCE_SER;
-#ifndef NATIVE_TEST
+#if !defined(NATIVE_TEST) && SM_DBG_ENABLED
                 Serial.printf("[SM-DBG] back to SER mode\n");
                 Serial.flush();
 #endif
@@ -212,8 +217,10 @@ void serial_monitor_loop(void *ud)
     if (sm_source == SM_SOURCE_BLE) {
         static bool s_prev_ble_active = false;
         if (!s_prev_ble_active) {
+#if SM_DBG_ENABLED
             Serial.printf("[SM-DBG] BLE loop active, running=%d ms=%lu\n",
                           (int)sm_running, (unsigned long)millis()); Serial.flush();
+#endif
             s_prev_ble_active = true;
         }
         if (sm_running) {
@@ -221,9 +228,11 @@ void serial_monitor_loop(void *ud)
         }
         bool prev = sm_bt_connected;
         sm_bt_connected = bt_uart_is_connected();
+#if SM_DBG_ENABLED
         Serial.printf("[SM-DBG] conn state check: prev=%d now=%d\n",
                       (int)prev, (int)sm_bt_connected);
         Serial.flush();
+#endif
         if (sm_bt_connected != prev) {
             xerintosh_push_pop_up(
                 sm_bt_connected ? "Connected" : "Disconnected", 1500);
