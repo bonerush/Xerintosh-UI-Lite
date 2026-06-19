@@ -99,14 +99,37 @@ static kern_err_t dev_ttyS0_write(kern_device_t *dev, const void *buf, size_t le
 
     TTY_ENTER_CRITICAL();
     size_t total = 0;
+    char last = 0;  /* 跟踪上一个写入字节，用于 \n→\r\n 转换 */
+
     while (total < len && g_tx_count < TTY_TX_BUF_SIZE) {
-        g_tx_buf[g_tx_head] = in[total];
+        char ch = in[total];
+
+        /* ── 终端换行转换：裸 \n → \r\n ──
+         * 串口终端需要 CR+LF 组合才能正确换行。如果检测到孤立的
+         * \n（前一个字符不是 \r），先在环形缓冲区中插入 \r。
+         * 缓冲区已满时跳过转换（避免死锁，最多丢失一个字符）。 */
+        if (ch == '\n' && last != '\r' && g_tx_count + 1 < TTY_TX_BUF_SIZE) {
+            g_tx_buf[g_tx_head] = '\r';
+            g_tx_head = (uint16_t)((g_tx_head + 1) % TTY_TX_BUF_SIZE);
+            #ifndef NATIVE_TEST
+            __atomic_fetch_add(&g_tx_count, 1, __ATOMIC_RELAXED);
+            #else
+            g_tx_count++;
+            #endif
+            last = '\r';
+        }
+
+        /* 写入当前字节（如果上一步插入了 \r 可能已填满缓冲区） */
+        if (g_tx_count >= TTY_TX_BUF_SIZE) break;
+
+        g_tx_buf[g_tx_head] = ch;
         g_tx_head = (uint16_t)((g_tx_head + 1) % TTY_TX_BUF_SIZE);
         #ifndef NATIVE_TEST
         __atomic_fetch_add(&g_tx_count, 1, __ATOMIC_RELAXED);
         #else
         g_tx_count++;
         #endif
+        last = ch;
         total++;
     }
 
