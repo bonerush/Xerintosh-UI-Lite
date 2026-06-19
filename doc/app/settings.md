@@ -129,9 +129,17 @@ void settings_load_from_storage(void);
 int16_t settings_brightness_hw_value(void);          /* 亮度档位 → 0-255 硬件值 */
 int16_t settings_anim_speed_value(void);             /* 速度档位 → 45-95 实际速度 */
 int32_t settings_serial_baud_hw_value(int16_t);      /* 波特率档位 → 实际波特率数值 */
+int     settings_serial_baud_count(void);            /* 波特率档位总数 */
+const int32_t *settings_serial_baud_table(void);     /* 波特率映射表只读指针 */
 float   settings_spring_stiffness_hw_value(int16_t); /* 弹簧硬度档位 → 0.04-0.40 浮点值 */
 float   settings_spring_damping_hw_value(int16_t);   /* 弹簧阻尼档位 → 0.04-0.40 浮点值 */
 ```
+
+*📄 Source: [settings.c](../../src/app/settings/settings.c#L176-L225)*
+
+**波特率映射表访问**：为避免 `app_menu.c` 与 `settings.c` 维护两份相同的波特率列表，settings 暴露 `settings_serial_baud_count()` 和 `settings_serial_baud_table()`。菜单构建时直接遍历该表生成按钮，无需手写标签和等级数组。
+
+**弹簧越界处理**：`settings_spring_stiffness_hw_value()` 与 `settings_spring_damping_hw_value()` 对越界输入统一 clamp 到 `[1, 10]`，与 `settings_set_spring_*()` 行为一致（之前分别默认回退到 5 和 9，行为不统一）。
 
 ## 初始化流程
 

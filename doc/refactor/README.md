@@ -1,6 +1,6 @@
 # 重构跟踪：shell-wifi-kernel（第十一轮 · 2026-06-19 · shell/WiFi/内核管线修复与代码优化）
 
-> **当前状态**：🔄 阶段 2.4 进行中
+> **当前状态**：✅ 阶段 2.4 完成
 > **当前分支**: `refactor/2026-06-19-shell-wifi-kernel`
 > **本轮目标**：基于第十轮修复的 shell 和 WiFi，深入检查对应内核管线、简化重复代码、统一代码风格、原子化更新文档
 
@@ -13,7 +13,7 @@
 | 2.1 | 内核层重构 | **DONE** | coder | `02-refactor/kernel.md` |
 | 2.2 | HAL 层重构 | **DONE** | coder | `02-refactor/hal.md` |
 | 2.3 | UI 核心层 | **DONE** | coder | `02-refactor/ui.md` |
-| 2.4 | App 层重构 | **RUNNING** | coder | `02-refactor/app.md` |
+| 2.4 | App 层重构 | **DONE** | coder | `02-refactor/app.md` |
 | 2.5 | 文档体系 | **PENDING** | coder | `02-refactor/docs.md` |
 | 3 | 集成验证 | **PENDING** | verification | `03-integration.md` |
 | 4 | 归档 | **PENDING** | coder | `04-archive.md` |
