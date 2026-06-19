@@ -13,7 +13,15 @@
 #include "ui_drawer.h"
 #include "ui_types.h"
 #include <math.h>
-#include "app/shutdown/power_key_popup.h"
+
+/* ═══ 双键模式回调（由 App 层注册，避免 UI 核心反向依赖 App）═══ */
+
+static bool (*s_dual_key_active_cb)(void) = NULL;
+
+void xerintosh_set_dual_key_callback(bool (*cb)(void))
+{
+    s_dual_key_active_cb = cb;
+}
 
 /* ═══ 生命周期 ═══ */
 
@@ -353,7 +361,8 @@ void xerintosh_ui_main_core()
 
   xerintosh_ui_render_frame();
 
-  /* 退场动画遮罩（双键关机模式下跳过） */
-  if (!g_xerintosh_exit_animation_finished && !power_key_popup_is_dual_active())
+  /* 退场动画遮罩（双键关机模式下跳过，回调由 App 层注册） */
+  if (!g_xerintosh_exit_animation_finished &&
+      (s_dual_key_active_cb == NULL || !s_dual_key_active_cb()))
     xerintosh_draw_exit_animation();
 }
