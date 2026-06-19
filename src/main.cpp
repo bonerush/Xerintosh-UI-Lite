@@ -263,7 +263,9 @@ static void deferred_kernel_init(void)
             uint8_t hw = (uint8_t)(val > 255 ? 255 : val);
             hal_display_set_brightness(hw);
             brightness = (int16_t)val;
-            storage_set_brightness(val);
+            /* sysfs  brightness 是 0-255 HW 值，storage 期望 1-10 level */
+            int16_t level = settings_brightness_level_from_hw((int16_t)val);
+            storage_set_brightness((uint8_t)level);
         }, NULL);
 
     /* rotation: sysfs 写入时同步到 M5 屏幕方向 */
@@ -298,6 +300,13 @@ static void deferred_kernel_init(void)
             g_anim_enabled = (val != 0);
             storage_set_anim_enabled(g_anim_enabled);
         }, NULL);
+
+    /* 同步 sysfs 初始值为当前硬件真实状态（K13）
+     * 避免用户 cat 到默认值后写入相同值却无变化。 */
+    kern_sysfs_update(KERN_SYSFS_BRIGHTNESS,   (int32_t)brightness);
+    kern_sysfs_update(KERN_SYSFS_ROTATION,     (int32_t)(g_is_landscape ? 1 : 0));
+    kern_sysfs_update(KERN_SYSFS_ANIM_SPEED,   (int32_t)g_anim_speed);
+    kern_sysfs_update(KERN_SYSFS_ANIM_ENABLED, g_anim_enabled ? 1 : 0);
 
     kern_devices_init();
     Serial.printf("[  OK  ] Kernel subsystems, free_heap=%u\n", ESP.getFreeHeap());

@@ -78,6 +78,13 @@ void settings_load_from_storage(void);
 int16_t settings_brightness_hw_value(void);
 
 /**
+ * @brief  将硬件 PWM 值（0-255）反向映射为亮度等级（1-10）
+ * @param  hw 硬件亮度值（0-255）
+ * @return 亮度等级（1-10）
+ */
+int16_t settings_brightness_level_from_hw(int16_t hw);
+
+/**
  * @brief  将动画速度等级转换为内部动画速度值
  * @return 内部动画速度值
  */
