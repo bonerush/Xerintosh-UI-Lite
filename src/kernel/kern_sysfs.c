@@ -150,6 +150,14 @@ static ssize_t sysfs_write(kern_file_t *f, const char *buf, size_t len)
         return KERN_EINVAL;
     }
 
+    /* 允许尾部空白（如 \r\n），中间出现非数字字符则拒绝（K35） */
+    while (*endptr == ' ' || *endptr == '\t' || *endptr == '\r' || *endptr == '\n') {
+        endptr++;
+    }
+    if (*endptr != '\0') {
+        return KERN_EINVAL;
+    }
+
     if (val < (long)def->min_val || val > (long)def->max_val) {
         return KERN_EINVAL;
     }

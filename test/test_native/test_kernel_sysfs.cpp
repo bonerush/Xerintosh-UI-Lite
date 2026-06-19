@@ -465,3 +465,33 @@ TEST(KernelSysfsTest, KernelPrefixedRootAttributesDoNotExist)
     EXPECT_LT(kern_open("/sys/kernel/anim_speed",   KERN_O_RDONLY), 0);
     EXPECT_LT(kern_open("/sys/kernel/anim_enabled", KERN_O_RDONLY), 0);
 }
+
+/* ═══ sysfs 写入严格性（K35）═══ */
+
+TEST(KernelSysfsTest, WriteRejectsTrailingGarbage)
+{
+    kern_vfs_init();
+    kern_sysfs_init();
+
+    kern_fd_t fd = kern_open("/sys/brightness", KERN_O_WRONLY);
+    ASSERT_GE(fd, 0);
+
+    ssize_t n = kern_write(fd, "128abc", 6);
+    EXPECT_LT(n, 0);
+
+    kern_close(fd);
+}
+
+TEST(KernelSysfsTest, WriteAcceptsTrailingNewline)
+{
+    kern_vfs_init();
+    kern_sysfs_init();
+
+    kern_fd_t fd = kern_open("/sys/brightness", KERN_O_WRONLY);
+    ASSERT_GE(fd, 0);
+
+    ssize_t n = kern_write(fd, "128\r\n", 5);
+    EXPECT_EQ(n, 5);
+
+    kern_close(fd);
+}
