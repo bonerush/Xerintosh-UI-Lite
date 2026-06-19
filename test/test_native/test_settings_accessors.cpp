@@ -8,6 +8,7 @@
 
 extern "C" {
 #include "app/settings/settings.h"
+#include "app/storage/storage.h"
 }
 
 /* ═══ 测试夹具 ═══ */
@@ -165,4 +166,18 @@ TEST_F(SettingsAccessorTest, BrightnessLevelFromHwClampsBoundary)
     EXPECT_EQ(settings_brightness_level_from_hw(0),   1);
     EXPECT_EQ(settings_brightness_level_from_hw(255), 10);
     EXPECT_EQ(settings_brightness_level_from_hw(300), 10);
+}
+
+/* ═══ storage 批量保存 / 加载（K22）═══ */
+
+TEST_F(SettingsAccessorTest, StorageSaveAllDoesNotCrash)
+{
+    storage_save_all();
+    SUCCEED();
+}
+
+TEST_F(SettingsAccessorTest, StorageLoadAllDoesNotCrash)
+{
+    storage_load_all();
+    SUCCEED();
 }

@@ -776,9 +776,11 @@ static void cmd_param(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t c
         kern_close(fd);
         kern_shell_println(tty, "OK");
     } else if (strcmp(argv[1], "save") == 0) {
-        kern_shell_println(tty, "param save: settings_save_all() NYI");
+        storage_save_all();
+        kern_shell_println(tty, "OK: parameters saved");
     } else if (strcmp(argv[1], "load") == 0) {
-        kern_shell_println(tty, "param load: settings_load_all() NYI");
+        storage_load_all();
+        kern_shell_println(tty, "OK: parameters loaded (reboot to apply hardware changes)");
     } else {
         kern_shell_println(tty, "param: unknown sub-command");
     }

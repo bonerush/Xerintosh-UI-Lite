@@ -216,6 +216,21 @@ uint8_t storage_get_flasher_pin_role(uint8_t pin);
  */
 void    storage_set_flasher_pin_role(uint8_t pin, uint8_t role);
 
+/* ═══ 批量保存 / 加载 ═══ */
+
+/**
+ * @brief 将当前所有设置项保存到 NVS 存储
+ * @note  调用各 storage_set_* 接口，保存亮度、动画、方向、波特率、弹簧参数等。
+ */
+void storage_save_all(void);
+
+/**
+ * @brief 从 NVS 存储重新加载所有设置项到全局变量
+ * @note  当前由 settings_load_from_storage() 实现；本函数为其薄封装，
+ *        供 Shell 等非 settings 模块调用。
+ */
+void storage_load_all(void);
+
 #ifdef __cplusplus
 }
 #endif

@@ -9,6 +9,7 @@
  */
 
 #include "storage.h"
+#include "app/settings/settings.h"
 
 #ifdef NATIVE_TEST
 
@@ -52,6 +53,9 @@ uint8_t storage_get_flasher_pin_role(uint8_t pin) {
 void storage_set_flasher_pin_role(uint8_t pin, uint8_t role) {
     (void)pin; (void)role;
 }
+
+void storage_save_all(void) {}
+void storage_load_all(void) {}
 
 #else
 
@@ -489,5 +493,20 @@ void storage_set_flasher_pin_role(uint8_t pin, uint8_t role) {
     prefs.end();
 }
 
+void storage_save_all(void)
+{
+    storage_set_brightness(settings_get_brightness());
+    storage_set_anim_speed((uint8_t)settings_get_anim_speed());
+    storage_set_anim_enabled(g_anim_enabled);
+    storage_set_screen_rotation((uint8_t)settings_get_rotation());
+    storage_set_spring_stiffness(settings_get_spring_stiffness());
+    storage_set_spring_damping(settings_get_spring_damping());
+    storage_set_serial_baud_rate(settings_get_baud_rate());
+}
+
+void storage_load_all(void)
+{
+    settings_load_from_storage();
+}
 
 #endif /* NATIVE_TEST */
