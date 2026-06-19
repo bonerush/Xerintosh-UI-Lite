@@ -47,17 +47,19 @@ static xerintosh_list_item_t *build_baud_submenu(void)
         return NULL;
     }
 
-    const char *baud_labels[] = {"9600", "19200", "38400", "57600", "115200", "230400"};
-    int16_t baud_levels[] = {1, 2, 3, 4, 5, 6};
-    for (int i = 0; i < 6; i++) {
+    const int32_t *baud_table = settings_serial_baud_table();
+    int baud_count = settings_serial_baud_count();
+    for (int i = 0; i < baud_count; i++) {
+        char label[16];
+        snprintf(label, sizeof(label), "%ld", (long)baud_table[i]);
         xerintosh_list_item_t *btn = xerintosh_new_button_item(
-            baud_labels[i], on_baud_selected_cb, default_icon);
+            label, on_baud_selected_cb, default_icon);
         if (btn == NULL) {
-            kern_log(KERN_LOG_ERROR, "app_menu: failed to create baud item %s", baud_labels[i]);
+            kern_log(KERN_LOG_ERROR, "app_menu: failed to create baud item %s", label);
             continue;
         }
-        btn->user_data = (void *)(intptr_t)baud_levels[i];
-        app_menu_push_checked(baud_menu, btn, baud_labels[i]);
+        btn->user_data = (void *)(intptr_t)(i + 1);
+        app_menu_push_checked(baud_menu, btn, label);
     }
     return baud_menu;
 }

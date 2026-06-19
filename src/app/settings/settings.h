@@ -99,6 +99,19 @@ int16_t settings_anim_speed_value(void);
 int32_t settings_serial_baud_hw_value(int16_t level);
 
 /**
+ * @brief  获取波特率映射表项数
+ * @return 等级总数（当前为 6）
+ */
+int settings_serial_baud_count(void);
+
+/**
+ * @brief  获取波特率映射表只读指针
+ * @return 指向 int32_t 数组首元素的常量指针
+ * @note   数组长度可通过 settings_serial_baud_count() 获取
+ */
+const int32_t *settings_serial_baud_table(void);
+
+/**
  * @brief  将弹簧硬度等级转换为实际 stiffness 浮点值
  * @param  level 等级 1-10
  * @return 浮点刚度值（0.04-0.40）
