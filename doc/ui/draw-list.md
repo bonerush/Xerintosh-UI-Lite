@@ -25,24 +25,33 @@ static bool is_item_visible(int16_t _y_item)
 
 ## 列表外观
 
-*📄 Source: [ui_draw_list.c](../../src/ui/ui_draw_list.c#L130-L186)*
+*📄 Source: [ui_draw_list.c](../../src/ui/ui_draw_list.c#L51-L114)*
 
 列表外观包括顶部装饰横线、右上角消散像素簇、右侧滚动条及滑块：
 
 ```c
-void xerintosh_draw_list_appearance()
+static void xerintosh_draw_list_appearance(int16_t selected_index, int16_t child_num)
 {
   g_xerintosh_draw_color = COLOR_FG;
   hal_draw_h_line(0, 1, 66, g_xerintosh_draw_color);
   hal_draw_h_line(0, 0, 67, g_xerintosh_draw_color);
 
   /* 顶部右侧装饰像素 */
-  const struct { uint8_t _start, _end, _step, _y; }
-  draw_cfg[] = {
-      {67, 99, 2, 1}, {68, 100, 2, 0},
-      {102, 111, 3, 1}, {103, 112, 3, 0},
-      {115, 124, 5, 1}, {116, 124, 5, 0}
+  const struct
+  {
+    uint8_t _start;
+    uint8_t _end;
+    uint8_t _step;
+    uint8_t _y;
+  } draw_cfg[] = {
+      {67, 99, 2, 1},
+      {68, 100, 2, 0},
+      {102, 111, 3, 1},
+      {103, 112, 3, 0},
+      {115, 124, 5, 1},
+      {116, 124, 5, 0}
     };
+
   for (uint8_t j = 0; j < sizeof(draw_cfg) / sizeof(draw_cfg[0]); ++j)
     for (uint8_t i = draw_cfg[j]._start; i <= draw_cfg[j]._end; i += draw_cfg[j]._step)
       hal_draw_pixel(i, draw_cfg[j]._y, g_xerintosh_draw_color);
@@ -51,25 +60,39 @@ void xerintosh_draw_list_appearance()
   hal_draw_v_line(SCREEN_WIDTH - 5, 0, SCREEN_HEIGHT, g_xerintosh_draw_color);
   hal_draw_v_line(SCREEN_WIDTH - 1, 0, SCREEN_HEIGHT, g_xerintosh_draw_color);
 
-  /* 滚动条（含缓存优化） */
+  /* 滚动条 */
   static uint8_t _cached_child_num = 0;
+  static int16_t _cached_screen_h = -1;
   static float _cached_length = 0;
-  if (_cached_child_num != g_xerintosh_selector.selected_item->parent->child_num) {
-    _cached_child_num = g_xerintosh_selector.selected_item->parent->child_num;
+  if (_cached_child_num != child_num || _cached_screen_h != SCREEN_HEIGHT) {
+    _cached_child_num = child_num;
+    _cached_screen_h = SCREEN_HEIGHT;
     _cached_length = ceilf((SCREEN_HEIGHT - 10.0f) / (float)_cached_child_num);
   }
   float _length_each_part = _cached_length;
-  hal_draw_fill_rect(SCREEN_WIDTH - 4, 5 + g_xerintosh_selector.selected_index * _length_each_part,
-                     3, _length_each_part, g_xerintosh_draw_color);
+  hal_draw_fill_rect(SCREEN_WIDTH - 4, 5 + selected_index * _length_each_part, 3, _length_each_part, g_xerintosh_draw_color);
 
   /* 滚动条内部高光线 */
   g_xerintosh_draw_color = COLOR_BG;
-  hal_draw_h_line(SCREEN_WIDTH - 4, _length_each_part + (float)g_xerintosh_selector.selected_index * _length_each_part, 3, ...);
+  hal_draw_h_line(SCREEN_WIDTH - 4, _length_each_part + (float)selected_index * _length_each_part, 3, g_xerintosh_draw_color);
+
+  if (_length_each_part >= 9)
+  {
+    hal_draw_h_line(SCREEN_WIDTH - 4,
+                     floorf(_length_each_part - 2.0f + (float)selected_index * _length_each_part), 3, g_xerintosh_draw_color);
+    hal_draw_h_line(SCREEN_WIDTH - 4,
+                     floorf(_length_each_part + 2.0f + (float)selected_index * _length_each_part), 3, g_xerintosh_draw_color);
+  }
 
   /* 滚动条上下端点 */
   g_xerintosh_draw_color = COLOR_FG;
   hal_draw_fill_rect(SCREEN_WIDTH - 4, 0, 3, 4, g_xerintosh_draw_color);
   hal_draw_fill_rect(SCREEN_WIDTH - 4, SCREEN_HEIGHT - 4, 3, 4, g_xerintosh_draw_color);
+  g_xerintosh_draw_color = COLOR_BG;
+  hal_draw_h_line(SCREEN_WIDTH - 4, 2, 3, g_xerintosh_draw_color);
+  hal_draw_pixel(SCREEN_WIDTH - 3, 1, g_xerintosh_draw_color);
+  hal_draw_h_line(SCREEN_WIDTH - 4, SCREEN_HEIGHT - 3, 3, g_xerintosh_draw_color);
+  hal_draw_pixel(SCREEN_WIDTH - 3, SCREEN_HEIGHT - 2, g_xerintosh_draw_color);
 }
 ```
 
@@ -108,7 +131,7 @@ void xerintosh_draw_list_appearance()
 
 ## 列表项绘制
 
-*📄 Source: [ui_draw_list.c](../../src/ui/ui_draw_list.c#L198-L288)*
+*📄 Source: [ui_draw_list.c](../../src/ui/ui_draw_list.c#L121-L200)*
 
 ```c
 static void xerintosh_draw_list_item()
@@ -145,6 +168,10 @@ static void xerintosh_draw_list_item()
       if (_has_right_control)
         _avail_width -= 11;
 
+      /* 防御性钳位：可用宽度不得为负，避免传给 HAL 裁剪函数行为未定义 */
+      if (_avail_width < 1)
+        _avail_width = 1;
+
       bool _is_selected = (_item == g_xerintosh_selector.selected_item);
       float _scroll_x = 0.0f;
 
@@ -156,6 +183,9 @@ static void xerintosh_draw_list_item()
         }
         uint32_t _elapsed = hal_get_ticks() - _item->scroll_start_time;
         _scroll_x = xerintosh_compute_scroll_offset(_text_width, _avail_width, true, _elapsed);
+
+        /* 文字滚动期间每帧都需清屏重绘，否则旧像素残留造成残影 */
+        xerintosh_invalidate();
       } else {
         _item->is_scrolling = false;
       }
@@ -170,8 +200,12 @@ static void xerintosh_draw_list_item()
       int16_t _draw_x = _clip_x - (int16_t)_scroll_x;
 
       /* 绘制两份相同文字，形成无缝循环跑马灯 */
-      hal_draw_string(_draw_x, _y_list_item + _font_h_2, _item->content, g_xerintosh_draw_color);
-      hal_draw_string(_draw_x + _cycle_dist, _y_list_item + _font_h_2, _item->content, g_xerintosh_draw_color);
+      hal_draw_string(_draw_x,
+                     _y_list_item + _font_h_2,
+                     _item->content, g_xerintosh_draw_color);
+      hal_draw_string(_draw_x + _cycle_dist,
+                     _y_list_item + _font_h_2,
+                     _item->content, g_xerintosh_draw_color);
 
       hal_clear_clip_rect();
       /* ═══════════════════════ */
@@ -246,7 +280,7 @@ static void xerintosh_draw_list_item()
 
 ## 选择器高亮
 
-*📄 Source: [ui_draw_list.c](../../src/ui/ui_draw_list.c#L295-L317)*
+*📄 Source: [ui_draw_list.c](../../src/ui/ui_draw_list.c#L207-L229)*
 
 ```c
 void xerintosh_draw_selector()
@@ -275,7 +309,7 @@ void xerintosh_draw_selector()
 
 ## 滑块数值覆盖层
 
-*📄 Source: [ui_draw_list.c](../../src/ui/ui_draw_list.c#L29-L43)*
+*📄 Source: [ui_draw_list.c](../../src/ui/ui_draw_list.c#L33-L43)*
 
 已确认的滑块项（处于编辑状态）在选择器 XOR 反色之后绘制。实际实现通过 `xerintosh_dispatch_draw_overlay()` 派发表路由，不再内联遍历和类型检查：
 
@@ -299,7 +333,7 @@ static void xerintosh_draw_slider_overlays(void)
 
 ## 文字滚动偏移计算
 
-*📄 Source: [ui_draw_list.c](../../src/ui/ui_draw_list.c#L364-L377)*
+*📄 Source: [ui_draw_list.c](../../src/ui/ui_draw_list.c#L277-L290)*
 
 ```c
 float xerintosh_compute_scroll_offset(int16_t text_width, int16_t avail_width,
@@ -324,7 +358,7 @@ float xerintosh_compute_scroll_offset(int16_t text_width, int16_t avail_width,
 
 ## 长按提示
 
-*📄 Source: [ui_draw_list.c](../../src/ui/ui_draw_list.c#L326-L339)*
+*📄 Source: [ui_draw_list.c](../../src/ui/ui_draw_list.c#L238-L251)*
 
 ```c
 void xerintosh_draw_long_press_hint(uint32_t duration_ms, uint32_t threshold_ms)

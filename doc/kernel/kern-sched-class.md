@@ -14,7 +14,7 @@
 
 ### 调度器类接口（kern_sched_class_t）
 
-*📄 Source: [kern_sched_class.h](../../src/kernel/kern_sched_class.h#L30-L41)*
+*📄 Source: [kern_sched_class.h](../../src/kernel/kern_sched_class.h#L30-L43)*
 
 ```c
 typedef struct kern_sched_class {
@@ -29,6 +29,7 @@ typedef struct kern_sched_class {
                          uint8_t old_prio);            /* 任务优先级变更通知 */
 
     struct kern_task *task_list;                       /* 本 class 的任务链表头 */
+    struct kern_task *task_list_tail;                  /* 本 class 的任务链表尾（O(1) 追加） */
 } kern_sched_class_t;
 ```
 
@@ -44,7 +45,7 @@ typedef struct kern_sched_class {
 
 ### 全局 class 注册表
 
-*📄 Source: [kern_sched_class.h](../../src/kernel/kern_sched_class.h#L45-L51)*
+*📄 Source: [kern_sched_class.h](../../src/kernel/kern_sched_class.h#L45-L57)*
 
 ```c
 /** 全局调度器 class 数组（按优先级顺序，NULL 终止） */
@@ -171,7 +172,7 @@ struct kern_task *pick_next_ready(void)
 
 ### 调度 tick 中的 class 遍历
 
-*📄 Source: [kern_sched.c](../../src/kernel/kern_sched.c#L227-L231) (Native) / L294-L298 (ESP32)*
+*📄 Source: [kern_sched.c](../../src/kernel/kern_sched.c#L238-L242) (Native) / L305-L309 (ESP32)*
 
 ```c
     /* 遍历所有调度类的 tick 回调（时间片递减、抢占标记） */

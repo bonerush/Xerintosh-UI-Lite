@@ -9,6 +9,7 @@
 #include "ui_context.h"
 #include "ui_item.h"   /* for xerintosh_selector_t, xerintosh_camera_t 等完整类型 */
 #include "ui_types.h"
+#include "hal/hal_display.h"
 
 /* ═══ 选择器弹簧动画参数（运行时可调） ═══ */
 float g_spring_stiffness_selector = SPRING_STIFFNESS_SELECTOR_DEFAULT;
@@ -19,8 +20,8 @@ bool  g_spring_anim_mode          = true;  /* 默认动弹（弹簧动画） */
 
 static xerintosh_selector_t s_selector = {};
 static xerintosh_camera_t s_camera = {0, 0, 0, 0, NULL};
-static xerintosh_info_bar_t s_info_bar = {0, 1, 0 - 2 * 15, 0 - 2 * 15, 80, 80, false, 0, 1};
-static xerintosh_pop_up_t s_pop_up = {0, 1, 0 - 2 * 48, 0 - 2 * 48, 80, 80, false, 0, 1, {NULL, NULL, NULL}, 0};
+static xerintosh_info_bar_t s_info_bar = {0, 1, 0 - 2 * 15, 0 - 2 * 15, 0, 0, false, 0, 1};
+static xerintosh_pop_up_t s_pop_up = {0, 1, 0 - 2 * 48, 0 - 2 * 48, 0, 0, false, 0, 1, {NULL, NULL, NULL}, 0};
 
 /* ═══ 全局上下文单例 ═══ */
 
@@ -73,8 +74,12 @@ void xerintosh_context_init(void)
   /* 重置子系统状态 */
   s_selector = (xerintosh_selector_t){};
   s_camera = (xerintosh_camera_t){0, 0, 0, 0, &s_selector};
-  s_info_bar = (xerintosh_info_bar_t){0, 1, 0 - 2 * 15, 0 - 2 * 15, 80, 80, false, 0, 1};
-  s_pop_up = (xerintosh_pop_up_t){0, 1, 0 - 2 * 48, 0 - 2 * 48, 80, 80, false, 0, 1, {NULL, NULL, NULL}, 0};
+  s_info_bar = (xerintosh_info_bar_t){0, 1, 0 - 2 * 15, 0 - 2 * 15, 0, 0, false, 0, 1};
+  s_pop_up = (xerintosh_pop_up_t){0, 1, 0 - 2 * 48, 0 - 2 * 48, 0, 0, false, 0, 1, {NULL, NULL, NULL}, 0};
+
+  /* 运行时根据当前屏幕方向设置初始宽度（硬件路径 SCREEN_WIDTH 为变量，不能在静态初始化中使用） */
+  s_info_bar.w_info_bar = s_info_bar.w_info_bar_trg = SCREEN_WIDTH;
+  s_pop_up.w_pop_up = s_pop_up.w_pop_up_trg = SCREEN_WIDTH;
 
   /* 重新连接指针 */
   g_ui_ctx.selector = &s_selector;

@@ -34,7 +34,7 @@
 
 ### 函数指针类型
 
-*📄 Source: [ui_dispatch.c](../../src/ui/ui_dispatch.c#L314-L324)*
+*📄 Source: [ui_dispatch.c](../../src/ui/ui_dispatch.c#L315-L325)*
 
 ```c
 typedef struct {
@@ -56,7 +56,7 @@ typedef struct {
 
 ### 派发表定义
 
-*📄 Source: [ui_dispatch.c](../../src/ui/ui_dispatch.c#L326-L382)*
+*📄 Source: [ui_dispatch.c](../../src/ui/ui_dispatch.c#L327-L383)*
 
 ```c
 static const xerintosh_dispatch_vtable_t s_dispatch[] = {
@@ -72,7 +72,7 @@ static const xerintosh_dispatch_vtable_t s_dispatch[] = {
 
 ### 公开派发函数
 
-*📄 Source: [ui_dispatch.c](../../src/ui/ui_dispatch.c#L384-L459)*
+*📄 Source: [ui_dispatch.c](../../src/ui/ui_dispatch.c#L386-L460)*
 
 ```c
 void xerintosh_dispatch_enter(xerintosh_list_item_t *item);
@@ -88,7 +88,7 @@ bool xerintosh_dispatch_has_right_control(xerintosh_list_item_t *item);
 
 两层防护：
 1. **NULL 检查**：防止空指针解引用
-2. **类型范围检查**：`item->type > button_item` 防护越界数组访问（如果 `type` 枚举值被意外修改或内存损坏）
+2. **类型范围检查**：`item->type < item_type_count` 防护越界数组访问（如果 `type` 枚举值被意外修改或内存损坏）
 
 ---
 
@@ -96,7 +96,7 @@ bool xerintosh_dispatch_has_right_control(xerintosh_list_item_t *item);
 
 ### dispatch_enter_list — 进入子菜单
 
-*📄 Source: [ui_dispatch.c](../../src/ui/ui_dispatch.c#L64)*
+*📄 Source: [ui_dispatch.c](../../src/ui/ui_dispatch.c#L84-L101)*
 
 ```c
 static void dispatch_enter_list(xerintosh_list_item_t *item)
@@ -107,6 +107,12 @@ static void dispatch_enter_list(xerintosh_list_item_t *item)
         item->child_list_item[i]->y_list_item = 0;
     g_xerintosh_selector.selected_index = 0;
     g_xerintosh_selector.selected_item = item->child_list_item[0];
+
+    /* 弹簧动画：进入子菜单时清零速度，保证入场和回退动画从零弹起 */
+    g_xerintosh_selector.v_y_selector = 0.0f;
+    g_xerintosh_selector.v_w_selector = 0.0f;
+    g_xerintosh_selector.v_h_selector = 0.0f;
+
     if (item->init_function) {
         item->init_function(item->user_data);
     }
@@ -136,12 +142,13 @@ static void dispatch_enter_list(xerintosh_list_item_t *item)
 
 ### dispatch_enter_user — 进入全屏 App
 
-*📄 Source: [ui_dispatch.c](../../src/ui/ui_dispatch.c#L25)*
+*📄 Source: [ui_dispatch.c](../../src/ui/ui_dispatch.c#L44-L54)*
 
 ```c
 static void dispatch_enter_user(xerintosh_list_item_t *item)
 {
     xerintosh_user_item_t *user = xerintosh_to_user_item(item);
+    if (user == NULL) return;
     g_xerintosh_exit_animation_finished = false;
     g_xerintosh_exit_animation_status = 0;
     user->entering_user_item = true;
@@ -176,12 +183,13 @@ static void dispatch_enter_user(xerintosh_list_item_t *item)
 
 ### dispatch_enter_switch — 切换开关
 
-*📄 Source: [ui_dispatch.c](../../src/ui/ui_dispatch.c#L32)*
+*📄 Source: [ui_dispatch.c](../../src/ui/ui_dispatch.c#L56-L63)*
 
 ```c
 static void dispatch_enter_switch(xerintosh_list_item_t *item)
 {
     xerintosh_switch_item_t *sw = xerintosh_to_switch_item(item);
+    if (sw == NULL) return;
     *sw->value = !*sw->value;
     if (sw->exit_function) sw->exit_function(item->user_data);
 }
@@ -191,12 +199,13 @@ static void dispatch_enter_switch(xerintosh_list_item_t *item)
 
 ### dispatch_enter_slider — 滑条确认/退出编辑
 
-*📄 Source: [ui_dispatch.c](../../src/ui/ui_dispatch.c#L51)*
+*📄 Source: [ui_dispatch.c](../../src/ui/ui_dispatch.c#L71-L83)*
 
 ```c
 static void dispatch_enter_slider(xerintosh_list_item_t *item)
 {
     xerintosh_slider_item_t *sl = xerintosh_to_slider_item(item);
+    if (sl == NULL) return;
     if (!sl->is_confirmed) {
         sl->is_confirmed = true;
         sl->value_backup = *sl->value;
@@ -218,12 +227,13 @@ static void dispatch_enter_slider(xerintosh_list_item_t *item)
 
 ### dispatch_enter_button — 触发按钮回调
 
-*📄 Source: [ui_dispatch.c](../../src/ui/ui_dispatch.c#L39)*
+*📄 Source: [ui_dispatch.c](../../src/ui/ui_dispatch.c#L64-L70)*
 
 ```c
 static void dispatch_enter_button(xerintosh_list_item_t *item)
 {
     xerintosh_button_item_t *btn = xerintosh_to_button_item(item);
+    if (btn == NULL) return;
     if (btn->exit_function) btn->exit_function(item->user_data);
 }
 ```
@@ -279,6 +289,13 @@ void xerintosh_selector_go_next_item()
 {
     if (g_xerintosh_selector.selected_item == NULL) return;
     if (xerintosh_dispatch_input_next(g_xerintosh_selector.selected_item)) return;
+    // 默认循环导航 ...
+}
+
+void xerintosh_selector_go_prev_item()
+{
+    if (g_xerintosh_selector.selected_item == NULL) return;
+    if (xerintosh_dispatch_input_prev(g_xerintosh_selector.selected_item)) return;
     // 默认循环导航 ...
 }
 

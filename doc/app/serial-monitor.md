@@ -13,7 +13,7 @@
 - 入场滑入动画（Phase 2 新增）
 - 按钮选中平滑过渡动画（Phase 2 新增）
 
-*📄 Source: [sm_app.h](../../src/app/serial_monitor/sm_app.h), [sm_app.cpp](../../src/app/serial_monitor/sm_app.cpp), [sm_ui.c](../../src/app/serial_monitor/sm_ui.c), [sm_buffer.c/h](../../src/app/serial_monitor/sm_buffer.c/h)*
+*📄 Source: [sm_app.h](../../src/app/serial_monitor/sm_app.h), [sm_app.cpp](../../src/app/serial_monitor/sm_app.cpp), [sm_ui.c](../../src/app/serial_monitor/sm_ui.c), [sm_buffer.c](../../src/app/serial_monitor/sm_buffer.c), [sm_buffer.h](../../src/app/serial_monitor/sm_buffer.h)*
 
 ---
 
@@ -24,7 +24,7 @@ sm_app.cpp (状态机 + 主循环)
 ├── sm_app.h             ← 全局状态变量（shared state）
 ├── sm_buffer.c/h        ← 终端环形缓冲区（数据层）
 ├── sm_ui.c/h            ← 绘制实现（信息栏 + 终端区域）
-└── ui_core.h            ← xerintosh_animation() 缓动函数
+└── ui_core.h            ← xerintosh_animate_unified() 统一动画缓动函数
 ```
 
 职责分离：
@@ -71,18 +71,19 @@ sm_app.cpp (状态机 + 主循环)
 
 进入串口监视器时，整个界面（信息栏 + 终端）从屏幕底部滑入：
 
-*📄 Source: [sm_app.cpp](../../src/app/serial_monitor/sm_app.cpp#L105-L106)*
+*📄 Source: [sm_app.cpp](../../src/app/serial_monitor/sm_app.cpp#L111)*
 
 ```c
 // init(): 起始位置
 sm_entry_offset = (float)SCREEN_HEIGHT;
+sm_entry_vel    = 0.0f;
 ```
 
-*📄 Source: [sm_app.cpp](../../src/app/serial_monitor/sm_app.cpp#L202)*
+*📄 Source: [sm_app.cpp](../../src/app/serial_monitor/sm_app.cpp#L199)*
 
 ```c
 // loop(): 每帧更新
-xerintosh_animation(&sm_entry_offset, 0.0f, ANIM_SPEED_EXIT);
+xerintosh_animate_unified(&sm_entry_offset, &sm_entry_vel, 0.0f, ANIM_SPEED_EXIT);
 ```
 
 *📄 Source: [sm_ui.c](../../src/app/serial_monitor/sm_ui.c#L30-L31, L159)*
@@ -100,18 +101,20 @@ int16_t term_y = HAL_HEADER_BOTTOM() + HAL_MARGIN_SM + entry;
 
 替代了原有的闪烁机制。两个按钮（RUN/STOP 和 SER/BLE）各有一个 alpha 值（0.0~100.0）：
 
-*📄 Source: [sm_app.cpp](../../src/app/serial_monitor/sm_app.cpp#L204-L208)*
+*📄 Source: [sm_app.cpp](../../src/app/serial_monitor/sm_app.cpp#L202-L205)*
 
 ```c
-// 全局动画变量（范围 [0, 100]，确保 xerintosh_animation 差值 > 1.0，触发逐帧动画）
+// 全局动画变量（范围 [0, 100]，确保 xerintosh_animate_unified 差值 > 1.0，触发逐帧动画）
 float sm_btn_alpha_0;  // 按钮 0 (RUN/STOP) 的高亮强度
 float sm_btn_alpha_1;  // 按钮 1 (SER/BLE) 的高亮强度
+static float sm_btn_vel_0;  // 按钮 0 动画速度
+static float sm_btn_vel_1;  // 按钮 1 动画速度
 
 // loop(): 每帧更新目标
 float trg0 = (sm_selected == 0) ? 100.0f : 0.0f;
 float trg1 = (sm_selected == 1) ? 100.0f : 0.0f;
-xerintosh_animation(&sm_btn_alpha_0, trg0, ANIM_SPEED_SELECTOR);
-xerintosh_animation(&sm_btn_alpha_1, trg1, ANIM_SPEED_SELECTOR);
+xerintosh_animate_unified(&sm_btn_alpha_0, &sm_btn_vel_0, trg0, ANIM_SPEED_SELECTOR);
+xerintosh_animate_unified(&sm_btn_alpha_1, &sm_btn_vel_1, trg1, ANIM_SPEED_SELECTOR);
 ```
 
 *📄 Source: [sm_ui.c](../../src/app/serial_monitor/sm_ui.c#L69-L72)*
@@ -154,31 +157,29 @@ hal_draw_xor_rect(slider_x + 1, bar_y + 1, slider_w - 2, bar_h - 2);
 | `sm_entry_offset` | `float` | 入场滑入偏移（SCREEN_HEIGHT → 0） |
 | `sm_btn_alpha_1` | `float` | 按钮 1 高亮强度（0.0~100.0） |
 
-注意：`sm_btn_alpha_0` 是 `sm_app.cpp` 中的 `static` 变量，不在 `sm_app.h` 中暴露。动画变量范围是 `[0, 100]` 而非 `[0, 1]`，以确保 `xerintosh_animation()` 的差值大于 1.0 从而触发逐帧插值。
+注意：`sm_btn_alpha_0` 是 `sm_app.cpp` 中的 `static` 变量，不在 `sm_app.h` 中暴露。动画变量范围是 `[0, 100]` 而非 `[0, 1]`，以确保 `xerintosh_animate_unified()` 的差值大于 1.0 从而触发逐帧插值。
 
 ---
 
 ## 数据源切换（SER ↔ BLE）
 
-*📄 Source: [sm_app.cpp](../../src/app/serial_monitor/sm_app.cpp#L150-L181)*
+*📄 Source: [sm_app.cpp](../../src/app/serial_monitor/sm_app.cpp#L150-L179)*
 
 ```c
 if (event_a == HAL_EVENT_LONG_PRESS) {
     if (sm_selected == 0) {
-        sm_running = !sm_running;   // 启动/停止数据捕获
+        sm_running = !sm_running;
     } else {
-        // 切换数据源 SER ↔ BLE
+        /* 切换数据源 SER ↔ BLE */
         if (sm_source == SM_SOURCE_SER) {
-            if (!bt_mgr_is_enabled()) {
-                bt_mgr_request_enable();
-                sm_bt_lazy_inited = true;
-            }
+            svc_mgr_bt_request_enable(&sm_bt_lazy_inited);
             sm_source = SM_SOURCE_BLE;
             sm_bt_connected = bt_uart_is_connected();
         } else {
             sm_source = SM_SOURCE_SER;
         }
-        sm_buffer_clear(&sm_buffer);  // 切换源时清空缓冲区，避免混淆
+        /* 切换源时清空缓冲区，避免混淆 */
+        sm_buffer_clear(&sm_buffer);
     }
 }
 ```
@@ -197,6 +198,19 @@ if (event_a == HAL_EVENT_LONG_PRESS) {
 xerintosh_list_item_t* item3 = xerintosh_new_user_item(
     "串口监视器", serial_monitor_init, serial_monitor_loop, serial_monitor_exit, default_icon);
 ```
+
+---
+
+## 调试开关
+
+*📄 Source: [sm_app.cpp](../../src/app/serial_monitor/sm_app.cpp#L24)*
+
+```c
+/* 串口监视器调试开关：0=禁用每帧调试日志，1=启用 */
+#define SM_DBG_ENABLED 0
+```
+
+`SM_DBG_ENABLED` 控制 BLE 切换、连接状态、RX 队列等每帧调试日志。启用后会通过 `Serial.printf` 输出大量信息，仅在排查 BT 生命周期或数据流问题时临时打开。
 
 ---
 

@@ -19,6 +19,9 @@ void wifi_mgr_disable(void) {}
 bool wifi_mgr_is_waiting_input(void) { return false; }
 bool wifi_mgr_is_enabled(void) { return false; }
 void wifi_mgr_update(void) {}
+void wifi_mgr_request_enable(void) {}
+void wifi_mgr_request_disable(void) {}
+void wifi_mgr_process_requests(void) {}
 void wifi_mgr_on_switch_toggle(void *ud) { (void)ud; }
 extern "C" void wifi_popup_refresh(void) {}
 void wifi_mgr_task_main(void *arg) { (void)arg; }
@@ -34,6 +37,7 @@ void wifi_mgr_task_main(void *arg) { (void)arg; }
 
 #include "app/wifi/wifi_manager.h"
 #include "app/wifi/wifi_menu.h"
+#include "app/bluetooth/bt_manager.h"
 
 extern "C" {
 #include "app/storage/storage.h"
@@ -46,7 +50,7 @@ extern "C" {
 
 /* ═══ 外部全局变量 ═══ */
 
-extern bool g_wifi_on;   /* 定义在 app/app_state.c */
+#include "app/app_state.h"
 
 /* ═══ 模块状态 ═══ */
 
@@ -54,6 +58,13 @@ static portMUX_TYPE g_popup_spinlock = portMUX_INITIALIZER_UNLOCKED;
 
 static wifi_mgr_state_t g_state           = WIFI_MGR_IDLE;    /* 状态机当前状态 */
 static bool             g_wifi_enabled    = false;            /* WiFi 是否已启用 */
+
+/* ═══ 异步请求标志（线程安全）═══
+ * UI 任务 / Xeros 任务通过 request_*() 设置标志，
+ * Arduino loop() 任务调用 process_requests() 统一执行 WiFi 驱动操作。 */
+static volatile bool g_enable_requested  = false;
+static volatile bool g_disable_requested = false;
+static volatile bool g_bt_was_on         = false; /* WiFi 启用前 BT 是否处于开启状态 */
 
 /* 连接状态 */
 static bool  g_connecting = false;                              /* 是否正在连接 */
@@ -167,6 +178,10 @@ bool wifi_mgr_is_waiting_input(void)
  */
 void wifi_mgr_init(void)
 {
+    g_enable_requested  = false;
+    g_disable_requested = false;
+    g_bt_was_on         = false;
+
     /* 按名称查找"设置"菜单项（Round 7 重构后，"设置"不再是
      * root->child_list_item[0]，因为 user items 先于"设置"挂载） */
     xerintosh_list_item_t *root = xerintosh_get_root_list();
@@ -194,6 +209,14 @@ void wifi_mgr_init(void)
  */
 void wifi_mgr_enable(void)
 {
+    /* BT/WiFi 双向互斥：BT 已启用时拒绝直接启用，应通过 process_requests 异步切换 */
+    if (bt_mgr_is_enabled()) {
+        wifi_popup_request("请先关闭蓝牙", 2000);
+        g_wifi_enabled = false;
+        g_state = WIFI_MGR_IDLE;
+        return;
+    }
+
     g_wifi_enabled = true;
 
     /* ── 内存预检：WiFi 驱动初始化需要 ~40KB 堆 ──
@@ -302,6 +325,44 @@ void wifi_mgr_disable(void)
     g_is_auto_connect     = false;
 }
 
+/* ═══ 异步请求接口（线程安全）═══ */
+
+void wifi_mgr_request_enable(void)
+{
+    g_disable_requested = false;
+    g_enable_requested  = true;
+}
+
+void wifi_mgr_request_disable(void)
+{
+    g_enable_requested  = false;
+    g_disable_requested = true;
+}
+
+/**
+ * @brief 在 Arduino loop() 任务上下文中统一处理 WiFi 启用/禁用请求
+ * @note  WiFi 驱动操作（WiFi.mode/esp_wifi_scan_start 等）必须在该上下文中执行，
+ *        避免跨任务调用导致 FreeRTOS 死锁或 TWDT 复位。
+ */
+void wifi_mgr_process_requests(void)
+{
+    if (g_disable_requested) {
+        g_disable_requested = false;
+        wifi_mgr_disable();
+        return;
+    }
+
+    if (g_enable_requested) {
+        /* BT/WiFi 双向互斥：若 BT 仍开启，先异步关闭 BT，下一帧再启用 WiFi */
+        if (bt_mgr_is_enabled()) {
+            bt_mgr_request_disable();
+            return;
+        }
+        g_enable_requested = false;
+        wifi_mgr_enable();
+    }
+}
+
 /* ═══ 开关切换回调 ═══ */
 
 /**
@@ -311,9 +372,9 @@ void wifi_mgr_on_switch_toggle(void *ud)
 {
     (void)ud;
     if (g_wifi_on) {
-        wifi_mgr_enable();
+        wifi_mgr_request_enable();
     } else {
-        wifi_mgr_disable();
+        wifi_mgr_request_disable();
     }
 }
 

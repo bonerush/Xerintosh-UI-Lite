@@ -16,6 +16,7 @@
 #include "wifi/wifi_manager.h"
 #include "bluetooth/bt_manager.h"
 #include "app/shutdown/power_key_popup.h"
+#include "ui/ui_core.h"
 
 void app_init_ui(void)
 {
@@ -27,6 +28,9 @@ void app_init_managers(void)
     bt_mgr_init();
     wifi_mgr_init();
     power_key_popup_init();
+
+    /* 将双键检测回调注册到 UI 核心，解除 UI 核心对 App 的反向依赖 */
+    xerintosh_set_dual_key_callback(power_key_popup_is_dual_active);
 
     /* 先初始化蓝牙（Classic BT SPP），再给 WiFi 初始化，
        避免 WiFi 占用大量 RAM 后 Bluedroid BLE 初始化分配失败

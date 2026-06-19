@@ -8,6 +8,7 @@
 
 extern "C" {
 #include "app/settings/settings.h"
+#include "app/storage/storage.h"
 }
 
 /* ═══ 测试夹具 ═══ */
@@ -145,4 +146,76 @@ TEST_F(SettingsAccessorTest, BaudRateClampsHigh)
 {
     settings_set_baud_rate(10);
     EXPECT_LE(settings_get_baud_rate(), 6);
+}
+
+/* ═══ 亮度 HW 值 ↔ level 双向映射（K23）═══ */
+
+TEST_F(SettingsAccessorTest, BrightnessHwValueAndReverseMapping)
+{
+    for (int16_t level = 1; level <= 10; level++) {
+        settings_set_brightness(level);
+        int16_t hw = settings_brightness_hw_value();
+        int16_t back = settings_brightness_level_from_hw(hw);
+        EXPECT_EQ(back, level) << "level=" << level << " hw=" << hw;
+    }
+}
+
+TEST_F(SettingsAccessorTest, BrightnessLevelFromHwClampsBoundary)
+{
+    EXPECT_EQ(settings_brightness_level_from_hw(-1),  1);
+    EXPECT_EQ(settings_brightness_level_from_hw(0),   1);
+    EXPECT_EQ(settings_brightness_level_from_hw(255), 10);
+    EXPECT_EQ(settings_brightness_level_from_hw(300), 10);
+}
+
+/* ═══ storage 批量保存 / 加载（K22）═══ */
+
+TEST_F(SettingsAccessorTest, StorageSaveAllDoesNotCrash)
+{
+    storage_save_all();
+    SUCCEED();
+}
+
+TEST_F(SettingsAccessorTest, StorageLoadAllDoesNotCrash)
+{
+    storage_load_all();
+    SUCCEED();
+}
+
+/* ═══ 弹簧硬度 / 阻尼转换（APP-P3-03）═══ */
+
+TEST_F(SettingsAccessorTest, SpringStiffnessMapsLevelToFloat)
+{
+    settings_set_spring_stiffness(5);
+    EXPECT_FLOAT_EQ(settings_spring_stiffness_hw_value(settings_get_spring_stiffness()), 0.20f);
+}
+
+TEST_F(SettingsAccessorTest, SpringDampingMapsLevelToFloat)
+{
+    settings_set_spring_damping(9);
+    EXPECT_FLOAT_EQ(settings_spring_damping_hw_value(settings_get_spring_damping()), 0.36f);
+}
+
+TEST_F(SettingsAccessorTest, SpringStiffnessHwValueClampsInvalidLow)
+{
+    EXPECT_FLOAT_EQ(settings_spring_stiffness_hw_value(-1), 0.04f);
+    EXPECT_FLOAT_EQ(settings_spring_stiffness_hw_value(0), 0.04f);
+}
+
+TEST_F(SettingsAccessorTest, SpringStiffnessHwValueClampsInvalidHigh)
+{
+    EXPECT_FLOAT_EQ(settings_spring_stiffness_hw_value(11), 0.40f);
+    EXPECT_FLOAT_EQ(settings_spring_stiffness_hw_value(100), 0.40f);
+}
+
+TEST_F(SettingsAccessorTest, SpringDampingHwValueClampsInvalidLow)
+{
+    EXPECT_FLOAT_EQ(settings_spring_damping_hw_value(-1), 0.04f);
+    EXPECT_FLOAT_EQ(settings_spring_damping_hw_value(0), 0.04f);
+}
+
+TEST_F(SettingsAccessorTest, SpringDampingHwValueClampsInvalidHigh)
+{
+    EXPECT_FLOAT_EQ(settings_spring_damping_hw_value(11), 0.40f);
+    EXPECT_FLOAT_EQ(settings_spring_damping_hw_value(100), 0.40f);
 }

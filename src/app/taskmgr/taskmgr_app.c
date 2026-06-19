@@ -207,9 +207,9 @@ void taskmgr_loop(void *ud)
                 kern_task_t *t = g_tm.tasks[g_tm.selected];
                 if (t != NULL && !kern_task_is_protected(t)) {
 #ifndef NATIVE_TEST
-                    /* 特殊任务：先清理硬件再杀任务 */
+                    /* 特殊任务：异步请求清理硬件，避免在 UI 任务中直接操作驱动 */
                     if (strcmp(t->name, "wifi-mgr") == 0) {
-                        wifi_mgr_disable();
+                        wifi_mgr_request_disable();
                     } else if (strcmp(t->name, "bt-mgr") == 0) {
                         bt_mgr_request_disable();
                     }

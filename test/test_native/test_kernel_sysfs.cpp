@@ -433,3 +433,65 @@ TEST(KernelSysfsTest, ReadFromInvalidFdReturnsError)
     ssize_t n = kern_read(999, buf, sizeof(buf));
     EXPECT_LT(n, 0);
 }
+
+/* ═══ param 命令路径正确性回归（K11）═══ */
+
+TEST(KernelSysfsTest, RootAttributesExist)
+{
+    kern_vfs_init();
+    kern_sysfs_init();
+
+    EXPECT_GE(kern_open("/sys/brightness",   KERN_O_RDONLY), 0);
+    EXPECT_GE(kern_open("/sys/rotation",     KERN_O_RDONLY), 0);
+    EXPECT_GE(kern_open("/sys/anim_speed",   KERN_O_RDONLY), 0);
+    EXPECT_GE(kern_open("/sys/anim_enabled", KERN_O_RDONLY), 0);
+}
+
+TEST(KernelSysfsTest, LogLevelExistsUnderSysKernel)
+{
+    kern_vfs_init();
+    kern_sysfs_init();
+
+    EXPECT_GE(kern_open("/sys/kernel/log_level", KERN_O_RDONLY), 0);
+}
+
+TEST(KernelSysfsTest, KernelPrefixedRootAttributesDoNotExist)
+{
+    kern_vfs_init();
+    kern_sysfs_init();
+
+    EXPECT_LT(kern_open("/sys/kernel/brightness",   KERN_O_RDONLY), 0);
+    EXPECT_LT(kern_open("/sys/kernel/rotation",     KERN_O_RDONLY), 0);
+    EXPECT_LT(kern_open("/sys/kernel/anim_speed",   KERN_O_RDONLY), 0);
+    EXPECT_LT(kern_open("/sys/kernel/anim_enabled", KERN_O_RDONLY), 0);
+}
+
+/* ═══ sysfs 写入严格性（K35）═══ */
+
+TEST(KernelSysfsTest, WriteRejectsTrailingGarbage)
+{
+    kern_vfs_init();
+    kern_sysfs_init();
+
+    kern_fd_t fd = kern_open("/sys/brightness", KERN_O_WRONLY);
+    ASSERT_GE(fd, 0);
+
+    ssize_t n = kern_write(fd, "128abc", 6);
+    EXPECT_LT(n, 0);
+
+    kern_close(fd);
+}
+
+TEST(KernelSysfsTest, WriteAcceptsTrailingNewline)
+{
+    kern_vfs_init();
+    kern_sysfs_init();
+
+    kern_fd_t fd = kern_open("/sys/brightness", KERN_O_WRONLY);
+    ASSERT_GE(fd, 0);
+
+    ssize_t n = kern_write(fd, "128\r\n", 5);
+    EXPECT_EQ(n, 5);
+
+    kern_close(fd);
+}

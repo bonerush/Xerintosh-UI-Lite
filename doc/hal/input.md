@@ -8,7 +8,7 @@
 
 当前实现架构：
 
-- **M5Unified 包办底层**：`M5.update()` 在 `main.cpp` 的 `loop()` 中每帧先行调用，负责 GPIO 读取、消抖、边沿检测
+- **M5Unified 包办底层**：`M5.update()` 在 `hal_input_update()` 内部每帧调用，负责 GPIO 读取、消抖、边沿检测
 - **HAL 层做事件判断**：接收 `wasPressed()` / `wasReleased()` 边沿信号，通过双击检测状态机判断短按/长按/双击
 - **双击可开关**：`hal_input_set_double_click_enabled()` 控制是否启用双击检测。菜单模式禁用（即时短按响应）；App 模式可启用以支持双击操作
 
@@ -19,12 +19,12 @@
 ### 双实现架构
 
 ```
-┌─────────────────┐     ┌─────────────────────┐
-│  NATIVE_TEST    │     │    硬件环境         │
-│  测试注入桩     │     │  M5Unified + 状态机 │
-│  优先返回注入   │     │  返回 SHORT/LONG/DC │
-│  事件，否则 NONE│     │                     │
-└─────────────────┘     └─────────────────────┘
+┌─────────────────┐     ┌─────────────────────────────────────┐
+│  NATIVE_TEST    │     │              硬件环境               │
+│  测试注入桩     │     │  M5Unified + 状态机                 │
+│  优先返回注入   │     │  hal_input_update() → M5.update()   │
+│  事件，否则 NONE│     │  hal_input_get_event() 返回事件     │
+└─────────────────┘     └─────────────────────────────────────┘
 ```
 
 Native 测试环境下输入函数支持**测试事件注入**：测试代码通过 `hal_test_inject_event()` 注入按键事件，`hal_input_get_event()` 优先返回注入的事件，否则返回 `HAL_EVENT_NONE`。`hal_input_init()` / `hal_input_update()` 为空操作，`hal_input_is_pressed()` 始终返回 `false`。
@@ -142,14 +142,8 @@ hal_event_t hal_input_dc_process(hal_input_dc_state_t *st,
                                   bool was_released,
                                   uint32_t now_ms)
 {
-    /* 第一步：检查是否有超时等待的短按 */
-    if (st->pending_short_press &&
-        (now_ms - st->last_release_ms) > DOUBLE_CLICK_WINDOW_MS) {
-        st->pending_short_press = false;
-        st->last_release_ms = 0;
-        return HAL_EVENT_SHORT_PRESS;
-    }
-
+    /* 第一步：处理按下边沿（必须在超时检查之前）
+     * 否则窗口超时的同一帧出现新按下时，按下事件会被丢弃 */
     if (was_pressed) {
         if (st->pending_short_press &&
             (now_ms - st->last_release_ms) <= DOUBLE_CLICK_WINDOW_MS) {
@@ -162,6 +156,7 @@ hal_event_t hal_input_dc_process(hal_input_dc_state_t *st,
         st->press_duration_ms = 0;
     }
 
+    /* 第二步：处理释放边沿 */
     if (was_released) {
         st->pressed = false;
         st->press_duration_ms = 0;
@@ -182,6 +177,15 @@ hal_event_t hal_input_dc_process(hal_input_dc_state_t *st,
         }
     }
 
+    /* 第三步：检查是否有超时等待的短按 */
+    if (st->pending_short_press &&
+        (now_ms - st->last_release_ms) > DOUBLE_CLICK_WINDOW_MS) {
+        st->pending_short_press = false;
+        st->last_release_ms = 0;
+        return HAL_EVENT_SHORT_PRESS;
+    }
+
+    /* 第四步：检测长按 */
     if (st->pressed && !st->long_fired) {
         st->press_duration_ms = now_ms - st->press_time;
         if (st->press_duration_ms >= LONG_PRESS_DURATION_MS) {
@@ -232,6 +236,7 @@ hal_event_t hal_input_dc_process(hal_input_dc_state_t *st,
 - **长按**在按住过程中确认：一旦达到阈值立即返回，无需等待松开
 - **长按触发后松开不再产生短按**：防止同一个按键动作产生两个事件
 - **双击**（仅启用时）：300ms 窗口期内两次按下释放触发双击；超时时返回短按
+- **边沿优先于超时检查**：双击状态机先处理 `was_pressed` / `was_released` 边沿，再检查待处理短按是否超时。这样可避免窗口期结束与新按下出现在同一帧时，新按下被遗漏。
 
 ### 事件输出 API
 
@@ -261,7 +266,7 @@ hal_event_t hal_input_get_event(hal_button_t btn)
 }
 ```
 
-**为什么 `M5.update()` 在 main 中先行调用**：M5Unified 的 `wasPressed()` / `wasReleased()` 是边沿敏感 API，它们只在 `M5.update()` 执行后的那一帧返回 true。因此 `main.cpp` 每帧先 `M5.update()`（在 `hal_input_update()` 内），再 `hal_input_get_event()`，才能捕获到正确的边沿。
+**为什么 `M5.update()` 在 `hal_input_update()` 内部调用**：M5Unified 的 `wasPressed()` / `wasReleased()` 是边沿敏感 API，它们只在 `M5.update()` 执行后的那一帧返回 true。`hal_input_update()` 内部调用 `M5.update()`，随后 `hal_input_get_event()` 读取边沿标志，确保同一帧内捕获到正确的边沿。微内核架构下，按键读取发生在 `ui_task` 中，必须保证 `M5.update()` 与事件读取成对出现。
 
 ### 长按进度查询
 
@@ -336,7 +341,7 @@ void hal_input_reset_events(void);
 
 ## 与其他组件的关系
 
-- **main.cpp**：每帧调用 `M5.update()` → `hal_input_update()` → `hal_input_get_event()` → 将事件传递给 UI 层
+- **main.cpp / ui_task**：每帧调用 `hal_input_update()`（内部调用 `M5.update()`）→ `hal_input_get_event()` → 将事件传递给 UI 层
 - **hal_system**：硬件实现依赖 `millis()` 获取时间基准
 - **ui_item**：`xerintosh_selector_go_next_item()` 等函数消费 `HAL_EVENT_SHORT_PRESS` / `HAL_EVENT_LONG_PRESS`
 

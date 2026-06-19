@@ -41,7 +41,7 @@ typedef struct {
 static const gpiofs_pin_desc_t g_gpio_pins[] = {
     {  0, "BOOT / I2C SDA",    true  },
     { 25, "Speaker DAC",       true  },
-    { 26, "LCD Backlight",     true  },
+    { 26, "LCD Backlight (HAL only)", false },
     { 32, "Grove SDA",         true  },
     { 33, "Grove SCL",         true  },
     { 36, "Button A (RTC)",    false },

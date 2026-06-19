@@ -28,12 +28,13 @@
 static char *dispatch_itoa(int16_t val, char *buf)
 {
     char *p = buf;
-    if (val < 0) { *p++ = '-'; val = (int16_t)(-val); }
-    if (val >= 10000) { *p++ = (char)('0' + val / 10000); val %= 10000; }
-    if (val >= 1000)  { *p++ = (char)('0' + val / 1000);  val %= 1000;  }
-    if (val >= 100)   { *p++ = (char)('0' + val / 100);   val %= 100;   }
-    if (val >= 10)    { *p++ = (char)('0' + val / 10);    val %= 10;    }
-    *p++ = (char)('0' + val);
+    int32_t v = val;  /* 使用 32 位中转，避免 INT16_MIN 取反溢出 */
+    if (v < 0) { *p++ = '-'; v = -v; }
+    if (v >= 10000) { *p++ = (char)('0' + v / 10000); v %= 10000; }
+    if (v >= 1000)  { *p++ = (char)('0' + v / 1000);  v %= 1000;  }
+    if (v >= 100)   { *p++ = (char)('0' + v / 100);   v %= 100;   }
+    if (v >= 10)    { *p++ = (char)('0' + v / 10);    v %= 10;    }
+    *p++ = (char)('0' + v);
     *p = '\0';
     return buf;
 }
@@ -385,7 +386,7 @@ static const xerintosh_dispatch_vtable_t s_dispatch[] = {
 
 static bool type_in_range(xerintosh_list_item_t *item)
 {
-    return item != NULL && item->type <= button_item;
+    return item != NULL && item->type < item_type_count;
 }
 
 void xerintosh_dispatch_enter(xerintosh_list_item_t *item)

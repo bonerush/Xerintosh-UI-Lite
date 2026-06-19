@@ -23,6 +23,10 @@ UI 核心层是 Xerintosh 菜单框架的主体，纯 C 实现。它提供菜单
 | — 图标渲染 | [draw-icons.md](draw-icons.md) | `src/ui/ui_draw_icons.c` | XBM 位图图标绘制 |
 | 行列表动画 | [ui-anim-row.md](ui-anim-row.md) | `src/ui/ui_anim_row.c/h` | 可复用行列表动画工具（入场滑入 + 高亮平滑过渡） |
 | 脏矩形管理 | [ui-dirty.md](ui-dirty.md) | `src/ui/ui_dirty.c/h` | 统一 invalidate / is_dirty / clear_dirty API |
+| 选择器 | [selector.md](selector.md) | `src/ui/ui_selector.h`、`ui_item_selector.c` | 高亮框、导航、安全移出、锚定重建 |
+| 相机/视口 | [camera.md](camera.md) | `src/ui/ui_camera.h`、`ui_core.c` | 视图滚动偏移、选择器可见性保证 |
+| 控件数据模型 | [widget.md](widget.md) | `src/ui/ui_widget.h`、`ui_item_popup.c` | 信息栏与弹窗状态、推送/隐藏/-dismiss API |
+| 基础类型 | [types.md](types.md) | `src/ui/ui_types.h` | 枚举、回调类型、动画常量、布局常量 |
 
 ## 重构概述（2026 年 6 月）
 
@@ -38,6 +42,8 @@ UI 核心层是 Xerintosh 菜单框架的主体，纯 C 实现。它提供菜单
 | T8 | `e723bb2` | 拆分主循环为 `xerintosh_ui_update_lifecycle()` + `xerintosh_ui_render_frame()` |
 | T9 | `2f3dad1` | 迁移退场动画 static 状态到 `ui_context` |
 | T10 | `26af50f` | 添加 `xerintosh_is_item_visible()` 边界回归测试 |
+| T11 | Phase 2.3 | 选择器弹簧动画运行时可调；统一动画调度 `xerintosh_animate_unified()` |
+| T12 | Phase 2.3 | 双键按住回调机制：`xerintosh_set_dual_key_callback()` 跳过退场动画 |
 
 ## 渲染管线（每帧顺序）
 
@@ -48,11 +54,11 @@ UI 核心层是 Xerintosh 菜单框架的主体，纯 C 实现。它提供菜单
 3. `xerintosh_ui_main_core()` — UI 核心调度
    - `xerintosh_ui_update_lifecycle()` — user_item 生命周期（init / loop / exit）
    - `xerintosh_ui_render_frame()` — 列表模式渲染
-     - `xerintosh_refresh_camera_position()` — 相机视口
      - `xerintosh_refresh_list_item_position()` — 列表项 Y 坐标插值
      - `xerintosh_refresh_selector_position()` — 选择器 Y/W/H 插值
+     - `xerintosh_refresh_camera_position()` — 相机视口（使用最新目标坐标）
      - `xerintosh_draw_list()` — 列表外观 + 列表项 + 选择器高亮
-   - `xerintosh_draw_exit_animation()` — 退场遮罩（沙漏 + 扫描线）
+   - `xerintosh_draw_exit_animation()` — 退场遮罩（沙漏 + 扫描线，双键模式跳过）
 4. `xerintosh_ui_widget_core()` — Widget（信息栏 + 弹窗）叠加层
 5. `xerintosh_draw_long_press_hint()` — 长按进度提示条
 6. `hal_display_flush()` — DMA `pushSprite` 刷新到屏幕

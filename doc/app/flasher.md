@@ -113,9 +113,35 @@ upload_flags =
   - 预测方法：预估总容量 = 已见最大相对地址 × 2（与 STK500 相同的启发性公式）
 - 协议自动识别：三种解析器同时运行，谁先匹配就以谁为准
 
+## 入场动画
+
+烧录器 App 与串口监视器使用相同的滑入入场效果：
+
+*📄 Source: [flasher_app.cpp](../../src/app/flasher/flasher_app.cpp#L60, L89, L192)*
+
+```c
+static float s_entry_offset = 0.0f;
+static float s_entry_vel    = 0.0f;
+
+void flasher_init(void *ud) {
+    ...
+    s_entry_offset = (float)SCREEN_HEIGHT;
+    s_entry_vel    = 0.0f;
+    ...
+}
+
+void flasher_loop(void *ud) {
+    ...
+    xerintosh_animate_unified(&s_entry_offset, &s_entry_vel, 0.0f, ANIM_SPEED_EXIT);
+    ...
+}
+```
+
+UI 绘制时叠加 `s_entry_offset`，使全屏进度条从屏幕底部滑入到最终位置。
+
 ## RX 噪音过滤
 
-*📄 Source: [flasher_app.cpp](../../src/app/flasher/flasher_app.cpp#L490-L501)*
+*📄 Source: [flasher_app.cpp](../../src/app/flasher/flasher_app.cpp#L231-L242)*
 
 ```c
 /* ── UART (目标板) → USB (PC) ── */
@@ -138,7 +164,7 @@ UART→USB 方向的数据仅在最近 **2 秒** 内有 USB→UART 转发时才�
 
 ## 透传协议
 
-*📄 Source: [flasher_app.cpp](../../src/app/flasher/flasher_app.cpp#L354-L369, L405-L457)*
+*📄 Source: [flasher_app.cpp](../../src/app/flasher/flasher_app.cpp#L198-L229, L231-L242)*
 
 - **波特率**：115200（`flasher_init_pins(115200U)`）
 - **透传方向**：USB (PC) ↔ UART (目标板)

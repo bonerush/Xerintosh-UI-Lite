@@ -88,3 +88,18 @@ TEST(HalDisplayInit, InitDoesNotCrash)
     hal_display_init();
     SUCCEED();
 }
+
+/* ═══ XBM 位序：MSB 在前（P1-6）═══ */
+
+TEST(HalDisplayXbm, MsbFirstBitOrder)
+{
+    hal_display_init();
+
+    /* 8x1 XBM，bitmap[0] = 0x80：仅最左侧像素应点亮 */
+    static const uint8_t bitmap[] = { 0x80 };
+    hal_draw_xbitmap(0, 0, 8, 1, bitmap);
+
+    EXPECT_NE(hal_test_fb_read(0, 0), 0u);   /* (0,0) 应点亮 */
+    EXPECT_EQ(hal_test_fb_read(1, 0), 0u);   /* (1,0) 应熄灭 */
+    EXPECT_EQ(hal_test_fb_read(7, 0), 0u);   /* (7,0) 应熄灭 */
+}

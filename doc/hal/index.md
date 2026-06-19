@@ -14,9 +14,9 @@ HAL（Hardware Abstraction Layer）层封装了所有硬件相关操作，为上
 | 屏幕尺寸 | [screen.md](screen.md) | `src/hal/hal_screen.h/c` | 运行时屏幕尺寸查询，解耦布局模块与完整显示头文件 |
 | 输入系统 | [input.md](input.md) | `src/hal/hal_input.cpp/h`, `src/hal/hal_input_double_click.c/h` | 按键短按/长按/双击状态机 |
 | 系统时钟 | [system.md](system.md) | `src/hal/hal_system.cpp/h` | `millis()` 封装、`std::chrono` 桌面回退 |
-| 电源键 | — | `src/hal/hal_power_key.cpp/h` | AXP192 电源键轮询检测（短按/长按/持续按住） |
-| 屏幕布局 | — | `src/hal/hal_layout.h` | 与屏幕尺寸无关的定位宏（边距/行高/对齐） |
-| 关机序列 | — | `src/hal/hal_power_off.cpp` | 关机时序控制 |
+| 电源键 | —（暂未文档化） | `src/hal/hal_power_key.cpp/h` | AXP192 电源键轮询检测（短按/长按/持续按住） |
+| 屏幕布局 | [layout.md](layout.md) | `src/hal/hal_layout.h` | 与屏幕尺寸无关的定位宏（边距/行高/对齐） |
+| 关机序列 | —（暂未文档化） | `src/hal/hal_power_off.cpp` | 关机时序控制 |
 
 ## 设计原则
 

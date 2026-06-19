@@ -109,8 +109,12 @@ extern bool xerintosh_animate_unified(float *_pos, float *_vel, float _target, f
 extern bool xerintosh_is_in_user_item(void);
 
 /**
- * @brief  标记 UI 脏状态，触发下一帧清屏重绘
- * @note   App 内任何需要即时重绘的操作（数据更新、状态变化、计时器等）
+ * @brief  注册双键按住检测回调
+ * @param  cb 返回 true 表示当前处于双键模式，UI 退场动画应被跳过
+ * @note   由 App 层（如 power_key_popup）注册，解除 UI 核心对 App 的反向依赖
+ */
+extern void xerintosh_set_dual_key_callback(bool (*cb)(void));
+
 /**
  * @brief  标记 UI 为脏状态，请求下一帧全量重绘
  * @note   user_item 内部不需要调用（框架每帧自动清屏）。

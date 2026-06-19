@@ -79,10 +79,9 @@ void app_input_process(void)
     }
     else if (event_b == HAL_EVENT_LONG_PRESS)
     {
-        /* 若 WiFi 或蓝牙正在等待串口输入，先取消输入 */
+        /* 若 WiFi 正在等待串口输入，先取消输入
+         * Classic BT SPP 不需要串口输入配对码，因此无需检查 bt_mgr_is_waiting_input() */
         if (wifi_mgr_is_waiting_input()) {
-            serial_cancel();
-        } else if (bt_mgr_is_waiting_input()) {
             serial_cancel();
         }
         xerintosh_selector_exit_current_item();

@@ -14,7 +14,7 @@
 
 ### RR class 实例
 
-*📄 Source: [kern_sched_rr.c](../../src/kernel/kern_sched_rr.c#L136-L144)*
+*📄 Source: [kern_sched_rr.c](../../src/kernel/kern_sched_rr.c#L181-L190)*
 
 ```c
 kern_sched_class_t sched_class_rr = {
@@ -25,28 +25,40 @@ kern_sched_class_t sched_class_rr = {
     .tick          = sched_rr_tick,
     .prio_changed  = sched_rr_prio_changed,  /* 空实现，RR 不使用优先级 */
     .task_list     = NULL,  /* 在 kern_sched_init 中设为 g_task_list */
+    .task_list_tail = NULL, /* O(1) 追加用尾指针 */
 };
 ```
 
-### enqueue：追加到链表尾部
+### enqueue：O(1) 追加到链表尾部
 
-*📄 Source: [kern_sched_rr.c](../../src/kernel/kern_sched_rr.c#L39-L59)*
+*📄 Source: [kern_sched_rr.c](../../src/kernel/kern_sched_rr.c#L35-L60)*
 
 ```c
 static void sched_rr_enqueue(kern_task_t *task)
 {
     if (task == NULL) return;
 
-    kern_task_t **head = &sched_class_rr.task_list;
-    kern_task_t *t = *head;
-    if (t == NULL) {
-        *head = task;
-        task->next = NULL;
-        return;
-    }
-    while (t->next != NULL) t = t->next;
-    t->next = task;
+    task_list_lock();
+
     task->next = NULL;
+    task->scheduler_class_id = sched_class_rr.class_id;
+
+    if (sched_class_rr.task_list == NULL) {
+        sched_class_rr.task_list = task;
+        sched_class_rr.task_list_tail = task;
+    } else {
+        /* 防御：如果 tail 未初始化（例如 kern_sched_init 遗漏），回退 O(n) 尾追加 */
+        if (sched_class_rr.task_list_tail != NULL) {
+            sched_class_rr.task_list_tail->next = task;
+        } else {
+            kern_task_t *t = sched_class_rr.task_list;
+            while (t->next != NULL) t = t->next;
+            t->next = task;
+        }
+        sched_class_rr.task_list_tail = task;
+    }
+
+    task_list_unlock();
 }
 ```
 
@@ -54,35 +66,46 @@ static void sched_rr_enqueue(kern_task_t *task)
 函数 RR入队(任务) {
     if (任务为空) 返回
 
-    头指针 = &RR类.task_list
-    当前 = *头指针
+    获取任务链表自旋锁()          // SMP 保护
 
-    if (链表为空) {
-        头 = 任务
-        任务.next = NULL
-        return
+    任务.next = NULL
+    任务.调度类ID = RR类.class_id // 同步任务所属调度类
+
+    if (RR类.task_list 为空) {
+        RR类.task_list = 任务
+        RR类.task_list_tail = 任务
+    } else {
+        if (RR类.task_list_tail 不为空) {
+            RR类.task_list_tail.next = 任务   // O(1) 尾追加
+        } else {
+            /* 防御性回退：tail 未初始化时遍历到尾部 */
+            当前 = RR类.task_list
+            while (当前.next != NULL) 当前 = 当前.next
+            当前.next = 任务
+        }
+        RR类.task_list_tail = 任务
     }
 
-    /* 遍历到链表尾部 */
-    循环 { if (当前.next == NULL) 跳出; 当前 = 当前.next }
-    当前.next = 任务
-    任务.next = NULL
+    释放任务链表自旋锁()
 }
 
-/* 追加到尾部意味着：
- * - 新创建的任务排在所有已有任务之后
- * - Round-Robin 轮转中，新任务获得公平的初始位置
+/* 核心变化：
+ * - 使用 task_list_tail 实现 O(1) 追加
+ * - SMP 下通过 task_list_lock 保护链表和 tail 指针
+ * - 入队时同步 task->scheduler_class_id，标记任务归属
  */
 ```
 
 ### dequeue：从链表中移除
 
-*📄 Source: [kern_sched_rr.c](../../src/kernel/kern_sched_rr.c#L63-L88)*
+*📄 Source: [kern_sched_rr.c](../../src/kernel/kern_sched_rr.c#L64-L97)*
 
 ```c
 static void sched_rr_dequeue(kern_task_t *task)
 {
     if (task == NULL) return;
+
+    task_list_lock();
 
     kern_task_t **head = &sched_class_rr.task_list;
     kern_task_t *prev = NULL;
@@ -90,22 +113,35 @@ static void sched_rr_dequeue(kern_task_t *task)
     while (t != NULL) {
         if (t == task) {
             if (prev != NULL) {
-                prev->next = t->next;    /* 中间节点：跳过 */
+                prev->next = t->next;
+                if (task == sched_class_rr.task_list_tail) {
+                    sched_class_rr.task_list_tail = prev;
+                }
             } else {
-                *head = t->next;          /* 头节点：更新头指针 */
+                *head = t->next;
+                if (task == sched_class_rr.task_list_tail) {
+                    sched_class_rr.task_list_tail = NULL;
+                }
             }
-            if (g_last_picked == task) g_last_picked = NULL;  /* 清除选中标记 */
+            if (g_last_picked == task) g_last_picked = NULL;
+            task->scheduler_class_id = -1;
+            task_list_unlock();
             return;
         }
         prev = t;
         t = t->next;
     }
+
+    task->scheduler_class_id = -1;
+    task_list_unlock();
 }
 ```
 
 ```
 函数 RR出队(任务) {
     if (任务为空) 返回
+
+    获取任务链表自旋锁()
 
     头 = &RR类.task_list
     前驱 = NULL
@@ -114,29 +150,41 @@ static void sched_rr_dequeue(kern_task_t *task)
     while (当前 != NULL) {
         if (当前 == 要移除的任务) {
             if (前驱 != NULL) {
-                前驱.next = 当前.next   /* 跳过当前节点 */
+                前驱.next = 当前.next
+                if (任务 == RR类.task_list_tail) {
+                    RR类.task_list_tail = 前驱   // 更新尾指针
+                }
             } else {
-                *头 = 当前.next        /* 当前是头节点 */
+                *头 = 当前.next
+                if (任务 == RR类.task_list_tail) {
+                    RR类.task_list_tail = NULL   // 链表唯一节点被移除
+                }
             }
             if (上一次选中的任务 == 要移除的任务) {
-                上一次选中 = NULL       /* 清除脏引用 */
+                上一次选中 = NULL                // 清除脏引用
             }
+            任务.调度类ID = -1                    // 标记不再属于任何调度类
+            释放任务链表自旋锁()
             return
         }
         前驱 = 当前
         当前 = 当前.next
     }
+
+    任务.调度类ID = -1
+    释放任务链表自旋锁()
 }
 
-/* 注意 g_last_picked 的处理：
- * 如果被移除的任务恰好是 g_last_picked，
- * pick_next 将从链表头重新开始扫描，防止野指针
+/* 核心变化：
+ * - 同步更新 task_list_tail，保证 O(1) enqueue 继续正确
+ * - 出队时重置 task->scheduler_class_id = -1
+ * - 全程在 task_list_lock 保护下操作
  */
 ```
 
 ### pick_next：两遍扫描 Round-Robin
 
-*📄 Source: [kern_sched_rr.c](../../src/kernel/kern_sched_rr.c#L92-L143)*
+*📄 Source: [kern_sched_rr.c](../../src/kernel/kern_sched_rr.c#L101-L152)*
 
 这是 RR 类的核心算法，实现两遍链表扫描 + CPU 亲和性检查。
 
@@ -251,37 +299,9 @@ static kern_task_t *sched_rr_pick_next(void)
  */
 ```
 
-#### 两遍扫描的时序图
-
-```
-假设链表: idle → shell → wifi → ui
-
-上一次选中 = shell
-
-第一次 tick:
-  第一遍: 检查所有 sleep 任务 → wifi 到期 → wifi.state = READY
-  第二遍: 从 shell.next = wifi 开始
-          → wifi.state == READY → 返回 wifi
-          → g_last_picked = wifi
-
-第二次 tick:
-  第一遍: 检查 sleep → 无到期
-  第二遍: 从 wifi.next = ui 开始
-          → ui.state == SLEEPING → 跳过
-          → ui.next = NULL → 回到 idle
-          → idle.state == READY → 返回 idle
-          → g_last_picked = idle
-
-第三次 tick:
-  第一遍: 检查 sleep → ui 到期 → ui.state = READY
-  第二遍: 从 idle.next = shell 开始
-          → shell.state == SLEEPING → 跳过
-          → shell.next = wifi → wifi == READY → 返回 wifi
-```
-
 ### tick：时间片递减 + 抢占标记
 
-*📄 Source: [kern_sched_rr.c](../../src/kernel/kern_sched_rr.c#L147-L159)*
+*📄 Source: [kern_sched_rr.c](../../src/kernel/kern_sched_rr.c#L156-L168)*
 
 ```c
 static void sched_rr_tick(kern_task_t *current)
@@ -329,7 +349,7 @@ static void sched_rr_tick(kern_task_t *current)
 
 ### prio_changed：RR 的空实现
 
-*📄 Source: [kern_sched_rr.c](../../src/kernel/kern_sched_rr.c#L163-L168)*
+*📄 Source: [kern_sched_rr.c](../../src/kernel/kern_sched_rr.c#L172-L177)*
 
 ```c
 static void sched_rr_prio_changed(kern_task_t *task, uint8_t old_prio)

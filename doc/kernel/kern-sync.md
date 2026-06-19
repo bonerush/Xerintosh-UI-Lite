@@ -102,56 +102,79 @@ SMP 模式:
 
 ### 互斥锁（mutex_t）
 
-*📄 Source: [kern_sync.h](../../src/kernel/kern_sync.h#L54-L58)*
+*📄 Source: [kern_sync.h](../../src/kernel/kern_sync.h#L54-L59)*
 
 ```c
 typedef struct {
-    spinlock_t    lock;        /* 内部自旋锁 */
-    kern_task_t  *owner;       /* 当前持有者 */
-    kern_task_t  *wait_queue;  /* 等待队列头（预留，当前实现为简单自旋） */
+    spinlock_t    lock;            /* 内部自旋锁 */
+    kern_task_t  *owner;           /* 当前持有者 */
+    uint8_t       recursive_count; /* 递归加锁计数 */
+    kern_task_t  *wait_queue;      /* 等待队列头（预留，当前实现为简单自旋） */
 } mutex_t;
 ```
 
-> **注意**：`wait_queue` 字段为未来阻塞式互斥锁预留，当前 SMP 实现采用**简单自旋**策略——锁被占用时循环检测 `owner` 状态，不操作等待队列。
+> **注意**：`wait_queue` 字段为未来阻塞式互斥锁预留，当前 SMP 实现采用**简单自旋**策略——锁被占用时循环检测 `owner` 状态，不操作等待队列。`recursive_count` 支持同任务递归获取：每次 `mutex_lock()` 计数加 1，每次 `mutex_unlock()` 计数减 1，计数归零时才真正释放所有权。
 
 #### SMP 模式实现
 
-*📄 Source: [kern_sync.c](../../src/kernel/kern_sync.c#L38-L81)*
+*📄 Source: [kern_sync.c](../../src/kernel/kern_sync.c#L38-L102)*
 
 ```c
-void mutex_lock(mutex_t *m)
+kern_err_t mutex_lock(mutex_t *m)
 {
     kern_task_t *self = g_current_task;
 
-    spinlock_lock(&m->lock);   /* 第1步：获取内部自旋锁 */
+    spinlock_lock(&m->lock);
 
-    if (m->owner == NULL) {    /* 第2步：无人持有，直接获取 */
+    if (m->owner == NULL) {
+        /* 无人持有，直接获取 */
         m->owner = self;
+        m->recursive_count = 1;
         spinlock_unlock(&m->lock);
     } else if (m->owner == self) {
-        /* 第3步：递归获取（允许但记录警告） */
+        /* 递归获取：计数器递增 */
+        m->recursive_count++;
         spinlock_unlock(&m->lock);
     } else {
-        /* 第4步：已被其他任务持有，自旋等待 */
+        /* 已被其他任务持有：加入等待队列并自旋 */
+        /* 简单实现：内核自旋锁，短临界区直接自旋等待 */
         spinlock_unlock(&m->lock);
+
         while (1) {
             spinlock_lock(&m->lock);
             if (m->owner == NULL) {
                 m->owner = self;
+                m->recursive_count = 1;
                 spinlock_unlock(&m->lock);
-                return;
+                return KERN_OK;
             }
             spinlock_unlock(&m->lock);
             __asm__ volatile("nop");
         }
     }
+
+    return KERN_OK;
 }
 
-void mutex_unlock(mutex_t *m)
+kern_err_t mutex_unlock(mutex_t *m)
 {
     spinlock_lock(&m->lock);
-    m->owner = NULL;
+
+    if (m->owner != g_current_task) {
+        spinlock_unlock(&m->lock);
+        return KERN_EPERM;
+    }
+
+    if (m->recursive_count > 0) {
+        m->recursive_count--;
+    }
+
+    if (m->recursive_count == 0) {
+        m->owner = NULL;
+    }
+
     spinlock_unlock(&m->lock);
+    return KERN_OK;
 }
 ```
 
@@ -166,9 +189,11 @@ void mutex_unlock(mutex_t *m)
     if (锁->持有者 == NULL) {
         /* 情况1：锁空闲，直接获取 */
         锁->持有者 = 我自己
+        锁->递归计数 = 1
         自旋锁_解锁(&锁->内部自旋锁)
     } else if (锁->持有者 == 我自己) {
-        /* 情况2：我已经持有（递归），允许但警告 */
+        /* 情况2：我已经持有（递归），计数加 1 */
+        锁->递归计数++
         自旋锁_解锁(&锁->内部自旋锁)
     } else {
         /* 情况3：被其他任务持有，自旋等待释放 */
@@ -177,19 +202,36 @@ void mutex_unlock(mutex_t *m)
             自旋锁_加锁(&锁->内部自旋锁)
             if (锁->持有者 == NULL) {
                 锁->持有者 = 我自己
+                锁->递归计数 = 1
                 自旋锁_解锁(&锁->内部自旋锁)
-                return  /* 获取成功 */
+                return 成功  /* 获取成功 */
             }
             自旋锁_解锁(&锁->内部自旋锁)
             NOP  /* 降低争用 */
         }
     }
+
+    return 成功
 }
 
 函数 互斥锁_解锁(锁指针) {
     自旋锁_加锁(&锁->内部自旋锁)
-    锁->持有者 = NULL     /* 释放所有权 */
+
+    if (锁->持有者 != 当前任务) {
+        自旋锁_解锁(&锁->内部自旋锁)
+        return 无权限          // 非持有者不能解锁
+    }
+
+    if (锁->递归计数 > 0) {
+        锁->递归计数--
+    }
+
+    if (锁->递归计数 == 0) {
+        锁->持有者 = NULL     /* 真正释放所有权 */
+    }
+
     自旋锁_解锁(&锁->内部自旋锁)
+    return 成功
     /* 等待者会在下一次循环中检测到 owner==NULL 并获取 */
 }
 ```
@@ -223,25 +265,42 @@ void mutex_unlock(mutex_t *m)
 
 #### 单核模式退化
 
-*📄 Source: [kern_sync.h](../../src/kernel/kern_sync.h#L68-L84)*
+*📄 Source: [kern_sync.h](../../src/kernel/kern_sync.h#L69-L103)*
 
 ```c
-static inline void mutex_init(mutex_t *m)
+static inline kern_err_t mutex_init(mutex_t *m)
 {
     spinlock_init(&m->lock);
-    m->owner      = NULL;
-    m->wait_queue = NULL;
+    m->owner           = NULL;
+    m->recursive_count = 0;
+    m->wait_queue      = NULL;
+    return KERN_OK;
 }
 
-static inline void mutex_lock(mutex_t *m)
+static inline kern_err_t mutex_lock(mutex_t *m)
 {
     /* 单核无竞争，直接标记所有权 */
-    m->owner = g_current_task;
+    if (m->owner == g_current_task) {
+        m->recursive_count++;
+    } else {
+        m->owner = g_current_task;
+        m->recursive_count = 1;
+    }
+    return KERN_OK;
 }
 
-static inline void mutex_unlock(mutex_t *m)
+static inline kern_err_t mutex_unlock(mutex_t *m)
 {
-    m->owner = NULL;
+    if (m->owner != g_current_task) {
+        return KERN_EPERM;
+    }
+    if (m->recursive_count > 0) {
+        m->recursive_count--;
+    }
+    if (m->recursive_count == 0) {
+        m->owner = NULL;
+    }
+    return KERN_OK;
 }
 ```
 
@@ -258,7 +317,7 @@ static inline void mutex_unlock(mutex_t *m)
   "我声明我正在使用这个资源"
 
 如果在单核模式下同一个任务重复 lock 同一个 mutex，
-不会报错（直接覆盖 owner），这简化了单核内核的使用场景。
+递归计数会递增，unlock 时递减到零才真正释放，行为与 SMP 模式一致。
 ```
 
 ---
@@ -267,7 +326,7 @@ static inline void mutex_unlock(mutex_t *m)
 
 | 特性 | spinlock_t | mutex_t |
 |------|------------|---------|
-| 内部结构 | `volatile bool locked` | `spinlock_t + owner指针 + 等待队列(预留)` |
+| 内部结构 | `volatile bool locked` | `spinlock_t + owner指针 + recursive_count + 等待队列(预留)` |
 | 持有者追踪 | 无 | 有（`owner` 字段） |
 | 递归获取 | 不支持（死锁） | 允许（警告） |
 | 等待行为 | 忙等（自旋） | 忙等（自旋 + 内部锁） |

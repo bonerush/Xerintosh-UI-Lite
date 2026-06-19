@@ -64,10 +64,9 @@ static int16_t brightness = 50;  /* 当前硬件亮度缓存 */
 extern "C" void on_brightness_change_cb(void *ud)
 {
     (void)ud;
-    brightness = g_brightness_level * 10;
-    uint8_t hw = (uint8_t)settings_brightness_hw_value();
-    hal_display_set_brightness(hw);
-    storage_set_brightness(brightness);
+    brightness = settings_brightness_hw_value();
+    hal_display_set_brightness((uint8_t)brightness);
+    storage_set_brightness(settings_get_brightness());
 }
 
 /**
@@ -188,8 +187,8 @@ void setup()
     settings_load_from_storage();
     Serial.println("[  OK  ] Settings loaded from NVS");
 
-    brightness = g_brightness_level * 10;
-    hal_display_set_brightness((uint8_t)settings_brightness_hw_value());
+    brightness = settings_brightness_hw_value();
+    hal_display_set_brightness((uint8_t)brightness);
     g_anim_speed = settings_anim_speed_value();
 
     /* M5StickC 实测 rotation 效果：
@@ -263,7 +262,9 @@ static void deferred_kernel_init(void)
             uint8_t hw = (uint8_t)(val > 255 ? 255 : val);
             hal_display_set_brightness(hw);
             brightness = (int16_t)val;
-            storage_set_brightness(val);
+            /* sysfs  brightness 是 0-255 HW 值，storage 期望 1-10 level */
+            int16_t level = settings_brightness_level_from_hw((int16_t)val);
+            storage_set_brightness((uint8_t)level);
         }, NULL);
 
     /* rotation: sysfs 写入时同步到 M5 屏幕方向 */
@@ -298,6 +299,13 @@ static void deferred_kernel_init(void)
             g_anim_enabled = (val != 0);
             storage_set_anim_enabled(g_anim_enabled);
         }, NULL);
+
+    /* 同步 sysfs 初始值为当前硬件真实状态（K13）
+     * 避免用户 cat 到默认值后写入相同值却无变化。 */
+    kern_sysfs_update(KERN_SYSFS_BRIGHTNESS,   (int32_t)brightness);
+    kern_sysfs_update(KERN_SYSFS_ROTATION,     (int32_t)(g_is_landscape ? 1 : 0));
+    kern_sysfs_update(KERN_SYSFS_ANIM_SPEED,   (int32_t)g_anim_speed);
+    kern_sysfs_update(KERN_SYSFS_ANIM_ENABLED, g_anim_enabled ? 1 : 0);
 
     kern_devices_init();
     Serial.printf("[  OK  ] Kernel subsystems, free_heap=%u\n", ESP.getFreeHeap());
@@ -345,6 +353,10 @@ void loop()
     /* 处理 BT 启用/禁用异步请求。必须在 loop() 上下文中执行，
      * 确保 begin() / connected() / read() 在同一 FreeRTOS 任务。 */
     bt_mgr_process_requests();
+
+    /* 处理 WiFi 启用/禁用异步请求。必须在 loop() 上下文中执行，
+     * 避免 UI 任务 / Xeros 任务直接调用 WiFi 驱动导致死锁或 TWDT 复位。 */
+    wifi_mgr_process_requests();
 
     /* BT 轮询：仅在 BT 已启用时执行。
      * BluetoothSerial 内部 Bluedroid 不是线程安全的，

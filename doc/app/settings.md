@@ -4,7 +4,7 @@
 
 ## 概述
 
-`settings` 模块负责管理所有用户可配置的设置项，包括亮度、动画速度、动画开关、屏幕方向和串口波特率。它提供统一的加载、保存和值转换接口，将 UI 中的"档位"（1-10）与实际硬件值分离。
+`settings` 模块负责管理所有用户可配置的设置项，包括亮度、动画速度、动画开关、屏幕方向、串口波特率，以及 Phase 2.5 新增的动画风格（弹簧/普通）、弹动硬度、反弹力度。它提供统一的加载、保存和值转换接口，将 UI 中的"档位"（1-10）与实际硬件值分离。
 
 ---
 
@@ -78,7 +78,7 @@ int16_t g_spring_damping_level    = 9;                        /* 默认弹簧阻
 
 ### Getter / Setter
 
-*📄 Source: [settings.c](../../src/app/settings/settings.c#L83-L114)*
+*📄 Source: [settings.c](../../src/app/settings/settings.c#L104-L138)*
 
 | 函数 | 说明 |
 |------|------|
@@ -89,6 +89,26 @@ int16_t g_spring_damping_level    = 9;                        /* 默认弹簧阻
 | `settings_get_baud_rate()` / `settings_set_baud_rate(level)` | 波特率档位 1-6 |
 | `settings_get_spring_stiffness()` / `settings_set_spring_stiffness(level)` | 弹簧硬度档位 1-10 |
 | `settings_get_spring_damping()` / `settings_set_spring_damping(level)` | 弹簧阻尼档位 1-10 |
+
+*📄 Source: [settings.c](../../src/app/settings/settings.c#L254-L268)*
+
+```c
+int16_t settings_get_spring_stiffness(void) { return g_spring_stiffness_level; }
+void settings_set_spring_stiffness(int16_t level) {
+    if (level < 1) level = 1;
+    if (level > 10) level = 10;
+    g_spring_stiffness_level = level;
+    g_spring_stiffness_selector = settings_spring_stiffness_hw_value(level);
+}
+
+int16_t settings_get_spring_damping(void) { return g_spring_damping_level; }
+void settings_set_spring_damping(int16_t level) {
+    if (level < 1) level = 1;
+    if (level > 10) level = 10;
+    g_spring_damping_level = level;
+    g_spring_damping_selector = settings_spring_damping_hw_value(level);
+}
+```
 
 ### 屏幕方向输入校验
 
@@ -120,18 +140,51 @@ void settings_load_from_storage(void);
 2. **动画速度**：旧格式直接存储速度值（40-95，步进 5），新格式存储档位（1-10）。加载时若检测到旧格式值，用 `(saved_anim - 40) / 5` 转换。
 3. **屏幕旋转**：新 key 直接存储新格式值 1/2。无效值默认回退到横屏（`ORIENTATION_LANDSCAPE`）。
 4. **波特率**：1-6 直接读取，无效值回退到 5（115200）。
+5. **弹簧动画风格**：从 NVS 读取 `g_spring_anim_mode`（`true`=弹簧，`false`=普通一阶）。
+6. **弹簧硬度 / 反弹力度**：读取档位后，调用 `settings_spring_stiffness_hw_value()` 与 `settings_spring_damping_hw_value()` 同步到 UI 全局变量 `g_spring_stiffness_selector` / `g_spring_damping_selector`，保证选择器动画参数立即生效。
+
+*📄 Source: [settings.c](../../src/app/settings/settings.c#L82-L99)*
+
+```c
+    /* 弹簧动画风格（true=动弹, false=普通） */
+    g_spring_anim_mode = storage_get_spring_mode();
+
+    /* 弹簧硬度等级（1-10） */
+    int16_t saved_stiff = storage_get_spring_stiffness();
+    if (saved_stiff >= 1 && saved_stiff <= 10) {
+        g_spring_stiffness_level = saved_stiff;
+    }
+
+    /* 弹簧阻尼等级（1-10） */
+    int16_t saved_damp = storage_get_spring_damping();
+    if (saved_damp >= 1 && saved_damp <= 10) {
+        g_spring_damping_level = saved_damp;
+    }
+
+    /* 同步弹簧参数到 UI 全局变量 */
+    g_spring_stiffness_selector = settings_spring_stiffness_hw_value(g_spring_stiffness_level);
+    g_spring_damping_selector   = settings_spring_damping_hw_value(g_spring_damping_level);
+```
 
 ### 值转换
 
-*📄 Source: [settings.c](../../src/app/settings/settings.c#L140-L214)*
+*📄 Source: [settings.c](../../src/app/settings/settings.c#L140-L250)*
 
 ```c
 int16_t settings_brightness_hw_value(void);          /* 亮度档位 → 0-255 硬件值 */
 int16_t settings_anim_speed_value(void);             /* 速度档位 → 45-95 实际速度 */
 int32_t settings_serial_baud_hw_value(int16_t);      /* 波特率档位 → 实际波特率数值 */
+int     settings_serial_baud_count(void);            /* 波特率档位总数 */
+const int32_t *settings_serial_baud_table(void);     /* 波特率映射表只读指针 */
 float   settings_spring_stiffness_hw_value(int16_t); /* 弹簧硬度档位 → 0.04-0.40 浮点值 */
 float   settings_spring_damping_hw_value(int16_t);   /* 弹簧阻尼档位 → 0.04-0.40 浮点值 */
 ```
+
+*📄 Source: [settings.c](../../src/app/settings/settings.c#L176-L225)*
+
+**波特率映射表访问**：为避免 `app_menu.c` 与 `settings.c` 维护两份相同的波特率列表，settings 暴露 `settings_serial_baud_count()` 和 `settings_serial_baud_table()`。菜单构建时直接遍历该表生成按钮，无需手写标签和等级数组。
+
+**弹簧越界处理**：`settings_spring_stiffness_hw_value()` 与 `settings_spring_damping_hw_value()` 对越界输入统一 clamp 到 `[1, 10]`，与 `settings_set_spring_*()` 行为一致（之前分别默认回退到 5 和 9，行为不统一）。
 
 ## 初始化流程
 
@@ -159,6 +212,9 @@ main.cpp setup():
 | 动画开关 | `on_anim_enabled_change_cb()` | 更新 `g_anim_enabled` |
 | 横屏/竖屏 | `on_screen_rotation_change_cb()` | `M5.Display.setRotation()` |
 | 波特率 | `on_serial_baud_change_cb()` | `Serial.end(); Serial.begin(baud)` |
+| 动画风格 | `on_spring_mode_change_cb()` | 切换 `g_spring_anim_mode`（弹簧/普通一阶） |
+| 弹动硬度 | `on_spring_stiffness_change_cb()` | 更新 `g_spring_stiffness_selector` |
+| 反弹力度 | `on_spring_damping_change_cb()` | 更新 `g_spring_damping_selector` |
 
 > **为什么回调在 main.cpp 中**：这些回调需要调用 `M5.Display` 等 C++ Arduino API，而 main.cpp 是唯一的 C++ 入口文件。
 

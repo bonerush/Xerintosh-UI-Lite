@@ -148,7 +148,7 @@ void kern_panic(const char *msg)
 
 ## 内核完整初始化顺序
 
-*📄 Source: [main.cpp](../../src/main.cpp#L138-L288) + [kern_task_lifecycle.c](../../src/kernel/kern_task_lifecycle.c#L159-L232)*
+*📄 Source: [main.cpp](../../src/main.cpp#L138-L288) + [kern_task_lifecycle.c](../../src/kernel/kern_task_lifecycle.c#L180-L267)（ESP32 FreeRTOS 后端）*
 
 ```
 main.cpp setup():

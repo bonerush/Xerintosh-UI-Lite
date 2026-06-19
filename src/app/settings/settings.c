@@ -150,6 +150,21 @@ int16_t settings_brightness_hw_value(void)
 }
 
 /**
+ * @brief 将硬件 PWM 值（0-255）反向映射为亮度等级（1-10）
+ * @param hw 硬件亮度值（0-255）
+ * @return 亮度等级（1-10）
+ */
+int16_t settings_brightness_level_from_hw(int16_t hw)
+{
+    if (hw <= 0) return 1;
+    if (hw >= 255) return 10;
+    int16_t level = (int16_t)((hw * 10 + 127) / 255);
+    if (level < 1) level = 1;
+    if (level > 10) level = 10;
+    return level;
+}
+
+/**
  * @brief 将动画速度等级转换为内部动画速度值
  * @return 内部动画速度值（40 + level * 5）
  */
@@ -187,16 +202,36 @@ int32_t settings_serial_baud_hw_value(int16_t level)
     return s_baud_rate_table[level - 1];
 }
 
+/**
+ * @brief  获取波特率映射表项数
+ * @return 等级总数（当前为 6）
+ */
+int settings_serial_baud_count(void)
+{
+    return (int)BAUD_RATE_TABLE_SIZE;
+}
+
+/**
+ * @brief  获取波特率映射表只读指针
+ * @return 指向 int32_t 数组首元素的常量指针
+ * @note   数组长度可通过 settings_serial_baud_count() 获取
+ */
+const int32_t *settings_serial_baud_table(void)
+{
+    return s_baud_rate_table;
+}
+
 /* ═══ 弹簧动画值转换 ═══ */
 
 /**
  * @brief 将弹簧硬度等级转换为实际浮点值
  * @param  level 等级 1-10
  * @return 浮点刚度值（level * 0.04，范围 0.04-0.40）
+ * @note   越界值统一 clamp 到 [1, 10]，与 setter 行为保持一致
  */
 float settings_spring_stiffness_hw_value(int16_t level)
 {
-    if (level < 1) level = 5;
+    if (level < 1) level = 1;
     if (level > 10) level = 10;
     return (float)level * 0.04f;
 }
@@ -205,10 +240,11 @@ float settings_spring_stiffness_hw_value(int16_t level)
  * @brief 将弹簧阻尼等级转换为实际浮点值
  * @param  level 等级 1-10
  * @return 浮点阻尼值（level * 0.04，范围 0.04-0.40）
+ * @note   越界值统一 clamp 到 [1, 10]，与 setter 行为保持一致
  */
 float settings_spring_damping_hw_value(int16_t level)
 {
-    if (level < 1) level = 9;
+    if (level < 1) level = 1;
     if (level > 10) level = 10;
     return (float)level * 0.04f;
 }

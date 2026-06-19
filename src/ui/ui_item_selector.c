@@ -47,7 +47,7 @@ bool xerintosh_bind_item_to_selector(xerintosh_list_item_t *_item)
   if (g_xerintosh_selector.selected_item == NULL)
   {
     g_xerintosh_selector.y_selector = 2 * SCREEN_HEIGHT;  /* 给个初始坐标做动画 */
-    g_xerintosh_selector.h_selector = 160;
+    g_xerintosh_selector.h_selector = SCREEN_HEIGHT;
   }
   g_xerintosh_selector.selected_index = find_item_index(_item->parent, _item);
   g_xerintosh_selector.selected_item = _item;
@@ -159,19 +159,22 @@ void xerintosh_selector_exit_current_item()
   g_xerintosh_refresh_list_value = true;
   xerintosh_invalidate();
 
-  if (g_xerintosh_selector.selected_item->parent == NULL) return;  /* 根节点无法退出 */
-  if (g_xerintosh_selector.selected_item->parent->layer == 0 && g_in_xerintosh)
+  xerintosh_list_item_t *parent = g_xerintosh_selector.selected_item->parent;
+  if (parent == NULL) return;  /* 根节点无法退出 */
+  if (parent->layer == 0 && g_in_xerintosh)
   {
     return;  /* 主菜单没有上一级，不允许退出 */
   }
 
-  /* 给选择的 item 的父 item 的父 item 的所有子 item 坐标清零，做动画 */
-  for (uint8_t i = 0; i < g_xerintosh_selector.selected_item->parent->parent->child_num; i++)
-      g_xerintosh_selector.selected_item->parent->parent->child_list_item[i]->y_list_item = 0;
+  xerintosh_list_item_t *grandparent = parent->parent;
+  if (grandparent == NULL) return;  /* 防御性：无祖父节点时无法回退 */
 
-  g_xerintosh_selector.selected_index = find_item_index(
-    g_xerintosh_selector.selected_item->parent->parent, g_xerintosh_selector.selected_item->parent);
-  g_xerintosh_selector.selected_item = g_xerintosh_selector.selected_item->parent;
+  /* 给选择的 item 的父 item 的父 item 的所有子 item 坐标清零，做动画 */
+  for (uint8_t i = 0; i < grandparent->child_num; i++)
+      grandparent->child_list_item[i]->y_list_item = 0;
+
+  g_xerintosh_selector.selected_index = find_item_index(grandparent, parent);
+  g_xerintosh_selector.selected_item = parent;
 
   /* 重置选择器到 y=0，与列表项同步从顶部滑入，避免子菜单残留位置导致的动画突变 */
   g_xerintosh_selector.y_selector = 0.0f;
@@ -230,20 +233,47 @@ void ui_selector_safety_move_out(xerintosh_list_item_t *subtree_root,
 {
     if (subtree_root == NULL) return;
 
-    /* 检查选择器是否位于即将被移除的子树内 */
+    /* 检查选择器是否位于即将被移除的子树内（包括等于子树根节点本身） */
     xerintosh_list_item_t *check = g_xerintosh_selector.selected_item;
     while (check && check != subtree_root) {
         check = check->parent;
     }
-    if (check == subtree_root) {
-        /* 将选择器移回 fallback_parent 的第一个子项 */
-        if (fallback_parent != NULL && fallback_parent->child_num > 0) {
-            g_xerintosh_selector.selected_item  = fallback_parent->child_list_item[0];
+    if (check != subtree_root) return;
+
+    if (fallback_parent == NULL) {
+        g_xerintosh_selector.selected_item = NULL;
+        g_xerintosh_selector.selected_index = 0;
+        xerintosh_invalidate();
+        return;
+    }
+
+    /* 优先移回 fallback_parent 中不在待移除子树内的子项 */
+    xerintosh_list_item_t *safe_item = NULL;
+    uint8_t safe_index = 0;
+    for (uint8_t i = 0; i < fallback_parent->child_num; i++) {
+        xerintosh_list_item_t *cand = fallback_parent->child_list_item[i];
+        if (cand == subtree_root) continue;
+        safe_item = cand;
+        safe_index = i;
+        break;
+    }
+
+    if (safe_item != NULL) {
+        g_xerintosh_selector.selected_item  = safe_item;
+        g_xerintosh_selector.selected_index = safe_index;
+    } else {
+        /* 所有子项都在待移除子树内（例如移除的是唯一子项），则回退到父项 */
+        g_xerintosh_selector.selected_item = fallback_parent;
+        if (fallback_parent->parent != NULL) {
+            g_xerintosh_selector.selected_index = find_item_index(
+                fallback_parent->parent, fallback_parent);
+        } else {
             g_xerintosh_selector.selected_index = 0;
-            g_xerintosh_selector.v_y_selector = 0.0f;  /* 弹簧动画：安全移出时清零速度 */
-            g_xerintosh_selector.v_w_selector = 0.0f;
-            g_xerintosh_selector.v_h_selector = 0.0f;
-            xerintosh_invalidate();
         }
     }
+
+    g_xerintosh_selector.v_y_selector = 0.0f;  /* 弹簧动画：安全移出时清零速度 */
+    g_xerintosh_selector.v_w_selector = 0.0f;
+    g_xerintosh_selector.v_h_selector = 0.0f;
+    xerintosh_invalidate();
 }

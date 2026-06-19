@@ -1,82 +1,74 @@
-# UI 核心层重构报告（2026-06-15）
+# 重构报告：UI 核心层（第十一轮 · 2026-06-19）
 
-## 变更摘要
+## 范围
 
-| # | 优化 | 诊断 ID | 效果 |
-|---|------|---------|------|
-| 1 | 脏矩形帧跳过 | U02 | 静态画面 90%+ 帧跳过全屏重绘 |
-| 2 | XOR 选择器批量操作 | U01 | 选择器绘制从 15 次→1 次 readRect/pushImage |
-| 3 | 静态装饰缓存 | U03 | 滚动条/边框仅在导航时重绘 |
-| 4 | 局部变量解引用缓存 | U09 | 减少指针链追踪 |
+`src/ui/*`、`src/app/app_init.c`（仅回调注册）、`test/test_native/test_ui_core_fixes.cpp`。
 
-## 详细变更
+## 目标
 
-### 1. 脏矩形帧跳过
+- 消除 UI 核心层对 App 层的反向依赖。
+- 加固跨任务信号、选择器安全、列表绘制边界。
+- 统一弹窗高度计算，清理硬编码尺寸与重复代码。
 
-**问题**：每帧无条件执行 `hal_display_clear()` + 全帧重绘，即使 UI 完全静止。
+## 处理的问题清单
 
-**修复**：
-- `ui_context.h`：添加 `bool dirty` 字段
-- `ui_context.c`：初始化 `dirty = true`
-- `ui_core.c:229-240`：`xerintosh_ui_main_core()` 开头检查 `dirty`，false 时 return；末尾清除 dirty
-- `ui_task.c:49-64`：主循环中当 dirty 为 false 时跳过 clear + main_core，但仍调用 widget_core
-- `ui_core.c:41-53`：`xerintosh_animation()` 检测到动画进行中时设置 `dirty = true`
-- `ui_dispatch.c`：`dispatch_input_next/prev/exit` 设置 dirty
-- `ui_item_selector.c`：导航时设置 dirty
-- 退出动画期间强制 dirty
+| ID | 优先级 | 文件 | 修复内容 |
+|----|--------|------|----------|
+| P1-3 | P1 | `src/ui/ui_core.c/h`, `src/app/app_init.c` | UI 核心不再直接 `#include <app/shutdown/power_key_popup.h>`；改为 `xerintosh_set_dual_key_callback()` 注册钩子，App 在 `app_init_managers()` 中注册 `power_key_popup_is_dual_active()`。 |
+| P1-4 | P1 | `src/ui/ui_context.h` | `exit_requested` 改为 `volatile bool`，避免其他任务/ISR写入后被编译器缓存。 |
+| P1-5 | P1 | `src/ui/ui_types.h` | 将 `xerintosh_is_item_visible()` 声明移入 `extern "C"` 块，避免 C/C++ 链接风险。 |
+| P1-7 | P1 | `src/ui/ui_item_popup.c` | `xerintosh_hide_pop_up()` 末尾追加 `xerintosh_invalidate()`，防止弹窗残像。 |
+| P2-4 | P2 | `src/ui/ui_draw_list.c` | 滚动条长度缓存 key 增加 `SCREEN_HEIGHT`，屏幕旋转后自动失效重算。 |
+| P2-5 | P2 | `src/ui/ui_context.c` | `info_bar`/`pop_up` 初始宽度在 `xerintosh_context_init()` 中按 `SCREEN_WIDTH` 设置；静态初始化使用 `0`，避免硬件路径 `SCREEN_WIDTH` 为变量导致编译错误。 |
+| P2-7 | P2 | `src/ui/ui_dispatch.c` | `dispatch_itoa()` 用 `int32_t` 中转，修复 `INT16_MIN` 取反溢出。 |
+| P2-8 | P2 | `src/ui/ui_dispatch.c`, `src/ui/ui_types.h` | 枚举增加 `item_type_count` 哨兵，`type_in_range()` 改为 `< item_type_count`，不再依赖枚举顺序。 |
+| P2-9 | P2 | `src/ui/ui_item_selector.c` | `xerintosh_selector_exit_current_item()` 增加祖父节点 NULL 检查。 |
+| P2-10 | P2 | `src/ui/ui_widget.h`, `src/ui/ui_item_popup.c`, `src/ui/ui_draw_widgets.c` | 将 `popup_compute_height()` 提取为 `ui_widget.h` 中的 `static inline`，消除两份重复实现。 |
+| P2-15 | P2 | `src/ui/ui_draw_list.c` | 文字裁剪宽度 `_avail_width` 钳位到 `>=1`，避免负宽传给 HAL。 |
+| P3-2 | P3 | `src/ui/ui_item_selector.c` | 初始选择器高度硬编码 `160` 改为 `SCREEN_HEIGHT`。 |
+| P3-4 | P3 | `src/ui/ui_core.h` | 修复嵌套/未闭合 Doxygen 注释块。 |
+| P3-5 | P3 | `src/ui/ui_item_selector.c`, `src/ui/ui_item_list.c` | `ui_selector_safety_move_out()` 改进为跳过待移除子树根节点本身，必要时回退到父项；`xerintosh_remove_item_from_list()` 在销毁前调用它，避免悬垂指针。 |
 
-**效果**：静态菜单（无按键、无动画）下，每帧跳过 ~25KB 内存操作。60fps 下节省约 1.5MB/s 带宽。
+## 新增/修改的 Public API
 
-### 2. XOR 选择器批量操作
+| API | 文件 | 说明 |
+|-----|------|------|
+| `void xerintosh_set_dual_key_callback(bool (*cb)(void))` | `src/ui/ui_core.h` | App 层注册双键检测回调；UI 核心据此在双键模式下跳过退场动画。 |
+| `item_type_count` | `src/ui/ui_types.h` | `xerintosh_list_item_type_t` 末尾哨兵，用于边界检查。 |
+| `volatile bool exit_requested` | `src/ui/ui_context.h` | 跨任务退出信号，外部写入需使用 `volatile` 语义。 |
 
-**问题**：选择器绘制逐行执行 15 次 `readRect + XOR + pushImage`，每次约 256 字节内存操作。
+## 测试
 
-**修复**：
-- `hal_display_adv.cpp:103-124`：改为一次性 `readRect` 读取整个选择器区域 → 一次性 XOR 循环 → 一次性 `pushImage` 写回
-- 使用 `static uint16_t xor_buf[4800]`（160×30 = 9600 bytes）作为暂存
-- 从 15 次函数调用减少到 1 次 readRect + 1 次 pushImage
+- 新增 `test/test_native/test_ui_core_fixes.cpp`，覆盖：
+  - `HidePopUpInvalidates`
+  - `SliderInt16MinDrawDoesNotCrash`
+  - `DispatchWithInvalidTypeIsNoOp`
+  - `SelectorSafetyMoveOutFromSubtree`
+  - `RemoveItemMovesSelectorSafely`
+  - `ExitCurrentItemGuardsNullGrandparent`
+  - `MainLoopWithoutDualKeyCallbackDoesNotCrash`
+- 调整 `test/test_native/test_kernel_devices.cpp` 中 `TtyS0ConcurrentReadWrite` 的测试数据，避开 `\n/\r`，以适配 native 回环的 `\n→\r\n` 转换。
 
-### 3. 静态装饰缓存
+## 验证结果
 
-**问题**：`xerintosh_draw_list_appearance()` 每帧重绘滚动条和装饰像素，即使选择器和列表未变化。
+- 硬件构建：`pio run -e m5stick-c` ✅ 通过（无新增警告）。
+- UI 相关 native 测试：
+  ```bash
+  ./.pio/build/native/program --gtest_filter=UiCoreFixesTest.*:UiDispatchTest.*:UiEmptyRootTest.*:UiItemTest.*
+  ```
+  23 个测试全部通过 ✅。
+- 全量 `pio test -e native` 仍受第十轮遗留的 `SIGTRAP/SIGHUP` teardown 问题影响，在测试套件完成前异常退出；本次 UI 修改未引入新的测试失败。
 
-**修复**：
-- `ui_draw_list.c`：添加 `static int16_t` 缓存 `selected_index` 和 `child_num`
-- 当缓存值与当前值相同时，提前返回跳过绘制
-- 配合脏矩形机制，大部分静态帧直接跳过此函数调用
+## 提交记录
 
-### 4. 局部变量解引用缓存
+```
+17e921d ui(core): low-risk fixes - popup invalidate, shared popup height, bounds, hardcoded dims
+5fd14b7 ui(selector/context): safety move-out, volatile exit flag, responsive widths
+4a50f78 ui(core): decouple power_key_popup via registered dual-key callback
+77ae250 test(ui): regression tests for UI core fixes
+```
 
-**问题**：`xerintosh_selector_go_next_item()` 和 `go_prev_item()` 中多次通过 `selected_item->parent->child_list_item` 长链解引用。
+## 后续工作
 
-**修复**：
-- `ui_item_selector.c`：将 `parent`、`children`、`count` 缓存为局部变量
-- 减少指针追踪次数
-
-## 性能影响（估算）
-
-| 场景 | 变更前（每帧） | 变更后（每帧） | 节省 |
-|------|---------------|---------------|------|
-| 静态菜单 | 全帧重绘 + 12.8KB pushSprite | pushSprite 仅 | ~25KB 内存操作 |
-| 导航中 | 全帧重绘 + 15次 readRect/pushImage | 全帧重绘 + 1次 readRect/pushImage | 14次函数调用 |
-| 静态装饰 | 滚动条+边框重绘 | 跳过 | ~100次像素操作 |
-
-## 验证
-
-- 硬件构建：✅ SUCCESS
-- Native 测试：✅ 414/415 通过
-- 动画测试：✅ AnimationTest.EasingConverges
-- UI 测试：✅ 所有 UI dispatch/item/widget 测试通过
-
-## 变更文件列表
-
-| 文件 | 变更行数 |
-|------|----------|
-| `src/ui/ui_context.h` | +1 (`dirty` 字段) |
-| `src/ui/ui_context.c` | +1 (初始化) |
-| `src/ui/ui_core.c` | ~10 (dirty 检查+设置+动画标记) |
-| `src/app/ui_task.c` | ~8 (主循环条件跳过) |
-| `src/ui/ui_dispatch.c` | ~6 (输入处理 dirty 设置) |
-| `src/ui/ui_item_selector.c` | ~12 (dirty 设置 + 解引用缓存) |
-| `src/hal/hal_display_adv.cpp` | ~15 (批量 XOR) |
-| `src/ui/ui_draw_list.c` | ~10 (装饰缓存) |
+- 阶段 2.4 App 层重构。
+- 阶段 2.5 同步更新 `doc/ui/core.md`、`doc/ui/dispatch.md`、`doc/ui/item.md` 中涉及的新 API 与枚举哨兵说明。

@@ -113,6 +113,23 @@ void hal_display_init(void) {
         memset(g_font_fb, 0, SCREEN_WIDTH * SCREEN_HEIGHT * sizeof(uint16_t));
     }
 }
+
+/**
+ * @brief 清屏（填充指定颜色）
+ * @param color 16 位 RGB565 颜色
+ */
+void hal_display_clear_color(uint16_t color) {
+    for (size_t i = 0; i < sizeof(g_framebuffer) / sizeof(g_framebuffer[0]); i++) {
+        g_framebuffer[i] = color;
+    }
+}
+
+/**
+ * @brief 清屏（填充背景色）
+ */
+void hal_display_clear(void) {
+    hal_display_clear_color(COLOR_BG);
+}
 ```
 
 *📄 Source: [hal_display_draw.cpp](../../src/hal/hal_display_draw.cpp#L20-L23)*
@@ -161,6 +178,13 @@ void hal_display_set_rotation(int rotation) {
     M5.Display.setRotation(rotation);
     g_screen_width = M5.Display.width();
     g_screen_height = M5.Display.height();
+
+    /* 重建 M5Canvas 精灵以匹配新的屏幕方向（P1-2）
+     * 调用方无需再手动调用 hal_display_init() */
+    if (g_canvas) {
+        g_canvas->deleteSprite();
+        hal_display_create_sprite(g_canvas, g_screen_width, g_screen_height, 8);
+    }
 }
 
 void hal_display_set_brightness(uint8_t level) {
@@ -169,7 +193,18 @@ void hal_display_set_brightness(uint8_t level) {
 }
 ```
 
-`/dev/fb0` 的 `DEV_FB_IOCTL_SET_ROTATION` 也转发到 `hal_display_set_rotation()`，实现 Shell 与 sysfs 对屏幕方向的统一控制。
+`/dev/fb0` 的 `DEV_FB_IOCTL_SET_ROTATION` 也转发到 `hal_display_set_rotation()`，实现 Shell 与 sysfs 对屏幕方向的统一控制。方向切换时会自动删除并重建 `M5Canvas` 精灵，保证缓冲区尺寸与新的 `SCREEN_WIDTH` / `SCREEN_HEIGHT` 一致。
+
+### 清屏
+
+*📄 Source: [hal_display.h](../../src/hal/hal_display.h#L50-L58) / [hal_display_fb.cpp](../../src/hal/hal_display_fb.cpp#L156-L171)*
+
+```c
+void hal_display_clear(void);           /* 填充背景色 COLOR_BG */
+void hal_display_clear_color(uint16_t color);  /* 填充指定 RGB565 颜色 */
+```
+
+`hal_display_clear()` 是常用入口，内部调用 `hal_display_clear_color(COLOR_BG)`。`hal_display_clear_color()` 在需要非黑背景时使用（例如关机画面、启动画面）。两套实现都保证全屏填充：真机通过 `M5Canvas::fillScreen()`，Native 通过遍历 `g_framebuffer` 数组。
 
 ### XOR 反色矩形（选择器高亮）
 
@@ -227,16 +262,38 @@ void hal_draw_xor_rect(int16_t x, int16_t y, int16_t w, int16_t h) {
 
 ### 字体与文本
 
-真机环境下直接委托给 M5GFX 的文本 API：
+真机环境下直接委托给 M5GFX 的文本 API，同时支持 `\n` 换行：
 
-*📄 Source: [hal_display_font.cpp](../../src/hal/hal_display_font.cpp#L240-L272)*
+*📄 Source: [hal_display_font.cpp](../../src/hal/hal_display_font.cpp#L246-L284)*
 
 ```c
 void hal_draw_string(int16_t x, int16_t y, const char* str, uint16_t color) {
     if (!g_canvas || !str) return;
     g_canvas->setTextColor(color);
     g_canvas->setTextDatum(lgfx::v1::baseline_left);
-    g_canvas->drawString(str, x, y);
+
+    const char *p = str;
+    const char *line_start = p;
+    int16_t line_y = y;
+    int16_t font_h = g_canvas->fontHeight();
+
+    while (1) {
+        if (*p == '\n' || *p == '\0') {
+            size_t len = p - line_start;
+            if (len > 0) {
+                char buf[256];
+                if (len >= sizeof(buf)) len = sizeof(buf) - 1;
+                memcpy(buf, line_start, len);
+                buf[len] = '\0';
+                g_canvas->drawString(buf, x, line_y);
+            }
+            if (*p == '\0') break;
+            line_y += font_h;
+            line_start = ++p;
+        } else {
+            p++;
+        }
+    }
 }
 
 int16_t hal_get_string_width(const char* str) {
@@ -266,7 +323,7 @@ Native 测试环境提供**固定宽度 ASCII 字体模拟**（6×8 位图字体
 - `hal_get_string_width(str)` 返回 `strlen(str) * 7`（含 1px 字间距）
 - `hal_draw_string()` 将字符写入独立的字体层，最终通过 `hal_test_fb_read()` 与帧缓冲叠加输出
 
-*📄 Source: [hal_display_font.cpp](../../src/hal/hal_display_font.cpp#L195-L214)*
+*📄 Source: [hal_display_font.cpp](../../src/hal/hal_display_font.cpp#L195-L211)*
 
 ```c
 void hal_draw_string(int16_t x, int16_t y, const char* str, uint16_t color) {
@@ -275,6 +332,12 @@ void hal_draw_string(int16_t x, int16_t y, const char* str, uint16_t color) {
     int16_t cx = x;
     int16_t cy = y - FONT_H + 1;
     while (*str) {
+        if (*str == '\n') {
+            cx = x;
+            cy += FONT_H;
+            str++;
+            continue;
+        }
         font_draw_char(cx, cy, *str, color);
         cx += FONT_W + 1;
         str++;
@@ -287,6 +350,16 @@ int16_t hal_get_string_width(const char* str) {
     return (int16_t)(len * (FONT_W + 1));
 }
 ```
+
+### 字体设置
+
+*📄 Source: [hal_display.h](../../src/hal/hal_display.h#L156-L160) / [hal_display_font.cpp](../../src/hal/hal_display_font.cpp#L188-L190) / [hal_display_font.cpp](../../src/hal/hal_display_font.cpp#L246-L252)*
+
+```c
+void hal_set_font(const void* font);
+```
+
+`hal_set_font()` 将当前绘图字体切换到指定字体指针。真机环境下该指针为 `lgfx::v1::IFont*`，会调用 `g_canvas->setFont()`；若传入 `NULL` 则回退到 `fonts::Font0`。Native 桩实现直接忽略参数。上层代码应优先使用 `xerintosh_set_font()`（带缓存），仅在 `user_item` 等需要临时切换字体的场景直接调用 `hal_set_font()`。
 
 `hal_get_cn_font()` 返回项目子集中文字体指针（U8G2 格式，仅包含源码使用的 844 个汉字），供 `hal_set_font()` 切换中文字体渲染。Native 测试环境返回 `NULL`（桩实现）。
 
@@ -315,7 +388,6 @@ uint16_t hal_test_fb_read(int16_t x, int16_t y)
 
 ## 与其他组件的关系
 
-- **ui_draw_driver**：通过宏把 `oled_draw_*` 映射到本层的 `hal_draw_*`
 - **ui_drawer**：调用 `hal_draw_xor_rect()` 实现选择器反色高亮
 - **main.cpp**：每帧调用 `hal_display_clear()` → 绘制 → `hal_display_flush()`
 - **hal_layout.h**：提供基于 `hal_get_font_height()` 和 `SCREEN_WIDTH/HEIGHT` 的布局宏

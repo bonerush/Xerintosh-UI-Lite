@@ -44,8 +44,9 @@ typedef struct kern_port_ops {
     void  (*idle)(void);
 
     /* 定时器基础设施（抢占式调度用） */
-    int   (*timer_set_periodic)(uint32_t period_us, void (*callback)(void));
+    int   (*timer_set_periodic)(uint32_t period_us);
     void  (*timer_stop)(void);
+    bool  (*preempt_consume)(void);  /* 检查并消费 ISR 抢占 tick 请求 */
 } kern_port_ops_t;
 
 extern const kern_port_ops_t g_kern_port_ops;  /* 全局操作表实例 */
@@ -92,7 +93,7 @@ kern_port.h (接口层)
 
 ## FreeRTOS 后端：双信号量令牌协议
 
-*📄 Source: [kern_port_freertos.c](../../src/kernel/kern_port_freertos.c#L291-L344)*
+*📄 Source: [kern_port_freertos.c](../../src/kernel/kern_port_freertos.c#L309-L332)*
 
 ```
 调度器（loop）                任务（wrapper）
@@ -137,7 +138,7 @@ kern_sched_tick()
 
 ## 抢占式定时器基础设施
 
-*📄 Source: [kern_port_freertos.c](../../src/kernel/kern_port_freertos.c#L109-L157)*
+*📄 Source: [kern_port_freertos.c](../../src/kernel/kern_port_freertos.c#L131-L178)*
 
 ESP32 抢占式调度通过硬件定时器（ESP32 `timer_group0/timer0`）驱动：
 
@@ -149,6 +150,30 @@ ESP32 抢占式调度通过硬件定时器（ESP32 `timer_group0/timer0`）驱�
 | ISR 属性 | `IRAM_ATTR` | 中断函数置于 IRAM 保证响应速度 |
 
 定时器 ISR 调用调度器的回调函数（如 `kern_sched_tick`），实现硬件定时抢占。
+
+## 抢占 tick 消费
+
+*📄 Source: [kern_port.h](../../src/kernel/kern_port.h#L226-L235) 与 [kern_port_freertos.c](../../src/kernel/kern_port_freertos.c#L169-L178)*
+
+```c
+static inline bool kern_port_preempt_consume(void)
+{
+    return g_kern_port_ops.preempt_consume();
+}
+```
+
+在 ESP32 FreeRTOS 后端中，硬件定时器 ISR 只设置一个原子标志 `g_preempt_tick_pending`，不做任何调度逻辑。`kern_port_preempt_consume()` 在 `loop()` 或调度循环上下文中检查该标志：如果为真则清零并返回 `true`，调用者随后触发一次 `kern_sched_tick()`；否则返回 `false`。
+
+```
+函数 抢占消费() {
+    if (无待处理抢占标志) return false
+
+    清零抢占标志
+    return true    // 调用者应执行一次调度 tick
+}
+```
+
+这样将 ISR 保持最小化，避免在中断中执行链表遍历、内存释放等不可预测长度的操作。
 
 ---
 
@@ -188,6 +213,7 @@ After (kernel-v2-phase1):
 | `kern_port_idle()` | — | 无就绪任务时的空闲处理 |
 | `kern_port_timer_set_periodic()` | — | 启动硬件定时器（抢占式用） |
 | `kern_port_timer_stop()` | — | 停止硬件定时器 |
+| `kern_port_preempt_consume()` | — | 检查并消费 ISR 抢占 tick 请求 |
 
 ---
 

@@ -14,7 +14,7 @@
 
 ### FIFO class 实例
 
-*📄 Source: [kern_sched_fifo.c](../../src/kernel/kern_sched_fifo.c#L128-L136)*
+*📄 Source: [kern_sched_fifo.c](../../src/kernel/kern_sched_fifo.c#L158-L167)*
 
 ```c
 kern_sched_class_t sched_class_fifo = {
@@ -25,6 +25,7 @@ kern_sched_class_t sched_class_fifo = {
     .tick          = sched_fifo_tick,
     .prio_changed  = sched_fifo_prio_changed,
     .task_list     = NULL,
+    .task_list_tail = NULL,
 };
 ```
 
@@ -32,7 +33,7 @@ FIFO class 拥有独立的 `task_list`，与 RR class 的 `task_list` 分离。�
 
 ### enqueue：按优先级有序插入 + 抢占检测
 
-*📄 Source: [kern_sched_fifo.c](../../src/kernel/kern_sched_fifo.c#L19-L47)*
+*📄 Source: [kern_sched_fifo.c](../../src/kernel/kern_sched_fifo.c#L36-L64)*
 
 ```c
 static void sched_fifo_enqueue(kern_task_t *task)
@@ -47,7 +48,6 @@ static void sched_fifo_enqueue(kern_task_t *task)
         task->next = *head;
         *head = task;
     } else {
-        /* 找到正确的插入位置（维持降序：高→低） */
         kern_task_t *t = *head;
         while (t->next != NULL && t->next->priority > task->priority) {
             t = t->next;
@@ -55,6 +55,8 @@ static void sched_fifo_enqueue(kern_task_t *task)
         task->next = t->next;
         t->next = task;
     }
+
+    task->scheduler_class_id = sched_class_fifo.class_id;
 
     /* 如果入队任务优先级高于当前运行的任务，触发抢占 */
     if (g_current_task != NULL
@@ -89,7 +91,10 @@ static void sched_fifo_enqueue(kern_task_t *task)
         当前.next = 任务     /* 插入在此位置之后 */
     }
 
-    /* ___步骤2：抢占检测___ */
+    /* 步骤2：同步调度类 ID */
+    新任务.调度类ID = FIFO类.class_id
+
+    /* ___步骤3：抢占检测___ */
     [仅抢占模式]
     if (当前运行的任务 != NULL
         且 新任务.状态 == 就绪
@@ -120,9 +125,9 @@ static void sched_fifo_enqueue(kern_task_t *task)
  */
 ```
 
-### dequeue：标准链表移除
+### dequeue：标准链表移除 + tail/scheduler_class_id 同步
 
-*📄 Source: [kern_sched_fifo.c](../../src/kernel/kern_sched_fifo.c#L51-L70)*
+*📄 Source: [kern_sched_fifo.c](../../src/kernel/kern_sched_fifo.c#L68-L94)*
 
 ```c
 static void sched_fifo_dequeue(kern_task_t *task)
@@ -136,9 +141,16 @@ static void sched_fifo_dequeue(kern_task_t *task)
         if (t == task) {
             if (prev != NULL) {
                 prev->next = t->next;
+                if (task == sched_class_fifo.task_list_tail) {
+                    sched_class_fifo.task_list_tail = prev;
+                }
             } else {
                 *head = t->next;
+                if (task == sched_class_fifo.task_list_tail) {
+                    sched_class_fifo.task_list_tail = NULL;
+                }
             }
+            task->scheduler_class_id = -1;
             return;
         }
         prev = t;
@@ -147,11 +159,11 @@ static void sched_fifo_dequeue(kern_task_t *task)
 }
 ```
 
-逻辑与 RR 的 `dequeue` 相同，不赘述。
+与 RR 的 `dequeue` 类似，额外维护 `task_list_tail`：若移除的是尾节点则更新尾指针；移除后重置 `task->scheduler_class_id = -1`，标记任务不再属于 FIFO class。
 
 ### pick_next：选择最高优先级就绪任务
 
-*📄 Source: [kern_sched_fifo.c](../../src/kernel/kern_sched_fifo.c#L74-L88)*
+*📄 Source: [kern_sched_fifo.c](../../src/kernel/kern_sched_fifo.c#L98-L117)*
 
 ```c
 static kern_task_t *sched_fifo_pick_next(void)
@@ -207,7 +219,7 @@ static kern_task_t *sched_fifo_pick_next(void)
 
 ### tick：定期检查更高优先级任务
 
-*📄 Source: [kern_sched_fifo.c](../../src/kernel/kern_sched_fifo.c#L92-L113)*
+*📄 Source: [kern_sched_fifo.c](../../src/kernel/kern_sched_fifo.c#L121-L143)*
 
 ```c
 static void sched_fifo_tick(kern_task_t *current)
@@ -266,7 +278,7 @@ static void sched_fifo_tick(kern_task_t *current)
 
 ### prio_changed：动态优先级变更时重新排序
 
-*📄 Source: [kern_sched_fifo.c](../../src/kernel/kern_sched_fifo.c#L117-L124)*
+*📄 Source: [kern_sched_fifo.c](../../src/kernel/kern_sched_fifo.c#L147-L154)*
 
 ```c
 static void sched_fifo_prio_changed(kern_task_t *task, uint8_t old_prio)
@@ -334,9 +346,6 @@ taskC.priority 从 50 提升到 150:
    - RR 的 pick_next 遍历所有任务（含高优先级），几乎总会返回任务
    - FIFO 仅在 RR 返回 NULL 时才有机会被查询
    - idle(priority=0) 作为最终兜底
-
-⚠️ 注意：当前实现中任务仅加入全局 g_task_list，RR 直接将其
-作为 task_list。FIFO 的 task_list 需显式入队才包含任务。
 ```
 
 ---
@@ -345,7 +354,7 @@ taskC.priority 从 50 提升到 150:
 
 - **kern_sched_class**：`sched_class_fifo` 是 `kern_sched_class_t` 接口的实例
 - **kern_sched**：`kern_sched_init()` 中仅在 ESP32 环境下注册此类（Native 环境未注册）
-- **kern_task**：任务通过 `priority` 字段决定链表中的位置。当前实现中 `scheduler_class_id` 未在 spawn 时自动分配
+- **kern_task**：任务通过 `priority` 字段决定链表中的位置；`enqueue()` 将 `scheduler_class_id` 同步为 FIFO class ID，`dequeue()` 将其重置为 `-1`
 - **kern_sched_rr**：与 RR class 协作完成两级调度（FIFO 优先，RR 兜底）
 
 ---

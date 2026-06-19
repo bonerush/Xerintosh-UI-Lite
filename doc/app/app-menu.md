@@ -14,6 +14,7 @@
 根菜单
 ├── 设置
 │   ├── WiFi（switch_item）
+│   ├── 蓝牙（switch_item）
 │   ├── 亮度（slider_item，1-10）
 │   ├── 动画效果（switch_item）
 │   ├── 动画速度（slider_item，1-10）
@@ -36,9 +37,19 @@
 
 ### app_menu_build()
 
-*📄 Source: [app_menu.c](../../src/app/app_menu.c#L157-L184)*
+*📄 Source: [app_menu.c](../../src/app/app_menu.c#L162-L189)*
 
 构建完整菜单树并挂载到根节点。该函数内部调用 `flasher_menu_init()` 与 `flasher_menu_get_root()` 获取烧录器引脚子菜单。
+
+### build_settings_items()
+
+*📄 Source: [app_menu.c](../../src/app/app_menu.c#L72-L117)*
+
+构建设置子菜单的所有控件项，包括 WiFi/蓝牙开关、亮度滑条、动画效果开关、动画速度滑条，以及 Phase 2.5 新增的弹簧动画三项：
+
+- **动画风格**（`switch_item`）：绑定 `g_spring_anim_mode`，切换弹簧/普通一阶动画
+- **弹动硬度**（`slider_item`，1-10）：绑定 `g_spring_stiffness_level`
+- **反弹力度**（`slider_item`，1-10）：绑定 `g_spring_damping_level`
 
 ### app_menu_push_checked()
 
@@ -80,7 +91,36 @@ phase 2.5 重构新增此 helper，避免菜单构建过程中因某个子项创
 
 波特率子菜单使用 `button_item`，每个选项的 `user_data` 保存目标档位。
 
-*📄 Source: [app_menu.c](../../src/app/app_menu.c#L190-L196)*
+*📄 Source: [app_menu.c](../../src/app/app_menu.c#L42-L65)*
+
+```c
+static xerintosh_list_item_t *build_baud_submenu(void)
+{
+    xerintosh_list_item_t *baud_menu = xerintosh_new_list_item("波特率", list_icon);
+    if (baud_menu == NULL) {
+        kern_log(KERN_LOG_ERROR, "app_menu: failed to create baud menu");
+        return NULL;
+    }
+
+    const int32_t *baud_table = settings_serial_baud_table();
+    int baud_count = settings_serial_baud_count();
+    for (int i = 0; i < baud_count; i++) {
+        char label[16];
+        snprintf(label, sizeof(label), "%ld", (long)baud_table[i]);
+        xerintosh_list_item_t *btn = xerintosh_new_button_item(
+            label, on_baud_selected_cb, default_icon);
+        if (btn == NULL) {
+            kern_log(KERN_LOG_ERROR, "app_menu: failed to create baud item %s", label);
+            continue;
+        }
+        btn->user_data = (void *)(intptr_t)(i + 1);
+        app_menu_push_checked(baud_menu, btn, label);
+    }
+    return baud_menu;
+}
+```
+
+*📄 Source: [app_menu.c](../../src/app/app_menu.c#L195-L201)*
 
 ```c
 static void on_baud_selected_cb(void *ud)

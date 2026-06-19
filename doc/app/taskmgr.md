@@ -8,7 +8,7 @@
 
 ## 功能
 
-1. **任务列表**: 显示所有运行中的内核任务（包括虚任务），格式为 `PID NAME STATE STACK`
+1. **任务列表**: 显示所有运行中的内核任务（**虚任务被跳过**），格式为 `PID NAME STATE STACK`
 2. **选择导航**: 短按 BtnA 下一项，短按 BtnB 上一项
 3. **终止任务**: 对选中任务长按 BtnA，进入确认弹窗，再次长按 BtnA 确认终止
 4. **退出**: 长按 BtnB 返回主菜单
@@ -46,7 +46,7 @@
 
 - **受保护任务**: 以 `*` 前缀标识，长按 A 无响应，会弹出 "Protected" 提示
 - **选中行**: 反色高亮（白底黑字）
-- **虚任务**: stack 字段显示 `n/a`
+- **虚任务**: 不在任务管理器中显示，避免退出时访问已释放的自身虚任务指针
 - **横屏 3 行布局**：header/footer 间距基于 `HAL_ROW_H()` 动态计算，80px 高度下可显示 3 行
 
 ---
@@ -55,7 +55,7 @@
 
 ### 架构
 
-*📄 Source: [taskmgr.h](../../src/app/taskmgr/taskmgr.h#L17-L22), [taskmgr_app.c](../../src/app/taskmgr/taskmgr_app.c#L42-L52)*
+*📄 Source: [taskmgr.h](../../src/app/taskmgr/taskmgr.h#L17-L22), [taskmgr_app.c](../../src/app/taskmgr/taskmgr_app.c#L43-L53)*
 
 任务管理器使用 `ui_anim_row` 公共动画工具：
 
@@ -78,7 +78,7 @@ typedef struct {
 
 ### 动画生命周期
 
-*📄 Source: [taskmgr_app.c](../../src/app/taskmgr/taskmgr_app.c#L101-L119)*
+*📄 Source: [taskmgr_app.c](../../src/app/taskmgr/taskmgr_app.c#L108-L127)*
 
 ```c
 taskmgr_init()
@@ -87,7 +87,7 @@ taskmgr_init()
        → 高亮框 Y = SCREEN_HEIGHT
 ```
 
-*📄 Source: [taskmgr_app.c](../../src/app/taskmgr/taskmgr_app.c#L165-L258)*
+*📄 Source: [taskmgr_app.c](../../src/app/taskmgr/taskmgr_app.c#L192-L286)*
 
 ```c
 taskmgr_loop() — 每帧
@@ -120,7 +120,7 @@ taskmgr_draw() → draw_list()
 #define TASKMGR_ROW_H        HAL_ROW_H()           /* 列表行高 = font_h + 4 */
 ```
 
-*📄 Source: [taskmgr_app.c](../../src/app/taskmgr/taskmgr_app.c#L127-L137)*
+*📄 Source: [taskmgr_app.c](../../src/app/taskmgr/taskmgr_app.c#L134-L144)*
 
 ```c
 int taskmgr_visible_lines(void)
@@ -156,7 +156,7 @@ int taskmgr_visible_lines(void)
 2. Shell `kill` 和任务管理器均调用此检查
 3. 匹配时拒绝操作并提示 "Protected"
 
-*📄 Source: [taskmgr_app.c](../../src/app/taskmgr/taskmgr_app.c#L172-L198)*
+*📄 Source: [taskmgr_app.c](../../src/app/taskmgr/taskmgr_app.c#L241-L250)*
 
 ```c
 if (event_a == HAL_EVENT_LONG_PRESS) {
@@ -177,8 +177,19 @@ if (event_a == HAL_EVENT_LONG_PRESS) {
 当用户进入 `user_item` App（如串口监视器）时，系统会自动为该 App 注册一个**虚任务**。虚任务：
 - 无独立 FreeRTOS 上下文
 - 不参与内核调度
-- 在 `/proc/tasks` 和任务管理器中可见（stack 显示 `n/a`）
-- 可通过 `kill` 或任务管理器终止（终止后 App 退出回主菜单）
+- 在 `/proc/tasks` 中可见
+- **任务管理器故意跳过虚任务**（`taskmgr_refresh_list()` 检查 `KERN_TASK_FLAG_VIRTUAL` 即跳过），避免退出时访问已释放的自身虚任务指针
+- 因此任务管理器无法选择或终止虚任务
+
+*📄 Source: [taskmgr_app.c](../../src/app/taskmgr/taskmgr_app.c#L68-L76)*
+
+```c
+/* 跳过虚任务（UI App），避免退出时访问已释放的自身虚任务指针 */
+if (t->flags & KERN_TASK_FLAG_VIRTUAL) {
+    t = t->next;
+    continue;
+}
+```
 
 ## 注册到菜单
 

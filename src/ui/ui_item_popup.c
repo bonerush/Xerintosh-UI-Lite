@@ -79,23 +79,6 @@ static size_t find_wrap_break(const char *text, size_t len, int16_t avail)
 /* ═══ 信息栏 ═══ */
 
 /**
- * @brief 根据换行数计算弹窗高度
- * @param wrap_line_count 内容行数
- * @return 弹窗总高度（含 padding）
- */
-static int16_t popup_compute_height(uint8_t wrap_line_count)
-{
-  int16_t fh = hal_get_font_height();
-  uint8_t n = wrap_line_count;
-  if (n < 1) n = 1;
-  if (n > POP_UP_WRAP_LINES) n = POP_UP_WRAP_LINES;
-  int16_t content_h = (int16_t)(n * fh + (n - 1) * 2);
-  int16_t pop_h = content_h + 8;
-  if (pop_h < 24) pop_h = 24;
-  return pop_h;
-}
-
-/**
  * @brief 推送顶部信息栏
  * @param _content 显示文本
  * @param _span    显示持续时间（毫秒）
@@ -277,6 +260,7 @@ void xerintosh_hide_pop_up(void)
   g_xerintosh_pop_up.is_running = false;
   g_xerintosh_pop_up.y_pop_up_trg = 0 - 2 * POP_UP_HEIGHT;
   g_xerintosh_pop_up.y_pop_up = 0 - 2 * POP_UP_HEIGHT;
+  xerintosh_invalidate();  /* 强制下一帧重绘背景，避免弹窗残像 */
 }
 
 /**

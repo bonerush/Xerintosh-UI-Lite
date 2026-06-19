@@ -78,6 +78,13 @@ void settings_load_from_storage(void);
 int16_t settings_brightness_hw_value(void);
 
 /**
+ * @brief  将硬件 PWM 值（0-255）反向映射为亮度等级（1-10）
+ * @param  hw 硬件亮度值（0-255）
+ * @return 亮度等级（1-10）
+ */
+int16_t settings_brightness_level_from_hw(int16_t hw);
+
+/**
  * @brief  将动画速度等级转换为内部动画速度值
  * @return 内部动画速度值
  */
@@ -90,6 +97,19 @@ int16_t settings_anim_speed_value(void);
  * @note   无效值回退到默认值 115200（level 5）
  */
 int32_t settings_serial_baud_hw_value(int16_t level);
+
+/**
+ * @brief  获取波特率映射表项数
+ * @return 等级总数（当前为 6）
+ */
+int settings_serial_baud_count(void);
+
+/**
+ * @brief  获取波特率映射表只读指针
+ * @return 指向 int32_t 数组首元素的常量指针
+ * @note   数组长度可通过 settings_serial_baud_count() 获取
+ */
+const int32_t *settings_serial_baud_table(void);
 
 /**
  * @brief  将弹簧硬度等级转换为实际 stiffness 浮点值

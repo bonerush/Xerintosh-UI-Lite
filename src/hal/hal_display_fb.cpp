@@ -131,6 +131,13 @@ void hal_display_set_rotation(int rotation) {
     M5.Display.setRotation(rotation);
     g_screen_width = M5.Display.width();
     g_screen_height = M5.Display.height();
+
+    /* 重建 M5Canvas 精灵以匹配新的屏幕方向（P1-2）。
+     * 调用方无需再手动调用 hal_display_init()。 */
+    if (g_canvas) {
+        g_canvas->deleteSprite();
+        hal_display_create_sprite(g_canvas, g_screen_width, g_screen_height, 8);
+    }
 }
 
 int hal_display_get_rotation(void) {

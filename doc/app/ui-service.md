@@ -55,7 +55,7 @@ void ui_service_exit_landscape(void);
 
 ## 使用示例
 
-*📄 Source: [about.c](../../src/app/about/about.c#L84-L108)*
+*📄 Source: [about.c](../../src/app/about/about.c#L85-L109)*
 
 ```c
 void about_init(void *ud)

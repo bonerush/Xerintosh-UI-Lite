@@ -285,15 +285,20 @@ void kern_kfree_untracked(void *ptr)
 
 | 场景 | 原因 |
 |------|------|
-| 资源追踪节点自身 | `kern_resource_t` 若用 `kern_kmalloc()` 分配，会形成"追踪节点追踪自己"的递归依赖 |
 | 全局/静态生命周期对象 | 对象生命周期不绑定任何任务 |
 | 内核启动早期 | 当前任务尚未建立，无法追踪 |
 
-*📄 调用点: [kern_resource.c](../../src/kernel/kern_resource.c#L36)*
+*📄 回退点: [kern_resource.c](../../src/kernel/kern_resource.c#L86-L90)*
 
 ```c
-kern_resource_t *res = (kern_resource_t *)kern_kmalloc_untracked(sizeof(kern_resource_t));
+kern_resource_t *res = res_pool_alloc();
+if (res == NULL) {
+    /* 池耗尽：回退 kern_kmalloc_untracked */
+    res = (kern_resource_t *)kern_kmalloc_untracked(sizeof(kern_resource_t));
+}
 ```
+
+**说明**：资源追踪节点现在优先从 `kern_resource.c` 内部的 32 槽对象池分配，仅在池耗尽时才回退到 `kern_kmalloc_untracked()`。对象池避免了"追踪节点追踪自己"的递归依赖，同时减少了堆碎片。
 
 ---
 

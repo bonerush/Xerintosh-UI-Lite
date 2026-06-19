@@ -40,7 +40,7 @@ void app_init_ui(void)
 
 ### app_init_managers()
 
-*📄 Source: [app_init.c](../../src/app/app_init.c#L25-L40)*
+*📄 Source: [app_init.c](../../src/app/app_init.c#L26-L44)*
 
 ```c
 void app_init_managers(void)
@@ -49,11 +49,19 @@ void app_init_managers(void)
     wifi_mgr_init();
     power_key_popup_init();
 
+    /* 将双键检测回调注册到 UI 核心，解除 UI 核心对 App 的反向依赖 */
+    xerintosh_set_dual_key_callback(power_key_popup_is_dual_active);
+
     /* BT 初始化已移至 deferred_kernel_init()（内核任务 spawn 之后），
        避免在 setup() 中过早消耗内存导致 FreeRTOS 任务创建失败。 */
     if (g_wifi_on) wifi_mgr_enable();
 }
 ```
+
+该函数在 `main.cpp setup()` 中调用，完成三件事：
+1. 初始化蓝牙、WiFi 管理器与电源键弹窗
+2. 向 UI 核心注册双键回调 `power_key_popup_is_dual_active()`，使框架能在 A+B 双键按下时屏蔽正常导航
+3. 若 WiFi 开关处于开启状态，则立即启用 WiFi
 
 ### app_input_process()
 
@@ -138,6 +146,9 @@ void app_input_process(void)
 | `g_is_landscape` | `settings.c` | 横屏/竖屏开关 |
 | `g_serial_baud_rate` | `settings.c` | 串口波特率档位 |
 | `on_*_change_cb` | `main.cpp` / `native_main.cpp` | 设置变更回调 |
+| `on_spring_mode_change_cb` | `main.cpp` / `native_main.cpp` | 动画风格（弹簧/普通）切换回调 |
+| `on_spring_stiffness_change_cb` | `main.cpp` / `native_main.cpp` | 弹动硬度档位变更回调 |
+| `on_spring_damping_change_cb` | `main.cpp` / `native_main.cpp` | 反弹力度档位变更回调 |
 
 ---
 

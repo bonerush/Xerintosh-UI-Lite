@@ -580,9 +580,6 @@ static void shell_task_main(void *arg)
             continue;
         }
 
-        /* ═══ 普通字符回显 ═══ */
-        kern_write(tty, &ch, 1);
-
         if (ch == '\r' || ch == '\n') {
             line[pos] = '\0';
             kern_shell_print(tty, "\r\n");
@@ -603,6 +600,8 @@ static void shell_task_main(void *arg)
             pos = 0;
             hist_browse = -1;
         } else if (pos < SHELL_BUF_SIZE - 1) {
+            /* 缓冲区有空间才回显并记录 */
+            kern_write(tty, &ch, 1);
             line[pos++] = ch;
             hist_browse = -1;
         }

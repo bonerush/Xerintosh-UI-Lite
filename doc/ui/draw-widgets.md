@@ -105,7 +105,7 @@ void xerintosh_draw_info_bar()
 
 ## 弹窗
 
-*📄 Source: [ui_draw_widgets.c](../../src/ui/ui_draw_widgets.c#L92-L157)*
+*📄 Source: [ui_draw_widgets.c](../../src/ui/ui_draw_widgets.c#L75-L135)*
 
 弹窗是居中的通知框，尺寸比信息栏大（`POP_UP_HEIGHT = 48` vs `INFO_BAR_HEIGHT = 15`），支持自动换行（最多 3 行），用于显示更重要的提示。
 
@@ -126,22 +126,17 @@ void xerintosh_draw_pop_up()
       g_xerintosh_pop_up.is_running = false;
   }
 
-  /* 优先使用缓存高度（push 时已计算），避免每帧调用 hal_get_font_height 和乘法 */
+  /* 使用缓存高度；缓存无效时重算 */
   int16_t pop_h = g_xerintosh_pop_up.cached_pop_h;
   int16_t content_h = g_xerintosh_pop_up.cached_content_h;
-  if (pop_h == 0) {
-    /* fallback: 缓存无效时重算 */
-    pop_h = popup_compute_height(g_xerintosh_pop_up.wrap_line_count);
-    int16_t fh_fb = hal_get_font_height();
-    uint8_t n_fb = g_xerintosh_pop_up.wrap_line_count;
-    if (n_fb < 1) n_fb = 1;
-    if (n_fb > POP_UP_WRAP_LINES) n_fb = POP_UP_WRAP_LINES;
-    content_h = (int16_t)(n_fb * fh_fb + (n_fb - 1) * 2);
-  }
   int16_t fh = hal_get_font_height();
   uint8_t n = g_xerintosh_pop_up.wrap_line_count;
   if (n < 1) n = 1;
   if (n > POP_UP_WRAP_LINES) n = POP_UP_WRAP_LINES;
+  if (pop_h == 0) {
+    pop_h = popup_compute_height(n);
+    content_h = (int16_t)(n * fh + (n - 1) * 2);
+  }
 
   int16_t _x_pop_up = SCREEN_WIDTH/2 - g_xerintosh_pop_up.w_pop_up/2;
   int16_t _y_pop_up = g_xerintosh_pop_up.y_pop_up + pop_h;
@@ -194,30 +189,31 @@ void xerintosh_draw_pop_up()
 
 弹窗和信息栏的状态由 `ui_widget.h` 中的结构体管理：
 
-*📄 Source: [ui_widget.h](../../src/ui/ui_widget.h#L27-L67)*
+*📄 Source: [ui_widget.h](../../src/ui/ui_widget.h#L27-L35) / [ui_widget.h](../../src/ui/ui_widget.h#L74-L86)*
 
 ```c
 typedef struct xerintosh_info_bar_t
 {
-  const char *content;
-  uint16_t span;
-  float y_info_bar, y_info_bar_trg, w_info_bar, w_info_bar_trg;
-  bool is_running;
-  uint32_t time_start;
-  uint32_t time;
+  const char *content;       /* 显示文本 */
+  uint16_t span;             /* 显示持续时间（毫秒） */
+  float y_info_bar, y_info_bar_trg, w_info_bar, w_info_bar_trg;  /* 位置与宽度 */
+  bool is_running;           /* 是否正在显示 */
+  uint32_t time_start;       /* 开始显示的时间戳 */
+  uint32_t time;             /* 最近一次更新的时间戳 */
 } xerintosh_info_bar_t;
 
 typedef struct xerintosh_pop_up_t
 {
-  const char *content;
-  uint16_t span;
-  float y_pop_up, y_pop_up_trg, w_pop_up, w_pop_up_trg;
-  bool is_running;
-  uint32_t time_start;
-  uint32_t time;
-  const char *wrap_lines[POP_UP_WRAP_LINES];
-  uint8_t wrap_line_count;
-  int16_t cached_pop_h;
+  const char *content;       /* 显示文本 */
+  uint16_t span;             /* 显示持续时间（毫秒） */
+  float y_pop_up, y_pop_up_trg, w_pop_up, w_pop_up_trg;  /* 位置与宽度 */
+  bool is_running;           /* 是否正在显示 */
+  uint32_t time_start;       /* 开始显示的时间戳 */
+  uint32_t time;             /* 最近一次更新的时间戳 */
+  const char *wrap_lines[POP_UP_WRAP_LINES];  /* 换行后的各行指针 */
+  uint8_t wrap_line_count;   /* 实际行数 */
+  int16_t cached_pop_h;      /* 缓存弹窗高度（避免每帧重算） */
+  int16_t cached_content_h;  /* 缓存内容区高度 */
   int16_t cached_content_h;
 } xerintosh_pop_up_t;
 ```
@@ -229,4 +225,37 @@ typedef struct xerintosh_pop_up_t
 
 ---
 
-> **See Also:** [绘制管线](drawer.md) | [项目系统](item.md) | [核心引擎](core.md)
+## Widget 管理 API
+
+*📄 Source: [ui_widget.h](../../src/ui/ui_widget.h#L39-L105) / [ui_item_popup.c](../../src/ui/ui_item_popup.c#L87-L273)*
+
+信息栏和弹窗的生命周期由 `ui_item_popup.c` 管理，`ui_widget.h` 暴露以下 API：
+
+```c
+/* 推送顶部信息栏，_span 为显示持续时间（毫秒） */
+void xerintosh_push_info_bar(const char *_content, const uint16_t _span);
+
+/* 推送中部弹窗，支持自动换行（最多 3 行） */
+void xerintosh_push_pop_up(const char *_content, const uint16_t _span);
+
+/* 立即隐藏弹窗（无动画，瞬间移出屏幕） */
+void xerintosh_hide_pop_up(void);
+
+/* 动画退出弹窗（触发向上滑出动画，动画结束后自动停止） */
+void xerintosh_dismiss_pop_up(void);
+```
+
+### 使用区别
+
+| 函数 | 行为 | 适用场景 |
+|---|---|---|
+| `xerintosh_push_info_bar` | 从顶部展开信息栏，超时后自动收回 | 操作成功、状态提示 |
+| `xerintosh_push_pop_up` | 居中弹出弹窗，自动按可用宽度折行 | 错误提示、重要通知 |
+| `xerintosh_hide_pop_up` | 瞬间将弹窗移出屏幕并停止运行 | 需要立即清除弹窗 |
+| `xerintosh_dismiss_pop_up` | 设置目标位置到屏幕外，由动画平滑收回 | 用户主动关闭 |
+
+**注意**：`content` 是指向调用方字符串的指针，调用方需保证在显示期间字符串有效。弹窗换行缓冲区使用 `ui_item_popup.c` 内部的静态数组，不对原始内容做原地修改。
+
+---
+
+> **See Also:** [绘制管线](drawer.md) | [项目系统](item.md) | [核心引擎](core.md) | [Widget 数据模型](widget.md)
