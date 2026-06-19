@@ -654,7 +654,7 @@ void bad_example(void) {
 
 | 限制 | 值 | 说明 |
 |------|-----|------|
-| `MAX_LIST_CHILD_NUM` | 10 | 每个父节点最多 10 个子项 |
+| `MAX_LIST_CHILD_NUM` | 12 | 每个父节点最多 12 个子项 |
 | `MAX_LIST_LAYER` | 10 | 菜单树最大深度 10 层 |
 
 *📄 Source: [ui_types.h](../src/ui/ui_types.h#L84-L85)*

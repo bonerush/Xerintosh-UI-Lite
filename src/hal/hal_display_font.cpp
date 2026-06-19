@@ -198,6 +198,12 @@ void hal_draw_string(int16_t x, int16_t y, const char* str, uint16_t color) {
     int16_t cx = x;
     int16_t cy = y - FONT_H + 1;
     while (*str) {
+        if (*str == '\n') {
+            cx = x;
+            cy += FONT_H;
+            str++;
+            continue;
+        }
         font_draw_char(cx, cy, *str, color);
         cx += FONT_W + 1;
         str++;
@@ -252,7 +258,29 @@ void hal_draw_string(int16_t x, int16_t y, const char* str, uint16_t color) {
     if (!g_canvas || !str) return;
     g_canvas->setTextColor(color);
     g_canvas->setTextDatum(lgfx::v1::baseline_left);
-    g_canvas->drawString(str, x, y);
+
+    const char *p = str;
+    const char *line_start = p;
+    int16_t line_y = y;
+    int16_t font_h = g_canvas->fontHeight();
+
+    while (1) {
+        if (*p == '\n' || *p == '\0') {
+            size_t len = p - line_start;
+            if (len > 0) {
+                char buf[256];
+                if (len >= sizeof(buf)) len = sizeof(buf) - 1;
+                memcpy(buf, line_start, len);
+                buf[len] = '\0';
+                g_canvas->drawString(buf, x, line_y);
+            }
+            if (*p == '\0') break;
+            line_y += font_h;
+            line_start = ++p;
+        } else {
+            p++;
+        }
+    }
 }
 
 /**

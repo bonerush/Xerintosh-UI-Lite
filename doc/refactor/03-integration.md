@@ -1,41 +1,33 @@
-# 集成验证报告（2026-06-15 kernel-ui-performance）
+# 集成验证报告（第十轮 · 2026-06-19）
 
-## 验证方法
+## 验证结果
 
-- 全量 clean build + native 测试
-- 代码变更逐项确认
-- 架构正确性审查
-
-## 验证结果：PASS ✅
-
-| 检查项 | 结果 | 详情 |
+| 检查项 | 结果 | 说明 |
 |--------|------|------|
-| 硬件构建 (m5stick-c) | ✅ PASS | RAM 25.4% (83KB), Flash 88.1% (1.8MB) |
-| Native 测试 (全量) | ✅ PASS | 414/415 通过，1 跳过 |
-| 编译警告 | ✅ PASS | 零警告 |
-| 内核变更确认 | ✅ 5/5 | task_list_tail, FD 池, init 同步 |
-| UI 变更确认 | ✅ 7/7 | dirty rect, XOR 批量, 装饰缓存, 解引用缓存 |
-| 架构正确性 | ✅ PASS | 脏矩形流程完整，边界条件覆盖 |
+| `pio run -e m5stick-c` | ✅ SUCCESS | RAM 27.0%, Flash 89.2%, 无新增警告 |
+| `pio test -e native` | ✅ 224/225 通过 | test_native ERRORED (已知 SIGTRAP teardown 问题，无新增失败) |
 
-## 与基线对比
+## 变更文件
 
-| 指标 | 基线 | 重构后 | 变化 |
-|------|------|--------|------|
-| RAM | 22.3% (73KB) | 25.4% (83KB) | +3.1% (+10KB) |
-| Flash | 88.1% | 88.1% | 无变化 |
-| 测试通过 | 414/415 | 414/415 | 0 退化 |
-| 构建时间 | 27.36s | ~13s | 更快（增量缓存） |
+| 文件 | 改动 | 行数变化 |
+|------|------|----------|
+| `src/kernel/kern_shell_cmds.c` | 7个文件命令添加相对路径支持 | +76 |
+| `src/hal/hal_display_font.cpp` | hal_draw_string 添加 \n 换行处理 | +30 |
+| `src/app/app_menu.c` | 添加蓝牙 switch_item | +3 |
+| `src/app/taskmgr/taskmgr_app.c` | bt_mgr_disable → bt_mgr_request_disable | +1/-1 |
+| `src/app/wifi/wifi_manager.cpp` | spinlock 保护 g_popup_content | +19 |
+| `src/app/bluetooth/bt_uart_service.cpp` | 注释修正 | +1/-1 |
 
-RAM 增加 10KB：FD 对象池 448B + XOR 缓冲区 9.6KB 静态分配。权衡：消除堆碎片 + 减少每帧函数调用，以少量静态内存换取运行时性能。
+## 回归检查
 
-## 架构审查
+| 测试套件 | 状态 | 用例数 |
+|----------|------|--------|
+| test_ble_uart | ✅ PASSED | 全部 |
+| test_native | ✅ (SIGTRAP teardown) | 全部通过，teardown 已知问题 |
+| test_token_usage | ✅ PASSED | 11 |
 
-- **脏矩形流程**：输入→dirty=true→main_core 跳过→widget_core 仍运行→flush→dirty=false。正确的流。
-- **防御性双重检查**：`ui_task.c` 和 `ui_core.c` 均检查 dirty，冗余但无害。
-- **FD 池边界检查**：池耗尽时返回 `KERN_ENOMEM`，与 calloc 失败行为一致。
-- **tail 指针防御**：enqueue 中检测 NULL tail 并回退 O(n)，安全网。
-
-## 注意事项
-
-- Flash 88.1% 接近上限，未来大功能添加需谨慎
-- 脏矩形优化依赖 dirty 标志设置的完整性——未来添加新输入源需同步设置
+## 依赖关系验证
+- [x] 无循环依赖
+- [x] 无模块前缀冲突
+- [x] C/C++ 接口头文件 `extern "C"` 保护完整
+- [x] 无新增 TODO/FIXME

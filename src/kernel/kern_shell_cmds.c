@@ -64,7 +64,9 @@ static const char *resolve_path(const char *cwd, const char *arg,
         snprintf(out, out_size, "%s", arg);
         return out;
     }
-    int written = snprintf(out, out_size, "%s/%s", cwd, arg);
+    bool cwd_is_root = (cwd[0] == '/' && cwd[1] == '\0');
+    int written = snprintf(out, out_size, "%s%s%s",
+                           cwd, cwd_is_root ? "" : "/", arg);
     if (written < 0 || (size_t)written >= out_size) return NULL;
     return out;
 }
@@ -289,22 +291,46 @@ static void cmd_pwd(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd
 
 static void cmd_cat(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_size)
 {
-    (void)cwd; (void)cwd_size;
+    (void)cwd_size;
     if (argc < 2) { kern_shell_println(tty, "Usage: cat <path>"); return; }
 
-    kern_fd_t fd = kern_open(argv[1], KERN_O_RDONLY);
+    char abs_path[KERN_PATH_MAX];
+    const char *target = resolve_path(cwd, argv[1], abs_path, sizeof(abs_path));
+    if (target == NULL) { kern_shell_println(tty, "cat: path too long"); return; }
+
+    kern_fd_t fd = kern_open(target, KERN_O_RDONLY);
     if (fd < 0) {
         char err[64];
-        snprintf(err, sizeof(err), "cat: cannot open '%s'", argv[1]);
+        snprintf(err, sizeof(err), "cat: cannot open '%s'", target);
         kern_shell_println(tty, err);
         return;
     }
 
     char buf[128];
     ssize_t n;
+    int iter = 0;
+    size_t total_read = 0;
     while ((n = kern_read(fd, buf, sizeof(buf))) > 0) {
         kern_write(tty, buf, (size_t)n);
+        total_read += (size_t)n;
         kern_yield();  /* 防止大文件读取触发看门狗 */
+
+        /* 防御性上限：防止异常设备返回恒正数据导致无限循环。
+         * 128B × 1024 = 128KB，远超任何正常 procfs/sysfs/touch 文件。 */
+        if (++iter >= 1024) {
+            kern_shell_print(tty, "\r\ncat: max read limit reached\r\n");
+            break;
+        }
+    }
+
+    /* 首读即返回 0 或错误：告知用户文件存在但无可读数据
+     * （对 /dev/input0、/dev/pwrkey 等事件流设备，无事件时 read 返回 0 是正常行为） */
+    if (total_read == 0 && n < 0) {
+        char err[48];
+        snprintf(err, sizeof(err), "cat: read error (err=%d)\r\n", (int)n);
+        kern_shell_print(tty, err);
+    } else if (total_read == 0) {
+        kern_shell_println(tty, "(no data)");
     }
     kern_close(fd);
 }
@@ -313,33 +339,45 @@ static void cmd_cat(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd
 
 static void cmd_cp(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_size)
 {
-    (void)cwd; (void)cwd_size;
+    (void)cwd_size;
     if (argc < 3) { kern_shell_println(tty, "Usage: cp <src> <dst>"); return; }
 
-    kern_fd_t src = kern_open(argv[1], KERN_O_RDONLY);
-    if (src < 0) { kern_shell_println(tty, "cp: cannot open source"); return; }
+    char src_abs[KERN_PATH_MAX];
+    const char *src = resolve_path(cwd, argv[1], src_abs, sizeof(src_abs));
+    if (src == NULL) { kern_shell_println(tty, "cp: source path too long"); return; }
 
-    kern_fd_t dst = kern_open(argv[2], KERN_O_WRONLY);
-    if (dst < 0) { kern_close(src); kern_shell_println(tty, "cp: cannot open destination"); return; }
+    char dst_abs[KERN_PATH_MAX];
+    const char *dst = resolve_path(cwd, argv[2], dst_abs, sizeof(dst_abs));
+    if (dst == NULL) { kern_shell_println(tty, "cp: dest path too long"); return; }
+
+    kern_fd_t fd_src = kern_open(src, KERN_O_RDONLY);
+    if (fd_src < 0) { kern_shell_println(tty, "cp: cannot open source"); return; }
+
+    kern_fd_t fd_dst = kern_open(dst, KERN_O_WRONLY);
+    if (fd_dst < 0) { kern_close(fd_src); kern_shell_println(tty, "cp: cannot open destination"); return; }
 
     char buf[128];
     ssize_t n;
-    while ((n = kern_read(src, buf, sizeof(buf))) > 0) {
-        kern_write(dst, buf, (size_t)n);
+    while ((n = kern_read(fd_src, buf, sizeof(buf))) > 0) {
+        kern_write(fd_dst, buf, (size_t)n);
         kern_yield();  /* 防止大文件复制触发看门狗 */
     }
-    kern_close(dst);
-    kern_close(src);
+    kern_close(fd_dst);
+    kern_close(fd_src);
 }
 
 /* ═══ rm — 删除文件/目录 ═══ */
 
 static void cmd_rm(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_size)
 {
-    (void)cwd; (void)cwd_size;
+    (void)cwd_size;
     if (argc < 2) { kern_shell_println(tty, "Usage: rm <path>"); return; }
 
-    int ret = kern_vfs_unlink(argv[1]);
+    char abs_path[KERN_PATH_MAX];
+    const char *target = resolve_path(cwd, argv[1], abs_path, sizeof(abs_path));
+    if (target == NULL) { kern_shell_println(tty, "rm: path too long"); return; }
+
+    int ret = kern_vfs_unlink(target);
     if (ret == KERN_ENOENT) {
         kern_shell_println(tty, "rm: no such file or directory");
     } else if (ret == KERN_ENOTEMPTY) {
@@ -353,10 +391,14 @@ static void cmd_rm(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_
 
 static void cmd_mkdir(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_size)
 {
-    (void)cwd; (void)cwd_size;
+    (void)cwd_size;
     if (argc < 2) { kern_shell_println(tty, "Usage: mkdir <path>"); return; }
 
-    int ret = kern_vfs_mkdir(argv[1]);
+    char abs_path[KERN_PATH_MAX];
+    const char *target = resolve_path(cwd, argv[1], abs_path, sizeof(abs_path));
+    if (target == NULL) { kern_shell_println(tty, "mkdir: path too long"); return; }
+
+    int ret = kern_vfs_mkdir(target);
     if (ret == KERN_EEXIST) {
         kern_shell_println(tty, "mkdir: directory already exists");
     } else if (ret != KERN_OK) {
@@ -368,10 +410,14 @@ static void cmd_mkdir(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t c
 
 static void cmd_touch(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_size)
 {
-    (void)cwd; (void)cwd_size;
+    (void)cwd_size;
     if (argc < 2) { kern_shell_println(tty, "Usage: touch <path>"); return; }
 
-    int ret = kern_vfs_touch(argv[1]);
+    char abs_path[KERN_PATH_MAX];
+    const char *target = resolve_path(cwd, argv[1], abs_path, sizeof(abs_path));
+    if (target == NULL) { kern_shell_println(tty, "touch: path too long"); return; }
+
+    int ret = kern_vfs_touch(target);
     if (ret == KERN_EEXIST) {
         /* 已存在，静默成功 */
     } else if (ret != KERN_OK) {
@@ -383,7 +429,7 @@ static void cmd_touch(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t c
 
 static void cmd_echo(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_size)
 {
-    (void)cwd; (void)cwd_size;
+    (void)cwd_size;
 
     /* 查找 ">" 重定向符号 */
     int redirect_pos = -1;
@@ -396,7 +442,11 @@ static void cmd_echo(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cw
 
     if (redirect_pos > 1 && redirect_pos + 1 < argc) {
         /* 重定向写入 */
-        kern_fd_t fd = kern_open(argv[redirect_pos + 1], KERN_O_WRONLY);
+        char abs_path[KERN_PATH_MAX];
+        const char *target = resolve_path(cwd, argv[redirect_pos + 1], abs_path, sizeof(abs_path));
+        if (target == NULL) { kern_shell_println(tty, "echo: path too long"); return; }
+
+        kern_fd_t fd = kern_open(target, KERN_O_WRONLY);
         if (fd < 0) {
             kern_shell_println(tty, "echo: cannot write to file");
             return;
@@ -599,10 +649,14 @@ static void cmd_date(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cw
 
 static void cmd_hexdump(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_size)
 {
-    (void)cwd; (void)cwd_size;
+    (void)cwd_size;
     if (argc < 2) { kern_shell_println(tty, "Usage: hexdump <path>"); return; }
 
-    kern_fd_t fd = kern_open(argv[1], KERN_O_RDONLY);
+    char abs_path[KERN_PATH_MAX];
+    const char *target = resolve_path(cwd, argv[1], abs_path, sizeof(abs_path));
+    if (target == NULL) { kern_shell_println(tty, "hexdump: path too long"); return; }
+
+    kern_fd_t fd = kern_open(target, KERN_O_RDONLY);
     if (fd < 0) {
         kern_shell_println(tty, "hexdump: cannot open file");
         return;

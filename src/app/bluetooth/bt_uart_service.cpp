@@ -185,7 +185,7 @@ uint16_t bt_uart_test_consume_tx(uint16_t len)
 /* ═══ BluetoothSerial 实现 ═══
  * ESP32 Arduino 框架在 setup() 之前就初始化了 BT controller + Bluedroid。
  * BluetoothSerial.begin() 能正确检测并复用已初始化的栈。
- * 内存策略：WiFi 默认关闭（节省 ~38KB），BT 延迟到内核任务 spawn 后初始化。
+ * 内存策略：WiFi 默认开启（g_wifi_on=true），BT 延迟到内核任务 spawn 后初始化。
  *
  * 线程安全策略：
  * - g_bt_serial 的 connected()/read()/write() 必须在 Arduino 主任务中调用

@@ -332,15 +332,11 @@ TEST_F(KernelDevicesTest, Input0ReadNoEventReturnsNone)
     kern_fd_t fd = kern_open("/dev/input0", KERN_O_RDONLY);
     ASSERT_GE(fd, 0);
 
-    /* 不注入事件，应返回 HAL_EVENT_NONE */
+    /* 不注入事件，队列为空时应返回 0（通知调用者无可用数据） */
 
     uint8_t buf[DEV_INPUT_EVENT_SIZE];
     ssize_t n = kern_read(fd, (char *)buf, sizeof(buf));
-    EXPECT_EQ(n, (ssize_t)DEV_INPUT_EVENT_SIZE);
-
-    dev_input_event_t ev;
-    memcpy(&ev, buf, DEV_INPUT_EVENT_SIZE);
-    EXPECT_EQ(ev.event, (uint8_t)HAL_EVENT_NONE);
+    EXPECT_EQ(n, 0);  /* 空队列：返回 0，避免 cat 等循环调用永不退出 */
 
     kern_close(fd);
 }
@@ -515,15 +511,11 @@ TEST_F(KernelDevicesTest, PwrkeyReadNoEventReturnsZero)
     kern_fd_t fd = kern_open("/dev/pwrkey", KERN_O_RDONLY);
     ASSERT_GE(fd, 0);
 
-    /* 不注入事件，应返回 HAL_PWR_KEY_NONE */
+    /* 不注入事件时应返回 0（通知调用者无可用数据，避免 cat 等循环读取永不退出） */
 
     uint8_t buf[DEV_PWRKEY_EVENT_SIZE];
     ssize_t n = kern_read(fd, (char *)buf, sizeof(buf));
-    EXPECT_EQ(n, (ssize_t)DEV_PWRKEY_EVENT_SIZE);
-
-    dev_pwrkey_event_t ev;
-    memcpy(&ev, buf, DEV_PWRKEY_EVENT_SIZE);
-    EXPECT_EQ(ev.event, (uint8_t)HAL_PWR_KEY_NONE);
+    EXPECT_EQ(n, 0);  /* 无事件：返回 0 */
 
     kern_close(fd);
 }

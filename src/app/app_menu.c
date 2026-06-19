@@ -73,6 +73,8 @@ static void build_settings_items(xerintosh_list_item_t *root)
 
     xerintosh_list_item_t *sw1 = xerintosh_new_switch_item(
         "WiFi", &g_wifi_on, NULL, wifi_mgr_on_switch_toggle, default_icon);
+    xerintosh_list_item_t *sw_bt = xerintosh_new_switch_item(
+        "蓝牙", &g_bt_on, NULL, bt_mgr_on_switch_toggle, default_icon);
     xerintosh_list_item_t *sl1 = xerintosh_new_slider_item(
         "亮度", &g_brightness_level, 1, 1, 10,
         NULL, on_brightness_change_cb, default_icon);
@@ -100,6 +102,7 @@ static void build_settings_items(xerintosh_list_item_t *root)
     xerintosh_list_item_t *baud_menu = build_baud_submenu();
 
     app_menu_push_checked(root, sw1, "WiFi");
+    app_menu_push_checked(root, sw_bt, "蓝牙");
     app_menu_push_checked(root, sl1, "亮度");
     app_menu_push_checked(root, sw_anim, "动画效果");
     app_menu_push_checked(root, sl_anim, "动画速度");
