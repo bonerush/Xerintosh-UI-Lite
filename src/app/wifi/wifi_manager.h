@@ -74,6 +74,26 @@ bool wifi_mgr_is_enabled(void);
 void wifi_mgr_update(void);
 
 /**
+ * @brief 请求启用 WiFi（线程安全，可从任意任务调用）
+ * @note  实际启用操作在 wifi_mgr_process_requests() 中执行，
+ *        必须在 Arduino loop() 任务上下文中调用。
+ */
+void wifi_mgr_request_enable(void);
+
+/**
+ * @brief 请求禁用 WiFi（线程安全，可从任意任务调用）
+ * @note  实际禁用操作在 wifi_mgr_process_requests() 中执行，
+ *        必须在 Arduino loop() 任务上下文中调用。
+ */
+void wifi_mgr_request_disable(void);
+
+/**
+ * @brief 处理挂起的 WiFi 启用/禁用请求
+ * @note  应在 main.cpp 的 loop() 中每帧调用，统一执行 WiFi 驱动操作。
+ */
+void wifi_mgr_process_requests(void);
+
+/**
  * @brief WiFi 开关切换回调（由 switch_item 的 exit_function 调用）
  * @note  根据 g_wifi_on 全局变量决定启用或禁用
  */

@@ -355,6 +355,10 @@ void loop()
      * 确保 begin() / connected() / read() 在同一 FreeRTOS 任务。 */
     bt_mgr_process_requests();
 
+    /* 处理 WiFi 启用/禁用异步请求。必须在 loop() 上下文中执行，
+     * 避免 UI 任务 / Xeros 任务直接调用 WiFi 驱动导致死锁或 TWDT 复位。 */
+    wifi_mgr_process_requests();
+
     /* BT 轮询：仅在 BT 已启用时执行。
      * BluetoothSerial 内部 Bluedroid 不是线程安全的，
      * connected()/read() 已与 begin() 统一到 loop() 任务上下文。 */
