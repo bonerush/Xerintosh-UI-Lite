@@ -44,3 +44,16 @@ TEST(SerialBaudTest, GlobalDefaultIsLevel5)
 {
     EXPECT_EQ(g_serial_baud_rate, 5);
 }
+
+/**
+ * @brief 波特率映射表访问器与 settings_serial_baud_hw_value 语义一致
+ */
+TEST(SerialBaudTest, BaudTableMatchesHwValue)
+{
+    const int32_t *table = settings_serial_baud_table();
+    int count = settings_serial_baud_count();
+    EXPECT_EQ(count, 6);
+    for (int i = 0; i < count; i++) {
+        EXPECT_EQ(table[i], settings_serial_baud_hw_value((int16_t)(i + 1)));
+    }
+}
