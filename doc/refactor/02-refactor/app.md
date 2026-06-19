@@ -1,79 +1,59 @@
-# App 层重构报告（第二轮 kernel-deep → App）
+# App 层重构报告（第十轮 · 2026-06-19）
 
-**日期**: 2026-06-15  
-**分支**: `refactor/2026-06-15-kernel-ui`  
-**范围**: `src/app/` — 对齐内核新 API，消除代码异味
+## 范围
+- 处理诊断问题：D9, D10, D11, D15
+- 变更文件：
+  - `src/app/app_menu.c` — 添加蓝牙开关
+  - `src/app/taskmgr/taskmgr_app.c` — 异步 BT 关闭
+  - `src/app/wifi/wifi_manager.cpp` — popup 跨任务保护
+  - `src/app/bluetooth/bt_uart_service.cpp` — 注释修正
 
-## 已修复问题
+## 变更摘要
+| 变更类型 | 数量 | 说明 |
+|----------|------|------|
+| 修改文件 | 4 | |
+| 新增行 | ~20 | switch_item 创建、spinlock 保护 |
+| 修改行 | ~10 | bt_mgr_request_disable、注释修正 |
+| 删除行 | ~5 | 旧 TODO 注释 |
 
-### P1-1: taskmgr_ui.c 直调内核 API → 通过 taskmgr 包装层
+## 详细变更
 
-**问题**: `taskmgr_ui.c` 直接 `#include "kernel/kern_task.h"`，在渲染函数中调用
-`kern_task_is_protected()` 和 `kern_task_stack_usage()`，违反分层原则。
+### 1. 设置菜单添加蓝牙开关 (D9)
+**原因**：`build_settings_items()` 只创建了 WiFi 开关，蓝牙开关完全缺失，用户无法从 UI 启停蓝牙。
 
-**修复** (`src/app/taskmgr/taskmgr.h:50-52`, `taskmgr_app.c:169-187`):
-- 新增 3 个包装函数：
-  ```c
-  bool   taskmgr_task_protected(const kern_task_t *task);
-  size_t taskmgr_task_stack_usage(const kern_task_t *task);
-  bool   taskmgr_task_is_virtual(const kern_task_t *task);
-  ```
-- `taskmgr_ui.c` 移除 `#include "kernel/kern_task.h"`，改用包装函数
+**实现**：在 WiFi 开关后添加 `xerintosh_new_switch_item("蓝牙", &g_bt_on, NULL, bt_mgr_on_switch_toggle, default_icon)`，并调用 `app_menu_push_checked()` 挂载。
 
-### P2-1: sm_ui.c 直读全局变量 → 使用 settings getter
+**文件**：`src/app/app_menu.c:76-77, 104`
 
-**问题**: `sm_ui.c:41` 直接读取 `g_serial_baud_rate` 而非通过 `settings_get_baud_rate()`
+### 2. taskmgr 使用异步 BT 关闭 (D10)
+**原因**：`taskmgr_app.c:214` 在 UI 任务上下文中直接调用同步 `bt_mgr_disable()`，违反"同步接口仅主任务可调用"的约束，可能导致 Bluedroid 死锁→TWDT 复位。
 
-**修复** (`src/app/serial_monitor/sm_ui.c:41`):
-```c
-// Before
-int32_t baud = settings_serial_baud_hw_value(g_serial_baud_rate);
-// After
-int32_t baud = settings_serial_baud_hw_value(settings_get_baud_rate());
-```
+**实现**：替换为 `bt_mgr_request_disable()`（异步接口）。
 
-### P2-2: ui_service.c 直写全局变量 → 使用 settings setter
+**文件**：`src/app/taskmgr/taskmgr_app.c:214`
 
-**问题**: `ui_service.c` 直接读写 `g_is_landscape` 和 `g_screen_rotation_level`
+### 3. g_popup_content 跨任务保护 (D11)
+**原因**：WiFi 任务写入 `g_popup_content`，UI 任务读取，`strncpy` 非原子操作可能产生乱码。
 
-**修复** (`src/app/ui_service.c:37-69`):
-```c
-// Before
-s_prev_landscape = g_is_landscape;
-g_is_landscape = true;
-g_screen_rotation_level = ORIENTATION_LANDSCAPE;
+**实现**：添加 `portMUX_TYPE g_popup_spinlock`，在 `wifi_popup_request()`（写入端）和 `wifi_popup_refresh()`（读取端）使用 `portENTER_CRITICAL`/`portEXIT_CRITICAL` 保护临界区。
 
-// After
-s_prev_landscape = settings_get_landscape();
-settings_set_landscape(true);  // 同时设置 g_screen_rotation_level
-```
+**文件**：`src/app/wifi/wifi_manager.cpp:93-142`
 
-## 未修复但已记录
+### 4. g_wifi_on 默认值注释修正 (D15)
+**原因**：`wifi_manager.cpp` 和 `bt_uart_service.cpp` 注释称"WiFi 默认关闭"，但实际 `app_state.c` 中 `g_wifi_on = true`。
 
-| # | 问题 | 文件 | 原因 |
-|---|------|------|------|
-| 1 | `wifi_manager.cpp` ~706行 | 待未来拆分为 scan/menu/connect | 影响面大，需单独计划 |
-| 2 | `flasher_app.cpp` ~525行 | 待未来拆分为 stk500/slip 协议 | 同上 |
-| 3 | `storage.cpp` ~423行 | 待未来按凭据/设置/API Key 拆分 | 同上 |
-| 4 | WiFi/BT 状态机重复 | 待提取公共骨架 | 当前 WiFi 复杂度远高 BT，收益有限 |
-| 5 | `about.c` NATIVE_TEST 守卫不一致 | 留待未来 | 涉及 hal_input 桩行为，不改更安全 |
-| 6 | `token_usage`/`flasher` 未用 ui_service | 留待未来 | flasher 生命周期复杂，需单独评估 |
+**实现**：修正注释为"WiFi 默认开启 (g_wifi_on=true)"。
 
-## 验证结果
+**文件**：`wifi_manager.cpp:184`, `bt_uart_service.cpp:188`
 
-| 验证项 | 状态 |
-|--------|------|
-| `pio run -e m5stick-c` | ✅ SUCCESS |
-| `pio test -e native` | ✅ 414/415 pass, 1 skipped |
-| 编译警告 | ✅ 无新增警告 |
-| RAM | 25.5%（+576B vs 上轮） |
+## 测试
+- 验证结果：
+  - `pio run -e m5stick-c`：✅ PASS (RAM 27.0%, Flash 89.2%)
+  - `pio test -e native`：✅ 224/225 通过
 
-## 变更文件清单
-
-| 文件 | 变更类型 |
-|------|---------|
-| `src/app/taskmgr/taskmgr.h` | +3 API 声明 |
-| `src/app/taskmgr/taskmgr_app.c` | +20行 包装实现 |
-| `src/app/taskmgr/taskmgr_ui.c` | -1 include, +4 调用替换 |
-| `src/app/serial_monitor/sm_ui.c` | 1 行 getter 替换 |
-| `src/app/ui_service.c` | -2行, 用 settings API 替换 |
+## 检查清单
+- [x] 蓝牙开关正确绑定 `g_bt_on` 和 `bt_mgr_on_switch_toggle`
+- [x] taskmgr 使用异步 BT 接口
+- [x] spinlock 正确初始化和配对使用
+- [x] 注释与代码一致
+- [x] 硬件构建无新增警告

@@ -50,6 +50,8 @@ extern bool g_wifi_on;   /* 定义在 app/app_state.c */
 
 /* ═══ 模块状态 ═══ */
 
+static portMUX_TYPE g_popup_spinlock = portMUX_INITIALIZER_UNLOCKED;
+
 static wifi_mgr_state_t g_state           = WIFI_MGR_IDLE;    /* 状态机当前状态 */
 static bool             g_wifi_enabled    = false;            /* WiFi 是否已启用 */
 
@@ -88,16 +90,13 @@ static void wifi_scan_done_handler(void* arg, esp_event_base_t base,
 
 /* ═══ 跨任务弹窗辅助 ═══
  * 与 power_key_popup 同模式：UI 任务每帧 push_pop_up 保持弹窗存活，
- * 自行管理超时退场（span 到期后 dismiss_pop_up 触发动画退出）。 */
+ * 自行管理超时退场（span 到期后 dismiss_pop_up 触发动画退出）。
+ * g_popup_content 使用 portMUX_TYPE spinlock 保护跨任务读写。 */
 
 static volatile bool     g_popup_active = false;   /* 弹窗是否激活 */
 static volatile uint16_t g_popup_span   = 0;        /* 显示时长（毫秒） */
 static uint32_t          g_popup_start  = 0;        /* 弹窗激活时的 tick */
 static char              g_popup_content[48] = {0};  /* 弹窗文本 */
-/* TODO(P1): g_popup_content 由 WiFi 任务写入，UI 任务读取，无锁保护。
- * strncpy 在 SMP 下非原子操作，可能读到半写状态产生乱码。
- * 建议改用 FreeRTOS 队列或 portMUX_TYPE 保护。当前通过 volatile
- * g_popup_active 标志提供部分保护，窗口较小但未完全消除。 */
 
 /**
  * @brief 请求显示弹窗（可从任意任务调用）
@@ -105,9 +104,11 @@ static char              g_popup_content[48] = {0};  /* 弹窗文本 */
  */
 static void wifi_popup_request(const char *msg, uint16_t span_ms)
 {
+    portENTER_CRITICAL(&g_popup_spinlock);
     strncpy(g_popup_content, msg, sizeof(g_popup_content) - 1);
     g_popup_content[sizeof(g_popup_content) - 1] = '\0';
     g_popup_span = span_ms;
+    portEXIT_CRITICAL(&g_popup_spinlock);
     g_popup_start = millis();
     g_popup_active = true;
 }
@@ -138,7 +139,9 @@ extern "C" void wifi_popup_refresh(void)
     }
 
     /* 每帧 push 保持弹窗存活（重置 time_start 防止弹窗自身超时） */
+    portENTER_CRITICAL(&g_popup_spinlock);
     xerintosh_push_pop_up(g_popup_content, g_popup_span);
+    portEXIT_CRITICAL(&g_popup_spinlock);
 }
 
 /* ═══ 前向声明（回调函数）═══ */
@@ -178,9 +181,9 @@ void wifi_mgr_init(void)
         }
     }
 
-    /* 注意：自动连接已移除。WiFi 默认关闭（g_wifi_on = false）。
-       在此处调用 WiFi.begin() 会导致后续扫描失败，因为
-       WiFi.disconnect() 会使驱动处于不稳定状态。
+    /* 注意：自动连接已移除。g_wifi_on 默认 true (WiFi 开机自启)，
+       此处不调用 WiFi.begin() 因为后续扫描会失败（
+       WiFi.disconnect() 会使驱动处于不稳定状态）。
        连接逻辑改为用户选择网络时触发。 */
 }
 

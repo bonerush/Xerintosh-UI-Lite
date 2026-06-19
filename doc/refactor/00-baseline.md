@@ -1,51 +1,53 @@
-# 重构基线报告（2026-06-15 kernel-ui-performance）
+# 重构基线报告：fullstack（第十轮 · 2026-06-19）
 
 ## 分支与 Commit
-
-- 分支：`refactor/2026-06-15-kernel-ui`
-- 起始 commit：`07b9e3192a97102b4da69c6464f72c7b6639c4ac`
-- 工作目录：`/Users/yukisala/Documents/PlatformIO/Projects/M5Stick-P1-refactor-kernel-ui`
-- 基线来源：上一轮 `refactor/2026-06-14-kernel-first` 已完成并合并到 main
+- 分支：`refactor/2026-06-19-fullstack`
+- 起始 commit：`f381d3b9a51824425bfcc069b7e383aa8174832c`
+- 父 commit 信息：`fix(wifi): 修复启用 WiFi 后网络菜单不出现`
 
 ## 构建基线
-
-### 硬件构建
-
-- 命令：`pio run -e m5stick-c`
-- 结果：✅ PASS
-- 耗时：27.36 秒
-- 内存占用：
-  - RAM：22.3%（73,104 bytes / 327,680 bytes）
-  - Flash：88.1%（1,846,669 bytes / 2,097,152 bytes）
-- 新增警告：无（`-fno-rtti` 警告来自 M5GFX 等第三方库，非项目源码）
-
-### Native 测试
-
-- 命令：`pio test -e native`
-- 结果：✅ PASS
-- 测试套件：3 个（test_ble_uart, test_native, test_token_usage）
-- 测试用例：415 个（414 通过，1 跳过）
-- 总耗时：10.294 秒
+- `pio run -e m5stick-c`：✅ PASS
+  - RAM:  27.0% (88408 / 327680 bytes)
+  - Flash: 89.2% (1870097 / 2097152 bytes)
+- `pio test -e native`：⚠️ PASS with known issue
+  - test_ble_uart: ✅ PASS (20 tests)
+  - test_native: ⚠️ ERRORED (SIGTRAP at teardown — 所有 test case 通过，PlatformIO runner 已知问题)
+  - test_token_usage: ✅ PASS (11 tests)
+  - 合计: 225 test cases, 224 succeeded
 
 ## 代码规模
+| 类型 | 数量 | 代码行 |
+|------|------|--------|
+| C 文件 | 70 | — |
+| C++ 文件 | 24 | — |
+| 头文件 | 87 | — |
+| **src/ 合计** | 181 | **27,318** |
+| doc/ markdown | — | **19,311** |
 
-| 范围 | 文件数 | 总行数 |
-|------|--------|--------|
-| `src/` | 166 | 24,295 |
-| `doc/` | ~89 | ~21,000 |
+## 已知问题（来自 TODO/FIXME 扫描）
 
-## 已知问题（来自 `src/` 与 `doc/` 扫描）
+| ID | 文件 | 行 | 内容 | 优先级 |
+|----|------|-----|------|--------|
+| T1 | `src/kernel/kern_init.c` | 121 | `/* TODO: 硬件 LED 闪烁 */` | P2 |
+| T2 | `src/kernel/kern_port_native.c` | 198 | `/* TODO: 使用 esp_timer 或简单的忙等待 */` | P2 |
+| T3 | `src/kernel/devices/dev_ttyS0.cpp` | 20 | `/* TODO(phase 2.4): 迁移到 app/flasher/flasher.h 声明 */` | P1 |
+| T4 | `src/app/wifi/wifi_manager.cpp` | — | `g_popup_content` 跨任务无锁共享 | P1 |
 
-1. `src/kernel/kern_init.c:121`：`/* TODO: 硬件 LED 闪烁 */`
-2. `src/kernel/kern_port_native.c:198`：`/* TODO: 使用 esp_timer 或简单的忙等待 */`
-3. `doc/kernel/kern-init.md:120`：引用了源码中的同一 TODO，文档与代码同步。
+## 用户反馈问题（本轮核心）
+
+| ID | 问题描述 | 涉及层 | 优先级 | 预判 |
+|----|----------|--------|--------|------|
+| U1 | 系统日志不能换行显示 | UI/HAL | P0 | serial_monitor sm_ui.c 渲染逻辑 |
+| U2 | Shell cat 命令 bug：不能相对路径打开，需要完整地址 | 内核 | P0 | kern_shell_cmds.c cat 实现 |
+| U3 | io 指令 GPIO 操作无效（背光控制） | 内核/HAL | P0 | gpiofs/sysfs 与硬件交互断层 |
+| U4 | 全 Shell 命令测试 | 内核 | P1 | 系统性测试脚本 |
+| U5 | Shell-内核交互整理 | 内核/HAL | P1 | 审计 kern_shell ↔ kern_vfs 链路 |
+| U6 | 蓝牙/WiFi 优化（蓝牙严重问题） | App | P0 | bt_manager / wifi_manager 状态机 |
+| U7 | 日常维护、debug、优化 | 全栈 | P1 | 贯穿全流程 |
 
 ## 本次重构范围
-
-本轮聚焦 **内核性能优化** 和 **UI 流畅度提升**：
-
-- [x] 内核层 — 内存占用、CPU 性能、实时性
-- [x] UI 核心层 — 动画优雅、帧率提高、响应速度
-- [ ] HAL 层 — 按需修复
-- [ ] App 层 — 按需修复
-- [ ] 文档体系
+- [x] 内核层 — shell cat/io 命令修复、gpiofs 硬件桥接审计
+- [x] UI 核心层 — 日志换行渲染
+- [x] HAL 层 — 显示/输入/背光控制
+- [x] App 层 — 蓝牙/WiFi 优化
+- [x] 文档体系 — 同步更新

@@ -211,7 +211,7 @@ void taskmgr_loop(void *ud)
                     if (strcmp(t->name, "wifi-mgr") == 0) {
                         wifi_mgr_disable();
                     } else if (strcmp(t->name, "bt-mgr") == 0) {
-                        bt_mgr_disable();
+                        bt_mgr_request_disable();
                     }
 #endif
                     kern_task_kill(t->pid);
