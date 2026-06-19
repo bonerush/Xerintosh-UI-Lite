@@ -16,17 +16,22 @@
 
 ### 列表外观（滚动条 + 装饰线）
 
-*📄 Source: [ui_draw_list.c](../../src/ui/ui_draw_list.c#L130-L186)*
+*📄 Source: [ui_draw_list.c](../../src/ui/ui_draw_list.c#L51-L114)*
 
 ```c
-void xerintosh_draw_list_appearance()
+static void xerintosh_draw_list_appearance(int16_t selected_index, int16_t child_num)
 {
+  g_xerintosh_draw_color = COLOR_FG;
   hal_draw_h_line(0, 1, 66, g_xerintosh_draw_color);
   hal_draw_h_line(0, 0, 67, g_xerintosh_draw_color);
 
-  // 右上角装饰像素簇
-  const struct {
-    uint8_t _start, _end, _step, _y;
+  /* 顶部右侧装饰像素 */
+  const struct
+  {
+    uint8_t _start;
+    uint8_t _end;
+    uint8_t _step;
+    uint8_t _y;
   } draw_cfg[] = {
       {67, 99, 2, 1},
       {68, 100, 2, 0},
@@ -34,25 +39,49 @@ void xerintosh_draw_list_appearance()
       {103, 112, 3, 0},
       {115, 124, 5, 1},
       {116, 124, 5, 0}
-  };
+    };
+
   for (uint8_t j = 0; j < sizeof(draw_cfg) / sizeof(draw_cfg[0]); ++j)
     for (uint8_t i = draw_cfg[j]._start; i <= draw_cfg[j]._end; i += draw_cfg[j]._step)
       hal_draw_pixel(i, draw_cfg[j]._y, g_xerintosh_draw_color);
 
-  // 右侧滚动条背景
+  /* 右侧边框竖线 */
   hal_draw_v_line(SCREEN_WIDTH - 5, 0, SCREEN_HEIGHT, g_xerintosh_draw_color);
   hal_draw_v_line(SCREEN_WIDTH - 1, 0, SCREEN_HEIGHT, g_xerintosh_draw_color);
 
-  // 滚动条滑块（含缓存优化）
+  /* 滚动条 */
   static uint8_t _cached_child_num = 0;
+  static int16_t _cached_screen_h = -1;
   static float _cached_length = 0;
-  if (_cached_child_num != g_xerintosh_selector.selected_item->parent->child_num) {
-    _cached_child_num = g_xerintosh_selector.selected_item->parent->child_num;
+  if (_cached_child_num != child_num || _cached_screen_h != SCREEN_HEIGHT) {
+    _cached_child_num = child_num;
+    _cached_screen_h = SCREEN_HEIGHT;
     _cached_length = ceilf((SCREEN_HEIGHT - 10.0f) / (float)_cached_child_num);
   }
   float _length_each_part = _cached_length;
-  hal_draw_fill_rect(SCREEN_WIDTH - 4, 5 + g_xerintosh_selector.selected_index * _length_each_part, 3, _length_each_part, g_xerintosh_draw_color);
-  // ... 滑块上的装饰分割线
+  hal_draw_fill_rect(SCREEN_WIDTH - 4, 5 + selected_index * _length_each_part, 3, _length_each_part, g_xerintosh_draw_color);
+
+  /* 滚动条内部高光线 */
+  g_xerintosh_draw_color = COLOR_BG;
+  hal_draw_h_line(SCREEN_WIDTH - 4, _length_each_part + (float)selected_index * _length_each_part, 3, g_xerintosh_draw_color);
+
+  if (_length_each_part >= 9)
+  {
+    hal_draw_h_line(SCREEN_WIDTH - 4,
+                     floorf(_length_each_part - 2.0f + (float)selected_index * _length_each_part), 3, g_xerintosh_draw_color);
+    hal_draw_h_line(SCREEN_WIDTH - 4,
+                     floorf(_length_each_part + 2.0f + (float)selected_index * _length_each_part), 3, g_xerintosh_draw_color);
+  }
+
+  /* 滚动条上下端点 */
+  g_xerintosh_draw_color = COLOR_FG;
+  hal_draw_fill_rect(SCREEN_WIDTH - 4, 0, 3, 4, g_xerintosh_draw_color);
+  hal_draw_fill_rect(SCREEN_WIDTH - 4, SCREEN_HEIGHT - 4, 3, 4, g_xerintosh_draw_color);
+  g_xerintosh_draw_color = COLOR_BG;
+  hal_draw_h_line(SCREEN_WIDTH - 4, 2, 3, g_xerintosh_draw_color);
+  hal_draw_pixel(SCREEN_WIDTH - 3, 1, g_xerintosh_draw_color);
+  hal_draw_h_line(SCREEN_WIDTH - 4, SCREEN_HEIGHT - 3, 3, g_xerintosh_draw_color);
+  hal_draw_pixel(SCREEN_WIDTH - 3, SCREEN_HEIGHT - 2, g_xerintosh_draw_color);
 }
 ```
 
@@ -91,7 +120,7 @@ void xerintosh_draw_list_appearance()
 
 ### 列表项绘制
 
-*📄 Source: [ui_draw_list.c](../../src/ui/ui_draw_list.c#L198-L288)*
+*📄 Source: [ui_draw_list.c](../../src/ui/ui_draw_list.c#L121-L200)*
 
 ```c
 static void xerintosh_draw_list_item()
@@ -106,9 +135,11 @@ static void xerintosh_draw_list_item()
     int16_t _x_list_item = g_xerintosh_camera.x_camera + LIST_ITEM_LEFT_MARGIN;
     int16_t _y_list_item = _item->y_list_item + g_xerintosh_camera.y_camera - _font_h_2;
 
+    /* 根据类型分发到对应的绘制函数 */
     g_xerintosh_draw_color = COLOR_FG;
     xerintosh_dispatch_draw(_item, _x_list_item, _y_list_item);
 
+    /* 自定义位图图标补充绘制 */
     if (_item->icon == custom_icon && _item->bitmap_data != NULL) {
       xerintosh_draw_item_bitmap(_item, _x_list_item, _y_list_item);
     }
@@ -166,7 +197,7 @@ bool xerintosh_is_item_visible(int16_t _y_item)
 
 ### 选择器高亮（XOR 反色）
 
-*📄 Source: [ui_draw_list.c](../../src/ui/ui_draw_list.c#L295-L317)*
+*📄 Source: [ui_draw_list.c](../../src/ui/ui_draw_list.c#L207-L229)*
 
 ```c
 static void xerintosh_draw_selector()
@@ -220,7 +251,7 @@ static void xerintosh_draw_selector()
 
 ### 弹窗（Pop-up）
 
-*📄 Source: [ui_draw_widgets.c](../../src/ui/ui_draw_widgets.c#L92-L157)*
+*📄 Source: [ui_draw_widgets.c](../../src/ui/ui_draw_widgets.c#L75-L135)*
 
 ```c
 void xerintosh_draw_pop_up()
@@ -326,7 +357,7 @@ void xerintosh_draw_pop_up()
 
 信息栏与弹窗结构几乎一致，区别仅在于尺寸更小（`INFO_BAR_HEIGHT = 15` vs `POP_UP_HEIGHT = 48`）和默认位置不同。
 
-*📄 Source: [ui_draw_widgets.c](../../src/ui/ui_draw_widgets.c#L20-L72)*
+*📄 Source: [ui_draw_widgets.c](../../src/ui/ui_draw_widgets.c#L21-L67)*
 
 ---
 

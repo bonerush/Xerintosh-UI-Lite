@@ -20,31 +20,47 @@
 
 ### 重构后的三层结构
 
-*📄 Source: [ui_core.c](../../src/ui/ui_core.c#L336-L359)*
+*📄 Source: [ui_core.c](../../src/ui/ui_core.c#L344-L368)*
 
 ```c
 void xerintosh_ui_main_core()
 {
   if (!g_in_xerintosh) return;
+  if (g_xerintosh_selector.selected_item == NULL) return;
 
-  xerintosh_ui_update_lifecycle();   // 第一层：生命周期
-  xerintosh_ui_render_frame();       // 第二层：帧渲染
-                                      // 第三层：退场动画（遮罩覆盖在所有内容之上）
-  if (!g_xerintosh_exit_animation_finished && !power_key_popup_is_dual_active())
+  /* 生命周期处理每帧必须运行（app loop 依赖它处理输入和退出检测） */
+  xerintosh_ui_update_lifecycle();
+
+  /* 退场动画进行中时强制重绘，确保动画不会被脏矩形跳过 */
+  if (!g_xerintosh_exit_animation_finished)
+    xerintosh_invalidate();
+
+  /* 脏矩形帧跳过：列表层静态画面无需重绘 */
+  if (!xerintosh_is_dirty()) return;
+
+  /* 清除脏标志：后续动画/输入若需要重绘，会重新设置 */
+  xerintosh_clear_dirty();
+
+  xerintosh_ui_render_frame();
+
+  /* 退场动画遮罩（双键关机模式下跳过，回调由 App 层注册） */
+  if (!g_xerintosh_exit_animation_finished &&
+      (s_dual_key_active_cb == NULL || !s_dual_key_active_cb()))
     xerintosh_draw_exit_animation();
 }
 ```
 
 ```
 调用栈（per frame）:
-main.cpp loop()
+main.cpp loop() / ui_task
   └─► xerintosh_ui_main_core()
         ├─► xerintosh_ui_update_lifecycle()
         │     └─► [user_item] → init / loop / exit 回调
+        ├─► 脏矩形判断（动画/输入触发时重绘）
         ├─► xerintosh_ui_render_frame()
         │     ├─► [user_item 内部] return（App 自行绘制）
-        │     └─► [列表模式] camera → list_item → selector → draw_list
-        └─► xerintosh_draw_exit_animation()  ← 遮罩层
+        │     └─► [列表模式] list_item → selector → camera → draw_list
+        └─► xerintosh_draw_exit_animation()  ← 遮罩层（双键模式跳过）
 ```
 
 ### 与重构前的对比
@@ -63,13 +79,13 @@ main.cpp loop()
 
 ### 四阶段状态机
 
-*📄 Source: [ui_core.c](../../src/ui/ui_core.c#L272-L317)*
+*📄 Source: [ui_core.c](../../src/ui/ui_core.c#L280-L325)*
 
 ```c
 static void xerintosh_ui_update_lifecycle(void)
 {
   xerintosh_list_item_t *item = g_xerintosh_selector.selected_item;
-  if (item->type != user_item) return;
+  if (item == NULL || item->type != user_item) return;
 
   xerintosh_user_item_t *user = xerintosh_to_user_item(item);
 
@@ -81,6 +97,7 @@ static void xerintosh_ui_update_lifecycle(void)
       user->init_function(item->user_data);
     user->in_user_item = 1;
     user->entering_user_item = false;
+    xerintosh_invalidate();
   }
 
   /* 阶段 2：运行 — 每帧调用 loop */
@@ -91,6 +108,7 @@ static void xerintosh_ui_update_lifecycle(void)
   if (g_xerintosh_exit_requested) {
     g_xerintosh_exit_requested = false;
     user->exiting_user_item = true;
+    xerintosh_invalidate();
   }
 
   /* 阶段 3：退出 — 退场动画到达中间态后触发 exit */
@@ -100,12 +118,14 @@ static void xerintosh_ui_update_lifecycle(void)
       user->exit_function(item->user_data);
     user->in_user_item = 0;
     user->exiting_user_item = false;
+    xerintosh_invalidate();
   }
 
   /* 阶段 4：兜底清理 — 防止退出状态残留 */
   if (user->exiting_user_item && g_xerintosh_exit_animation_finished) {
     user->in_user_item = 0;
     user->exiting_user_item = false;
+    xerintosh_invalidate();
   }
 }
 ```
@@ -207,16 +227,16 @@ static void xerintosh_ui_update_lifecycle(void)
 
 ### 渲染分支
 
-*📄 Source: [ui_core.c](../../src/ui/ui_core.c#L322-L330)*
+*📄 Source: [ui_core.c](../../src/ui/ui_core.c#L330-L338)*
 
 ```c
 static void xerintosh_ui_render_frame(void)
 {
   if (xerintosh_is_in_user_item()) return; /* user_item 自行绘制 */
 
-  xerintosh_refresh_camera_position();
   xerintosh_refresh_list_item_position();
   xerintosh_refresh_selector_position();
+  xerintosh_refresh_camera_position();   /* 在所有位置更新完成后计算 */
   xerintosh_draw_list();
 }
 ```
@@ -228,9 +248,9 @@ static void xerintosh_ui_render_frame(void)
     if (当前处于用户App内部) return  // App自己负责绘制
 
     // 列表模式渲染管线:
-    刷新相机位置()          // 确保选择器在可视区域
     刷新列表项位置()        // 所有子项的Y坐标动画插值
     刷新选择器位置()        // 选择器框的大小和位置动画
+    刷新相机位置()          // 确保选择器在可视区域（使用最新目标坐标）
     绘制列表()              // 委托 drawer 绘制背景+项+选择器高亮
 }
 ```
@@ -241,7 +261,7 @@ static void xerintosh_ui_render_frame(void)
 
 ### user_item 状态查询
 
-*📄 Source: [ui_core.c](../../src/ui/ui_core.c#L24-L31)*
+*📄 Source: [ui_core.c](../../src/ui/ui_core.c#L32-L39)*
 
 ```c
 bool xerintosh_is_in_user_item()
@@ -266,7 +286,7 @@ bool xerintosh_is_in_user_item()
 
 ### 缓动公式
 
-*📄 Source: [ui_core.c](../../src/ui/ui_core.c#L47-L67)*
+*📄 Source: [ui_core.c](../../src/ui/ui_core.c#L55-L75)*
 
 ```c
 bool xerintosh_animation(float *_pos, float _pos_trg, float _speed)
@@ -344,7 +364,7 @@ bool xerintosh_animation(float *_pos, float _pos_trg, float _speed)
 
 ### 弹簧动画（Spring Animation）
 
-*📄 Source: [ui_core.c](../../src/ui/ui_core.c#L93-L115)*
+*📄 Source: [ui_core.c](../../src/ui/ui_core.c#L101-L123)*
 
 自 Round 10 起，选择器（selector）的 Y/W/H 动画从一阶指数衰减升级为**二阶弹簧-阻尼器模型**，产生"QQ弹弹"的弹性过渡效果。
 
@@ -419,7 +439,7 @@ void xerintosh_spring_animation(float *_pos, float *_vel, float _pos_trg,
 
 ### 视口滚动算法
 
-*📄 Source: [ui_core.c](../../src/ui/ui_core.c#L170-L184)*
+*📄 Source: [ui_core.c](../../src/ui/ui_core.c#L178-L192)*
 
 ```c
 void xerintosh_refresh_camera_position()
@@ -466,7 +486,7 @@ void xerintosh_refresh_camera_position()
 
 ## 选择器位置刷新（含宽度缓存）
 
-*📄 Source: [ui_core.c](../../src/ui/ui_core.c#L230-L253)*
+*📄 Source: [ui_core.c](../../src/ui/ui_core.c#L238-L261)*
 
 ```c
 void xerintosh_refresh_selector_position()
@@ -507,7 +527,7 @@ void xerintosh_refresh_selector_position()
 
 ## Widget 刷新
 
-*📄 Source: [ui_core.c](../../src/ui/ui_core.c#L260-L266)*
+*📄 Source: [ui_core.c](../../src/ui/ui_core.c#L268-L274)*
 
 ```c
 void xerintosh_ui_widget_core()
@@ -531,6 +551,7 @@ Widget（信息栏 + 弹窗）的刷新独立于主渲染。它在主循环之�
 | `xerintosh_spring_animation` | `(float*, float*, float, float, float) → void` | 二阶弹簧-阻尼器动画（位置+速度状态） |
 | `xerintosh_animate_unified` | `(float*, float*, float, float) → bool` | 统一动画调度，根据 `g_spring_anim_mode` 自动选择弹簧或缓动 |
 | `xerintosh_is_in_user_item` | `(void) → bool` | 查询是否处于 user_item 运行态 |
+| `xerintosh_set_dual_key_callback` | `(bool (*)(void)) → void` | 注册双键按住检测回调，跳过退场动画 |
 | `xerintosh_init_core` | `(void) → void` | 初始化列表、选择器、相机绑定 |
 | `xerintosh_refresh_camera_position` | `(void) → void` | 自动调整视口保证选择器可见 |
 | `xerintosh_refresh_list_item_position` | `(void) → void` | 刷新当前菜单所有子项的Y坐标插值 |

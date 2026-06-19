@@ -51,6 +51,44 @@ typedef struct kern_resource {
 
 每个资源追踪节点挂在任务的 `resource_head` 的单链表上。`ptr` 是资源的唯一标识（地址），用于后续定位和移除；`release` 回调在回收时被调用，负责真正的清理工作。为了避免 SMP 多核下并发修改同一任务的资源链表，TCB 中新增了 `resource_lock` 布尔自旋锁，`track/untrack/release_all` 都会在操作链表前后加锁/解锁。
 
+### 资源节点对象池
+
+*📄 Source: [kern_resource.c](../../src/kernel/kern_resource.c#L16-L51)*
+
+```c
+#define RES_POOL_SIZE 32  /* 预分配资源节点数 */
+
+static kern_resource_t g_res_pool[RES_POOL_SIZE];
+static uint32_t g_res_pool_bitmap;  /* 位图：bit i = 1 表示已分配 */
+
+static kern_resource_t *res_pool_alloc(void) {
+    for (int i = 0; i < RES_POOL_SIZE; i++) {
+        if (!(g_res_pool_bitmap & (1UL << i))) {
+            g_res_pool_bitmap |= (1UL << i);
+            memset(&g_res_pool[i], 0, sizeof(kern_resource_t));
+            return &g_res_pool[i];
+        }
+    }
+    return NULL;  /* 池耗尽 */
+}
+
+static void res_pool_free(kern_resource_t *r) {
+    if (r == NULL) return;
+    int idx = (int)(r - g_res_pool);
+    if (idx >= 0 && idx < RES_POOL_SIZE) {
+        g_res_pool_bitmap &= ~(1UL << idx);
+    }
+}
+
+static bool res_is_pooled(kern_resource_t *r) {
+    if (r == NULL) return false;
+    int idx = (int)(r - g_res_pool);
+    return (idx >= 0 && idx < RES_POOL_SIZE);
+}
+```
+
+为了减少资源节点自身频繁分配/释放带来的堆碎片和开销，`kern_resource` 内部维护了一个可容纳 32 个节点的静态对象池。`track()` 首先尝试从池中分配；只有在位图全满时，才回退到 `kern_kmalloc_untracked()` 从堆中分配。`untrack()` 和 `release_all()` 释放节点时，会根据节点地址判断它来自对象池还是堆，分别使用 `res_pool_free()` 或 `kern_kfree_untracked()`，避免错误释放。
+
 ### 资源链表在 TCB 中的位置
 
 *📄 Source: [kern_task.h](../../src/kernel/kern_task.h#L85-L91)*
@@ -106,22 +144,30 @@ typedef struct kern_task {
 
 ### kern_resource_track — 追踪资源
 
-*📄 Source: [kern_resource.c](../../src/kernel/kern_resource.c#L29-L52)*
+*📄 Source: [kern_resource.c](../../src/kernel/kern_resource.c#L79-L106)*
 
 ```c
 kern_err_t kern_resource_track(kern_task_t *task, void *ptr,
                         kern_resource_type_t type, void (*release)(void *))
 {
-    if (task == NULL || ptr == NULL || release == NULL) return KERN_EINVAL;
+    if (task == NULL || ptr == NULL || release == NULL) {
+        return KERN_EINVAL;
+    }
 
-    kern_resource_t *res = (kern_resource_t *)kern_kmalloc_untracked(sizeof(kern_resource_t));
-    if (res == NULL) return KERN_ENOMEM;
+    kern_resource_t *res = res_pool_alloc();
+    if (res == NULL) {
+        /* 池耗尽：回退 kern_kmalloc_untracked */
+        res = (kern_resource_t *)kern_kmalloc_untracked(sizeof(kern_resource_t));
+    }
+    if (res == NULL) {
+        return KERN_ENOMEM;
+    }
 
     res->ptr = ptr;
     res->type = type;
     res->release = release;
 
-    /* 插入到资源链表头部 — O(1)，加锁保护 SMP 并发 */
+    /* 插入到资源链表头部 */
     _resource_lock(task);
     res->next = task->resource_head;
     task->resource_head = res;
@@ -137,14 +183,20 @@ kern_err_t kern_resource_track(kern_task_t *task, void *ptr,
 函数 追踪资源(任务, 资源指针, 资源类型, 释放回调) {
     if (任务为空 或 资源指针为空 或 释放回调为空) return 参数错误
 
-    分配节点 = 分配内存(sizeof(资源追踪节点))
+    /* 对象池优先：避免频繁堆分配 */
+    分配节点 = 对象池分配()
+    if (分配节点为空) {
+        分配节点 = 无追踪堆分配(sizeof(资源追踪节点))   // 池耗尽才回退
+    }
     if (分配节点为空) return 内存不足
 
     初始化节点(资源指针, 类型, 释放回调)
 
     /* 头插法：将新节点插入链表头部 */
+    加锁(任务.resource_lock)
     节点.下一节点 = 任务.资源链表头
     任务.资源链表头 = 节点
+    解锁(任务.resource_lock)
 
     return 成功
 }
@@ -162,7 +214,7 @@ kern_err_t kern_resource_track(kern_task_t *task, void *ptr,
 
 ### kern_resource_untrack — 移除追踪
 
-*📄 Source: [kern_resource.c](../../src/kernel/kern_resource.c#L54-L83)*
+*📄 Source: [kern_resource.c](../../src/kernel/kern_resource.c#L108-L137)*
 
 从链表中查找并移除指定 `ptr` 对应的节点，释放追踪节点自身的内存。**注意**：此函数不调用资源的 `release` 回调——它只在资源已被显式释放后调用，仅负责清理追踪元数据。
 
@@ -183,7 +235,7 @@ kern_err_t kern_resource_track(kern_task_t *task, void *ptr,
             else
                 前驱.下一节点 = 当前节点.下一节点      // 删除中间节点
 
-            释放内存(当前节点)                        // 仅释放节点，不调用 release
+            释放节点(当前节点)                        // 池节点归还给对象池，堆节点用 kern_kfree_untracked
             return 成功
         }
         前驱 = 当前节点
@@ -196,7 +248,7 @@ kern_err_t kern_resource_track(kern_task_t *task, void *ptr,
 
 ### kern_resource_release_all — 全部回收
 
-*📄 Source: [kern_resource.c](../../src/kernel/kern_resource.c#L85-L108)*
+*📄 Source: [kern_resource.c](../../src/kernel/kern_resource.c#L139-L162)*
 
 ```c
 void kern_resource_release_all(kern_task_t *task)
@@ -242,8 +294,8 @@ void kern_resource_release_all(kern_task_t *task)
         if (当前节点.释放回调 不为空 且 当前节点.资源指针 不为空)
             当前节点.释放回调(当前节点.资源指针)
 
-        /* 步骤二：释放追踪节点（untracked，避免递归自追踪） */
-        kern_kfree_untracked(当前节点)
+        /* 步骤二：释放追踪节点（根据来源归还对象池或堆） */
+        释放节点(当前节点)
 
         当前节点 = 保存下一节点
     }

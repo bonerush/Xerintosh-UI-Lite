@@ -10,7 +10,7 @@
 
 ## 命令注册表
 
-*📄 Source: [kern_shell_cmds.c](../../src/kernel/kern_shell_cmds.c#L883-L926)*
+*📄 Source: [kern_shell_cmds.c](../../src/kernel/kern_shell_cmds.c#L1082-L1135)*
 
 ```c
 typedef struct {
@@ -22,7 +22,7 @@ typedef struct {
 
 命令表是一个静态数组，由 `kern_shell_lookup_cmd()` 线性遍历查找：
 
-*📄 Source: [kern_shell_cmds.c](../../src/kernel/kern_shell_cmds.c#L883-L926)*
+*📄 Source: [kern_shell_cmds.c](../../src/kernel/kern_shell_cmds.c#L1082-L1135)*
 
 ```c
 static const kern_shell_cmd_t g_builtin_cmds[] = {
@@ -68,6 +68,12 @@ static const kern_shell_cmd_t g_builtin_cmds[] = {
 
     /* ── App 配置命令 ── */
     { "dskey",     cmd_dskey,     "set/view DeepSeek API key" },
+
+    /* ── 新增 Shell 增强命令 ── */
+    { "meminfo",   cmd_meminfo,   "detailed memory info (DRAM/IRAM)" },
+    { "tree",      cmd_tree,      "recursive directory tree" },
+    { "tasks",     cmd_ps,        "list tasks (alias: ps)" },
+    { "uptime",    cmd_date,      "show uptime (alias: date)" },
 };
 ```
 
@@ -77,7 +83,7 @@ static const kern_shell_cmd_t g_builtin_cmds[] = {
 
 ### ps — 列出所有任务
 
-*📄 Source: [kern_shell_cmds.c](../../src/kernel/kern_shell_cmds.c#L111-L137)*
+*📄 Source: [kern_shell_cmds.c](../../src/kernel/kern_shell_cmds.c#L124-L197)*
 
 ```c
 static void cmd_ps(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_size)
@@ -85,9 +91,8 @@ static void cmd_ps(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_
     (void)argc; (void)argv; (void)cwd; (void)cwd_size;
 
     kern_task_t *task = kern_task_list_head();
-    char line[100];
 
-    kern_shell_println(tty, "PID  STATE     NAME          STACK");
+    kern_shell_println(tty, "PID  STATE     NAME           STACK");
 
     while (task != NULL) {
         const char *state_str;
@@ -100,12 +105,52 @@ static void cmd_ps(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_
         default:                 state_str = "?????    "; break;
         }
 
-        snprintf(line, sizeof(line), "%-4d %s %-12s %zu/%zu",
-                 (int)task->pid, state_str, task->name,
-                 kern_task_stack_usage(task), task->stack_size);
-        kern_shell_println(tty, line);
+        /* PID: 左对齐 4 字符 */
+        char pid_str[8];
+        int pid_len = snprintf(pid_str, sizeof(pid_str), "%d", (int)task->pid);
+        kern_shell_print(tty, pid_str);
+        for (int p = pid_len; p < 4; p++) kern_shell_print(tty, " ");
+        kern_shell_print(tty, " ");
 
-        task = task->next;
+        kern_shell_print(tty, state_str);
+        kern_shell_print(tty, " ");
+
+        /* 名称: 按终端显示宽度左对齐（ASCII=1列, 多字节UTF-8=2列） */
+        const char *nm = task->name[0] != '\0' ? task->name : "?";
+        kern_shell_print(tty, nm);
+        int dw = 0;  /* 显示宽度 */
+        for (const char *s = nm; *s != '\0'; ) {
+            if ((*s & 0x80) == 0)      { dw++;  s++; }
+            else if ((*s & 0xE0) == 0xC0) { dw += 2; s += 2; }
+            else                       { dw += 2; s += 3; }  /* 中/日/韩 */
+        }
+        for (int n = dw; n < 14; n++) kern_shell_print(tty, " ");
+        kern_shell_print(tty, " ");
+
+        /* 栈: 虚任务无独立栈，实任务显示 已用/总量（字节） */
+        {
+#if defined(NATIVE_TEST)
+            size_t used = kern_task_stack_usage(task);
+            size_t total = task->stack_size;
+            char stack_buf[32];
+            snprintf(stack_buf, sizeof(stack_buf), "%zu/%zu", used, total);
+            kern_shell_println(tty, stack_buf);
+#else
+            if (task->port_thread == KERN_PORT_THREAD_NULL) {
+                kern_shell_println(tty, "shrd");  /* 共享 ui 线程栈 */
+            } else {
+                size_t used = kern_task_stack_usage(task);
+                size_t total = task->stack_size * 4;  /* 字数→字节 */
+                char stack_buf[32];
+                snprintf(stack_buf, sizeof(stack_buf), "%zu/%zu", used, total);
+                kern_shell_println(tty, stack_buf);
+            }
+#endif
+        }
+
+        kern_task_t *next = task->next;  /* 先保存 next 再 yield */
+        kern_yield();
+        task = next;
     }
 }
 ```
@@ -136,7 +181,7 @@ static void cmd_ps(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_
 
 ### scope — 实时数据监测引擎
 
-*📄 Source: [kern_shell_cmds.c](../../src/kernel/kern_shell_cmds.c#L756-L780)*
+*📄 Source: [kern_shell_cmds.c](../../src/kernel/kern_shell_cmds.c#L876-L900)*
 
 ```c
 static void cmd_scope(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_size)
@@ -172,14 +217,14 @@ static void cmd_scope(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t c
 
 ## 命令历史
 
-*📄 Source: [kern_shell_cmds.c](../../src/kernel/kern_shell_cmds.c#L72-L94)*
+*📄 Source: [kern_shell_cmds.c](../../src/kernel/kern_shell_cmds.c#L87-L109)*
 
 ```c
-#define HISTORY_SIZE 16
+#define HISTORY_SIZE 8
 
-static char g_history[HISTORY_SIZE][128];
-static int  g_hist_count = 0;
-static int  g_hist_index = 0;
+static char g_history[HISTORY_SIZE][64]; /* 最多 8 条命令，各 64 字节 */
+static int  g_hist_count = 0;            /* 历史条数 */
+static int  g_hist_index = 0;            /* 写入位置（环形） */
 
 void shell_history_add(const char *cmd)
 {
@@ -188,8 +233,8 @@ void shell_history_add(const char *cmd)
     int last = (g_hist_count > 0) ? ((g_hist_count - 1) % HISTORY_SIZE) : -1;
     if (last >= 0 && strcmp(g_history[last], cmd) == 0) return;
 
-    strncpy(g_history[g_hist_index], cmd, 127);
-    g_history[g_hist_index][127] = '\0';
+    strncpy(g_history[g_hist_index], cmd, 63);
+    g_history[g_hist_index][63] = '\0';
     g_hist_index = (g_hist_index + 1) % HISTORY_SIZE;
     if (g_hist_count < HISTORY_SIZE) g_hist_count++;
 }
@@ -198,8 +243,8 @@ void shell_history_add(const char *cmd)
 #### 中文伪代码拆解
 
 ```
-常量 历史大小 = 16
-字符数组 历史[16][128]
+常量 历史大小 = 8
+字符数组 历史[8][64]
 整数 历史条数 = 0
 整数 写入位置 = 0
 
@@ -207,16 +252,16 @@ void shell_history_add(const char *cmd)
     if (命令为空) return
 
     // 去重检查
-    最后一条索引 = (历史条数 > 0) ? (历史条数 - 1) % 16 : -1
+    最后一条索引 = (历史条数 > 0) ? (历史条数 - 1) % 8 : -1
     if (最后一条存在 且 最后一条 == 当前命令) return
 
     复制命令到历史[写入位置]
-    写入位置 = (写入位置 + 1) % 16    // 环形缓冲区
-    if (历史条数 < 16) 历史条数++
+    写入位置 = (写入位置 + 1) % 8    // 环形缓冲区
+    if (历史条数 < 8) 历史条数++
 }
 ```
 
-**核心思想**：使用环形缓冲区存储最近 16 条命令，支持上下键回溯。连续输入相同命令时只保留一条，避免历史被重复命令占满。
+**核心思想**：使用环形缓冲区存储最近 8 条命令，每条最多 64 字节，支持上下键回溯。连续输入相同命令时只保留一条，避免历史被重复命令占满。
 
 ---
 

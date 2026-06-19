@@ -159,7 +159,7 @@ XEROS_NATIVE_SCHED（setjmp/longjmp）：
 
 ### 动态栈管理
 
-*📄 Source: [kern_sched.c](../../src/kernel/kern_sched.c#L234-L243)（Native 测试环境）*
+*📄 Source: [kern_sched.c](../../src/kernel/kern_sched.c#L244-L254)（Native 测试环境）*
 
 ```c
 /* tick 中每 500 tick 检查一次栈使用率（仅 Native 后端） */
@@ -175,7 +175,7 @@ if (g_current_task != NULL && g_current_task != g_idle_task
 }
 ```
 
-> **注意**：ESP32 FreeRTOS 后端中栈由 FreeRTOS 自动管理，`kern_task_stack_usage()` 通过 `uxTaskGetStackHighWaterMark()` 查询（见 [kern_port_freertos.c](../../src/kernel/kern_port_freertos.c#L279-L287)），tick 中不做主动扫描。
+> **注意**：ESP32 FreeRTOS 后端中栈由 FreeRTOS 自动管理，`kern_task_stack_usage()` 通过 `uxTaskGetStackHighWaterMark()` 查询（见 [kern_port_freertos.c](../../src/kernel/kern_port_freertos.c#L298-L305)），tick 中不做主动扫描。
 
 #### 中文伪代码拆解
 
@@ -194,11 +194,11 @@ if (g_current_task != NULL && g_current_task != g_idle_task
 
 | 层级 | 检测机制 | 触发条件 | 行为 |
 |------|----------|----------|------|
-| 1 | 金丝雀 | `canary != 0xDEADC0DE` | 输出警告日志（见 [kern_task_stack.c](../../src/kernel/kern_task_stack.c#L67-L92)） |
+| 1 | 金丝雀 | `canary != 0xDEADC0DE` | 输出警告日志（见 [kern_task_stack.c](../../src/kernel/kern_task_stack.c#L68-L93)） |
 | 2 | SP 使用率警告 | `usage > stack_size * 75%` | 输出警告日志（仅 Native tick 中检查） |
 | 3 | 上限限制 | `stack_size > KERN_STACK_MAX (8KB)` | `task_stack_init()` 截断到 8KB |
 
-> **注意**：ESP32 FreeRTOS 后端中栈由 FreeRTOS 自动管理，金丝雀和栈扫描机制不适用。`task_stack_init()` 和 `task_write_canary()` 在此后端中为空操作（见 [kern_task_stack.c](../../src/kernel/kern_task_stack.c#L48-L60)）。`kern_task_stack_usage()` 通过 `uxTaskGetStackHighWaterMark()` 查询（见 [kern_port_freertos.c](../../src/kernel/kern_port_freertos.c#L279-L287)）。
+> **注意**：ESP32 FreeRTOS 后端中栈由 FreeRTOS 自动管理，金丝雀和栈扫描机制不适用。`task_stack_init()` 和 `task_write_canary()` 在此后端中为空操作（见 [kern_task_stack.c](../../src/kernel/kern_task_stack.c#L48-L60)）。`kern_task_stack_usage()` 通过 `uxTaskGetStackHighWaterMark()` 查询（见 [kern_port_freertos.c](../../src/kernel/kern_port_freertos.c#L298-L305)）。
 
 ### 任务生命周期
 
@@ -219,7 +219,7 @@ if (g_current_task != NULL && g_current_task != g_idle_task
        ├→ 调用 kern_mpu_setup_stack_guard() 配置栈守卫（Native 后端）
        └→ 状态设为 READY
 
-   *📄 Source: [kern_task_lifecycle.c](../../src/kernel/kern_task_lifecycle.c#L159-L232)（ESP32 FreeRTOS 后端）*
+   *📄 Source: [kern_task_lifecycle.c](../../src/kernel/kern_task_lifecycle.c#L180-L267)（ESP32 FreeRTOS 后端）*
 
 2. RUNNING 阶段
    └→ pick_next_ready() 选中该任务后

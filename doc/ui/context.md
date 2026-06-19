@@ -28,7 +28,7 @@ typedef struct xerintosh_context_t
   /* 核心状态 */
   bool in_xerintosh;                  /* UI 是否处于激活状态 */
   bool anim_enabled;                  /* 动画是否启用 */
-  bool exit_requested;                /* 外部请求退出当前 user_item */
+  volatile bool exit_requested;       /* 外部请求退出当前 user_item（可能被其他任务/ISR写入） */
   uint8_t exit_animation_status;      /* 退场动画阶段状态机 */
   bool exit_animation_finished;       /* 退场动画是否已完成 */
   bool refresh_list_value;            /* 是否需要刷新列表项显示值 */
@@ -62,8 +62,10 @@ typedef struct xerintosh_context_t
 |------|------|--------|------|
 | `in_xerintosh` | `bool` | `false` | 全局 UI 激活标志，设为 false 后主循环退出 |
 | `anim_enabled` | `bool` | `true` | 全局动画开关，关闭后所有位置直接跳变 |
-| `exit_requested` | `bool` | `false` | 外部组件请求退出当前 user_item 的信号 |
+| `exit_requested` | `volatile bool` | `false` | 外部组件请求退出当前 user_item 的信号；可能被其他任务或 ISR 写入，因此加 `volatile` 防止编译器优化掉循环内的读取 |
 | `exit_animation_status` | `uint8_t` | `0` | 退场动画状态机：0=展开中, 1=到达底部, 2=回缩中 |
+
+`exit_requested` 使用 `volatile` 的原因：内核 Shell 的 `kill` 命令或其他任务可能在 UI 主循环之外设置该标志。不加 `volatile` 时，编译器可能认为主循环内读取的值不变而只做一次读取，导致退出请求无法被及时消费。
 | `exit_animation_finished` | `bool` | `true` | 退场动画是否已完成 |
 | `refresh_list_value` | `bool` | `true` | 标记需要重新调用 switch/slider 的 init_function |
 | `dirty` | `bool` | `true` | 脏矩形标志，标记 UI 需重绘（`xerintosh_invalidate()` 设置） |
@@ -78,7 +80,7 @@ typedef struct xerintosh_context_t
 
 ### 单例模式
 
-*📄 Source: [ui_context.c](../../src/ui/ui_context.c#L27-L47)*
+*📄 Source: [ui_context.c](../../src/ui/ui_context.c#L28-L48)*
 
 ```c
 static xerintosh_context_t g_ui_ctx = {
@@ -117,7 +119,7 @@ xerintosh_context_t *xerintosh_get_context(void)
 
 ### 初始化函数
 
-*📄 Source: [ui_context.c](../../src/ui/ui_context.c#L54-L84)*
+*📄 Source: [ui_context.c](../../src/ui/ui_context.c#L55-L89)*
 
 ```c
 void xerintosh_context_init(void)
@@ -261,9 +263,42 @@ if (g_xerintosh_exit_anim_prev_screen_h != SCREEN_HEIGHT)
 
 ## 性能缓存
 
+### Phase 2.3 运行时弹簧参数
+
+*📄 Source: [ui_types.h](../../src/ui/ui_types.h#L38-L44) / [ui_context.c](../../src/ui/ui_context.c#L14-L17)*
+
+Phase 2.3 将选择器弹簧参数从编译期常量改为运行时可调全局变量，支持在 设置 > 弹簧硬度 / 反弹力度 中实时调整动画手感：
+
+```c
+extern float g_spring_stiffness_selector;  /* 弹簧刚度，默认 0.20f */
+extern float g_spring_damping_selector;    /* 弹簧阻尼，默认 0.35f */
+extern bool  g_spring_anim_mode;           /* true=动弹弹力, false=普通一阶 */
+
+#define SPRING_STIFFNESS_SELECTOR_DEFAULT  0.20f
+#define SPRING_DAMPING_SELECTOR_DEFAULT    0.35f
+```
+
+*📄 Source: [ui_context.c](../../src/ui/ui_context.c#L14-L17)*
+
+```c
+float g_spring_stiffness_selector = SPRING_STIFFNESS_SELECTOR_DEFAULT;
+float g_spring_damping_selector   = SPRING_DAMPING_SELECTOR_DEFAULT;
+bool  g_spring_anim_mode          = true;  /* 默认动弹（弹簧动画） */
+```
+
+| 参数 | 默认值 | 作用 |
+|---|---|---|
+| `g_spring_stiffness_selector` | 0.20f | 刚度越大，选择器响应越快、振荡频率越高 |
+| `g_spring_damping_selector` | 0.35f | 阻尼越大，能量衰减越快、弹跳越少 |
+| `g_spring_anim_mode` | `true` | 全局动画模式开关；`false` 时选择器回退到一阶缓动 |
+
+`xerintosh_refresh_selector_position()` 根据 `g_spring_anim_mode` 自动选择 `xerintosh_spring_animation()` 或 `xerintosh_animation()`。
+
+---
+
 ### 选择器宽度缓存
 
-*📄 Source: [ui_dispatch.c](../../src/ui/ui_dispatch.c#L190-L198)*
+*📄 Source: [ui_dispatch.c](../../src/ui/ui_dispatch.c#L191-L199)*
 
 ```c
 if (g_xerintosh_cached_selector_content != g_xerintosh_selector.selected_item->content) {

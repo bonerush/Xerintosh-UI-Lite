@@ -252,8 +252,15 @@ flowchart LR
 - **[应用初始化](app/app-init.md)** — 入口封装，委托菜单构建、输入处理与管理器初始化
 - **[菜单构建](app/app-menu.md)** — Xerintosh UI 菜单树构造
 - **[输入处理](app/app-input.md)** — 按键映射与各状态机调度
+- **[全局状态](app/app-state.md)** — 跨模块全局状态（`g_wifi_on`、`g_bt_on`）
 - **[UI 公共服务](app/ui-service.md)** — user_item 生命周期公共辅助
 - **[设置管理](app/settings.md)** — 亮度/动画/方向/波特率配置与存储
+- **[开机画面](app/boot.md)** — Macintosh 128K 风格开机动画
+- **[关于页面](app/about.md)** — 版本/Logo/开发者信息
+- **[存储模块](app/storage.md)** — NVS 持久化存储封装
+- **[WiFi 管理器](app/wifi.md)** — WiFi 状态机（扫描/连接/密码输入）
+- **[蓝牙管理器](app/bluetooth.md)** — Classic BT SPP 生命周期与 UART 服务
+- **[串口输入](app/serial-input.md)** — 串口 CLI 输入（WiFi/蓝牙密码）
 - **[任务管理器](app/taskmgr.md)** — 进程列表查看与安全终止（动画行列表 + 横屏 3 行）
 - **[串口监视器](app/serial-monitor.md)** — 串口数据监视（入场滑入动画 + 按钮平滑过渡）
 - **[UI 任务](app/ui-task.md)** — 内核任务包装的 UI 主循环
@@ -272,6 +279,7 @@ flowchart LR
 - **[屏幕尺寸](hal/screen.md)** — 运行时屏幕尺寸查询，解耦布局模块与显示驱动
 - **[输入系统](hal/input.md)** — 按键状态机、消抖、事件派发
 - **[系统时钟](hal/system.md)** — `millis()` 封装、`std::chrono` 桌面回退
+- **[屏幕布局](hal/layout.md)** — 与屏幕尺寸无关的定位宏（边距/行高/对齐）
 
 ### UI 核心层
 🛈 原 `draw-driver` 模块已在 UI 重构中移除，其 `oled_*` → `hal_*` 桥接功能已分散到各调用方
@@ -279,6 +287,10 @@ flowchart LR
 - **[核心引擎](ui/core.md)** — 动画系统、生命周期管理、主循环调度、渲染分支
 - **[类型派发表](ui/dispatch.md)** — 函数指针数组 O(1) 类型路由（替代内联 switch）
 - **[全局上下文](ui/context.md)** — 单例状态容器、向后兼容宏、退场动画状态迁移
+- **[选择器](ui/selector.md)** — 高亮框、导航、安全移出、锚定重建
+- **[相机/视口](ui/camera.md)** — 视图滚动偏移、选择器可见性保证
+- **[控件数据模型](ui/widget.md)** — 信息栏与弹窗状态、生命周期 API
+- **[基础类型](ui/types.md)** — 枚举、回调类型、动画常量、布局常量
 - **[绘制管线](ui/drawer.md)** — 列表外观绘制、选择器渲染、弹窗与信息栏、退场动画、图标
 - **[行列表动画工具](ui/ui-anim-row.md)** — 可复用行列表动画（入场滑入 + 高亮平滑过渡）
 

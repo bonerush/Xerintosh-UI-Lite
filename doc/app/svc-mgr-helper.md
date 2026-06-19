@@ -10,7 +10,7 @@
 
 ## 核心 API
 
-*📄 Source: [svc_mgr_helper.h](../../src/app/svc_mgr_helper.h#L24-L50)*
+*📄 Source: [svc_mgr_helper.h](../../src/app/svc_mgr_helper.h#L20-L35)*
 
 ```c
 void svc_mgr_bt_request_enable(bool *lazy_inited);

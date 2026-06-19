@@ -14,7 +14,7 @@
 | 2.2 | HAL 层重构 | **DONE** | coder | `02-refactor/hal.md` |
 | 2.3 | UI 核心层 | **DONE** | coder | `02-refactor/ui.md` |
 | 2.4 | App 层重构 | **DONE** | coder | `02-refactor/app.md` |
-| 2.5 | 文档体系 | **PENDING** | coder | `02-refactor/docs.md` |
+| 2.5 | 文档体系 | **DONE** | coder | `02-refactor/docs.md` |
 | 3 | 集成验证 | **PENDING** | verification | `03-integration.md` |
 | 4 | 归档 | **PENDING** | coder | `04-archive.md` |
 

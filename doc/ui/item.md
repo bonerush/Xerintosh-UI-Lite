@@ -14,7 +14,7 @@
 
 ### 类型层次（继承体系）
 
-*📄 Source: [ui_types.h](../../src/ui/ui_types.h#L71-L78)*
+*📄 Source: [ui_types.h](../../src/ui/ui_types.h#L71-L79)*
 
 ```c
 typedef enum
@@ -24,6 +24,7 @@ typedef enum
   slider_item,  // 滑条项
   user_item,    // 用户自定义页面
   button_item,  // 按钮项
+  item_type_count,  // 哨兵：类型数量，用于边界检查
 } xerintosh_list_item_type_t;
 
 // 基类
@@ -49,7 +50,7 @@ typedef struct xerintosh_list_item_t
 
 所有派生类都把 `xerintosh_list_item_t` 作为**第一个成员**：
 
-*📄 Source: [ui_item_core.h](../../src/ui/ui_item_core.h#L66-L123)*
+*📄 Source: [ui_item_core.h](../../src/ui/ui_item_core.h#L66-L128)*
 
 ```c
 typedef struct xerintosh_switch_item_t
@@ -59,6 +60,12 @@ typedef struct xerintosh_switch_item_t
   xerintosh_cb_t init_function;      // 进入该项时调用的初始化函数
   xerintosh_cb_t exit_function;      // 值改变后调用的退出函数
 } xerintosh_switch_item_t;
+
+typedef struct xerintosh_button_item_t
+{
+  xerintosh_list_item_t base_item;   // 必须放在第一个位置
+  xerintosh_cb_t exit_function;      // 按下时触发的回调函数
+} xerintosh_button_item_t;
 
 typedef struct xerintosh_slider_item_t
 {
@@ -97,7 +104,7 @@ typedef struct xerintosh_user_item_t
     层级深度
     当前Y坐标, 目标Y坐标     // 动画插值用
     子项数量
-    子项指针数组[最大10个]
+    子项指针数组[最大12个]
     父项指针
     用户自定义数据指针
     滚动开始时间
@@ -222,7 +229,7 @@ bool xerintosh_push_item_to_list(xerintosh_list_item_t *_parent, xerintosh_list_
 函数 挂载子项到父项(父项, 子项) {
     // 边界检查
     if (父项为空 或 子项为空) return 失败
-    if (父项子项数 >= 最大子项数10) return 失败
+    if (父项子项数 >= 最大子项数12) return 失败
     if (父项层级 >= 最大层级10) return 失败
 
     子项.层级 = 父项.层级 + 1
@@ -341,7 +348,7 @@ void xerintosh_selector_jump_to_selected_item()
 
 ### 回退操作
 
-*📄 Source: [ui_item_selector.c](../../src/ui/ui_item_selector.c#L154-L183)*
+*📄 Source: [ui_item_selector.c](../../src/ui/ui_item_selector.c#L154-L186)*
 
 ```c
 void xerintosh_selector_exit_current_item()
@@ -416,7 +423,7 @@ static void recalc_child_y_positions(xerintosh_list_item_t *_parent)
 
 `xerintosh_is_item_visible()` 原是 `ui_draw_list.c` 中的 `static` 函数。重构中将其提取为公开 API，方便绘制代码和测试代码复用。
 
-*📄 Source: [ui_types.h](../../src/ui/ui_types.h#L109-L115)*
+*📄 Source: [ui_types.h](../../src/ui/ui_types.h#L106-L112)*
 
 ```c
 /**
@@ -475,14 +482,42 @@ typedef struct xerintosh_camera_t
 
 相机不是硬件相机，而是**视口偏移量**。当选择器移出屏幕可视区域时，相机会自动调整 `y_camera` 将整个列表向上/向下滚动，确保选择器始终可见。
 
+### 选择器安全辅助函数
+
+*📄 Source: [ui_selector.h](../../src/ui/ui_selector.h#L68-L90)*
+
+`ui_selector.h` 还暴露三个与安全相关的公共 helper，实现位于 `ui_item_selector.c`：
+
+```c
+/* user_item 通用退出检测：长按 B 时自动退出当前 user_item */
+extern bool ui_user_item_try_exit(hal_event_t event_b);
+
+/* 若选择器位于即将被移除的子树内，将其移回父项 */
+extern void ui_selector_safety_move_out(xerintosh_list_item_t *subtree_root,
+                                        xerintosh_list_item_t *fallback_parent);
+
+/* 若选择器位于子树内，将其提升到子树根节点 */
+extern void ui_selector_rebuild_anchor(xerintosh_list_item_t *subtree_root,
+                                       xerintosh_list_item_t *parent);
+```
+
+| 函数 | 说明 |
+|---|---|
+| `ui_user_item_try_exit` | 在 `user_item` 的 `loop()` 中调用，检测按钮 B 长按事件并触发退出。返回 `true` 表示事件已被消费。 |
+| `ui_selector_safety_move_out` | 在 `xerintosh_remove_item_from_list()` 和清空子树前调用，防止选择器指向被释放的内存。 |
+| `ui_selector_rebuild_anchor` | 在动态重建子菜单前调用，将选择器临时提升到子树根节点，避免后续 `push_item` 时索引混乱。 |
+
+详见 [选择器文档](selector.md)。
+
 ---
 
 ## 与其他组件的关系
 
 - **ui_core**：消费选择器和相机的坐标，每帧调用 `xerintosh_animation()` 进行插值
 - **ui_drawer**：读取 `xerintosh_selector.selected_item->parent->child_list_item[]` 绘制列表
+- **ui_selector**：导航、绑定、安全移出/锚定逻辑详见 [selector.md](selector.md)
 - **main.cpp**：调用 `xerintosh_new_*_item()` 和 `xerintosh_push_item_to_list()` 构建菜单树
 
 ---
 
-> **See Also:** [核心引擎](core.md) | [绘制管线](drawer.md) | [输入系统](../hal/input.md)
+> **See Also:** [核心引擎](core.md) | [绘制管线](drawer.md) | [选择器](selector.md) | [输入系统](../hal/input.md)

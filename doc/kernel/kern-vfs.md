@@ -121,7 +121,7 @@ v2 较旧版的关键变化：
 
 ### open() 完整流程
 
-*📄 Source: [kern_vfs.c](../../src/kernel/kern_vfs.c#L410-L464)*
+*📄 Source: [kern_vfs.c](../../src/kernel/kern_vfs.c#L448-L503)*
 
 ```
 kern_open("/dev/fb0", KERN_O_WRONLY):
@@ -189,7 +189,7 @@ kern_open("/dev/fb0", KERN_O_WRONLY):
 
 ### read() / write() 流程
 
-*📄 Source: [kern_vfs.c](../../src/kernel/kern_vfs.c#L486-L516)*
+*📄 Source: [kern_vfs.c](../../src/kernel/kern_vfs.c#L524-L554)*
 
 ```
 kern_read(fd, buf, len):
@@ -208,7 +208,7 @@ kern_write(fd, buf, len):
 
 ### close() 与资源回收（v2 新增）
 
-*📄 Source: [kern_vfs.c](../../src/kernel/kern_vfs.c#L467-L484)*
+*📄 Source: [kern_vfs.c](../../src/kernel/kern_vfs.c#L505-L522)*
 
 ```
 kern_close(fd):
@@ -224,7 +224,7 @@ kern_close(fd):
 
 ### inode 引用计数
 
-*📄 Source: [kern_vfs.c](../../src/kernel/kern_vfs.c#L33-L62)*
+*📄 Source: [kern_vfs.c](../../src/kernel/kern_vfs.c#L78-L98)*
 
 v2 为 `kern_inode_t` 新增 `ref_count` 字段，用于跟踪还有多少个 dentry 和打开 FD 指向该 inode：
 
@@ -265,7 +265,7 @@ uint32_t kern_vfs_inode_ref_count(const kern_inode_t *inode);
 
 ## 路径解析（Path Walker）
 
-*📄 Source: [kern_vfs.c](../../src/kernel/kern_vfs.c#L40-L106)*
+*📄 Source: [kern_vfs.c](../../src/kernel/kern_vfs.c#L116-L182)*
 
 路径解析由内部函数 `path_walk()` 实现，核心算法：
 

@@ -592,7 +592,7 @@ void build_main_menu(void)
 }
 ```
 
-*📄 Source: [app_menu.c](../../src/app/app_menu.c#L32-L103)*
+*📄 Source: [app_menu.c](../src/app/app_menu.c#L32-L103)*
 
 ### 典型 App 内部结构
 
@@ -624,7 +624,7 @@ flowchart TB
     LOOP -.-> SVC
 ```
 
-*📄 Source: [ui_task.c](../../src/app/ui_task.c), [ui_service.c](../../src/app/ui_service.c)*
+*📄 Source: [ui_task.c](../src/app/ui_task.c), [ui_service.c](../src/app/ui_service.c)*
 
 ---
 

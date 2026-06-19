@@ -223,13 +223,18 @@ const uint8_t _points[][2] = {
 
 ## 与主循环的交互
 
-退场动画在 `ui_core.c` 的主循环末尾调用：
+退场动画在 `ui_core.c` 的主循环末尾调用，但双键模式下会被跳过：
+
+*📄 Source: [ui_core.c](../../src/ui/ui_core.c#L344-L368)*
 
 ```c
 /* ui_core.c */
-if (!g_xerintosh_exit_animation_finished)
+if (!g_xerintosh_exit_animation_finished &&
+    (s_dual_key_active_cb == NULL || !s_dual_key_active_cb()))
   xerintosh_draw_exit_animation();
 ```
+
+`xerintosh_set_dual_key_callback()` 允许 App 层注册一个回调，返回 `true` 时表示当前处于双键按住模式（如 power_key_popup 的关机确认）。此时 UI 核心跳过退场遮罩动画，让 App 自行处理视觉反馈。
 
 在动画播放期间，框架输入被禁止（`app_input_process()` 中检查 `g_xerintosh_exit_animation_finished`），避免用户误操作。
 
