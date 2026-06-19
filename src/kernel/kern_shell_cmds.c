@@ -53,6 +53,19 @@ void kern_shell_println(kern_fd_t tty, const char *msg)
 
 /* ═══ 路径解析 ═══ */
 
+/**
+ * @brief 根据属性名构造 sysfs 文件路径
+ * @details log_level 位于 /sys/kernel/，其余属性位于 /sys/ 根目录。
+ */
+static void kern_shell_sysfs_attr_path(const char *attr, char *out, size_t out_size)
+{
+    if (attr != NULL && strcmp(attr, "log_level") == 0) {
+        snprintf(out, out_size, "/sys/kernel/%s", attr ? attr : "");
+    } else {
+        snprintf(out, out_size, "/sys/%s", attr ? attr : "");
+    }
+}
+
 static const char *resolve_path(const char *cwd, const char *arg,
                                char *out, size_t out_size)
 {
@@ -741,22 +754,22 @@ static void cmd_param(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t c
     if (argc < 2) { kern_shell_println(tty, "Usage: param <list|get|set|save|load> [args]"); return; }
 
     if (strcmp(argv[1], "list") == 0) {
-        /* 遍历已知 sysfs 属性 */
+        /* 遍历已知 sysfs 属性；log_level 在 /sys/kernel/，其余在 /sys/ */
         const char *known[] = {
-            "/sys/kernel/brightness", "/sys/kernel/rotation",
-            "/sys/kernel/anim_speed", "/sys/kernel/anim_enabled",
-            "/sys/kernel/log_level", NULL
+            "brightness", "rotation", "anim_speed", "anim_enabled", "log_level", NULL
         };
         for (int i = 0; known[i] != NULL; i++) {
-            cmd_cat(tty, 2, (char *[]){ "cat", (char *)known[i], NULL }, cwd, cwd_size);
+            char path[KERN_PATH_MAX];
+            kern_shell_sysfs_attr_path(known[i], path, sizeof(path));
+            cmd_cat(tty, 2, (char *[]){ "cat", path, NULL }, cwd, cwd_size);
         }
     } else if (strcmp(argv[1], "get") == 0 && argc >= 3) {
         char path[KERN_PATH_MAX];
-        snprintf(path, sizeof(path), "/sys/kernel/%s", argv[2]);
+        kern_shell_sysfs_attr_path(argv[2], path, sizeof(path));
         cmd_cat(tty, 2, (char *[]){ "cat", path, NULL }, cwd, cwd_size);
     } else if (strcmp(argv[1], "set") == 0 && argc >= 4) {
         char path[KERN_PATH_MAX];
-        snprintf(path, sizeof(path), "/sys/kernel/%s", argv[2]);
+        kern_shell_sysfs_attr_path(argv[2], path, sizeof(path));
         kern_fd_t fd = kern_open(path, KERN_O_WRONLY);
         if (fd < 0) { kern_shell_println(tty, "param set: cannot open parameter"); return; }
         kern_write(fd, argv[3], strlen(argv[3]));
