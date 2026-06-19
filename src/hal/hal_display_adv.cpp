@@ -49,7 +49,7 @@ void hal_draw_xbitmap(int16_t x, int16_t y, int16_t w, int16_t h, const uint8_t*
     for (int16_t row = 0; row < h; row++) {
         for (int16_t col = 0; col < w; col++) {
             int16_t byteIndex = (col + row * w) / 8;
-            int16_t bitIndex = col % 8;
+            int16_t bitIndex = 7 - (col % 8);  /* XBM 标准：MSB 在前（P1-6） */
             if (bitmap[byteIndex] & (1 << bitIndex)) {
                 hal_draw_pixel(x + col, y + row, COLOR_FG);
             }
