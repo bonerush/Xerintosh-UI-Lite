@@ -9,7 +9,8 @@
 | 阶段 | 名称 | 状态 | 负责 Agent | 产物文件 |
 |------|------|------|------------|----------|
 | 0 | 基线建立 | **DONE** | coder | `00-baseline-shell-wifi-kernel.md` |
-| 1 | 扫描诊断 | **RUNNING** | explore | `01-diagnosis-shell-wifi-kernel.md` |
+| 1 | 扫描诊断 | **DONE** | explore | `01-diagnosis-shell-wifi-kernel.md` |
+| 2.1 | 内核层重构 | **RUNNING** | coder | `02-refactor/kernel.md` |
 | 2.1 | 内核层重构 | **PENDING** | coder | `02-refactor/kernel.md` |
 | 2.2 | HAL 层重构 | **PENDING** | coder | `02-refactor/hal.md` |
 | 2.3 | UI 核心层 | **PENDING** | coder | `02-refactor/ui.md` |
