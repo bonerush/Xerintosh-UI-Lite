@@ -146,3 +146,35 @@ TEST_F(KernelGpiofsTest, InvalidPinFileDoesNotExist)
     kern_fd_t fd = kern_open("/sys/gpio/99", KERN_O_RDONLY);
     EXPECT_LT(fd, 0);
 }
+
+/* ═══ 背光引脚仅通过 HAL 控制（K21）═══ */
+
+TEST_F(KernelGpiofsTest, BacklightPinIsReadOnly)
+{
+    ASSERT_EQ(kern_gpiofs_init(), KERN_OK);
+
+    /* GPIO26 是 LCD 背光，应由 HAL /sys/brightness 控制，gpiofs 不可写 */
+    kern_fd_t fd = kern_open("/sys/gpio/26", KERN_O_WRONLY);
+    ASSERT_GE(fd, 0);
+
+    ssize_t n = kern_write(fd, "1", 1);
+    EXPECT_LT(n, 0);
+
+    kern_close(fd);
+}
+
+TEST_F(KernelGpiofsTest, BacklightPinMarkedHalOnly)
+{
+    ASSERT_EQ(kern_gpiofs_init(), KERN_OK);
+
+    kern_fd_t fd = kern_open("/sys/gpio/26", KERN_O_RDONLY);
+    ASSERT_GE(fd, 0);
+
+    char buf[128];
+    memset(buf, 0, sizeof(buf));
+    ssize_t n = kern_read(fd, buf, sizeof(buf) - 1);
+    EXPECT_GT(n, 0);
+    EXPECT_NE(strstr(buf, "HAL only"), nullptr);
+
+    kern_close(fd);
+}
