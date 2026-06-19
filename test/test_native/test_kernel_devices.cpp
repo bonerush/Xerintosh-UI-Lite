@@ -431,7 +431,8 @@ TEST_F(KernelDevicesTest, TtyS0ConcurrentReadWrite)
     const int total = 256;
     char write_buf[total];
     for (int i = 0; i < total; i++) {
-        write_buf[i] = (char)(i % 251);
+        /* 使用可打印字符且避开 \n/\r，保证 native 回环不会触发 \n→\r\n 转换 */
+        write_buf[i] = (char)(' ' + (i % 95));
     }
 
     ssize_t written = kern_write(fd, write_buf, total);
