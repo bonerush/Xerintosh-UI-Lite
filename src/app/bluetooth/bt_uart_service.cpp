@@ -196,6 +196,7 @@ uint16_t bt_uart_test_consume_tx(uint16_t len)
 #include <BluetoothSerial.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/queue.h>
+#include <freertos/semphr.h>
 #include "esp_bt.h"
 #include "esp_bt_main.h"
 
@@ -209,6 +210,9 @@ static bool g_prev_connected = false;
 /* RX 数据跨任务传递队列（主任务写入，UI 任务消费） */
 #define BT_RX_QUEUE_SIZE 512
 static QueueHandle_t g_rx_queue = NULL;
+
+/* poll 完成信号量：deinit 等待当前正在执行的 bt_uart_poll() 结束 */
+static SemaphoreHandle_t g_poll_done_sem = NULL;
 
 bool bt_uart_service_init(void)
 {
@@ -227,6 +231,14 @@ bool bt_uart_service_init(void)
     /* 创建 RX 数据跨任务队列 */
     if (!g_rx_queue) {
         g_rx_queue = xQueueCreate(BT_RX_QUEUE_SIZE, sizeof(uint8_t));
+    }
+
+    /* 创建 poll 完成信号量，初始可用 */
+    if (!g_poll_done_sem) {
+        g_poll_done_sem = xSemaphoreCreateBinary();
+    }
+    if (g_poll_done_sem) {
+        xSemaphoreGive(g_poll_done_sem);
     }
 
     Serial.printf("[BT-INIT] begin() start free_heap=%u ms=%lu\n",
@@ -271,15 +283,14 @@ void bt_uart_service_deinit(void)
 {
     if (!g_initialized) return;
 
-    /* ═══ 线程安全：先关标记，阻止 bt_uart_poll() 继续使用队列 ═══
-     * 这不能完全消除竞态（poll 可能已过了检查点），但将窗口缩小到
-     * 单次 poll 调用内。xQueueSend(timeout=0) 不会阻塞，即使队列
-     * 正在被删除也只会返回失败，不会触发断言。 */
+    /* ═══ 线程安全：先关标记，阻止 bt_uart_poll() 继续使用队列 ═══ */
     g_initialized = false;
-    /* 等待最多 100ms，让正在执行的 bt_uart_poll() 完成（单次 poll 上限
-     * 256 字节 + delay(0) yield，正常应在数毫秒内返回）。超出后继续
-     * 清理 —— xQueueSend(timeout=0) 在队列被删除时安全返回失败。 */
-    delay(100);
+
+    /* 等待当前正在执行的 bt_uart_poll() 给出完成信号，超时 100ms。
+     * poll 与 deinit 均在 loop() 任务中，此处阻塞不会导致死锁。 */
+    if (g_poll_done_sem) {
+        xSemaphoreTake(g_poll_done_sem, pdMS_TO_TICKS(100));
+    }
 
     g_bt_serial.end();
 
@@ -344,7 +355,17 @@ uint16_t bt_uart_get_rx_buffer_usage(void)
 
 void bt_uart_poll(void)
 {
-    if (!g_initialized) return;
+    if (!g_initialized) {
+        if (g_poll_done_sem) {
+            xSemaphoreGive(g_poll_done_sem);
+        }
+        return;
+    }
+
+    /* 标记 poll 进入临界区；deinit 会等待此信号量 */
+    if (g_poll_done_sem) {
+        xSemaphoreTake(g_poll_done_sem, 0);
+    }
 
     /* ── 检查连接状态 ── */
     bool now_connected = g_bt_serial.connected();
@@ -400,6 +421,11 @@ void bt_uart_poll(void)
         if ((rx_count & 0x1F) == 0) {
             delay(0);  /* taskYIELD — 给 FreeRTOS idle 喂狗机会 */
         }
+    }
+
+    /* 标记 poll 离开临界区 */
+    if (g_poll_done_sem) {
+        xSemaphoreGive(g_poll_done_sem);
     }
 }
 
