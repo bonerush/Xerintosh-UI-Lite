@@ -80,9 +80,11 @@ static void xerintosh_draw_list_appearance(int16_t selected_index, int16_t child
 
   /* 滚动条 */
   static uint8_t _cached_child_num = 0;
+  static int16_t _cached_screen_h = -1;
   static float _cached_length = 0;
-  if (_cached_child_num != child_num) {
+  if (_cached_child_num != child_num || _cached_screen_h != SCREEN_HEIGHT) {
     _cached_child_num = child_num;
+    _cached_screen_h = SCREEN_HEIGHT;
     _cached_length = ceilf((SCREEN_HEIGHT - 10.0f) / (float)_cached_child_num);
   }
   float _length_each_part = _cached_length;
@@ -149,6 +151,10 @@ static void xerintosh_draw_list_item()
       /* switch/slider 额外占用右侧控件空间 */
       if (_has_right_control)
         _avail_width -= 11;
+
+      /* 防御性钳位：可用宽度不得为负，避免传给 HAL 裁剪函数行为未定义 */
+      if (_avail_width < 1)
+        _avail_width = 1;
 
       bool _is_selected = (_item == g_xerintosh_selector.selected_item);
       float _scroll_x = 0.0f;

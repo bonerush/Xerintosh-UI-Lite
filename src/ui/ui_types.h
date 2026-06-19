@@ -75,6 +75,7 @@ typedef enum
   slider_item,
   user_item,
   button_item,
+  item_type_count,  /* 哨兵：类型数量，用于边界检查 */
 } xerintosh_list_item_type_t;
 
 /**
@@ -102,10 +103,6 @@ typedef enum {
 #define LIST_INFO_BAR_HEIGHT 3  /* 信息栏高度补偿 */
 #define LIST_FONT_TOP_MARGIN 6  /* 字体顶部边距 */
 
-#ifdef __cplusplus
-}
-#endif
-
 /**
  * @brief  判断列表项 Y 坐标是否在屏幕可视区域内
  * @param  _y_item 项的 y 坐标（屏幕坐标）
@@ -113,5 +110,9 @@ typedef enum {
  * @return false 不可见（超出上下边界 + 2px 容差）
  */
 extern bool xerintosh_is_item_visible(int16_t _y_item);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* UI_TYPES_H */

@@ -49,6 +49,25 @@ extern void xerintosh_push_info_bar(const char *_content, const uint16_t _span);
 #define POP_UP_OFFSET 8
 #define POP_UP_WRAP_LINES 3
 
+#include "hal/hal_display.h"
+
+/**
+ * @brief 根据换行数计算弹窗高度（共享实现，避免 ui_item_popup.c / ui_draw_widgets.c 重复）
+ * @param wrap_line_count 内容行数
+ * @return 弹窗总高度（含 padding）
+ */
+static inline int16_t popup_compute_height(uint8_t wrap_line_count)
+{
+  int16_t fh = hal_get_font_height();
+  uint8_t n = wrap_line_count;
+  if (n < 1) n = 1;
+  if (n > POP_UP_WRAP_LINES) n = POP_UP_WRAP_LINES;
+  int16_t content_h = (int16_t)(n * fh + (n - 1) * 2);
+  int16_t pop_h = content_h + 8;
+  if (pop_h < 24) pop_h = 24;
+  return pop_h;
+}
+
 /**
  * @brief 中部弹窗结构体
  */
