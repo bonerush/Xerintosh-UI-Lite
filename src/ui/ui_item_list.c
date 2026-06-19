@@ -98,6 +98,9 @@ bool xerintosh_remove_item_from_list(xerintosh_list_item_t *_parent, xerintosh_l
   /* 重新计算剩余子项的目标坐标 */
   recalc_child_y_positions(_parent);
 
+  /* 若选择器位于即将移除的子树内，先安全移出，避免悬垂指针 */
+  ui_selector_safety_move_out(_child, _parent);
+
   /* 递归释放子节点及其后代 */
   xerintosh_destroy_item_tree(_child);
   return true;

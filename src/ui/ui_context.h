@@ -30,7 +30,7 @@ typedef struct xerintosh_context_t
   /* 核心状态 */
   bool in_xerintosh;                  /* UI 是否处于激活状态 */
   bool anim_enabled;                  /* 动画是否启用 */
-  bool exit_requested;                /* 外部请求退出当前 user_item */
+  volatile bool exit_requested;       /* 外部请求退出当前 user_item（可能被其他任务/ISR写入） */
   uint8_t exit_animation_status;      /* 退场动画阶段状态机 */
   bool exit_animation_finished;       /* 退场动画是否已完成 */
   bool refresh_list_value;            /* 是否需要刷新列表项显示值 */
