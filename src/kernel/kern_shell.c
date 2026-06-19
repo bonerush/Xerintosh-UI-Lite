@@ -16,6 +16,7 @@
 #include "kern_shell_parser.h"
 #include "kern_shell_cmds.h"
 #include "kern_shell_cmds_internal.h"
+#include "kern_shell_complete.h"
 
 #include <string.h>
 #include <stdio.h>
@@ -57,77 +58,126 @@ static char vt100_parse_arrow(const char *seq, int len)
 /* ═══ 补全辅助函数 ═══ */
 
 /**
+ * @brief 判断字符是否为 shell token 分隔符
+ * @note  与 kern_shell_tokenize 保持一致：空格、tab、\r、\n
+ */
+static bool shell_is_token_delim(char c)
+{
+    return c == ' ' || c == '\t' || c == '\r' || c == '\n';
+}
+
+/**
  * @brief 获取当前 token 在 line 中的起始位置
  * @param line 输入行缓冲区
  * @param pos  当前光标/输入位置
  * @return 当前 token 第一个字符的索引
  */
-static size_t shell_token_start(const char *line, size_t pos)
+size_t shell_token_start(const char *line, size_t pos)
 {
-    while (pos > 0 && line[pos - 1] != ' ') {
+    while (pos > 0 && !shell_is_token_delim(line[pos - 1])) {
         pos--;
     }
     return pos;
 }
 
 /**
- * @brief 从 prefix 中拆分出父目录路径和基础名前缀
- * @param cwd      当前工作目录
- * @param prefix   用户已输入的路径前缀（可能是相对或绝对路径）
- * @param dir_out  输出：父目录绝对路径
- * @param dir_size dir_out 缓冲区大小
- * @param base_out 输出：基础名前缀指针（指向 prefix 内部或静态缓冲区）
- * @return true 成功拆分
+ * @brief 将 cwd 与相对子路径拼接为绝对路径
+ * @param cwd      当前工作目录（必须以 '/' 开头）
+ * @param rel_dir  相对目录部分（不含前导 '/'，可能为空）
+ * @param dir_out  输出缓冲区
+ * @param dir_size 输出缓冲区大小
+ * @return true 成功
+ * @note  当 cwd 为 "/" 时避免生成 "//xxx"。
  */
-static bool shell_parent_path(const char *cwd, const char *prefix,
-                              char *dir_out, size_t dir_size,
-                              const char **base_out)
+static bool shell_join_cwd(const char *cwd, const char *rel_dir,
+                           char *dir_out, size_t dir_size)
 {
+    bool cwd_is_root = (cwd[0] == '/' && cwd[1] == '\0');
+    const char *sep = cwd_is_root ? "" : "/";
+
+    int n;
+    if (rel_dir == NULL || rel_dir[0] == '\0') {
+        n = snprintf(dir_out, dir_size, "%s", cwd);
+    } else {
+        n = snprintf(dir_out, dir_size, "%s%s%s", cwd, sep, rel_dir);
+    }
+
+    return (n >= 0 && (size_t)n < dir_size);
+}
+
+bool shell_parent_path(const char *cwd, const char *prefix,
+                       char *dir_out, size_t dir_size,
+                       const char **base_out)
+{
+    if (cwd == NULL || cwd[0] != '/') {
+        return false;
+    }
     if (prefix == NULL || prefix[0] == '\0') {
-        snprintf(dir_out, dir_size, "%s", cwd);
+        if (!shell_join_cwd(cwd, "", dir_out, dir_size)) {
+            return false;
+        }
         *base_out = "";
         return true;
     }
 
+    const char *last_slash = strrchr(prefix, '/');
+    if (last_slash == NULL) {
+        /* 纯相对文件名：基于 cwd */
+        if (!shell_join_cwd(cwd, "", dir_out, dir_size)) {
+            return false;
+        }
+        if (strlen(prefix) > KERN_NAME_MAX) {
+            return false;
+        }
+        *base_out = prefix;
+        return true;
+    }
+
+    /* prefix 中包含 '/'：拆出目录部分 */
+    size_t dir_len = (size_t)(last_slash - prefix);
+
     if (prefix[0] == '/') {
-        /* 绝对路径：拆分出目录部分和基础名 */
-        const char *last_slash = strrchr(prefix, '/');
-        if (last_slash == prefix) {
-            snprintf(dir_out, dir_size, "/");
-            *base_out = prefix + 1;
+        /* 绝对路径：目录部分就是 prefix[0..dir_len) */
+        if (dir_len == 0) {
+            /* prefix 以 '/' 开头且 slash 在首位 -> 根目录 */
+            if (!shell_join_cwd("/", "", dir_out, dir_size)) {
+                return false;
+            }
         } else {
-            size_t dir_len = (size_t)(last_slash - prefix);
             if (dir_len >= dir_size) return false;
             memcpy(dir_out, prefix, dir_len);
             dir_out[dir_len] = '\0';
-            *base_out = last_slash + 1;
         }
     } else {
-        /* 相对路径：基于 cwd */
-        const char *last_slash = strrchr(prefix, '/');
-        if (last_slash == NULL) {
-            snprintf(dir_out, dir_size, "%s", cwd);
-            *base_out = prefix;
-        } else {
-            size_t rel_dir_len = (size_t)(last_slash - prefix);
-            int n = snprintf(dir_out, dir_size, "%s/", cwd);
-            if (n < 0 || (size_t)n >= dir_size) return false;
-            size_t used = (size_t)n;
-            if (used + rel_dir_len >= dir_size) return false;
-            memcpy(dir_out + used, prefix, rel_dir_len);
-            dir_out[used + rel_dir_len] = '\0';
-            *base_out = last_slash + 1;
+        /* 相对路径：cwd + prefix 中的目录部分 */
+        char rel_dir[KERN_PATH_MAX];
+        if (dir_len >= sizeof(rel_dir)) return false;
+        memcpy(rel_dir, prefix, dir_len);
+        rel_dir[dir_len] = '\0';
+        if (!shell_join_cwd(cwd, rel_dir, dir_out, dir_size)) {
+            return false;
         }
     }
+
+    *base_out = last_slash + 1;
+
+    /* 基础名前缀过长：超过 VFS 允许的文件名最大长度 */
+    if (strlen(*base_out) > KERN_NAME_MAX) {
+        return false;
+    }
+
     return true;
 }
 
 /**
  * @brief 判断 dentry 是否为目录
+ * @note  VFS 自动创建的中间目录可能没有 inode，但只要有子节点就视为目录。
  */
 static bool shell_is_dir(const kern_dentry_t *d)
 {
-    return d != NULL && d->inode != NULL && d->inode->type == KERN_FILE_DIR;
+    if (d == NULL) return false;
+    if (d->inode != NULL && d->inode->type == KERN_FILE_DIR) return true;
+    return d->child_count > 0;
 }
 
 /**
@@ -139,11 +189,10 @@ static bool shell_is_dir(const kern_dentry_t *d)
  * @param cwd        当前工作目录
  * @note 单个匹配时自动补全；目录补全后追加 '/'，普通文件追加 ' '
  */
-static void shell_complete_path(kern_fd_t tty, char *line, size_t *pos,
-                                size_t tok_start, const char *cwd)
+void shell_complete_path(kern_fd_t tty, char *line, size_t *pos,
+                         size_t tok_start, const char *cwd)
 {
     const char *prefix = line + tok_start;
-    size_t prefix_len = *pos - tok_start;
 
     char dir_path[KERN_PATH_MAX];
     const char *base = "";
@@ -176,37 +225,36 @@ static void shell_complete_path(kern_fd_t tty, char *line, size_t *pos,
         /* 单个匹配：补全 */
         const char *match = matches[0];
         const char *suffix = match + base_len;
-        bool is_dir = false;
 
         /* 找到匹配的 dentry 以判断类型 */
         kern_dentry_t *matched_d = NULL;
         for (uint8_t i = 0; i < dir->child_count; i++) {
-            if (dir->children[i] != NULL && strcmp(dir->children[i]->name, match) == 0) {
+            if (dir->children[i] != NULL
+                && strcmp(dir->children[i]->name, match) == 0) {
                 matched_d = dir->children[i];
                 break;
             }
         }
-        is_dir = shell_is_dir(matched_d);
+        bool is_dir = shell_is_dir(matched_d);
 
         size_t suffix_len = strlen(suffix);
-        size_t append_len = suffix_len + (is_dir ? 1 : 0);
-        if (*pos + append_len >= SHELL_BUF_SIZE - 1) {
-            /* 空间不足：静默截断 */
-            append_len = SHELL_BUF_SIZE - 1 - *pos;
-            is_dir = false;  /* 截断后不再追加分隔符 */
+        size_t space_left = SHELL_BUF_SIZE - 1 - *pos;
+        if (suffix_len > space_left) {
+            /* 空间不足以放下补全后缀：静默放弃 */
+            return;
         }
 
-        if (append_len > 0) {
-            memcpy(line + *pos, suffix, append_len);
-            *pos += append_len;
-            kern_shell_print(tty, suffix);
-            if (append_len > suffix_len) {
-                kern_shell_print(tty, "/");
-            }
-        }
+        /* 复制补全后缀 */
+        memcpy(line + *pos, suffix, suffix_len);
+        *pos += suffix_len;
+        kern_shell_print(tty, suffix);
 
-        /* 目录且成功追加 '/'，或普通文件，都补一个空格 */
-        if (*pos < SHELL_BUF_SIZE - 1) {
+        /* 目录且空间足够时追加 '/'；普通文件追加空格 */
+        if (is_dir && *pos < SHELL_BUF_SIZE - 1) {
+            line[*pos] = '/';
+            (*pos)++;
+            kern_shell_print(tty, "/");
+        } else if (!is_dir && *pos < SHELL_BUF_SIZE - 1) {
             line[*pos] = ' ';
             (*pos)++;
             kern_shell_print(tty, " ");
@@ -215,7 +263,31 @@ static void shell_complete_path(kern_fd_t tty, char *line, size_t *pos,
         return;
     }
 
-    /* 多个匹配：列出候选 */
+    /* 多个匹配：先计算最长公共前缀 */
+    size_t common_len = strlen(matches[0]);
+    for (int i = 1; i < match_count; i++) {
+        size_t j = 0;
+        while (j < common_len && matches[i][j] != '\0'
+               && matches[0][j] == matches[i][j]) {
+            j++;
+        }
+        common_len = j;
+    }
+
+    /* 公共前缀长于用户已输入部分：先补全公共前缀 */
+    if (common_len > base_len) {
+        const char *common_suffix = matches[0] + base_len;
+        size_t suffix_len = common_len - base_len;
+        if (*pos + suffix_len < SHELL_BUF_SIZE - 1) {
+            memcpy(line + *pos, common_suffix, suffix_len);
+            *pos += suffix_len;
+            line[*pos] = '\0';
+            kern_shell_print(tty, common_suffix);
+        }
+        return;
+    }
+
+    /* 无公共前缀可补：列出候选 */
     kern_shell_print(tty, "\r\n");
     for (int i = 0; i < match_count; i++) {
         kern_shell_print(tty, "  ");
@@ -235,8 +307,8 @@ static void shell_complete_path(kern_fd_t tty, char *line, size_t *pos,
  * @param line      输入行缓冲区
  * @param pos       当前输入位置（传入/传出）
  */
-static void shell_complete_command(kern_fd_t tty, char *line, size_t *pos,
-                                    const char *cwd)
+void shell_complete_command(kern_fd_t tty, char *line, size_t *pos,
+                            const char *cwd)
 {
     if (*pos == 0) return;
 
