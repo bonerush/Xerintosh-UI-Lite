@@ -187,7 +187,7 @@ TEST_F(ShellCompleteTest, CompleteSingleFile)
 
     char line[128] = "cat /dev/shell_test1/fb";
     size_t pos = strlen(line);
-    shell_complete_path(tty, line, &pos, 4, "/");
+    shell_complete_path(tty, line, &pos, 4, "/", false);
 
     EXPECT_STREQ(line, "cat /dev/shell_test1/fb0 ");
     EXPECT_EQ(pos, strlen("cat /dev/shell_test1/fb0 "));
@@ -203,7 +203,7 @@ TEST_F(ShellCompleteTest, CompleteSingleDir)
 
     char line[128] = "ls /dev/shell_test2/su";
     size_t pos = strlen(line);
-    shell_complete_path(tty, line, &pos, 3, "/");
+    shell_complete_path(tty, line, &pos, 3, "/", false);
 
     /* 目录补全后追加 '/'，但不追加空格 */
     EXPECT_STREQ(line, "ls /dev/shell_test2/sub/");
@@ -222,7 +222,7 @@ TEST_F(ShellCompleteTest, CompleteCommonPrefix)
 
     char line[128] = "cat /dev/shell_test3/";
     size_t pos = strlen(line);
-    shell_complete_path(tty, line, &pos, 4, "/");
+    shell_complete_path(tty, line, &pos, 4, "/", false);
 
     /* 多个匹配但无公共前缀，应列出候选而不修改 line */
     EXPECT_STREQ(line, "cat /dev/shell_test3/");
@@ -241,7 +241,7 @@ TEST_F(ShellCompleteTest, CompleteCommonPrefixPartial)
 
     char line[128] = "cat /dev/shell_test4/f";
     size_t pos = strlen(line);
-    shell_complete_path(tty, line, &pos, 4, "/");
+    shell_complete_path(tty, line, &pos, 4, "/", false);
 
     /* fb0 和 fb1 的公共前缀是 "fb"，应补全为 /dev/shell_test4/fb */
     EXPECT_STREQ(line, "cat /dev/shell_test4/fb");
@@ -258,7 +258,7 @@ TEST_F(ShellCompleteTest, CompleteRelativeFromRoot)
 
     char line[128] = "cat dev/shell_test5/f";
     size_t pos = strlen(line);
-    shell_complete_path(tty, line, &pos, 4, "/");
+    shell_complete_path(tty, line, &pos, 4, "/", false);
 
     EXPECT_STREQ(line, "cat dev/shell_test5/fb0 ");
     EXPECT_EQ(pos, strlen("cat dev/shell_test5/fb0 "));
@@ -274,11 +274,131 @@ TEST_F(ShellCompleteTest, CompleteNoMatch)
 
     char line[128] = "cat /dev/shell_test6/xyz";
     size_t pos = strlen(line);
-    shell_complete_path(tty, line, &pos, 4, "/");
+    shell_complete_path(tty, line, &pos, 4, "/", false);
 
     /* 无匹配：line 和 pos 应保持不变 */
     EXPECT_STREQ(line, "cat /dev/shell_test6/xyz");
     EXPECT_EQ(pos, strlen("cat /dev/shell_test6/xyz"));
+
+    kern_close(tty);
+}
+
+/* ═══ . 与 .. 路径归一化测试 ═══
+ *
+ * VFS 本身不支持 . 与 .. 分量，shell 补全前应先归一化再解析。
+ */
+
+TEST_F(ShellCompleteTest, CompleteDotSlash)
+{
+    ASSERT_EQ(kern_dentry_register("/dev/shell_test7/fb0", make_inode(KERN_FILE_CHRDEV)), KERN_OK);
+    kern_fd_t tty = open_null_fd();
+    ASSERT_GE(tty, 0);
+
+    char line[128] = "cat ./f";
+    size_t pos = strlen(line);
+    shell_complete_path(tty, line, &pos, 4, "/dev/shell_test7", false);
+
+    EXPECT_STREQ(line, "cat ./fb0 ");
+    EXPECT_EQ(pos, strlen("cat ./fb0 "));
+
+    kern_close(tty);
+}
+
+TEST_F(ShellCompleteTest, CompleteDotDotSlash)
+{
+    ASSERT_EQ(kern_dentry_register("/dev/shell_test8/fb0", make_inode(KERN_FILE_CHRDEV)), KERN_OK);
+    /* 创建 /dev/shell_test8/sub 作为当前目录 */
+    ASSERT_EQ(kern_dentry_register("/dev/shell_test8/sub/dir", make_inode(KERN_FILE_DIR)), KERN_OK);
+    kern_fd_t tty = open_null_fd();
+    ASSERT_GE(tty, 0);
+
+    char line[128] = "cat ../f";
+    size_t pos = strlen(line);
+    shell_complete_path(tty, line, &pos, 4, "/dev/shell_test8/sub", false);
+
+    EXPECT_STREQ(line, "cat ../fb0 ");
+    EXPECT_EQ(pos, strlen("cat ../fb0 "));
+
+    kern_close(tty);
+}
+
+/* ═══ dir_only 测试（cd 命令路径补全） ═══ */
+
+TEST_F(ShellCompleteTest, DirOnlySkipsFiles)
+{
+    /* /dev/shell_dir1 下同时有文件和目录，dir_only 应只匹配目录 */
+    ASSERT_EQ(kern_dentry_register("/dev/shell_dir1/fb0", make_inode(KERN_FILE_CHRDEV)), KERN_OK);
+    ASSERT_EQ(kern_dentry_register("/dev/shell_dir1/sub_dir", make_inode(KERN_FILE_DIR)), KERN_OK);
+    kern_fd_t tty = open_null_fd();
+    ASSERT_GE(tty, 0);
+
+    char line[128] = "cd /dev/shell_dir1/";
+    size_t pos = strlen(line);
+    shell_complete_path(tty, line, &pos, 3, "/", true);
+
+    /* dir_only=true：只列出目录 sub_dir，不列出文件 fb0 */
+    EXPECT_STREQ(line, "cd /dev/shell_dir1/");
+    EXPECT_EQ(pos, strlen("cd /dev/shell_dir1/"));
+
+    kern_close(tty);
+}
+
+TEST_F(ShellCompleteTest, DirOnlySingleMatchAppendsSlash)
+{
+    /* 只有一个目录匹配时，应补全并追加 '/' */
+    ASSERT_EQ(kern_dentry_register("/dev/shell_dir2/only_dir", make_inode(KERN_FILE_DIR)), KERN_OK);
+    /* 同名前缀的文件不应干扰 */
+    ASSERT_EQ(kern_dentry_register("/dev/shell_dir2/only_file", make_inode(KERN_FILE_CHRDEV)), KERN_OK);
+    kern_fd_t tty = open_null_fd();
+    ASSERT_GE(tty, 0);
+
+    char line[128] = "cd /dev/shell_dir2/only_d";
+    size_t pos = strlen(line);
+    shell_complete_path(tty, line, &pos, 3, "/", true);
+
+    /* dir_only=true：只匹配 only_dir，追加 '/' */
+    EXPECT_STREQ(line, "cd /dev/shell_dir2/only_dir/");
+    EXPECT_EQ(pos, strlen("cd /dev/shell_dir2/only_dir/"));
+
+    kern_close(tty);
+}
+
+TEST_F(ShellCompleteTest, DirOnlyFalseShowsFiles)
+{
+    /* 确认 dir_only=false 时仍然显示文件（回归验证） */
+    ASSERT_EQ(kern_dentry_register("/dev/shell_dir3/fb0", make_inode(KERN_FILE_CHRDEV)), KERN_OK);
+    ASSERT_EQ(kern_dentry_register("/dev/shell_dir3/sub", make_inode(KERN_FILE_DIR)), KERN_OK);
+    kern_fd_t tty = open_null_fd();
+    ASSERT_GE(tty, 0);
+
+    char line[128] = "cat /dev/shell_dir3/fb";
+    size_t pos = strlen(line);
+    shell_complete_path(tty, line, &pos, 4, "/", false);
+
+    /* dir_only=false：正常匹配文件 fb0 */
+    EXPECT_STREQ(line, "cat /dev/shell_dir3/fb0 ");
+    EXPECT_EQ(pos, strlen("cat /dev/shell_dir3/fb0 "));
+
+    kern_close(tty);
+}
+
+/* ═══ null 终止安全性测试 ═══ */
+
+TEST_F(ShellCompleteTest, NullTermSafetyAfterBackspace)
+{
+    ASSERT_EQ(kern_dentry_register("/dev/shell_nt1/fb0", make_inode(KERN_FILE_CHRDEV)), KERN_OK);
+    kern_fd_t tty = open_null_fd();
+    ASSERT_GE(tty, 0);
+
+    /* 模拟退格场景：line 缓冲区残留旧数据，pos < 实际内容末尾 */
+    char line[128] = "cat /dev/shell_nt1/fb0 extra garbage";
+    size_t pos = strlen("cat /dev/shell_nt1/f");  /* 光标在 'f' 之后 */
+
+    shell_complete_path(tty, line, &pos, 4, "/", false);
+
+    /* null 终止守卫应确保只看到 "cat /dev/shell_nt1/f"，匹配 fb0 */
+    EXPECT_STREQ(line, "cat /dev/shell_nt1/fb0 ");
+    EXPECT_EQ(pos, strlen("cat /dev/shell_nt1/fb0 "));
 
     kern_close(tty);
 }

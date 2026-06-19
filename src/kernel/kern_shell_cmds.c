@@ -64,7 +64,9 @@ static const char *resolve_path(const char *cwd, const char *arg,
         snprintf(out, out_size, "%s", arg);
         return out;
     }
-    int written = snprintf(out, out_size, "%s/%s", cwd, arg);
+    bool cwd_is_root = (cwd[0] == '/' && cwd[1] == '\0');
+    int written = snprintf(out, out_size, "%s%s%s",
+                           cwd, cwd_is_root ? "" : "/", arg);
     if (written < 0 || (size_t)written >= out_size) return NULL;
     return out;
 }

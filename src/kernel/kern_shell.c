@@ -38,6 +38,21 @@ static void kern_shell_print_prompt(kern_fd_t tty, const char *cwd)
     kern_shell_print(tty, prompt);  /* kern_shell_print 由 kern_shell_cmds.c 提供 */
 }
 
+/**
+ * @brief 清空当前输入行并重新绘制提示符 + 当前输入内容
+ * @note  使用 ANSI \x1b[J 清除从光标到屏幕末尾的内容，避免退格跨行时
+ *        擦除命令提示符。适用于退格、历史浏览等需要重绘行的场景。
+ */
+static void shell_redraw_line(kern_fd_t tty, const char *cwd,
+                              const char *line, size_t pos)
+{
+    kern_shell_print(tty, "\r\x1b[J");
+    kern_shell_print_prompt(tty, cwd);
+    if (pos > 0) {
+        kern_write(tty, line, pos);
+    }
+}
+
 /* ═══ VT100 转义序列解析 ═══ */
 
 /**
@@ -181,6 +196,55 @@ static bool shell_is_dir(const kern_dentry_t *d)
 }
 
 /**
+ * @brief 规范化路径中的 . 和 .. 分量
+ * @param path  待规范化的绝对路径（原地修改）
+ * @param size  缓冲区大小
+ * @return true 成功
+ * @note  仅处理连续的 /、. 和 ..；VFS 本身不支持 . 与 ..，shell 补全前先归一化。
+ */
+static bool shell_normalize_path(char *path, size_t size)
+{
+    if (path == NULL || path[0] != '/') return false;
+
+    char *out = path;
+    char *p = path;
+    *out++ = '/';
+    p++;
+
+    while (*p != '\0') {
+        while (*p == '/') p++;
+        if (*p == '\0') break;
+
+        const char *start = p;
+        while (*p != '/' && *p != '\0') p++;
+        size_t len = (size_t)(p - start);
+
+        if (len == 1 && start[0] == '.') {
+            /* 跳过 . 分量 */
+        } else if (len == 2 && start[0] == '.' && start[1] == '.') {
+            /* 回退一级：移除末尾的 / 和上一级分量 */
+            if (out > path + 1) {
+                out--;
+                while (out > path && *(out - 1) != '/') out--;
+            }
+        } else {
+            if ((size_t)(out - path) + len + 1 >= size) return false;
+            memcpy(out, start, len);
+            out += len;
+            if (*p == '/') {
+                *out++ = '/';
+            }
+        }
+    }
+
+    if (out == path) {
+        *out++ = '/';
+    }
+    *out = '\0';
+    return true;
+}
+
+/**
  * @brief 对路径参数进行 Tab 补全
  * @param tty        终端 FD
  * @param line       输入行缓冲区
@@ -190,8 +254,12 @@ static bool shell_is_dir(const kern_dentry_t *d)
  * @note 单个匹配时自动补全；目录补全后追加 '/'，普通文件追加 ' '
  */
 void shell_complete_path(kern_fd_t tty, char *line, size_t *pos,
-                         size_t tok_start, const char *cwd)
+                         size_t tok_start, const char *cwd, bool dir_only)
 {
+    /* 防御性 null 终止：确保 prefix 的 strlen 正确，
+     * 避免退格/VT100 序列消耗后 pos 与脏数据之间的 gap 被读入 */
+    line[*pos] = '\0';
+
     const char *prefix = line + tok_start;
 
     char dir_path[KERN_PATH_MAX];
@@ -202,7 +270,14 @@ void shell_complete_path(kern_fd_t tty, char *line, size_t *pos,
 
     kern_dentry_t *dir = kern_path_resolve(dir_path);
     if (dir == NULL) {
-        return;
+        /* VFS 不支持 . 与 ..，尝试归一化后再解析 */
+        if (!shell_normalize_path(dir_path, sizeof(dir_path))) {
+            return;
+        }
+        dir = kern_path_resolve(dir_path);
+        if (dir == NULL) {
+            return;
+        }
     }
 
     const char *matches[16];
@@ -212,6 +287,7 @@ void shell_complete_path(kern_fd_t tty, char *line, size_t *pos,
     for (uint8_t i = 0; i < dir->child_count && match_count < 16; i++) {
         kern_dentry_t *child = dir->children[i];
         if (child == NULL) continue;
+        if (dir_only && !shell_is_dir(child)) continue;
         if (strncmp(child->name, base, base_len) == 0) {
             matches[match_count++] = child->name;
         }
@@ -249,12 +325,13 @@ void shell_complete_path(kern_fd_t tty, char *line, size_t *pos,
         *pos += suffix_len;
         kern_shell_print(tty, suffix);
 
-        /* 目录且空间足够时追加 '/'；普通文件追加空格 */
-        if (is_dir && *pos < SHELL_BUF_SIZE - 1) {
+        /* 目录且空间足够时追加 '/'；普通文件追加空格；
+         * dir_only 模式下匹配已过滤为目录，直接追加 '/' */
+        if ((is_dir || dir_only) && *pos < SHELL_BUF_SIZE - 1) {
             line[*pos] = '/';
             (*pos)++;
             kern_shell_print(tty, "/");
-        } else if (!is_dir && *pos < SHELL_BUF_SIZE - 1) {
+        } else if (!is_dir && !dir_only && *pos < SHELL_BUF_SIZE - 1) {
             line[*pos] = ' ';
             (*pos)++;
             kern_shell_print(tty, " ");
@@ -342,6 +419,31 @@ void shell_complete_command(kern_fd_t tty, char *line, size_t *pos,
             line[*pos] = '\0';
         }
     } else if (match_count > 1) {
+        /* 先计算最长公共前缀 */
+        size_t common_len = strlen(matches[0]);
+        for (int i = 1; i < match_count; i++) {
+            size_t j = 0;
+            while (j < common_len && matches[i][j] != '\0'
+                   && matches[0][j] == matches[i][j]) {
+                j++;
+            }
+            common_len = j;
+        }
+
+        /* 公共前缀长于已输入：补全公共前缀 */
+        if (common_len > *pos) {
+            const char *common_suffix = matches[0] + *pos;
+            size_t suffix_len = common_len - *pos;
+            if (*pos + suffix_len < SHELL_BUF_SIZE - 1) {
+                memcpy(line + *pos, common_suffix, suffix_len);
+                *pos += suffix_len;
+                line[*pos] = '\0';
+                kern_shell_print(tty, common_suffix);
+            }
+            return;
+        }
+
+        /* 无更多公共前缀：列出候选 */
         kern_shell_print(tty, "\r\n");
         for (int i = 0; i < match_count; i++) {
             kern_shell_print(tty, "  ");
@@ -418,10 +520,8 @@ static void shell_task_main(void *arg)
                     continue;
                 }
 
-                /* 清屏当前行 */
-                for (size_t i = 0; i < pos; i++) {
-                    kern_shell_print(tty, "\b \b");
-                }
+                /* 清屏当前行并重新绘制提示符 */
+                shell_redraw_line(tty, cwd, line, 0);
                 /* 写入历史命令 */
                 strncpy(line, entry, SHELL_BUF_SIZE - 1);
                 line[SHELL_BUF_SIZE - 1] = '\0';
@@ -433,7 +533,7 @@ static void shell_task_main(void *arg)
                     hist_browse--;
                     const char *entry = shell_history_get(hist_browse);
                     if (entry != NULL) {
-                        for (size_t i = 0; i < pos; i++) kern_shell_print(tty, "\b \b");
+                        shell_redraw_line(tty, cwd, line, 0);
                         strncpy(line, entry, SHELL_BUF_SIZE - 1);
                         line[SHELL_BUF_SIZE - 1] = '\0';
                         kern_shell_print(tty, line);
@@ -441,7 +541,7 @@ static void shell_task_main(void *arg)
                     }
                 } else {
                     /* 回到最新：清空行 */
-                    for (size_t i = 0; i < pos; i++) kern_shell_print(tty, "\b \b");
+                    shell_redraw_line(tty, cwd, line, 0);
                     line[0] = '\0';
                     pos = 0;
                     hist_browse = -1;
@@ -450,29 +550,31 @@ static void shell_task_main(void *arg)
             continue;
         }
 
-        /* ═══ 退格处理（拦截在回显之前，发送擦除序列）═══ */
+        /* ═══ 退格处理（拦截在回显之前，重绘当前行）═══ */
         if (ch == '\b' || ch == 0x7F) {
             if (pos > 0) {
                 pos--;
-                /* \b 移到被删字符，空格覆盖，\b 回到空格前。
-                 * 行首时 pos==0，不再发送 \b，防止某些终端回退到提示符。 */
-                kern_shell_print(tty, "\b \b");
                 hist_browse = -1;
+                /* 重绘整行：避免 \b 跨物理行时擦除命令提示符 */
+                shell_redraw_line(tty, cwd, line, pos);
             } else {
-                /* 已到行首：响铃提示，绝对不要发送 \b */
+                /* 已到行首：响铃提示 */
                 kern_shell_print(tty, "\x07");
             }
             continue;
         }
 
         /* ═══ Tab 自动补全 ═══
-         * 第一个 token 补全命令名；后续 token 补全 VFS 路径。 */
+         * 第一个 token 补全命令名；后续 token 补全 VFS 路径。
+         * cd 命令仅补全目录（dir_only = true）。 */
         if (ch == '\t') {
+            line[pos] = '\0';  /* 防御性 null 终止 */
             size_t tok_start = shell_token_start(line, pos);
             if (tok_start == 0) {
                 shell_complete_command(tty, line, &pos, cwd);
             } else {
-                shell_complete_path(tty, line, &pos, tok_start, cwd);
+                bool dir_only = (strncmp(line, "cd ", 3) == 0);
+                shell_complete_path(tty, line, &pos, tok_start, cwd, dir_only);
             }
             hist_browse = -1;
             continue;

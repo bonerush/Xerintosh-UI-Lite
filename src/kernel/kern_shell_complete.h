@@ -52,11 +52,12 @@ bool shell_parent_path(const char *cwd, const char *prefix,
  * @param pos        当前输入位置（传入/传出）
  * @param tok_start  当前 token 起始位置
  * @param cwd        当前工作目录
+ * @param dir_only   true 时仅匹配目录条目（用于 cd 命令）
  * @note  单个匹配时自动补全；目录补全后追加 '/'，普通文件追加 ' '。
  *        多个匹配时先尝试补全最长公共前缀；无公共前缀则列出候选。
  */
 void shell_complete_path(kern_fd_t tty, char *line, size_t *pos,
-                         size_t tok_start, const char *cwd);
+                         size_t tok_start, const char *cwd, bool dir_only);
 
 /**
  * @brief 对命令名进行 Tab 补全
