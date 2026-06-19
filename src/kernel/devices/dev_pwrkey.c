@@ -47,6 +47,9 @@ static kern_err_t pwrkey_read(kern_device_t *dev, void *buf, size_t len, size_t 
         ev.event     = (uint8_t)e;
         ev.hold_ms   = hal_power_key_get_hold_duration_ms();
         ev.timestamp = hal_get_ticks();
+    } else {
+        /* 无事件：返回 0 通知调用者无可用数据，避免 cat 等循环读取永不退出 */
+        return 0;
     }
 
     memcpy(buf, &ev, DEV_PWRKEY_EVENT_SIZE);

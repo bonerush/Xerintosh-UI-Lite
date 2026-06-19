@@ -74,6 +74,10 @@ static kern_err_t dev_input0_read(kern_device_t *dev, void *buf, size_t len, siz
         ev = g_event_queue[g_event_tail];
         g_event_tail = (uint8_t)((g_event_tail + 1) % INPUT0_EVENT_QUEUE_SIZE);
         g_event_count--;
+    } else {
+        /* 队列为空：返回 0 通知调用者无可用事件，避免 cat 等循环读取
+         * 永不退出（此前返回零值结构体会导致无限循环）。 */
+        return 0;
     }
 
     memcpy(buf, &ev, DEV_INPUT_EVENT_SIZE);

@@ -306,9 +306,29 @@ static void cmd_cat(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd
 
     char buf[128];
     ssize_t n;
+    int iter = 0;
+    size_t total_read = 0;
     while ((n = kern_read(fd, buf, sizeof(buf))) > 0) {
         kern_write(tty, buf, (size_t)n);
+        total_read += (size_t)n;
         kern_yield();  /* 防止大文件读取触发看门狗 */
+
+        /* 防御性上限：防止异常设备返回恒正数据导致无限循环。
+         * 128B × 1024 = 128KB，远超任何正常 procfs/sysfs/touch 文件。 */
+        if (++iter >= 1024) {
+            kern_shell_print(tty, "\r\ncat: max read limit reached\r\n");
+            break;
+        }
+    }
+
+    /* 首读即返回 0 或错误：告知用户文件存在但无可读数据
+     * （对 /dev/input0、/dev/pwrkey 等事件流设备，无事件时 read 返回 0 是正常行为） */
+    if (total_read == 0 && n < 0) {
+        char err[48];
+        snprintf(err, sizeof(err), "cat: read error (err=%d)\r\n", (int)n);
+        kern_shell_print(tty, err);
+    } else if (total_read == 0) {
+        kern_shell_println(tty, "(no data)");
     }
     kern_close(fd);
 }
