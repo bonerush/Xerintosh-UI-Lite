@@ -558,3 +558,49 @@ TEST_F(KernelDevicesTest, WriteOnlyDeviceRejectsRead)
 
     kern_close(fd);
 }
+
+/* ═══ /dev/ttyS0 \n→\r\n 转换与回环一致性（K31+K32）═══ */
+
+TEST_F(KernelDevicesTest, TtyS0WriteConvertsLfToCrLf)
+{
+    kern_devices_init();
+    kern_fd_t fd = kern_open("/dev/ttyS0", KERN_O_RDWR);
+    ASSERT_GE(fd, 0);
+
+    const char *msg = "a\nb";
+    ssize_t n = kern_write(fd, msg, strlen(msg));
+    EXPECT_EQ(n, (ssize_t)strlen(msg));
+
+    char buf[16];
+    memset(buf, 0, sizeof(buf));
+    ssize_t m = kern_read(fd, buf, sizeof(buf));
+    EXPECT_EQ(m, 4);
+    EXPECT_EQ(buf[0], 'a');
+    EXPECT_EQ(buf[1], '\r');
+    EXPECT_EQ(buf[2], '\n');
+    EXPECT_EQ(buf[3], 'b');
+
+    kern_close(fd);
+}
+
+TEST_F(KernelDevicesTest, TtyS0WriteKeepsExistingCrLf)
+{
+    kern_devices_init();
+    kern_fd_t fd = kern_open("/dev/ttyS0", KERN_O_RDWR);
+    ASSERT_GE(fd, 0);
+
+    const char *msg = "a\r\nb";
+    ssize_t n = kern_write(fd, msg, strlen(msg));
+    EXPECT_EQ(n, (ssize_t)strlen(msg));
+
+    char buf[16];
+    memset(buf, 0, sizeof(buf));
+    ssize_t m = kern_read(fd, buf, sizeof(buf));
+    EXPECT_EQ(m, 4);
+    EXPECT_EQ(buf[0], 'a');
+    EXPECT_EQ(buf[1], '\r');
+    EXPECT_EQ(buf[2], '\n');
+    EXPECT_EQ(buf[3], 'b');
+
+    kern_close(fd);
+}

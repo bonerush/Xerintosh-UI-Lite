@@ -107,19 +107,22 @@ static kern_err_t dev_ttyS0_write(kern_device_t *dev, const void *buf, size_t le
         /* ── 终端换行转换：裸 \n → \r\n ──
          * 串口终端需要 CR+LF 组合才能正确换行。如果检测到孤立的
          * \n（前一个字符不是 \r），先在环形缓冲区中插入 \r。
-         * 缓冲区已满时跳过转换（避免死锁，最多丢失一个字符）。 */
-        if (ch == '\n' && last != '\r' && g_tx_count + 1 < TTY_TX_BUF_SIZE) {
-            g_tx_buf[g_tx_head] = '\r';
-            g_tx_head = (uint16_t)((g_tx_head + 1) % TTY_TX_BUF_SIZE);
-            #ifndef NATIVE_TEST
-            __atomic_fetch_add(&g_tx_count, 1, __ATOMIC_RELAXED);
-            #else
-            g_tx_count++;
-            #endif
-            last = '\r';
+         * 缓冲区只剩一个槽位时优先保留原始 \n，跳过 \r 转换（K31）。 */
+        if (ch == '\n' && last != '\r') {
+            if (g_tx_count + 1 < TTY_TX_BUF_SIZE) {
+                g_tx_buf[g_tx_head] = '\r';
+                g_tx_head = (uint16_t)((g_tx_head + 1) % TTY_TX_BUF_SIZE);
+                #ifndef NATIVE_TEST
+                __atomic_fetch_add(&g_tx_count, 1, __ATOMIC_RELAXED);
+                #else
+                g_tx_count++;
+                #endif
+                last = '\r';
+            }
+            /* 空间不足时跳过 \r，保证 \n 不丢失 */
         }
 
-        /* 写入当前字节（如果上一步插入了 \r 可能已填满缓冲区） */
+        /* 写入当前字节 */
         if (g_tx_count >= TTY_TX_BUF_SIZE) break;
 
         g_tx_buf[g_tx_head] = ch;
@@ -134,13 +137,26 @@ static kern_err_t dev_ttyS0_write(kern_device_t *dev, const void *buf, size_t le
     }
 
     #ifdef NATIVE_TEST
-    /* native 环境没有硬件串口，将写入数据复制到 rx buffer 供 loopback 测试 */
+    /* native 环境没有硬件串口，将转换后的数据复制到 RX buffer 供 loopback 测试（K32）。
+     * 这里直接对原始输入 in[0..total) 再做一次 \n→\r\n 转换，避免依赖 TX buffer
+     * 的累积状态，保持与硬件路径一致的回环语义。 */
+    char last_rx = 0;
     size_t rx_total = 0;
     while (rx_total < total && g_rx_count < TTY_RX_BUF_SIZE) {
-        g_rx_buf[g_rx_head] = in[rx_total];
-        g_rx_head = (uint16_t)((g_rx_head + 1) % TTY_RX_BUF_SIZE);
-        g_rx_count++;
-        rx_total++;
+        char ch = in[rx_total];
+        if (ch == '\n' && last_rx != '\r' && g_rx_count + 1 < TTY_RX_BUF_SIZE) {
+            g_rx_buf[g_rx_head] = '\r';
+            g_rx_head = (uint16_t)((g_rx_head + 1) % TTY_RX_BUF_SIZE);
+            g_rx_count++;
+            last_rx = '\r';
+        }
+        if (g_rx_count < TTY_RX_BUF_SIZE) {
+            g_rx_buf[g_rx_head] = ch;
+            g_rx_head = (uint16_t)((g_rx_head + 1) % TTY_RX_BUF_SIZE);
+            g_rx_count++;
+            last_rx = ch;
+            rx_total++;
+        }
     }
     #endif
 
