@@ -41,6 +41,17 @@ typedef enum {
     BT_MGR_CONNECTED,  /* 有客户端连接 */
 } bt_mgr_state_t;
 
+/**
+ * @brief 蓝牙启用结果错误码
+ */
+typedef enum {
+    BT_MGR_OK = 0,
+    BT_MGR_ERR_HEAP,
+    BT_MGR_ERR_BLUEDROID,
+    BT_MGR_ERR_RADIO,
+    BT_MGR_ERR_UNKNOWN,
+} bt_mgr_err_t;
+
 /* ═══ 生命周期 ═══ */
 
 /**
@@ -54,8 +65,9 @@ void bt_mgr_init(void);
  * @brief 启用蓝牙（启动 BluetoothSerial 并开始预热）
  * @note  **仅在 Arduino 主任务（loop()）中调用**。
  *        UI 任务应使用 bt_mgr_request_enable()。
+ * @return BT_MGR_OK 成功，其他为错误码
  */
-void bt_mgr_enable(void);
+bt_mgr_err_t bt_mgr_enable(void);
 
 /**
  * @brief 禁用蓝牙（释放 BluetoothSerial）
@@ -107,6 +119,17 @@ void bt_mgr_update(void);
  * @return false 蓝牙未初始化
  */
 bool bt_mgr_is_enabled(void);
+
+/**
+ * @brief  查询蓝牙驱动是否真实初始化成功
+ * @return true  BluetoothSerial 已 begin 成功
+ */
+bool bt_mgr_is_driver_on(void);
+
+/**
+ * @brief  返回 BT 启用建议的最小空闲内存（字节）
+ */
+uint32_t bt_mgr_needed_heap(void);
 
 /**
  * @brief 蓝牙开关切换回调（由 switch_item 的 exit_function 调用）

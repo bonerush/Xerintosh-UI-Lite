@@ -355,4 +355,56 @@ sequenceDiagram
 
 ---
 
-> **See Also:** [资源追踪](kern-resource.md) | [调度器与任务管理](kern-task.md) | [类型系统](kern-types.md) | [内核初始化](kern-init.md)
+## 内存统计与压力
+
+*📄 Source: [kern_kmalloc.h](../../src/kernel/kern_kmalloc.h#L77-L127)*
+
+### 统计快照 `kern_kmem_stat_t`
+
+```c
+typedef struct {
+    size_t total_bytes;           /* 堆总字节数（FreeRTOS）/ 0（native） */
+    size_t free_bytes;            /* 当前空闲字节数 */
+    size_t largest_free_block;    /* 最大连续空闲块 */
+    size_t min_free_bytes;        /* 历史最小空闲字节数 */
+    size_t allocated_bytes;       /* kmalloc 已追踪分配字节总和 */
+    size_t fragmentation_percent; /* 碎片率估算 0-100 */
+} kern_kmem_stat_t;
+```
+
+`kern_kmem_get_stats()` 在 ESP32 后端调用 `heap_caps_get_*()` 系列 API，在 native 后端仅返回 `kern_kmalloc` 自身维护的 `allocated_bytes`。
+
+### 内存压力等级
+
+```c
+typedef enum {
+    KERN_KMEM_PRESSURE_LOW = 0,
+    KERN_KMEM_PRESSURE_MEDIUM,
+    KERN_KMEM_PRESSURE_HIGH,
+} kern_kmem_pressure_level_t;
+
+kern_kmem_pressure_level_t kern_kmem_pressure_level(void);
+```
+
+判断阈值（ESP32）：
+
+| 等级 | 条件 |
+|------|------|
+| HIGH | `free_bytes / total_bytes < 10%` |
+| MEDIUM | `free_bytes / total_bytes < 25%` 或 `fragmentation > 50%` |
+| LOW | 其他 |
+
+调度器每 100 ticks 调用 `kern_kmem_pressure_level()` 并把结果分发给所有已注册的调度类（见 [可插拔调度类](kern-sched-class.md)）。
+
+### 保留内存
+
+```c
+void kern_kmem_set_reserved_bytes(size_t bytes);
+size_t kern_kmem_reserved_bytes(void);
+```
+
+保留水位供 App 层 `xeros_mem_can_alloc()` 计算可用内存时扣除，避免一次性把堆吃光。
+
+---
+
+> **See Also:** [资源追踪](kern-resource.md) | [调度器与任务管理](kern-task.md) | [类型系统](kern-types.md) | [内核初始化](kern-init.md) | [App 统一内存视图](../app/app-mem.md)

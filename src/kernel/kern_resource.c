@@ -20,15 +20,15 @@
  * 池耗尽时回退 kern_kmalloc_untracked。
  */
 
-#define RES_POOL_SIZE 32  /* 预分配资源节点数 */
+#define RES_POOL_SIZE (KERN_MAX_TASKS * 4)  /* 16 * 4 = 64 */
 
 static kern_resource_t g_res_pool[RES_POOL_SIZE];
-static uint32_t g_res_pool_bitmap;  /* 位图：bit i = 1 表示已分配 */
+static uint64_t g_res_pool_bitmap;  /* 位图：bit i = 1 表示已分配 */
 
 static kern_resource_t *res_pool_alloc(void) {
     for (int i = 0; i < RES_POOL_SIZE; i++) {
-        if (!(g_res_pool_bitmap & (1UL << i))) {
-            g_res_pool_bitmap |= (1UL << i);
+        if (!(g_res_pool_bitmap & (1ULL << i))) {
+            g_res_pool_bitmap |= (1ULL << i);
             memset(&g_res_pool[i], 0, sizeof(kern_resource_t));
             return &g_res_pool[i];
         }
@@ -40,7 +40,7 @@ static void res_pool_free(kern_resource_t *r) {
     if (r == NULL) return;
     int idx = (int)(r - g_res_pool);
     if (idx >= 0 && idx < RES_POOL_SIZE) {
-        g_res_pool_bitmap &= ~(1UL << idx);
+        g_res_pool_bitmap &= ~(1ULL << idx);
     }
 }
 

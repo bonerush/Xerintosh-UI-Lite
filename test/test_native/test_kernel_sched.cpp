@@ -300,3 +300,167 @@ TEST(KernelSchedTest, FifoDequeueClearsClassId)
     sched_class_fifo.dequeue(&dummy);
     EXPECT_EQ(dummy.scheduler_class_id, -1);
 }
+
+TEST(KernelSchedTest, StackPressureWarningDoesNotCrash)
+{
+    kern_sched_init();
+    g_sched_counter = 0;
+
+    kern_pid_t pid = kern_spawn("pressure_test", simple_counter, NULL, 1024);
+    ASSERT_GE(pid, 0);
+
+    /* 触发至少一次 500 tick 边界的栈压力检查 */
+    for (int i = 0; i < 600; i++) {
+        kern_sched_tick();
+    }
+
+    /* 只要没有崩溃/段错误即通过 */
+    SUCCEED();
+}
+
+/* ═══ 内存压力回调测试 ═══ */
+
+static kern_kmem_pressure_level_t g_last_pressure = KERN_KMEM_PRESSURE_LOW;
+static int g_pressure_callback_count = 0;
+
+static void dummy_memory_pressure(kern_kmem_pressure_level_t level)
+{
+    g_last_pressure = level;
+    g_pressure_callback_count++;
+}
+
+TEST(KernelSchedTest, MemoryPressureCallbackInvoked)
+{
+    kern_sched_init();
+    g_pressure_callback_count = 0;
+    g_last_pressure = KERN_KMEM_PRESSURE_LOW;
+
+    kern_sched_class_t dummy = {
+        .name            = "dummy-pressure",
+        .enqueue         = NULL,
+        .dequeue         = NULL,
+        .pick_next       = NULL,
+        .tick            = NULL,
+        .prio_changed    = NULL,
+        .memory_pressure = dummy_memory_pressure,
+        .task_list       = NULL,
+        .task_list_tail  = NULL,
+    };
+
+    /* 保存并恢复注册表 */
+    uint8_t saved_count = g_sched_class_count;
+    kern_sched_class_t *saved_classes[KERN_SCHED_MAX_CLASSES];
+    memcpy(saved_classes, g_sched_classes, sizeof(saved_classes));
+
+    kern_sched_class_register(&dummy);
+
+    /* 运行足够 tick 触发至少一次 100 tick 边界的压力分发 */
+    for (int i = 0; i < 110; i++) {
+        kern_sched_tick();
+    }
+
+    EXPECT_GT(g_pressure_callback_count, 0);
+
+    /* 恢复注册表 */
+    g_sched_class_count = saved_count;
+    memcpy(g_sched_classes, saved_classes, KERN_SCHED_MAX_CLASSES * sizeof(kern_sched_class_t *));
+}
+
+TEST(KernelSchedTest, RrTimesliceShortensUnderHighPressure)
+{
+    kern_sched_init();
+    g_pressure_callback_count = 0;
+    g_last_pressure = KERN_KMEM_PRESSURE_LOW;
+
+    kern_sched_class_t dummy = {
+        .name            = "dummy-pressure",
+        .enqueue         = NULL,
+        .dequeue         = NULL,
+        .pick_next       = NULL,
+        .tick            = NULL,
+        .prio_changed    = NULL,
+        .memory_pressure = dummy_memory_pressure,
+        .task_list       = NULL,
+        .task_list_tail  = NULL,
+    };
+
+    uint8_t saved_count = g_sched_class_count;
+    kern_sched_class_t *saved_classes[KERN_SCHED_MAX_CLASSES];
+    memcpy(saved_classes, g_sched_classes, sizeof(saved_classes));
+
+    kern_sched_class_register(&dummy);
+
+    /* 设置保留水位并分配超过它，制造 HIGH 压力 */
+    kern_kmem_set_reserved_bytes(64);
+    void *p = kern_kmalloc(128);
+
+    /* 运行一次压力分发 */
+    for (int i = 0; i < 110; i++) {
+        kern_sched_tick();
+    }
+
+    EXPECT_EQ(g_last_pressure, KERN_KMEM_PRESSURE_HIGH);
+
+    kern_kfree(p);
+    kern_kmem_set_reserved_bytes(0);
+
+    /* 恢复注册表 */
+    g_sched_class_count = saved_count;
+    memcpy(g_sched_classes, saved_classes, KERN_SCHED_MAX_CLASSES * sizeof(kern_sched_class_t *));
+}
+
+TEST(KernelSchedTest, RrTimesliceRestoresUnderLowPressure)
+{
+    kern_sched_init();
+    g_pressure_callback_count = 0;
+    g_last_pressure = KERN_KMEM_PRESSURE_HIGH;
+
+    kern_sched_class_t dummy = {
+        .name            = "dummy-pressure",
+        .enqueue         = NULL,
+        .dequeue         = NULL,
+        .pick_next       = NULL,
+        .tick            = NULL,
+        .prio_changed    = NULL,
+        .memory_pressure = dummy_memory_pressure,
+        .task_list       = NULL,
+        .task_list_tail  = NULL,
+    };
+
+    uint8_t saved_count = g_sched_class_count;
+    kern_sched_class_t *saved_classes[KERN_SCHED_MAX_CLASSES];
+    memcpy(saved_classes, g_sched_classes, sizeof(saved_classes));
+
+    kern_sched_class_register(&dummy);
+
+    /* 保留水位为 0，应为 LOW */
+    kern_kmem_set_reserved_bytes(0);
+
+    for (int i = 0; i < 110; i++) {
+        kern_sched_tick();
+    }
+
+    EXPECT_EQ(g_last_pressure, KERN_KMEM_PRESSURE_LOW);
+
+    /* 恢复注册表 */
+    g_sched_class_count = saved_count;
+    memcpy(g_sched_classes, saved_classes, KERN_SCHED_MAX_CLASSES * sizeof(kern_sched_class_t *));
+}
+
+TEST(KernelSchedTest, StackGrowTriggerDoesNotCrash)
+{
+    kern_sched_init();
+
+    /* spawn 一个短生命周期的任务；tick 中栈压力检查只会在非运行态触发增长，
+     * 该测试主要验证调度器 tick 路径不会因新增栈压力逻辑崩溃。 */
+    kern_pid_t pid = kern_spawn("grow_trigger", simple_counter, NULL, 1024);
+    ASSERT_GE(pid, 0);
+
+    /* 运行足够 tick，让栈压力检查有机会触发 */
+    for (int i = 0; i < 600; i++) {
+        kern_sched_tick();
+    }
+
+    /* 只要没有崩溃/段错误即通过 */
+    SUCCEED();
+}

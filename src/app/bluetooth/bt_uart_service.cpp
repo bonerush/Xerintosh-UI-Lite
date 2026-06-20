@@ -82,14 +82,14 @@ static volatile bool             g_connected  = false;
 
 /* ═══ NATIVE_TEST 桩实现 ═══ */
 
-bool bt_uart_service_init(void)
+bt_uart_err_t bt_uart_service_init(void)
 {
     ringbuf_init(&g_tx_buf, BT_UART_TX_BUF_SIZE);
     ringbuf_init(&g_rx_buf, BT_UART_RX_BUF_SIZE);
     g_connected = false;
     g_rx_cb     = NULL;
     g_conn_cb   = NULL;
-    return true;
+    return BT_UART_OK;
 }
 
 void bt_uart_service_deinit(void)
@@ -203,6 +203,11 @@ uint16_t bt_uart_test_consume_tx(uint16_t len)
 /* ═══ 调试开关 ═══ */
 #define BT_DBG_ENABLED 0
 
+/* 内存守卫阈值
+ * Bluedroid SPP begin() 实际需要约 45-50KB 连续堆内存，保留 5KB 余量。 */
+#define BT_UART_MIN_FREE_HEAP       45000
+#define BT_UART_MIN_MAX_ALLOC_HEAP  22000
+
 static BluetoothSerial g_bt_serial;
 static bool g_initialized    = false;
 static volatile bool g_prev_connected = false;
@@ -214,11 +219,11 @@ static QueueHandle_t g_rx_queue = NULL;
 /* poll 完成信号量：deinit 等待当前正在执行的 bt_uart_poll() 结束 */
 static SemaphoreHandle_t g_poll_done_sem = NULL;
 
-bool bt_uart_service_init(void)
+bt_uart_err_t bt_uart_service_init(void)
 {
     if (g_initialized) {
         Serial.println("[BT] bt_uart_service_init: already initialized");
-        return true;
+        return BT_UART_OK;
     }
 
     ringbuf_init(&g_tx_buf, BT_UART_TX_BUF_SIZE);
@@ -241,21 +246,33 @@ bool bt_uart_service_init(void)
         xSemaphoreGive(g_poll_done_sem);
     }
 
-    Serial.printf("[BT-INIT] begin() start free_heap=%u ms=%lu\n",
-                  ESP.getFreeHeap(), (unsigned long)millis());
+    /* 内存守卫 */
+    uint32_t free_heap = ESP.getFreeHeap();
+    uint32_t max_alloc = ESP.getMaxAllocHeap();
+    if (free_heap < BT_UART_MIN_FREE_HEAP || max_alloc < BT_UART_MIN_MAX_ALLOC_HEAP) {
+        Serial.printf("[BT-INIT] ERR_HEAP free=%u max_alloc=%u\n", free_heap, max_alloc);
+        return BT_UART_ERR_HEAP;
+    }
+
+    Serial.printf("[BT-INIT] begin() start free_heap=%u max_alloc=%u ms=%lu\n",
+                  free_heap, max_alloc, (unsigned long)millis());
     Serial.flush();
 
     uint32_t t0 = millis();
     bool ok = g_bt_serial.begin("M5Stick-P1");
     uint32_t elapsed = millis() - t0;
 
-    Serial.printf("[BT-INIT] begin()=%d took=%lums free_heap=%u\n",
-                  (int)ok, (unsigned long)elapsed, ESP.getFreeHeap());
+    Serial.printf("[BT-INIT] begin()=%d took=%lums free_heap=%u max_alloc=%u\n",
+                  (int)ok, (unsigned long)elapsed, ESP.getFreeHeap(), ESP.getMaxAllocHeap());
     Serial.flush();
 
     if (!ok) {
         Serial.println("[BT] BluetoothSerial.begin() failed");
-        return false;
+        /* 尝试推断原因 */
+        if (esp_bt_controller_get_status() != ESP_BT_CONTROLLER_STATUS_ENABLED) {
+            return BT_UART_ERR_RADIO;
+        }
+        return BT_UART_ERR_BLUEDROID;
     }
 
     g_initialized = true;
@@ -276,7 +293,7 @@ bool bt_uart_service_init(void)
                   ESP.getFreeHeap());
     Serial.flush();
 
-    return true;
+    return BT_UART_OK;
 }
 
 void bt_uart_service_deinit(void)

@@ -13,6 +13,7 @@
 #include "kern_vfs.h"
 #include "kern_task.h"
 #include "kern_types.h"
+#include "kern_kmalloc.h"
 #include "kern_init.h"
 #include "kern_version.h"
 
@@ -174,17 +175,19 @@ static void cmd_ps(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_
             /* Native: 栈由 Xeros 管理（字节），无 port_thread 字段 */
             size_t used = kern_task_stack_usage(task);
             size_t total = task->stack_size;
-            char stack_buf[32];
-            snprintf(stack_buf, sizeof(stack_buf), "%zu/%zu", used, total);
+            char stack_buf[48];
+            snprintf(stack_buf, sizeof(stack_buf), "%zu/%zu/%zu",
+                     used, total, kern_task_stack_highwater(task));
             kern_shell_println(tty, stack_buf);
 #else
             if (task->port_thread == KERN_PORT_THREAD_NULL) {
                 kern_shell_println(tty, "shrd");  /* 共享 ui 线程栈 */
             } else {
                 size_t used = kern_task_stack_usage(task);
-                size_t total = task->stack_size * 4;  /* 字数→字节 */
-                char stack_buf[32];
-                snprintf(stack_buf, sizeof(stack_buf), "%zu/%zu", used, total);
+                size_t total = task->stack_size;  /* 已统一为字节 */
+                char stack_buf[48];
+                snprintf(stack_buf, sizeof(stack_buf), "%zu/%zu/%zu",
+                         used, total, kern_task_stack_highwater(task));
                 kern_shell_println(tty, stack_buf);
             }
 #endif
@@ -515,14 +518,25 @@ static void cmd_help(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cw
 static void cmd_free(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_size)
 {
     (void)argc; (void)argv; (void)cwd; (void)cwd_size;
-    char line[80];
+    char line[96];
+    kern_kmem_stat_t st;
+    kern_kmem_get_stats(&st);
+
 #ifndef NATIVE_TEST
-    snprintf(line, sizeof(line), "free_heap=%" PRIu32 "  min_free=%" PRIu32 "  total=%" PRIu32,
-             esp_get_free_heap_size(),
-             esp_get_minimum_free_heap_size(),
-             heap_caps_get_total_size(MALLOC_CAP_DEFAULT));
+    snprintf(line, sizeof(line),
+             "free=%" PRIu32 " max_alloc=%" PRIu32 " min_free=%" PRIu32 " frag=%" PRIu32 "%% reserved=%" PRIu32 " pressure=%d",
+             (uint32_t)st.free_bytes,
+             (uint32_t)st.largest_free_block,
+             (uint32_t)st.min_free_bytes,
+             (uint32_t)st.fragmentation_percent,
+             (uint32_t)kern_kmem_reserved_bytes(),
+             (int)kern_kmem_pressure_level());
 #else
-    snprintf(line, sizeof(line), "free_heap=N/A (native mode)");
+    snprintf(line, sizeof(line),
+             "allocated=%" PRIu32 " reserved=%" PRIu32 " pressure=%d (native mode)",
+             (uint32_t)st.allocated_bytes,
+             (uint32_t)kern_kmem_reserved_bytes(),
+             (int)kern_kmem_pressure_level());
 #endif
     kern_shell_println(tty, line);
 }
@@ -1003,21 +1017,27 @@ static void cmd_dskey(kern_fd_t tty, int argc, char *argv[],
 static void cmd_meminfo(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_size)
 {
     (void)argc; (void)argv; (void)cwd; (void)cwd_size;
-#ifndef NATIVE_TEST
     char line[128];
-    snprintf(line, sizeof(line), "Total DRAM:    %" PRIu32 " bytes", heap_caps_get_total_size(MALLOC_CAP_8BIT));
+    kern_kmem_stat_t st;
+    kern_kmem_get_stats(&st);
+
+#ifndef NATIVE_TEST
+    snprintf(line, sizeof(line), "Total DRAM:    %" PRIu32 " bytes", (uint32_t)st.total_bytes);
     kern_shell_println(tty, line);
-    snprintf(line, sizeof(line), "Free DRAM:     %" PRIu32 " bytes", heap_caps_get_free_size(MALLOC_CAP_8BIT));
+    snprintf(line, sizeof(line), "Free DRAM:     %" PRIu32 " bytes", (uint32_t)st.free_bytes);
     kern_shell_println(tty, line);
-    snprintf(line, sizeof(line), "Largest block: %" PRIu32 " bytes", heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
+    snprintf(line, sizeof(line), "Largest block: %" PRIu32 " bytes", (uint32_t)st.largest_free_block);
     kern_shell_println(tty, line);
-    snprintf(line, sizeof(line), "Min free ever: %" PRIu32 " bytes", esp_get_minimum_free_heap_size());
+    snprintf(line, sizeof(line), "Min free ever: %" PRIu32 " bytes", (uint32_t)st.min_free_bytes);
     kern_shell_println(tty, line);
     uint32_t iram_free = heap_caps_get_free_size(MALLOC_CAP_32BIT) - heap_caps_get_free_size(MALLOC_CAP_8BIT);
     snprintf(line, sizeof(line), "IRAM free:     %" PRIu32 " bytes", iram_free);
     kern_shell_println(tty, line);
+    snprintf(line, sizeof(line), "Fragmentation: %" PRIu32 "%%", (uint32_t)st.fragmentation_percent);
+    kern_shell_println(tty, line);
 #else
-    kern_shell_println(tty, "meminfo: N/A (native mode)");
+    snprintf(line, sizeof(line), "Allocated: %" PRIu32 " bytes (native mode)", (uint32_t)st.allocated_bytes);
+    kern_shell_println(tty, line);
 #endif
 }
 

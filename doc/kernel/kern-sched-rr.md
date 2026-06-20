@@ -18,14 +18,15 @@
 
 ```c
 kern_sched_class_t sched_class_rr = {
-    .name          = "round-robin",
-    .enqueue       = sched_rr_enqueue,
-    .dequeue       = sched_rr_dequeue,
-    .pick_next     = sched_rr_pick_next,
-    .tick          = sched_rr_tick,
-    .prio_changed  = sched_rr_prio_changed,  /* 空实现，RR 不使用优先级 */
-    .task_list     = NULL,  /* 在 kern_sched_init 中设为 g_task_list */
-    .task_list_tail = NULL, /* O(1) 追加用尾指针 */
+    .name             = "round-robin",
+    .enqueue          = sched_rr_enqueue,
+    .dequeue          = sched_rr_dequeue,
+    .pick_next        = sched_rr_pick_next,
+    .tick             = sched_rr_tick,
+    .prio_changed     = sched_rr_prio_changed,  /* 空实现，RR 不使用优先级 */
+    .memory_pressure  = sched_rr_memory_pressure,
+    .task_list        = NULL,  /* 在 kern_sched_init 中设为 g_task_list */
+    .task_list_tail   = NULL, /* O(1) 追加用尾指针 */
 };
 ```
 
@@ -362,19 +363,41 @@ static void sched_rr_prio_changed(kern_task_t *task, uint8_t old_prio)
 
 RR 调度类完全不使用 `priority` 字段。这个回调仅在 FIFO class 中有实际逻辑（见 [kern-sched-fifo.md](kern-sched-fifo.md)）。
 
+### 内存压力回调：高压下缩短时间片
+
+*📄 Source: [kern_sched_rr.c](../../src/kernel/kern_sched_rr.c#L175-L184)*
+
+```c
+static void sched_rr_memory_pressure(kern_kmem_pressure_level_t level)
+{
+    if (level == KERN_KMEM_PRESSURE_HIGH) {
+        g_rr_timeslice = SCHED_RR_HIGH_PRESSURE_TIMESLICE;
+    } else {
+        g_rr_timeslice = SCHED_RR_DEFAULT_TIMESLICE;
+    }
+}
+```
+
+当 `kern_kmem_pressure_level()` 返回 `HIGH` 时，RR 把全局时间片从默认值切换到更短的 `SCHED_RR_HIGH_PRESSURE_TIMESLICE`：
+
+- 低压/中压：使用默认时间片，保证任务吞吐
+- 高压：缩短时间片，让内存紧张时各任务更频繁地让出 CPU，降低单任务长时间持有内存峰值的风险
+
 ### 默认时间片
 
-*📄 Source: [kern_sched_rr.h](../../src/kernel/kern_sched_rr.h#L22)*
+*📄 Source: [kern_sched_rr.h](../../src/kernel/kern_sched_rr.h#L22-L23)*
 
 ```c
 #define SCHED_RR_DEFAULT_TIMESLICE 10
+#define SCHED_RR_HIGH_PRESSURE_TIMESLICE 3
 ```
 
 | 参数 | 值 | 说明 |
 |------|-----|------|
 | 默认时间片 | 10 tick | 每个任务连续运行 10 个 tick 后被强制切换 |
+| 高压时间片 | 3 tick | 内存压力 HIGH 时缩短切换间隔 |
 | tick 频率 | ~1000 Hz | 约 1ms 一个 tick |
-| 时间片时长 | ~10ms | 在 10ms 内完成一轮 Round-Robin |
+| 时间片时长 | ~10ms / ~3ms | 默认/高压下一轮 Round-Robin 的时长 |
 
 ---
 

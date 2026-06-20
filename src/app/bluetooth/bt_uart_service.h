@@ -26,6 +26,17 @@ extern "C" {
 /* ═══ 类型定义 ═══ */
 
 /**
+ * @brief Bluetooth UART 服务初始化错误码
+ */
+typedef enum {
+    BT_UART_OK = 0,
+    BT_UART_ERR_HEAP,        /* 内存不足 */
+    BT_UART_ERR_BLUEDROID,   /* Bluedroid 初始化/状态错误 */
+    BT_UART_ERR_RADIO,       /* BT controller 射频/状态错误 */
+    BT_UART_ERR_UNKNOWN,     /* 其他未知错误 */
+} bt_uart_err_t;
+
+/**
  * @brief 接收数据回调函数类型
  * @param  data  接收到的数据指针
  * @param  len   数据长度（字节）
@@ -43,10 +54,9 @@ typedef void (*bt_uart_connect_callback_t)(bool connected);
 
 /**
  * @brief  初始化 Bluetooth UART 服务
- * @return true  初始化成功
- * @return false 初始化失败
+ * @return BT_UART_OK 成功，其他为错误码
  */
-bool bt_uart_service_init(void);
+bt_uart_err_t bt_uart_service_init(void);
 
 /**
  * @brief 反初始化 Bluetooth UART 服务

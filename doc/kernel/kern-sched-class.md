@@ -14,7 +14,7 @@
 
 ### 调度器类接口（kern_sched_class_t）
 
-*📄 Source: [kern_sched_class.h](../../src/kernel/kern_sched_class.h#L30-L43)*
+*📄 Source: [kern_sched_class.h](../../src/kernel/kern_sched_class.h#L31-L45)*
 
 ```c
 typedef struct kern_sched_class {
@@ -27,13 +27,14 @@ typedef struct kern_sched_class {
     void (*tick)(struct kern_task *current);           /* 定时器 tick：时间片递减/抢占检测 */
     void (*prio_changed)(struct kern_task *task,
                          uint8_t old_prio);            /* 任务优先级变更通知 */
+    void (*memory_pressure)(kern_kmem_pressure_level_t level);  /* 内存压力通知（可选） */
 
     struct kern_task *task_list;                       /* 本 class 的任务链表头 */
     struct kern_task *task_list_tail;                  /* 本 class 的任务链表尾（O(1) 追加） */
 } kern_sched_class_t;
 ```
 
-#### 五个回调函数的职责
+#### 六个回调函数的职责
 
 | 回调 | 调用时机 | 职责 |
 |------|----------|------|
@@ -42,6 +43,7 @@ typedef struct kern_sched_class {
 | `pick_next()` | `pick_next_ready()` 遍历时 | 返回本 class 中应运行的下一个任务（NULL = 无就绪任务） |
 | `tick(current)` | 每个调度 tick | 时间片递减、抢占标记、睡眠唤醒等周期性操作 |
 | `prio_changed(task, old)` | 任务优先级被修改时 | 重组链表顺序（FIFO 需要按新优先级重排，RR 忽略） |
+| `memory_pressure(level)` | 每 100 ticks | 接收 `kern_kmem_pressure_level_t`，让调度策略根据内存压力调整行为 |
 
 ### 全局 class 注册表
 
@@ -172,7 +174,7 @@ struct kern_task *pick_next_ready(void)
 
 ### 调度 tick 中的 class 遍历
 
-*📄 Source: [kern_sched.c](../../src/kernel/kern_sched.c#L238-L242) (Native) / L305-L309 (ESP32)*
+*📄 Source: [kern_sched.c](../../src/kernel/kern_sched.c#L297-L302) (Native) / L359-L363 (ESP32)*
 
 ```c
     /* 遍历所有调度类的 tick 回调（时间片递减、抢占标记） */
@@ -187,6 +189,27 @@ struct kern_task *pick_next_ready(void)
         /* ... 上下文切换 ... */
     }
 ```
+
+### 内存压力分发
+
+*📄 Source: [kern_sched.c](../../src/kernel/kern_sched.c#L96-L107)*
+
+```c
+static void sched_notify_memory_pressure(void)
+{
+    if ((g_sched_ticks % 100) != 0) return;
+
+    kern_kmem_pressure_level_t level = kern_kmem_pressure_level();
+    for (int i = 0; i < g_sched_class_count; i++) {
+        kern_sched_class_t *cls = g_sched_classes[i];
+        if (cls != NULL && cls->memory_pressure != NULL) {
+            cls->memory_pressure(level);
+        }
+    }
+}
+```
+
+每 100 ticks 获取一次内存压力等级，并调用每个 class 注册的 `memory_pressure` 回调。RR class 利用该回调在高压下缩短时间片（见 [Round-Robin 类](kern-sched-rr.md)）。
 
 #### 完整调度流程图
 
@@ -273,15 +296,17 @@ struct kern_task *pick_next_ready(void)
    static void xxx_dequeue(kern_task_t *task) { ... }
    static void xxx_tick(kern_task_t *current) { ... }
    static void xxx_prio_changed(kern_task_t *task, uint8_t old) { ... }
+   static void xxx_memory_pressure(kern_kmem_pressure_level_t level) { ... }
 
    kern_sched_class_t sched_class_xxx = {
-       .name         = "my-scheduler",
-       .enqueue      = xxx_enqueue,
-       .dequeue      = xxx_dequeue,
-       .pick_next    = xxx_pick_next,
-       .tick         = xxx_tick,
-       .prio_changed = xxx_prio_changed,
-       .task_list    = NULL,
+       .name             = "my-scheduler",
+       .enqueue          = xxx_enqueue,
+       .dequeue          = xxx_dequeue,
+       .pick_next        = xxx_pick_next,
+       .tick             = xxx_tick,
+       .prio_changed     = xxx_prio_changed,
+       .memory_pressure  = xxx_memory_pressure,  /* 可选 */
+       .task_list        = NULL,
    };
 
 3. 在 kern_sched_init() 中注册:

@@ -45,13 +45,15 @@
 static bool g_bt_enabled_test = false;
 
 void bt_mgr_init(void) { g_bt_enabled_test = false; }
-void bt_mgr_enable(void) { g_bt_enabled_test = true; }
+bt_mgr_err_t bt_mgr_enable(void) { g_bt_enabled_test = true; return BT_MGR_OK; }
 void bt_mgr_disable(void) { g_bt_enabled_test = false; }
 void bt_mgr_request_enable(void) { g_bt_enabled_test = true; }
 void bt_mgr_request_disable(void) { g_bt_enabled_test = false; }
 void bt_mgr_process_requests(void) {}
 bool bt_mgr_is_waiting_input(void) { return false; }
 bool bt_mgr_is_enabled(void) { return g_bt_enabled_test; }
+bool bt_mgr_is_driver_on(void) { return g_bt_enabled_test; }
+uint32_t bt_mgr_needed_heap(void) { return 70000; }
 void bt_mgr_update(void) {}
 void bt_mgr_on_switch_toggle(void *ud) { (void)ud; }
 
@@ -68,6 +70,7 @@ void bt_mgr_test_set_enabled(bool enabled)
 #include <Arduino.h>
 #include "app/bluetooth/bt_manager.h"
 #include "app/bluetooth/bt_uart_service.h"
+#include "app/app_mem.h"
 
 extern "C" {
 #include "app/wifi/wifi_manager.h"
@@ -91,59 +94,95 @@ void bt_mgr_init(void) {
     g_disable_requested = false;
 }
 
-void bt_mgr_enable(void) {
-    if (g_bt_enabled) return;
+/* 内存守卫阈值
+ * 本轮重构修复 FreeRTOS 栈单位错误后释放约 36KB，BT 初始化的实际需求
+ * 从 ~92KB 降到 ~55KB。空闲低于此值时拒绝启用，避免初始化到一半失败
+ * 导致 Bluedroid 处于不一致状态。 */
+#define BT_MIN_FREE_HEAP        50000
+#define BT_MIN_MAX_ALLOC_HEAP   28000
+#define BT_WIFI_SHUTDOWN_TIMEOUT_MS 1500
+#define BT_WIFI_SHUTDOWN_POLL_MS    50
+
+bool bt_mgr_is_driver_on(void) { return g_bt_enabled; }
+
+uint32_t bt_mgr_needed_heap(void) { return BT_MIN_FREE_HEAP; }
+
+bt_mgr_err_t bt_mgr_enable(void) {
+    if (g_bt_enabled) return BT_MGR_OK;
+
+    Serial.printf("[BT] enable start free=%u max=%u\n",
+                  (uint32_t)ESP.getFreeHeap(), (uint32_t)ESP.getMaxAllocHeap());
+    Serial.flush();
 
 #if BT_MGR_DBG_ENABLED
     Serial.printf("[BT-DBG] bt_mgr_enable() entry free_heap=%u ms=%lu\n",
                   ESP.getFreeHeap(), (unsigned long)millis()); Serial.flush();
 #endif
 
-    /* ═══ 堆内存安全守卫 ═══
-     * Bluedroid Classic BT SPP 初始化 + 连接建链约需 ~70KB。
-     * （BLE 内存已在 bt_uart_service_init 中通过
-     *  esp_bt_controller_mem_release 释放，节省 ~25KB） */
-    const uint32_t BT_MIN_HEAP = 70000;
-    if (ESP.getFreeHeap() < BT_MIN_HEAP) {
-        Serial.printf("[BT] FATAL: heap too low for BT (%u < %u).\n",
-                      ESP.getFreeHeap(), BT_MIN_HEAP);
-        Serial.flush();
-        return;
+    /* ═══ 双内存守卫 ═══
+     * Bluedroid Classic BT SPP 初始化 + 连接建链约需 ~55KB（修复栈单位错误后）。
+     * 使用 xeros_mem_can_alloc() 统一检查总空闲、最大连续块与保留水位。 */
+    if (!xeros_mem_can_alloc(BT_MIN_FREE_HEAP, BT_MIN_MAX_ALLOC_HEAP)) {
+        kern_kmem_stat_t st;
+        xeros_mem_get_stats(&st);
+        Serial.printf("[BT] heap guard failed: free=%u max_alloc=%u reserved=%u\n",
+                      (uint32_t)st.free_bytes,
+                      (uint32_t)st.largest_free_block,
+                      (uint32_t)kern_kmem_reserved_bytes());
+        g_bt_on = false;   /* A9: 回写状态 */
+        return BT_MGR_ERR_HEAP;
     }
 
-    /*
-     * ═══ BT/WiFi 互斥模式 ═══
-     * 启用 BT 前必须关闭 WiFi 以释放 ~34KB 堆内存。
-     * g_wifi_was_on 记录原始状态，供 bt_mgr_disable() 恢复用。
-     *
-     * 关键：esp_wifi_deinit() 是异步操作，WiFi 内存不会立即释放。
-     * 需要 delay(500ms) 等待 FreeRTOS WiFi 任务完成清理，否则
-     * Bluedroid 初始化时堆内存不足，导致 SPP 连接失败。
-     * （参考串口监视器 sm_app_init 中 hal_delay_ms(500) 模式）
-     */
     g_wifi_was_on = wifi_mgr_is_enabled();
     if (g_wifi_was_on) {
         wifi_mgr_disable();
-        delay(500);  /* 等待 WiFi 栈内存完全释放 */
+        /* 轮询等待 WiFi 内存释放，最多 1500ms */
+        uint32_t wait_start = millis();
+        while (millis() - wait_start < BT_WIFI_SHUTDOWN_TIMEOUT_MS) {
+            if (xeros_mem_can_alloc(BT_MIN_FREE_HEAP, BT_MIN_MAX_ALLOC_HEAP)) break;
+            delay(BT_WIFI_SHUTDOWN_POLL_MS);
+        }
+        if (!xeros_mem_can_alloc(BT_MIN_FREE_HEAP, BT_MIN_MAX_ALLOC_HEAP)) {
+            Serial.printf("[BT] WiFi shutdown did not free enough heap\n");
+            /* 恢复 WiFi，保持用户意图 */
+            wifi_mgr_enable();
+            g_bt_on = false;   /* A9 */
+            return BT_MGR_ERR_HEAP;
+        }
     }
 
-    if (!bt_uart_service_init()) {
-        Serial.println("[BT] bt_uart_service_init failed");
-        /* 初始化失败时恢复 WiFi */
+    bt_uart_err_t uerr = bt_uart_service_init();
+    if (uerr != BT_UART_OK) {
+        Serial.printf("[BT] bt_uart_service_init failed: %d\n", (int)uerr);
         if (g_wifi_was_on) {
             wifi_mgr_enable();
         }
-        return;
+        g_bt_on = false;   /* A9 */
+
+        switch (uerr) {
+        case BT_UART_ERR_HEAP:       return BT_MGR_ERR_HEAP;
+        case BT_UART_ERR_RADIO:      return BT_MGR_ERR_RADIO;
+        case BT_UART_ERR_BLUEDROID:  return BT_MGR_ERR_BLUEDROID;
+        default:                     return BT_MGR_ERR_UNKNOWN;
+        }
     }
+
     g_bt_enabled = true;
     g_state = BT_MGR_ENABLED;
+    Serial.printf("[BT] enable done free=%u max=%u\n",
+                  (uint32_t)ESP.getFreeHeap(), (uint32_t)ESP.getMaxAllocHeap());
+    Serial.flush();
 #if BT_MGR_DBG_ENABLED
     Serial.printf("[BT-DBG] bt_mgr_enable() done free_heap=%u ms=%lu\n",
                   ESP.getFreeHeap(), (unsigned long)millis()); Serial.flush();
 #endif
+    return BT_MGR_OK;
 }
 
 void bt_mgr_disable(void) {
+    Serial.printf("[BT] disable start free=%u max=%u\n",
+                  (uint32_t)ESP.getFreeHeap(), (uint32_t)ESP.getMaxAllocHeap());
+    Serial.flush();
 #if BT_MGR_DBG_ENABLED
     Serial.printf("[BT-DBG] bt_mgr_disable() free_heap=%u ms=%lu\n",
                   ESP.getFreeHeap(), (unsigned long)millis()); Serial.flush();
@@ -158,6 +197,10 @@ void bt_mgr_disable(void) {
         wifi_mgr_enable();
         g_wifi_was_on = false;
     }
+
+    Serial.printf("[BT] disable done free=%u max=%u\n",
+                  (uint32_t)ESP.getFreeHeap(), (uint32_t)ESP.getMaxAllocHeap());
+    Serial.flush();
 }
 
 /* ═══ 异步请求接口（供 UI 任务调用） ═══ */

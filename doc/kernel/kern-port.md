@@ -91,9 +91,44 @@ kern_port.h (接口层)
 
 ---
 
+## FreeRTOS 后端：栈大小单位
+
+*📄 Source: [kern_port_freertos.c](../../src/kernel/kern_port_freertos.c#L256-L264)*
+
+`xTaskCreatePinnedToCore()` 的 `usStackDepth` 参数以 **字（`StackType_t`，ESP32 上 4 字节）** 为单位，而 Xeros 的 `stack_size` 全部按 **字节** 语义维护。`kern_port_thread_spawn()` 在调用 FreeRTOS 前做显式转换：
+
+```c
+size_t stack_words = stack_size / sizeof(StackType_t);
+if (stack_size % sizeof(StackType_t) != 0) {
+    stack_words++;
+}
+
+BaseType_t ret = xTaskCreatePinnedToCore(
+    task_wrapper,
+    name ? name : "xtask",
+    (uint32_t)stack_words,  /* 栈大小（字） */
+    task,
+    tskIDLE_PRIORITY + 1,
+    &handle,
+    cpu
+);
+```
+
+**关键约定**：
+
+| 字段/参数 | 单位 | 说明 |
+|-----------|------|------|
+| `kern_task_t.stack_size` | 字节 | TCB 中统一使用字节，所有上层代码都按字节理解 |
+| `xTaskCreatePinnedToCore(usStackDepth)` | 字 | 仅在 `kern_port_freertos.c` 内部转换 |
+| `kern_port_thread_stack_usage()` | 字 | 返回 `uxTaskGetStackHighWaterMark()` 的原始字数；调用者负责 `* sizeof(StackType_t)` 转字节 |
+
+修复前，代码直接把字节数传给 `usStackDepth`，导致每个 Xeros 任务在 ESP32 上获得 **4 倍于预期的栈**，浪费约 36KB+ 堆内存。
+
+---
+
 ## FreeRTOS 后端：双信号量令牌协议
 
-*📄 Source: [kern_port_freertos.c](../../src/kernel/kern_port_freertos.c#L309-L332)*
+*📄 Source: [kern_port_freertos.c](../../src/kernel/kern_port_freertos.c#L317-L340)*
 
 ```
 调度器（loop）                任务（wrapper）
@@ -206,7 +241,7 @@ After (kernel-v2-phase1):
 | `kern_port_thread_spawn()` | — | 创建新的执行上下文 |
 | `kern_port_thread_exit()` | 任务→调度器 | 销毁当前线程（不返回） |
 | `kern_port_thread_kill()` | — | 从外部销毁指定线程 |
-| `kern_port_thread_stack_usage()` | — | 获取栈使用量 |
+| `kern_port_thread_stack_usage()` | — | 获取栈使用量（FreeRTOS 后端返回字，调用者转字节） |
 | `kern_port_switch_to(task)` | 调度器→任务 | 调度器切换到目标任务（阻塞等待） |
 | `kern_port_task_yield()` | 任务→调度器 | 任务主动让出 CPU |
 | `kern_port_task_exit()` | 任务→调度器 | 任务退出并销毁（不返回） |

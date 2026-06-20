@@ -161,3 +161,130 @@ TEST(KernelStackTest, StackFreedOnTaskExit)
             << "第 " << round << " 轮子任务未在调度后被回收";
     }
 }
+
+TEST(KernelStackTest, StackSizeStoredAsBytes)
+{
+    kern_sched_init();
+    /* 使用 KERN_STACK_MIN 以上值，避免被下限截断 */
+    kern_pid_t pid = kern_spawn("size_bytes", noop_task, NULL, 1024);
+    ASSERT_GE(pid, 0);
+
+    kern_task_t *task = kern_task_get(pid);
+    ASSERT_NE(task, nullptr);
+    EXPECT_EQ(task->stack_size, (size_t)1024)
+        << "task->stack_size 应以字节存储";
+}
+
+TEST(KernelStackTest, StackUsageReturnsByteValue)
+{
+    kern_sched_init();
+    kern_pid_t pid = kern_spawn("usage_bytes", noop_task, NULL, 1024);
+    ASSERT_GE(pid, 0);
+
+    kern_task_t *task = kern_task_get(pid);
+    ASSERT_NE(task, nullptr);
+
+    size_t usage = kern_task_stack_usage(task);
+    EXPECT_LE(usage, task->stack_size)
+        << "栈使用量不应超过总字节数";
+}
+
+TEST(KernelStackTest, StackHighwaterTracksPeak)
+{
+    kern_sched_init();
+    kern_pid_t pid = kern_spawn("highwater", noop_task, NULL, 1024);
+    ASSERT_GE(pid, 0);
+
+    kern_task_t *task = kern_task_get(pid);
+    ASSERT_NE(task, nullptr);
+
+    /* 调用 stack_usage 会更新高水位 */
+    (void)kern_task_stack_usage(task);
+    size_t hw1 = kern_task_stack_highwater(task);
+    EXPECT_GE(hw1, (size_t)1);
+
+    /* 高水位只增不减 */
+    size_t hw2 = kern_task_stack_highwater(task);
+    EXPECT_EQ(hw2, hw1);
+}
+
+TEST(KernelStackTest, StackHighwaterNullReturnsZero)
+{
+    EXPECT_EQ(kern_task_stack_highwater(NULL), (size_t)0);
+}
+
+TEST(KernelStackTest, StackRecommendWithinBounds)
+{
+    kern_sched_init();
+    kern_pid_t pid = kern_spawn("recommend", noop_task, NULL, 1024);
+    ASSERT_GE(pid, 0);
+
+    kern_task_t *task = kern_task_get(pid);
+    ASSERT_NE(task, nullptr);
+
+    size_t rec = kern_task_stack_recommend(task, 0);
+    EXPECT_GE(rec, (size_t)KERN_STACK_MIN);
+    EXPECT_LE(rec, (size_t)KERN_STACK_MAX);
+}
+
+TEST(KernelStackTest, StackRecommendGrowsWithPeak)
+{
+    kern_sched_init();
+    kern_pid_t pid = kern_spawn("recommend_peak", noop_task, NULL, 1024);
+    ASSERT_GE(pid, 0);
+
+    kern_task_t *task = kern_task_get(pid);
+    ASSERT_NE(task, nullptr);
+
+    /* 构造一个较大高水位 */
+    task->stack_highwater = 3000;
+    size_t rec = kern_task_stack_recommend(task, task->stack_size);
+    EXPECT_GT(rec, task->stack_size);
+}
+
+TEST(KernelStackTest, StackGrowDoesNotCrash)
+{
+    kern_sched_init();
+    kern_pid_t pid = kern_spawn("grow", noop_task, NULL, 1024);
+    ASSERT_GE(pid, 0);
+
+    kern_task_t *task = kern_task_get(pid);
+    ASSERT_NE(task, nullptr);
+    size_t old_size = task->stack_size;
+
+    /* 对非运行任务执行增长 */
+    bool ok = kern_task_stack_grow(task, 2048);
+    EXPECT_TRUE(ok);
+    EXPECT_GT(task->stack_size, old_size);
+    EXPECT_EQ(task->stack_size, (size_t)2048);
+}
+
+TEST(KernelStackTest, StackGrowPreservesCanary)
+{
+    kern_sched_init();
+    kern_pid_t pid = kern_spawn("grow_canary", noop_task, NULL, 1024);
+    ASSERT_GE(pid, 0);
+
+    kern_task_t *task = kern_task_get(pid);
+    ASSERT_NE(task, nullptr);
+
+    uint32_t canary_before;
+    memcpy(&canary_before, task->stack_base, sizeof(uint32_t));
+    EXPECT_EQ(canary_before, (uint32_t)KERN_STACK_CANARY);
+
+    bool ok = kern_task_stack_grow(task, 2048);
+    ASSERT_TRUE(ok);
+
+    uint32_t canary;
+    memcpy(&canary, task->stack_base, sizeof(uint32_t));
+    EXPECT_EQ(canary, (uint32_t)KERN_STACK_CANARY);
+}
+
+TEST(KernelStackTest, StackGrowRunningTaskFails)
+{
+    kern_sched_init();
+
+    /* 当前运行任务即 idle */
+    bool ok = kern_task_stack_grow(g_current_task, 2048);
+    EXPECT_FALSE(ok);
+}

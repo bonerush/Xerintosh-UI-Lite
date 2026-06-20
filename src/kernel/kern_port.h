@@ -112,9 +112,12 @@ static inline void kern_port_init(void)
  * @param  entry      入口函数
  * @param  arg        入口参数
  * @param  name       线程名（调试用）
- * @param  stack_size 栈大小（字节，0 表示使用默认值）
+ * @param  stack_size 栈大小（**字节**，0 表示使用默认值）
  * @param  task       关联的 Xeros TCB 指针
  * @return 线程句柄，失败返回 KERN_PORT_THREAD_NULL
+ * @note   FreeRTOS 后端：stack_size 在创建时转换为 StackType_t 字数后传入
+ *         xTaskCreatePinnedToCore。创建后 Xeros 无法调整该栈大小或回收。
+ *         如需“按需分配”，请在创建前使用 kern_task_stack_recommend()。
  */
 static inline kern_port_thread_t kern_port_thread_spawn(
     void (*entry)(void *arg),
@@ -151,7 +154,8 @@ static inline void kern_port_thread_kill(kern_port_thread_t thread)
 /**
  * @brief  获取线程栈使用高水位
  * @param  thread 线程句柄
- * @return 已使用的栈字节数（近似值）
+ * @return 剩余栈字数（FreeRTOS 后端）或已使用栈字节数（Native 后端）。
+ *         调用者 kern_task_stack_usage() 负责按后端统一转换为字节。
  */
 static inline size_t kern_port_thread_stack_usage(kern_port_thread_t thread)
 {

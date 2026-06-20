@@ -30,6 +30,7 @@ typedef struct kern_task {
     /* 动态栈管理 */
     uint8_t            *stack_base;             /* 栈底指针 */
     size_t              stack_size;             /* 栈大小（字节） */
+    size_t              stack_highwater;        /* 历史最大栈使用量（字节） */
 
     /* 上下文保存（平台相关） */
 #if defined(NATIVE_TEST)
@@ -83,6 +84,7 @@ typedef struct kern_task {
     /* 动态栈 */
     栈底指针        指向栈的最低地址
     栈大小           当前分配的字节数
+    栈高水位        历史最大栈使用量（字节）
     上下文对象       平台相关（ucontext / setjmp_buf / FreeRTOS句柄）
 
     /* ___v2新增___ 调度元数据 */
@@ -113,6 +115,7 @@ typedef struct kern_task {
 | `priority` | `uint8_t` | `128`（`kern_spawn` 中硬编码） | 优先级 0-255。RR 不使用此字段，FIFO 按优先级排序 |
 | `timeslice_remaining` | `uint8_t` | `SCHED_RR_DEFAULT_TIMESLICE` (10) | RR 时间片剩余 tick。每次 `sched_rr_tick()` 递减，归零时标记 `g_need_resched` |
 | `scheduler_class_id` | `int8_t` | `-1` → `KERN_SCHED_CLASS_RR_ID` (0) | `kern_spawn()` 先初始化为 `-1`，随后默认加入 RR 调度类并同步为 `0`；调度类 `enqueue/dequeue` 负责维护此字段 |
+| `stack_highwater` | `size_t` | `0` | 历史最大栈使用量（字节）。`kern_task_stack_usage()`/`kern_task_stack_highwater()` 自动更新，供 `kern_task_stack_recommend()` 推荐栈大小 |
 | `resource_lock` | `volatile bool` | `false` | 保护 `resource_head` 链表的布尔自旋锁，避免 SMP 下并发修改资源链表 |
 | `fd_table[]` | `kern_file_t*[KERN_MAX_FD_PER_TASK]` | 全 `NULL` | 每任务独立的文件描述符表，VFS `open/close/read/write` 只操作当前任务的 FD 槽位 |
 
@@ -159,46 +162,126 @@ XEROS_NATIVE_SCHED（setjmp/longjmp）：
 
 ### 动态栈管理
 
-*📄 Source: [kern_sched.c](../../src/kernel/kern_sched.c#L244-L254)（Native 测试环境）*
+#### 栈高水位跟踪
+
+*📄 Source: [kern_task_stack.c](../../src/kernel/kern_task_stack.c#L150-L169)（FreeRTOS）/ L80-L109（Native）*
+
+`kern_task_stack_usage()` 在查询已用栈空间时，会把峰值写入 `task->stack_highwater`：
 
 ```c
-/* tick 中每 500 tick 检查一次栈使用率（仅 Native 后端） */
-if (g_current_task != NULL && g_current_task != g_idle_task
-    && (g_sched_ticks % 500) == 0) {
-    size_t usage = kern_task_stack_usage(g_current_task);
-    if (usage > 0 && g_current_task->stack_size > 0
-        && usage > g_current_task->stack_size * 3 / 4) {
+size_t kern_task_stack_usage(kern_task_t *task)
+{
+    /* ... 计算 used ... */
+    if (used > task->stack_highwater) {
+        task->stack_highwater = used;
+    }
+    return used;
+}
+```
+
+`kern_task_stack_highwater()` 是专用读取接口：
+
+```c
+size_t kern_task_stack_highwater(kern_task_t *task);
+```
+
+#### 栈推荐值
+
+*📄 Source: [kern_task_stack.c](../../src/kernel/kern_task_stack.c#L194-L205)*
+
+```c
+size_t kern_task_stack_recommend(kern_task_t *task, size_t current_size)
+{
+    if (task != NULL && current_size == 0) current_size = task->stack_size;
+    if (current_size == 0) current_size = KERN_STACK_MIN;
+    if (current_size < KERN_STACK_MIN) current_size = KERN_STACK_MIN;
+
+    size_t peak = (task != NULL) ? task->stack_highwater : 0;
+    size_t recommended = peak + KERN_STACK_GROW * 2;
+    if (recommended < current_size) recommended = current_size;
+    if (recommended > KERN_STACK_MAX) recommended = KERN_STACK_MAX;
+    return recommended;
+}
+```
+
+推荐值 = 历史峰值 + 2 倍增长余量，并 clamp 到 `[KERN_STACK_MIN, KERN_STACK_MAX]`。可用于：
+- 任务创建时按历史峰值预留栈
+- Native 后端触发自动增长时计算目标大小
+
+#### Tick 中的栈压力检查
+
+*📄 Source: [kern_sched.c](../../src/kernel/kern_sched.c#L56-L92)*
+
+```c
+static void sched_check_stack_pressure(kern_task_t *task)
+{
+    if (task == NULL || task == g_idle_task) return;
+    if ((g_sched_ticks % 500) != 0) return;
+
+    size_t usage = kern_task_stack_usage(task);
+
+    if (task->stack_size > 0
+        && usage > task->stack_size * STACK_PRESSURE_THRESHOLD_PCT / 100) {
         kern_log(KERN_LOG_WARN,
                  "task %s stack usage %zu/%zu (>75%%)",
-                 g_current_task->name, usage, g_current_task->stack_size);
+                 task->name, usage, task->stack_size);
     }
-}
-```
 
-> **注意**：ESP32 FreeRTOS 后端中栈由 FreeRTOS 自动管理，`kern_task_stack_usage()` 通过 `uxTaskGetStackHighWaterMark()` 查询（见 [kern_port_freertos.c](../../src/kernel/kern_port_freertos.c#L298-L305)），tick 中不做主动扫描。
-
-#### 中文伪代码拆解
-
-```
-函数 栈检查(当前任务) {
-    每500个tick执行一次:
-        计算已用栈空间 = kern_task_stack_usage(任务)
-        if (使用率超过75%) {
-            输出警告日志 "task xxx stack usage 800/1024 (>75%)"
-            /* 不自动扩展，仅警告。开发者应调整 stack_min 参数 */
+#if defined(NATIVE_TEST) || defined(XEROS_NATIVE_SCHED)
+    /* 仅 Native 后端：连续多次超高使用率触发自动增长 */
+    static uint8_t s_grow_counter[KERN_MAX_TASKS] = {0};
+    if (task->pid >= 0 && task->pid < KERN_MAX_TASKS) {
+        if (task->stack_size > 0
+            && usage > task->stack_size * STACK_GROW_THRESHOLD_PCT / 100) {
+            s_grow_counter[task->pid]++;
+            if (s_grow_counter[task->pid] >= STACK_GROW_CONSECUTIVE) {
+                size_t recommended = kern_task_stack_recommend(task, 0);
+                if (recommended > task->stack_size) {
+                    kern_log(KERN_LOG_INFO,
+                             "stack_grow: task %s %zu -> %zu",
+                             task->name, task->stack_size, recommended);
+                    kern_task_stack_grow(task, recommended);
+                }
+                s_grow_counter[task->pid] = 0;
+            }
+        } else {
+            s_grow_counter[task->pid] = 0;
         }
+    }
+#endif
 }
 ```
 
-**栈安全防线（Native 后端）：**
+#### 栈自动增长（仅 Native 后端）
+
+*📄 Source: [kern_task_stack.c](../../src/kernel/kern_task_stack.c#L211-L259)*
+
+```c
+bool kern_task_stack_grow(kern_task_t *task, size_t new_size)
+{
+    if (task == NULL || new_size <= task->stack_size) return false;
+    if (new_size > KERN_STACK_MAX) new_size = KERN_STACK_MAX;
+    if (task == g_current_task) return false;   /* 不能增长正在运行的任务 */
+
+    /* 1. 分配新栈并复制旧栈内容 */
+    /* 2. 更新 task->stack_base / stack_size / stack_highwater */
+    /* 3. 重建 ucontext / setjmp 上下文，使其指向新栈 */
+    /* 4. 释放旧栈 */
+}
+```
+
+> **FreeRTOS 后端限制**：FreeRTOS 任务栈在创建后不可调整大小。`kern_task_stack_grow()` 在 ESP32 后端直接返回 `false` 并输出警告。因此 ESP32 上采用“创建时按历史峰值预留 + 监控先行”策略，避免运行时再发现栈不足。
+
+#### 栈安全防线
 
 | 层级 | 检测机制 | 触发条件 | 行为 |
 |------|----------|----------|------|
-| 1 | 金丝雀 | `canary != 0xDEADC0DE` | 输出警告日志（见 [kern_task_stack.c](../../src/kernel/kern_task_stack.c#L68-L93)） |
-| 2 | SP 使用率警告 | `usage > stack_size * 75%` | 输出警告日志（仅 Native tick 中检查） |
+| 1 | 金丝雀 | `canary != 0xDEADC0DE` | 输出警告日志（Native 后端） |
+| 2 | SP 使用率警告 | `usage > stack_size * 75%` | 输出警告日志（tick 每 500ms 检查） |
 | 3 | 上限限制 | `stack_size > KERN_STACK_MAX (8KB)` | `task_stack_init()` 截断到 8KB |
+| 4 | 自动增长 | 连续 3 次使用率 > 85% | Native 后端按推荐值扩大栈（不超过上限） |
 
-> **注意**：ESP32 FreeRTOS 后端中栈由 FreeRTOS 自动管理，金丝雀和栈扫描机制不适用。`task_stack_init()` 和 `task_write_canary()` 在此后端中为空操作（见 [kern_task_stack.c](../../src/kernel/kern_task_stack.c#L48-L60)）。`kern_task_stack_usage()` 通过 `uxTaskGetStackHighWaterMark()` 查询（见 [kern_port_freertos.c](../../src/kernel/kern_port_freertos.c#L298-L305)）。
+> **注意**：ESP32 FreeRTOS 后端中栈由 FreeRTOS 自动管理，金丝雀、栈扫描和自动增长机制不适用。`task_stack_init()` 和 `task_write_canary()` 在此后端中为空操作，`kern_task_stack_usage()` 通过 `uxTaskGetStackHighWaterMark()` 查询。
 
 ### 任务生命周期
 
@@ -215,6 +298,7 @@ if (g_current_task != NULL && g_current_task != g_idle_task
        ├→ PID 递增分配
        ├→ 初始化 fd_table[KERN_MAX_FD_PER_TASK] 为全 NULL
        ├→ 创建底层上下文（FreeRTOS线程 / ucontext / setjmp栈）
+       ├→ stack_highwater = 0（开始累计历史最大栈使用量）
        ├→ 插入 g_task_list 链表尾部
        ├→ 调用 kern_mpu_setup_stack_guard() 配置栈守卫（Native 后端）
        └→ 状态设为 READY
@@ -285,8 +369,9 @@ kern_task_unregister_virtual(pid);
 - **kern_mpu**：`mpu_config` 在上下文切换时由 `kern_mpu_apply()` 加载（当前为框架实现，尚未写入实际硬件寄存器）
 - **kern_resource**：`resource_head` 在任务退出时自动遍历释放；`resource_lock` 保护链表操作，避免 SMP 下并发冲突
 - **kern_vfs**：文件描述符表已迁移到 TCB 中（`fd_table[KERN_MAX_FD_PER_TASK]`），每个任务拥有独立的 FD 命名空间；任务退出时 `kern_resource_release_all()` 自动关闭关联的 FD
+- **kern_kmalloc**：任务栈在 Native 后端通过 `kern_kmalloc_for_task()` 分配，自动挂载到目标任务资源链表；栈内存统计为内存压力判断提供数据
 - **kern_procfs**：`/proc/tasks` 遍历调度器链表显示任务信息
 
 ---
 
-> **See Also:** [类型系统](kern-types.md) | [可插拔调度类](kern-sched-class.md) | [Round-Robin 类](kern-sched-rr.md) | [FIFO 类](kern-sched-fifo.md) | [SMP 支持](kern-smp.md)
+> **See Also:** [类型系统](kern-types.md) | [可插拔调度类](kern-sched-class.md) | [Round-Robin 类](kern-sched-rr.md) | [FIFO 类](kern-sched-fifo.md) | [SMP 支持](kern-smp.md) | [内核分配器](kern-kmalloc.md) | [App 统一内存视图](../app/app-mem.md)

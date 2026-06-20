@@ -41,6 +41,7 @@ void bt_mgr_task_main(void *arg);
 /* Xeros 内核 */
 #include "kernel/kern_init.h"
 #include "kernel/kern_task.h"
+#include "kernel/kern_kmalloc.h"
 #include "kernel/kern_vfs.h"
 #include "kernel/kern_devfs.h"
 #include "kernel/kern_procfs.h"
@@ -49,6 +50,7 @@ void bt_mgr_task_main(void *arg);
 #include "kernel/devices/kern_devices.h"
 #include "kernel/devices/dev_ttyS0.h"
 #include "kernel/kern_shell.h"
+#include "app/app_mem.h"
 
 /* UI 任务入口 */
 extern "C" void ui_task_main(void *arg);
@@ -234,6 +236,11 @@ void setup()
 
 static bool g_kernel_inited = false;
 
+/* 任务栈大小（字节），基于阶段 2.1 后实际负载估算 */
+#define UI_TASK_STACK_SIZE      4096
+#define WIFI_MGR_STACK_SIZE     4096
+#define BT_MGR_STACK_SIZE       3072
+
 static void deferred_kernel_init(void)
 {
     if (g_kernel_inited) return;
@@ -246,6 +253,12 @@ static void deferred_kernel_init(void)
     kern_devfs_init();
     kern_procfs_init();
     kern_sysfs_init();
+
+    /* ── 设置系统保留内存 ──
+     * 保留水位是系统应急缓冲，不应等于所有服务同时开启所需内存之和。
+     * 当前 DRAM 约 200KB，UI/M5GFX 已占约 140KB，空闲约 60KB，因此
+     * 保留水位必须保持较小（8KB），否则 WiFi/BT 的正常启用都会被拒绝。 */
+    kern_kmem_set_reserved_bytes(8 * 1024);
 
     /* ── GPIO 文件系统 ── */
     kern_err_t gpio_rc = kern_gpiofs_init();
@@ -315,13 +328,13 @@ static void deferred_kernel_init(void)
     Serial.println("[  OK  ] Shell spawned on /dev/ttyS0");
 
     /* ── 启动 UI 任务 ── */
-    kern_pid_t ui_pid = kern_spawn("ui", ui_task_main, NULL, 4096);
+    kern_pid_t ui_pid = kern_spawn("ui", ui_task_main, NULL, UI_TASK_STACK_SIZE);
     Serial.printf("[  OK  ] UI task spawned (pid=%d)\n", ui_pid);
 
     /* WiFi/BT 管理器作为独立内核任务运行，与 UI 任务解耦 */
-    kern_spawn("wifi-mgr", wifi_mgr_task_main, NULL, 4096);
+    kern_spawn("wifi-mgr", wifi_mgr_task_main, NULL, WIFI_MGR_STACK_SIZE);
     Serial.println("[  OK  ] WiFi manager spawned as kernel task");
-     kern_spawn("bt-mgr",   bt_mgr_task_main, NULL, 4096);  /* 仅状态更新，4KB 充足 */
+    kern_spawn("bt-mgr",   bt_mgr_task_main, NULL, BT_MGR_STACK_SIZE);
     Serial.println("[  OK  ] BT manager spawned as kernel task");
 
     /* 让出 CPU 给 FreeRTOS，使刚创建的任务有机会启动并阻塞在调度信号量上 */

@@ -12,6 +12,7 @@
 #define KERN_SCHED_CLASS_H
 
 #include "kern_types.h"
+#include "kern_kmalloc.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -37,6 +38,7 @@ typedef struct kern_sched_class {
     void (*tick)(struct kern_task *current);        /* 定时器 tick：时间片递减 / 抢占检测 */
     void (*prio_changed)(struct kern_task *task,
                          uint8_t old_prio);         /* 任务优先级变更通知 */
+    void (*memory_pressure)(kern_kmem_pressure_level_t level);  /* 内存压力通知（可选） */
 
     struct kern_task *task_list;                    /* 本 class 的任务链表头 */
     struct kern_task *task_list_tail;               /* 本 class 的任务链表尾（O(1) 追加） */

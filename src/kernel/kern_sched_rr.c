@@ -11,8 +11,13 @@
 #include "kern_sched.h"
 #include "kern_task.h"
 #include "kern_smp.h"
+#include "kern_kmalloc.h"
 
 #include <stddef.h>
+
+/* ═══ 时间片状态 ═══ */
+
+static uint8_t g_rr_timeslice = SCHED_RR_DEFAULT_TIMESLICE;
 
 /* ═══ SMP 自旋锁辅助 ═══ */
 
@@ -162,8 +167,19 @@ static void sched_rr_tick(kern_task_t *current)
     }
     if (current->timeslice_remaining == 0) {
         /* 时间片用尽，触发重调度 */
-        current->timeslice_remaining = SCHED_RR_DEFAULT_TIMESLICE;
+        current->timeslice_remaining = g_rr_timeslice;
         g_need_resched = true;
+    }
+}
+
+/* ═══ 内存压力回调：高压下缩短时间片 ═══ */
+
+static void sched_rr_memory_pressure(kern_kmem_pressure_level_t level)
+{
+    if (level == KERN_KMEM_PRESSURE_HIGH) {
+        g_rr_timeslice = SCHED_RR_HIGH_PRESSURE_TIMESLICE;
+    } else {
+        g_rr_timeslice = SCHED_RR_DEFAULT_TIMESLICE;
     }
 }
 
@@ -179,12 +195,13 @@ static void sched_rr_prio_changed(kern_task_t *task, uint8_t old_prio)
 /* ═══ 全局 RR class 实例 ═══ */
 
 kern_sched_class_t sched_class_rr = {
-    .name          = "round-robin",
-    .enqueue       = sched_rr_enqueue,
-    .dequeue       = sched_rr_dequeue,
-    .pick_next     = sched_rr_pick_next,
-    .tick          = sched_rr_tick,
-    .prio_changed  = sched_rr_prio_changed,
-    .task_list     = NULL,  /* 在 kern_sched_init 中设为 g_task_list */
-    .task_list_tail = NULL,
+    .name             = "round-robin",
+    .enqueue          = sched_rr_enqueue,
+    .dequeue          = sched_rr_dequeue,
+    .pick_next        = sched_rr_pick_next,
+    .tick             = sched_rr_tick,
+    .prio_changed     = sched_rr_prio_changed,
+    .memory_pressure  = sched_rr_memory_pressure,
+    .task_list        = NULL,  /* 在 kern_sched_init 中设为 g_task_list */
+    .task_list_tail   = NULL,
 };

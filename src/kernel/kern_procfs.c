@@ -13,6 +13,7 @@
 #include "kern_procfs.h"
 #include "kern_vfs.h"
 #include "kern_task.h"
+#include "kern_kmalloc.h"
 #include "kern_init.h"
 #include "kern_version.h"
 
@@ -85,12 +86,13 @@ static size_t procfs_tasks_generate(char *content, size_t max_len)
 
     while (t != NULL && pos < max_len) {
         int written = snprintf(content + pos, max_len - pos,
-                               "%d %s %s %zu/%zu\n",
+                               "%d %s %s %zu/%zu/%zu\n",
                                t->pid,
                                t->name,
                                task_state_str(t->state),
                                kern_task_stack_usage(t),
-                               t->stack_size);
+                               t->stack_size,
+                               kern_task_stack_highwater(t));
         if (written < 0 || (size_t)written >= max_len - pos) {
             break;
         }
@@ -137,23 +139,29 @@ static size_t procfs_version_generate(char *content, size_t max_len)
  */
 static size_t procfs_meminfo_generate(char *content, size_t max_len)
 {
-#ifndef NATIVE_TEST
-    uint32_t free_heap  = esp_get_free_heap_size();
-    uint32_t min_free   = esp_get_minimum_free_heap_size();
-    uint32_t total_heap = heap_caps_get_total_size(MALLOC_CAP_DEFAULT);
-    uint32_t used_heap  = total_heap - free_heap;
+    kern_kmem_stat_t st;
+    kern_kmem_get_stats(&st);
 
-    int written = snprintf(content, max_len,
-                           "MemTotal: %" PRIu32 " kB\n"
-                           "MemFree:  %" PRIu32 " kB\n"
-                           "MemUsed:  %" PRIu32 " kB\n"
-                           "MinFree:  %" PRIu32 " kB\n",
-                           total_heap / 1024,
-                           free_heap / 1024,
-                           used_heap / 1024,
-                           min_free / 1024);
+    int written;
+#ifndef NATIVE_TEST
+    written = snprintf(content, max_len,
+                       "MemTotal:    %" PRIu32 " kB\n"
+                       "MemFree:     %" PRIu32 " kB\n"
+                       "MemUsed:     %" PRIu32 " kB\n"
+                       "LargestBlock:%" PRIu32 " kB\n"
+                       "MinFree:     %" PRIu32 " kB\n"
+                       "Fragmentation: %" PRIu32 "%%\n",
+                       (uint32_t)(st.total_bytes / 1024),
+                       (uint32_t)(st.free_bytes / 1024),
+                       (uint32_t)((st.total_bytes - st.free_bytes) / 1024),
+                       (uint32_t)(st.largest_free_block / 1024),
+                       (uint32_t)(st.min_free_bytes / 1024),
+                       (uint32_t)st.fragmentation_percent);
 #else
-    int written = snprintf(content, max_len, "MemTotal: N/A (native)\n");
+    written = snprintf(content, max_len,
+                       "MemTotal: N/A (native)\n"
+                       "Allocated: %" PRIu32 " bytes\n",
+                       (uint32_t)st.allocated_bytes);
 #endif
     return (written > 0) ? (size_t)written : 0;
 }

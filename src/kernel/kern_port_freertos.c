@@ -253,13 +253,23 @@ static kern_port_thread_t kern_port_freertos_thread_spawn(
         stack_size = KERN_PORT_STACK_MIN;
     }
 
+    /* stack_size 为字节，转换为 FreeRTOS 需要的字数（向上对齐） */
+    size_t stack_words = stack_size / sizeof(StackType_t);
+    if (stack_size % sizeof(StackType_t) != 0) {
+        stack_words++;
+    }
+
+    /* 约束最小字数，避免低于 FreeRTOS 绝对下限 */
+    if (stack_words < 1) stack_words = 1;
+
     TaskHandle_t handle = NULL;
     uint8_t cpu = task->cpu_id;
     if (cpu >= KERN_MAX_CPUS) cpu = 0;
+
     BaseType_t ret = xTaskCreatePinnedToCore(
         task_wrapper,           /* 包装函数 */
         name ? name : "xtask",  /* FreeRTOS 任务名 */
-        (uint32_t)stack_size,   /* 栈大小（字） */
+        (uint32_t)stack_words,  /* 栈大小（字） */
         task,                   /* 参数 = kern_task_t* */
         tskIDLE_PRIORITY + 1,   /* 优先级略高于 idle */
         &handle,

@@ -21,6 +21,9 @@ extern kern_sched_class_t sched_class_rr;
 /** 默认时间片（tick 数） */
 #define SCHED_RR_DEFAULT_TIMESLICE 10
 
+/** 高内存压力下的时间片（tick 数） */
+#define SCHED_RR_HIGH_PRESSURE_TIMESLICE 3
+
 #ifdef __cplusplus
 }
 #endif

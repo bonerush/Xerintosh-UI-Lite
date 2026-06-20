@@ -259,3 +259,38 @@ TEST(KernelResourceTest, ResourceTrackUnderLock)
     /* 恢复 idle 栈资源 */
     task->resource_head = idle_stack_res;
 }
+
+TEST(KernelResourceTest, PoolSizeLinkedToMaxTasks)
+{
+    kern_init();
+    kern_sched_init();
+
+    kern_task_t *task = kern_task_current();
+    ASSERT_NE(task, nullptr);
+
+    /* 隔离 idle 任务栈资源 */
+    kern_resource_t *idle_stack_res = task->resource_head;
+    task->resource_head = nullptr;
+
+    /* 池大小 = KERN_MAX_TASKS * 4 = 64；追踪 40 个应全部成功 */
+    static void *ptrs[40];
+    for (int i = 0; i < 40; i++) {
+        ptrs[i] = (void *)(uintptr_t)(0x1000 + (size_t)i);
+        EXPECT_EQ(kern_resource_track(task, ptrs[i], KERN_RES_MEMORY, counting_release), KERN_OK)
+            << "第 " << i << " 个资源追踪失败";
+    }
+
+    /* 验证链表长度 */
+    int count = 0;
+    for (kern_resource_t *cur = task->resource_head; cur != NULL; cur = cur->next) {
+        count++;
+    }
+    EXPECT_EQ(count, 40);
+
+    /* 清理 */
+    kern_resource_release_all(task);
+    EXPECT_EQ(task->resource_head, nullptr);
+
+    /* 恢复 idle 栈资源 */
+    task->resource_head = idle_stack_res;
+}

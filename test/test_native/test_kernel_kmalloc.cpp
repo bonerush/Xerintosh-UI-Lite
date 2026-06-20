@@ -315,3 +315,87 @@ TEST(KernelKmallocTest, LargeAllocation)
     kern_kfree(ptr);
 }
 
+TEST(KernelKmallocTest, MemoryStatsBasic)
+{
+    kern_init();
+    kern_sched_init();
+
+    kern_kmem_stat_t before;
+    ASSERT_TRUE(kern_kmem_get_stats(&before));
+
+    void *ptr = kern_kmalloc(256);
+    ASSERT_NE(ptr, nullptr);
+
+    kern_kmem_stat_t after;
+    ASSERT_TRUE(kern_kmem_get_stats(&after));
+    EXPECT_GE(after.allocated_bytes, before.allocated_bytes + 256)
+        << "allocated_bytes 应反映新增分配";
+
+    kern_kfree(ptr);
+
+    kern_kmem_stat_t freed;
+    ASSERT_TRUE(kern_kmem_get_stats(&freed));
+    EXPECT_LE(freed.allocated_bytes, after.allocated_bytes)
+        << "释放后 allocated_bytes 应下降";
+}
+
+TEST(KernelKmallocTest, MemoryStatsFragmentation)
+{
+    kern_init();
+    kern_sched_init();
+
+    kern_kmem_stat_t st;
+    ASSERT_TRUE(kern_kmem_get_stats(&st));
+    EXPECT_LE(st.fragmentation_percent, (size_t)100)
+        << "碎片率应在 0-100 之间";
+}
+
+TEST(KernelKmallocTest, MemoryStatsNullOut)
+{
+    EXPECT_FALSE(kern_kmem_get_stats(NULL));
+}
+
+TEST(KernelKmallocTest, ReservedBytesDefaultZero)
+{
+    EXPECT_EQ(kern_kmem_reserved_bytes(), (size_t)0);
+}
+
+TEST(KernelKmallocTest, ReservedBytesCanBeSet)
+{
+    kern_kmem_set_reserved_bytes(12345);
+    EXPECT_EQ(kern_kmem_reserved_bytes(), (size_t)12345);
+
+    /* 恢复默认，避免影响其他测试 */
+    kern_kmem_set_reserved_bytes(0);
+}
+
+TEST(KernelKmallocTest, MemoryPressureLevelLow)
+{
+    kern_init();
+    kern_sched_init();
+
+    /* 默认保留水位为 0，应返回 LOW */
+    kern_kmem_set_reserved_bytes(0);
+    EXPECT_EQ(kern_kmem_pressure_level(), KERN_KMEM_PRESSURE_LOW);
+}
+
+TEST(KernelKmallocTest, MemoryPressureLevelHighWhenOverReserved)
+{
+    kern_init();
+    kern_sched_init();
+
+    kern_kmem_stat_t before;
+    ASSERT_TRUE(kern_kmem_get_stats(&before));
+
+    /* 设置一个较低的保留水位，然后分配超过它 */
+    kern_kmem_set_reserved_bytes(before.allocated_bytes + 64);
+
+    void *ptr = kern_kmalloc(128);
+    ASSERT_NE(ptr, nullptr);
+
+    EXPECT_EQ(kern_kmem_pressure_level(), KERN_KMEM_PRESSURE_HIGH);
+
+    kern_kfree(ptr);
+    kern_kmem_set_reserved_bytes(0);
+}
+

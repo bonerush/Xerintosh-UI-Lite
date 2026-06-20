@@ -23,7 +23,7 @@ extern uint16_t bt_uart_test_consume_tx(uint16_t len);
 
 TEST(BleUartTest, InitReturnsTrue)
 {
-    EXPECT_TRUE(bt_uart_service_init());
+    EXPECT_EQ(bt_uart_service_init(), BT_UART_OK);
 }
 
 TEST(BleUartTest, InitSetsDefaultState)

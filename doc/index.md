@@ -52,6 +52,7 @@ Project Root
 │   ├── app_menu.c/h        ← 菜单树构建
 │   ├── app_input.c/h       ← 每帧输入路由与状态机调度
 │   ├── app_state.c/h       ← 跨模块全局状态（g_wifi_on/g_bt_on）
+│   ├── app_mem.c/h         ← App 层统一内存视图（保留水位 + 安全分配判断）
 │   ├── ui_service.c/h      ← user_item 生命周期公共辅助 + 横屏切换 helper
 │   ├── ui_task.c           ← UI 内核任务包装（输入→渲染→yield）
 │   ├── boot/               ← 开机画面
@@ -253,6 +254,7 @@ flowchart LR
 - **[菜单构建](app/app-menu.md)** — Xerintosh UI 菜单树构造
 - **[输入处理](app/app-input.md)** — 按键映射与各状态机调度
 - **[全局状态](app/app-state.md)** — 跨模块全局状态（`g_wifi_on`、`g_bt_on`）
+- **[统一内存视图](app/app-mem.md)** — 包装内核内存统计，提供保留水位感知的安全分配判断
 - **[UI 公共服务](app/ui-service.md)** — user_item 生命周期公共辅助
 - **[设置管理](app/settings.md)** — 亮度/动画/方向/波特率配置与存储
 - **[开机画面](app/boot.md)** — Macintosh 128K 风格开机动画
@@ -311,6 +313,7 @@ flowchart LR
 | 2026-06-15 | 第一轮 | `refactor/2026-06-15-kernel-ui` | 内核 O(1) enqueue + FD 池 + P0 ISR；UI dirty rect + XOR 批量 + 缓存 | [归档](refactor/04-archive.md) |
 | 2026-06-15 | 第二轮 | 同上 | 内核 P1-11 + O(1) 插入 + resource 池 + 设备加固；App 包装层 + getter 统一 | [归档 v2](refactor/04-archive-v2.md) |
 | 2026-06-16 | 第八轮 | `refactor/2026-06-16-app-transition-device-optimizations` | 内核设备优化（设备注册表加锁、`/dev/ttyS0`/`fb0`/`input0`、`/sys/gpio`）；UI/App 过渡动画已回滚 | [内核设备优化报告](refactor/02-refactor/kernel-device-optimizations.md) |
+| 2026-06-19 | 第十二轮 | `refactor/2026-06-19-memory-schedule` | 内核内存分配与调度按需分配（FreeRTOS 栈单位修复、内存统计/压力、栈高水位/自动增长、App 统一内存视图） | [归档](refactor/04-archive-memory-schedule.md) |
 
 ### 两轮合计内核优化
 
@@ -341,3 +344,36 @@ flowchart LR
 - ✅ 新增 Native 测试：`test_kernel_device.cpp` / `test_kernel_devices.cpp` / `test_kernel_gpiofs.cpp`
 
 验证结果：`pio run -e m5stick-c` ✅（RAM 28.1%，Flash 88.9%）；`pio test -e native` ✅ 442 passed，1 skipped。
+
+### 第十二轮内存-调度重构（2026-06-19）
+
+目标：改进 Xeros 内核内存分配与任务调度机制，使任务栈/内存按当前实际需求自动分配，解决 WiFi/蓝牙因静态内存预留导致无法共存和服务错误的问题。
+
+**内核层优化**
+
+- ✅ FreeRTOS 栈单位语义修复：`xTaskCreatePinnedToCore` 按 `StackType_t` 字数接收栈，`task->stack_size` 统一为字节
+- ✅ `kern_task_stack.c` 新增栈高水位 `stack_highwater`、`kern_task_stack_highwater()`、`kern_task_stack_recommend()`
+- ✅ Native 后端支持栈自动增长 `kern_task_stack_grow()`；FreeRTOS 后端明确不支持动态增长，采用创建时按需预留
+- ✅ `kern_kmalloc.c` 新增内存统计 `kern_kmem_stat_t`、`kern_kmem_get_stats()`、内存压力等级、保留内存接口
+- ✅ `kern_sched.c` 每 500 ticks 检查栈压力，每 100 ticks 分发内存压力回调
+- ✅ `kern_sched_class.h` 新增 `memory_pressure` vtable 回调；RR class 在高压下缩短时间片
+- ✅ `kern_resource.c` 资源节点池扩至 `KERN_MAX_TASKS * 4`
+- ✅ `/proc/meminfo`、`ps`、`free` 等 Shell 命令使用新统计 API
+
+**App 层优化**
+
+- ✅ 新增 `src/app/app_mem.c/h`：统一内存视图 `xeros_mem_get_stats()` / `xeros_mem_available_bytes()` / `xeros_mem_can_alloc()`
+- ✅ WiFi/BT 管理器启用前改用 `xeros_mem_can_alloc()` 双内存守卫（总空闲 + 最大连续块）
+- ✅ BT 初始化错误分类，内存不足时返回 `BT_MGR_ERR_NO_MEM` 并回写 `g_bt_on`
+- ✅ WiFi 关闭后采用轮询等待堆恢复，替代固定 500ms delay
+- ✅ `main.cpp` UI/WiFi/BT 任务栈按需初始化为 4096 字节
+
+**验证结果**
+
+- `pio run -e m5stick-c` ✅（RAM 27.2%，Flash 89.4%）
+- `pio test -e native` ✅ 242/243 passed，1 errored（基线已有的 native `ucontext` 上下文切换 SIGTRAP，非本轮引入）
+
+**待跟进**
+
+- 真机验证 WiFi/BT 共存、栈高水位显示、`free` 命令输出
+- 根因修复 native `swapcontext` 在 spawned task 退出时的崩溃（已在 `main` 基线存在）

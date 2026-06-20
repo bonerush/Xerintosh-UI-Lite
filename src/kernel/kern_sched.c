@@ -14,6 +14,7 @@
 #include "kern_mpu.h"
 #include "kern_init.h"
 #include "kern_port.h"
+#include "kern_kmalloc.h"
 
 #include <string.h>
 #include <stdlib.h>
@@ -45,6 +46,65 @@ static bool    g_sched_initialized = false;
 /* 共享任务列表自旋锁 */
 volatile bool  g_task_list_lock = false;
 #endif
+
+/* ═══ 栈压力检查（后端无关）═══ */
+
+#define STACK_PRESSURE_THRESHOLD_PCT 75
+#define STACK_GROW_THRESHOLD_PCT     85
+#define STACK_GROW_CONSECUTIVE       3
+
+static void sched_check_stack_pressure(kern_task_t *task)
+{
+    if (task == NULL || task == g_idle_task) return;
+    if ((g_sched_ticks % 500) != 0) return;
+
+    size_t usage = kern_task_stack_usage(task);
+
+    if (task->stack_size > 0
+        && usage > task->stack_size * STACK_PRESSURE_THRESHOLD_PCT / 100) {
+        kern_log(KERN_LOG_WARN,
+                 "task %s stack usage %zu/%zu (>75%%)",
+                 task->name, usage, task->stack_size);
+    }
+
+#if defined(NATIVE_TEST) || defined(XEROS_NATIVE_SCHED)
+    /* 仅 Native 后端：连续多次超高使用率触发自动增长 */
+    static uint8_t s_grow_counter[KERN_MAX_TASKS] = {0};
+    if (task->pid >= 0 && task->pid < KERN_MAX_TASKS) {
+        if (task->stack_size > 0
+            && usage > task->stack_size * STACK_GROW_THRESHOLD_PCT / 100) {
+            s_grow_counter[task->pid]++;
+            if (s_grow_counter[task->pid] >= STACK_GROW_CONSECUTIVE) {
+                size_t recommended = kern_task_stack_recommend(task, 0);
+                if (recommended > task->stack_size) {
+                    kern_log(KERN_LOG_INFO,
+                             "stack_grow: task %s %zu -> %zu",
+                             task->name, task->stack_size, recommended);
+                    kern_task_stack_grow(task, recommended);
+                }
+                s_grow_counter[task->pid] = 0;
+            }
+        } else {
+            s_grow_counter[task->pid] = 0;
+        }
+    }
+#endif
+}
+
+/* ═══ 内存压力分发 ═══ */
+
+static void sched_notify_memory_pressure(void)
+{
+    if ((g_sched_ticks % 100) != 0) return;
+
+    kern_kmem_pressure_level_t level = kern_kmem_pressure_level();
+    for (int i = 0; i < g_sched_class_count; i++) {
+        kern_sched_class_t *cls = g_sched_classes[i];
+        if (cls != NULL && cls->memory_pressure != NULL) {
+            cls->memory_pressure(level);
+        }
+    }
+}
 
 #ifdef NATIVE_TEST
 ucontext_t     g_sched_ctx;
@@ -241,17 +301,8 @@ void kern_sched_tick(void)
         }
     }
 
-    /* 定期检查栈使用率 */
-    if (g_current_task != NULL && g_current_task != g_idle_task
-        && (g_sched_ticks % 500) == 0) {
-        size_t usage = kern_task_stack_usage(g_current_task);
-        if (usage > 0 && g_current_task->stack_size > 0
-            && usage > g_current_task->stack_size * 3 / 4) {
-            kern_log(KERN_LOG_WARN,
-                     "task %s stack usage %zu/%zu (>75%%)",
-                     g_current_task->name, usage, g_current_task->stack_size);
-        }
-    }
+    sched_check_stack_pressure(g_current_task);
+    sched_notify_memory_pressure();
 
     /* 检查是否需要重新调度（时间片到期 或 任务状态变更） */
     if (g_need_resched || (g_current_task && g_current_task->state != KERN_TASK_RUNNING)) {
@@ -281,6 +332,9 @@ void kern_sched_tick(void)
         }
     }
 
+    sched_check_stack_pressure(g_current_task);
+    sched_notify_memory_pressure();
+
     if (g_need_resched || (g_current_task && g_current_task->state != KERN_TASK_RUNNING)) {
         g_need_resched = false;
         kern_task_t *next = pick_next_ready();
@@ -307,6 +361,9 @@ void kern_sched_tick(void) /* ESP32: FreeRTOS */
             g_sched_classes[i]->tick(g_current_task);
         }
     }
+
+    sched_check_stack_pressure(g_current_task);
+    sched_notify_memory_pressure();
 
     if (g_need_resched || (g_current_task && g_current_task->state != KERN_TASK_RUNNING)) {
         g_need_resched = false;

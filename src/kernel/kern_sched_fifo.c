@@ -156,12 +156,13 @@ static void sched_fifo_prio_changed(kern_task_t *task, uint8_t old_prio)
 /* ═══ 全局 FIFO class 实例 ═══ */
 
 kern_sched_class_t sched_class_fifo = {
-    .name          = "priority-fifo",
-    .enqueue       = sched_fifo_enqueue,
-    .dequeue       = sched_fifo_dequeue,
-    .pick_next     = sched_fifo_pick_next,
-    .tick          = sched_fifo_tick,
-    .prio_changed  = sched_fifo_prio_changed,
-    .task_list     = NULL,
-    .task_list_tail = NULL,
+    .name             = "priority-fifo",
+    .enqueue          = sched_fifo_enqueue,
+    .dequeue          = sched_fifo_dequeue,
+    .pick_next        = sched_fifo_pick_next,
+    .tick             = sched_fifo_tick,
+    .prio_changed     = sched_fifo_prio_changed,
+    .memory_pressure  = NULL,
+    .task_list        = NULL,
+    .task_list_tail   = NULL,
 };

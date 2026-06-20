@@ -53,6 +53,7 @@ typedef struct kern_task {
     /* 动态栈管理（Native: 堆分配+ucontext；ESP32: FreeRTOS 管理栈） */
     uint8_t            *stack_base;     /* 栈底指针 */
     size_t              stack_size;     /* 栈大小（字节） */
+    size_t              stack_highwater; /* 历史最大栈使用量（字节） */
 
     /* 上下文保存 */
 #if defined(NATIVE_TEST)
@@ -177,6 +178,30 @@ extern kern_task_t *kern_task_current(void);
 extern kern_task_t *kern_task_get(kern_pid_t pid);
 extern kern_task_t *kern_task_list_head(void);
 extern size_t kern_task_stack_usage(kern_task_t *task);
+
+/**
+ * @brief  获取任务栈历史高水位（字节）
+ * @note  Native: 返回 TCB 中记录的峰值
+ *        FreeRTOS: 根据 uxTaskGetStackHighWaterMark 计算峰值
+ */
+extern size_t kern_task_stack_highwater(kern_task_t *task);
+
+/**
+ * @brief  根据历史高水位推荐新栈大小
+ * @param  task         任务指针（可为 NULL，此时按 current_size 推荐）
+ * @param  current_size 当前栈大小（字节），0 表示使用 task->stack_size
+ * @return 推荐栈大小（字节），已 clamp 到 [KERN_STACK_MIN, KERN_STACK_MAX]
+ * @note  推荐算法：max(current_size, highwater + KERN_STACK_GROW * 2)
+ */
+extern size_t kern_task_stack_recommend(kern_task_t *task, size_t current_size);
+
+/**
+ * @brief  增长任务栈
+ * @note   Native/XEROS_NATIVE_SCHED 后端：分配新栈、复制旧栈、更新上下文。
+ *         FreeRTOS 后端：不支持，返回 false。
+ *         **仅对非运行态任务安全调用**。
+ */
+extern bool kern_task_stack_grow(kern_task_t *task, size_t new_size);
 
 /* ═══ 虚任务管理 ═══ */
 

@@ -12,10 +12,16 @@
 #include "kern_kmalloc.h"
 #include "kern_resource.h"
 #include "kern_task.h"
+#include "kern_init.h"
 
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
+
+#ifndef NATIVE_TEST
+#include <esp_heap_caps.h>
+#include <esp_system.h>
+#endif
 
 /* ═══ 分配头结构 ═══ */
 
@@ -36,6 +42,17 @@ static inline kmalloc_header_t *get_header(void *ptr)
     if (ptr == NULL) return NULL;
     return (kmalloc_header_t *)((uint8_t *)ptr - sizeof(kmalloc_header_t));
 }
+
+/* ═══ 全局内存统计 ═══ */
+
+static volatile size_t g_kmem_allocated_bytes = 0;
+
+/* 用 canary 包围保留水位，检测是否有越界写或非法修改 */
+static struct {
+    uint32_t canary_before;
+    volatile size_t reserved;
+    uint32_t canary_after;
+} g_kmem_reserved_guard = { 0xDEADBEEF, 0, 0xBEEFDEAD };
 
 /* ═══ 内存释放回调（供资源追踪使用） ═══ */
 
@@ -74,6 +91,8 @@ static void *kern_kmalloc_impl(size_t size, kern_task_t *owner, bool track)
             return NULL;
         }
     }
+
+    g_kmem_allocated_bytes += size;
 
     return user_ptr;
 }
@@ -123,6 +142,12 @@ void kern_kfree(void *ptr)
         kern_resource_untrack(hdr->owner, ptr);
     }
 
+    if (hdr->size <= g_kmem_allocated_bytes) {
+        g_kmem_allocated_bytes -= hdr->size;
+    } else {
+        g_kmem_allocated_bytes = 0;
+    }
+
     free(hdr);
 }
 
@@ -156,11 +181,20 @@ void *kern_krealloc(void *ptr, size_t new_size)
         kern_resource_untrack(old_hdr->owner, ptr);
     }
 
+    /* 先扣除旧大小；成功后再加回新大小 */
+    size_t old_size = old_hdr->size;
+    if (old_size <= g_kmem_allocated_bytes) {
+        g_kmem_allocated_bytes -= old_size;
+    } else {
+        g_kmem_allocated_bytes = 0;
+    }
+
     /* 重新分配 */
     kmalloc_header_t *new_hdr = (kmalloc_header_t *)realloc(old_hdr,
                                             sizeof(kmalloc_header_t) + new_size);
     if (new_hdr == NULL) {
-        /* realloc 失败：旧内存仍有效，重新追踪 */
+        /* realloc 失败：旧内存仍有效，恢复统计并重新追踪 */
+        g_kmem_allocated_bytes += old_size;
         if (old_hdr->owner != NULL) {
             kern_resource_track(old_hdr->owner, ptr,
                                 KERN_RES_MEMORY, kmem_release);
@@ -170,6 +204,7 @@ void *kern_krealloc(void *ptr, size_t new_size)
 
     new_hdr->size = new_size;
     new_hdr->owner = kern_task_current();
+    g_kmem_allocated_bytes += new_size;
 
     void *user_ptr = (void *)((uint8_t *)new_hdr + sizeof(kmalloc_header_t));
 
@@ -182,4 +217,85 @@ void *kern_krealloc(void *ptr, size_t new_size)
     }
 
     return user_ptr;
+}
+
+/* ═══ 内存统计 API ═══ */
+
+bool kern_kmem_get_stats(kern_kmem_stat_t *out)
+{
+    if (out == NULL) return false;
+
+    memset(out, 0, sizeof(*out));
+    out->allocated_bytes = g_kmem_allocated_bytes;
+
+#ifndef NATIVE_TEST
+    out->total_bytes = heap_caps_get_total_size(MALLOC_CAP_8BIT);
+    out->free_bytes  = heap_caps_get_free_size(MALLOC_CAP_8BIT);
+    out->largest_free_block = heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
+    out->min_free_bytes = esp_get_minimum_free_heap_size();
+
+    if (out->free_bytes > 0 && out->largest_free_block <= out->free_bytes) {
+        out->fragmentation_percent =
+            100 - (out->largest_free_block * 100 / out->free_bytes);
+    } else {
+        out->fragmentation_percent = 0;
+    }
+#else
+    /* native 环境无统一堆接口，只返回 kmalloc 自身统计 */
+    out->free_bytes = 0;
+    out->largest_free_block = 0;
+    out->min_free_bytes = 0;
+    out->fragmentation_percent = 0;
+#endif
+
+    return true;
+}
+
+/* ═══ 内存压力等级与保留内存 ═══ */
+
+#define KERN_KMEM_PRESSURE_HIGH_PCT  10
+#define KERN_KMEM_PRESSURE_LOW_PCT   25
+#define KERN_KMEM_PRESSURE_HIGH_FRAG 50
+
+kern_kmem_pressure_level_t kern_kmem_pressure_level(void)
+{
+    kern_kmem_stat_t st;
+    if (!kern_kmem_get_stats(&st)) return KERN_KMEM_PRESSURE_LOW;
+
+#ifndef NATIVE_TEST
+    if (st.total_bytes == 0) return KERN_KMEM_PRESSURE_LOW;
+    size_t free_pct = st.free_bytes * 100 / st.total_bytes;
+    if (free_pct < KERN_KMEM_PRESSURE_HIGH_PCT) return KERN_KMEM_PRESSURE_HIGH;
+    if (free_pct < KERN_KMEM_PRESSURE_LOW_PCT ||
+        st.fragmentation_percent > KERN_KMEM_PRESSURE_HIGH_FRAG) {
+        return KERN_KMEM_PRESSURE_MEDIUM;
+    }
+    return KERN_KMEM_PRESSURE_LOW;
+#else
+    /* Native 无真实堆总大小，基于保留水位判断 */
+    if (g_kmem_reserved_guard.reserved == 0) return KERN_KMEM_PRESSURE_LOW;
+    if (st.allocated_bytes > g_kmem_reserved_guard.reserved) return KERN_KMEM_PRESSURE_HIGH;
+    if (st.allocated_bytes > g_kmem_reserved_guard.reserved * 3 / 4) return KERN_KMEM_PRESSURE_MEDIUM;
+    return KERN_KMEM_PRESSURE_LOW;
+#endif
+}
+
+void kern_kmem_set_reserved_bytes(size_t bytes)
+{
+    g_kmem_reserved_guard.reserved = bytes;
+}
+
+size_t kern_kmem_reserved_bytes(void)
+{
+    /* 保留水位：仅由 kern_kmem_set_reserved_bytes() 修改，默认 0 */
+    if (g_kmem_reserved_guard.canary_before != 0xDEADBEEF ||
+        g_kmem_reserved_guard.canary_after != 0xBEEFDEAD) {
+        kern_log(KERN_LOG_ERROR,
+                 "reserved guard corrupted: before=0x%08lx after=0x%08lx",
+                 (unsigned long)g_kmem_reserved_guard.canary_before,
+                 (unsigned long)g_kmem_reserved_guard.canary_after);
+        g_kmem_reserved_guard.canary_before = 0xDEADBEEF;
+        g_kmem_reserved_guard.canary_after = 0xBEEFDEAD;
+    }
+    return g_kmem_reserved_guard.reserved;
 }

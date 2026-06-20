@@ -68,6 +68,16 @@ bool wifi_mgr_is_waiting_input(void);
 bool wifi_mgr_is_enabled(void);
 
 /**
+ * @brief  查询 WiFi 驱动是否真实初始化成功
+ */
+bool wifi_mgr_is_driver_on(void);
+
+/**
+ * @brief  返回 WiFi 启用建议的最小空闲内存（字节）
+ */
+uint32_t wifi_mgr_needed_heap(void);
+
+/**
  * @brief 每帧更新 WiFi 状态机（非阻塞）
  * @note  应在主循环中每帧调用，处理扫描超时、连接超时、状态转换等
  */

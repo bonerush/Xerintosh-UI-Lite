@@ -18,6 +18,8 @@ void wifi_mgr_enable(void) {}
 void wifi_mgr_disable(void) {}
 bool wifi_mgr_is_waiting_input(void) { return false; }
 bool wifi_mgr_is_enabled(void) { return false; }
+bool wifi_mgr_is_driver_on(void) { return false; }
+uint32_t wifi_mgr_needed_heap(void) { return 45000; }
 void wifi_mgr_update(void) {}
 void wifi_mgr_request_enable(void) {}
 void wifi_mgr_request_disable(void) {}
@@ -38,6 +40,7 @@ void wifi_mgr_task_main(void *arg) { (void)arg; }
 #include "app/wifi/wifi_manager.h"
 #include "app/wifi/wifi_menu.h"
 #include "app/bluetooth/bt_manager.h"
+#include "app/app_mem.h"
 
 extern "C" {
 #include "app/storage/storage.h"
@@ -98,6 +101,10 @@ static void wifi_scan_done_handler(void* arg, esp_event_base_t base,
 #define WIFI_WARMUP_DELAY_MS    2000  /* 预热等待时间（WiFi 驱动需要充分初始化） */
 #define WIFI_SCAN_TIMEOUT_MS    30000  /* 扫描超时时间 */
 #define WIFI_CONNECT_TIMEOUT_MS 15000  /* 连接超时时间 */
+
+/* 内存守卫阈值 */
+#define WIFI_MIN_FREE_HEAP        45000
+#define WIFI_MIN_MAX_ALLOC_HEAP   20000
 
 /* ═══ 跨任务弹窗辅助 ═══
  * 与 power_key_popup 同模式：UI 任务每帧 push_pop_up 保持弹窗存活，
@@ -169,6 +176,10 @@ bool wifi_mgr_is_waiting_input(void)
     return g_state == WIFI_MGR_CONNECTING;
 }
 
+bool wifi_mgr_is_driver_on(void) { return g_wifi_enabled; }
+
+uint32_t wifi_mgr_needed_heap(void) { return WIFI_MIN_FREE_HEAP; }
+
 /* ═══ 初始化 ═══ */
 
 /**
@@ -217,13 +228,25 @@ void wifi_mgr_enable(void)
         return;
     }
 
+    Serial.printf("[WiFi] enable start free=%u max=%u\n",
+                  (uint32_t)ESP.getFreeHeap(), (uint32_t)ESP.getMaxAllocHeap());
+    Serial.flush();
+
     g_wifi_enabled = true;
 
     /* ── 内存预检：WiFi 驱动初始化需要 ~40KB 堆 ──
+     * 使用 xeros_mem_can_alloc() 统一检查总空闲、最大连续块与保留水位。
      * BT 默认关闭时堆约 163KB，BT 按需加载后堆约 132KB，仍需留足余量 */
-    if (ESP.getFreeHeap() < 45000) {
+    if (!xeros_mem_can_alloc(WIFI_MIN_FREE_HEAP, WIFI_MIN_MAX_ALLOC_HEAP)) {
+        kern_kmem_stat_t st;
+        xeros_mem_get_stats(&st);
+        Serial.printf("[WiFi] heap guard failed: free=%u max_alloc=%u reserved=%u\n",
+                      (uint32_t)st.free_bytes,
+                      (uint32_t)st.largest_free_block,
+                      (uint32_t)kern_kmem_reserved_bytes());
         wifi_popup_request("内存不足", 2000);
         g_wifi_enabled = false;
+        g_wifi_on = false;   /* A9: 回写状态 */
         g_state = WIFI_MGR_IDLE;
         wifi_menu_rebuild_list(0);
         return;
@@ -290,6 +313,10 @@ extern "C" const char *wifi_mgr_get_scan_ssid(int index)
  */
 void wifi_mgr_disable(void)
 {
+    Serial.printf("[WiFi] disable start free=%u max=%u\n",
+                  (uint32_t)ESP.getFreeHeap(), (uint32_t)ESP.getMaxAllocHeap());
+    Serial.flush();
+
     wifi_popup_dismiss();
     if (g_connecting) {
         restore_wifi_logs();
@@ -306,6 +333,10 @@ void wifi_mgr_disable(void)
     esp_wifi_stop();
     esp_wifi_deinit();
     g_wifi_enabled = false;
+
+    Serial.printf("[WiFi] disable done free=%u max=%u\n",
+                  (uint32_t)ESP.getFreeHeap(), (uint32_t)ESP.getMaxAllocHeap());
+    Serial.flush();
 
     if (g_networks_list) {
         /* 若选择器当前位于网络子树内，将其移回设置项 */
