@@ -37,6 +37,8 @@ static void sched_fifo_enqueue(kern_task_t *task)
 {
     if (task == NULL) return;
 
+    task_list_lock();
+
     kern_task_t **head = &sched_class_fifo.task_list;
     task->next = NULL;
 
@@ -61,6 +63,8 @@ static void sched_fifo_enqueue(kern_task_t *task)
         && task->priority > g_current_task->priority) {
         g_need_resched = true;
     }
+
+    task_list_unlock();
 }
 
 /* ═══ FIFO dequeue：从链表中移除 ═══ */
@@ -68,6 +72,8 @@ static void sched_fifo_enqueue(kern_task_t *task)
 static void sched_fifo_dequeue(kern_task_t *task)
 {
     if (task == NULL) return;
+
+    task_list_lock();
 
     kern_task_t **head = &sched_class_fifo.task_list;
     kern_task_t *prev = NULL;
@@ -86,11 +92,14 @@ static void sched_fifo_dequeue(kern_task_t *task)
                 }
             }
             task->scheduler_class_id = -1;
+            task_list_unlock();
             return;
         }
         prev = t;
         t = t->next;
     }
+
+    task_list_unlock();
 }
 
 /* ═══ FIFO pick_next：选择最高优先级就绪任务 ═══ */

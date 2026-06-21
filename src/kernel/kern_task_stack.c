@@ -271,3 +271,70 @@ bool kern_task_stack_grow(kern_task_t *task, size_t new_size)
 }
 
 #endif
+
+/* ═══ 栈使用画像（按任务名记录历史高水位）═══ */
+
+#define KERN_STACK_PROFILE_MAX 16
+
+static kern_task_stack_profile_t g_stack_profiles[KERN_STACK_PROFILE_MAX];
+static size_t                    g_stack_profile_count = 0;
+
+static size_t stack_profile_recommended(size_t highwater)
+{
+    size_t rec = highwater + KERN_STACK_GROW * 2;
+    if (rec < KERN_STACK_MIN) rec = KERN_STACK_MIN;
+    if (rec > KERN_STACK_MAX) rec = KERN_STACK_MAX;
+    return rec;
+}
+
+void kern_task_stack_profile_record(const char *name, size_t highwater)
+{
+    if (name == NULL) return;
+
+    for (size_t i = 0; i < g_stack_profile_count; i++) {
+        if (strncmp(g_stack_profiles[i].name, name, KERN_TASK_NAME_LEN) != 0) {
+            continue;
+        }
+        if (highwater > g_stack_profiles[i].highwater) {
+            g_stack_profiles[i].highwater   = highwater;
+            g_stack_profiles[i].recommended = stack_profile_recommended(highwater);
+        }
+        return;
+    }
+
+    if (g_stack_profile_count >= KERN_STACK_PROFILE_MAX) {
+        kern_log(KERN_LOG_WARN, "stack profile table full, dropping %s", name);
+        return;
+    }
+
+    kern_task_stack_profile_t *p = &g_stack_profiles[g_stack_profile_count++];
+    strncpy(p->name, name, KERN_TASK_NAME_LEN);
+    p->name[KERN_TASK_NAME_LEN] = '\0';
+    p->highwater   = highwater;
+    p->recommended = stack_profile_recommended(highwater);
+}
+
+size_t kern_task_stack_recommend_by_name(const char *name, size_t fallback)
+{
+    if (name == NULL) return stack_profile_recommended(fallback);
+
+    for (size_t i = 0; i < g_stack_profile_count; i++) {
+        if (strncmp(g_stack_profiles[i].name, name, KERN_TASK_NAME_LEN) == 0) {
+            size_t rec = g_stack_profiles[i].highwater + KERN_STACK_GROW * 2;
+            if (rec < fallback) rec = fallback;
+            if (rec > KERN_STACK_MAX) rec = KERN_STACK_MAX;
+            return rec;
+        }
+    }
+
+    return stack_profile_recommended(fallback);
+}
+
+void kern_task_stack_profile_dump(void (*cb)(const kern_task_stack_profile_t *profile, void *ud),
+                                  void *ud)
+{
+    if (cb == NULL) return;
+    for (size_t i = 0; i < g_stack_profile_count; i++) {
+        cb(&g_stack_profiles[i], ud);
+    }
+}

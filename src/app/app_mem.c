@@ -36,8 +36,11 @@ bool xeros_mem_can_alloc(uint32_t needed_bytes, uint32_t needed_contiguous)
     if (st.allocated_bytes + needed_bytes > budget) return false;
     return true;
 #else
+    /* 保留水位只从总空闲池中扣除一次；连续块需求是物理分配要求，
+     * 不应再叠加保留水位，否则会把本就紧张的连续大块进一步高估，
+     * 导致 BT/WiFi 等需要大连续堆的初始化被错误拒绝。 */
     if (st.free_bytes < (size_t)needed_bytes + reserved) return false;
-    if (st.largest_free_block < (size_t)needed_contiguous + reserved) return false;
+    if (st.largest_free_block < (size_t)needed_contiguous) return false;
     return true;
 #endif
 }

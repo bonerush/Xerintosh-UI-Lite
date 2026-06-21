@@ -199,6 +199,8 @@ uint16_t bt_uart_test_consume_tx(uint16_t len)
 #include <freertos/semphr.h>
 #include "esp_bt.h"
 #include "esp_bt_main.h"
+#include "esp_bt_device.h"
+#include "esp_gap_bt_api.h"
 
 /* ═══ 调试开关 ═══ */
 #define BT_DBG_ENABLED 0
@@ -209,7 +211,16 @@ uint16_t bt_uart_test_consume_tx(uint16_t len)
 #define BT_UART_MIN_MAX_ALLOC_HEAP  22000
 
 static BluetoothSerial g_bt_serial;
-static bool g_initialized    = false;
+
+/* BT UART 服务状态机 */
+typedef enum {
+    BT_UART_STATE_UNINIT = 0,
+    BT_UART_STATE_INITING,
+    BT_UART_STATE_READY,
+    BT_UART_STATE_DEINITING,
+} bt_uart_state_t;
+
+static bt_uart_state_t g_state = BT_UART_STATE_UNINIT;
 static volatile bool g_prev_connected = false;
 
 /* RX 数据跨任务传递队列（主任务写入，UI 任务消费） */
@@ -221,10 +232,16 @@ static SemaphoreHandle_t g_poll_done_sem = NULL;
 
 bt_uart_err_t bt_uart_service_init(void)
 {
-    if (g_initialized) {
+    if (g_state == BT_UART_STATE_INITING || g_state == BT_UART_STATE_READY) {
         Serial.println("[BT] bt_uart_service_init: already initialized");
         return BT_UART_OK;
     }
+    if (g_state == BT_UART_STATE_DEINITING) {
+        Serial.println("[BT] bt_uart_service_init: still deinitializing");
+        return BT_UART_ERR_BLUEDROID;
+    }
+
+    g_state = BT_UART_STATE_INITING;
 
     ringbuf_init(&g_tx_buf, BT_UART_TX_BUF_SIZE);
     ringbuf_init(&g_rx_buf, BT_UART_RX_BUF_SIZE);
@@ -237,20 +254,29 @@ bt_uart_err_t bt_uart_service_init(void)
     if (!g_rx_queue) {
         g_rx_queue = xQueueCreate(BT_RX_QUEUE_SIZE, sizeof(uint8_t));
     }
+    if (!g_rx_queue) {
+        Serial.println("[BT-INIT] ERR: RX queue allocation failed");
+        g_state = BT_UART_STATE_UNINIT;
+        return BT_UART_ERR_HEAP;
+    }
 
     /* 创建 poll 完成信号量，初始可用 */
     if (!g_poll_done_sem) {
         g_poll_done_sem = xSemaphoreCreateBinary();
     }
-    if (g_poll_done_sem) {
-        xSemaphoreGive(g_poll_done_sem);
+    if (!g_poll_done_sem) {
+        Serial.println("[BT-INIT] ERR: poll semaphore allocation failed");
+        g_state = BT_UART_STATE_UNINIT;
+        return BT_UART_ERR_HEAP;
     }
+    xSemaphoreGive(g_poll_done_sem);
 
     /* 内存守卫 */
     uint32_t free_heap = ESP.getFreeHeap();
     uint32_t max_alloc = ESP.getMaxAllocHeap();
     if (free_heap < BT_UART_MIN_FREE_HEAP || max_alloc < BT_UART_MIN_MAX_ALLOC_HEAP) {
         Serial.printf("[BT-INIT] ERR_HEAP free=%u max_alloc=%u\n", free_heap, max_alloc);
+        g_state = BT_UART_STATE_UNINIT;
         return BT_UART_ERR_HEAP;
     }
 
@@ -268,6 +294,7 @@ bt_uart_err_t bt_uart_service_init(void)
 
     if (!ok) {
         Serial.println("[BT] BluetoothSerial.begin() failed");
+        g_state = BT_UART_STATE_UNINIT;
         /* 尝试推断原因 */
         if (esp_bt_controller_get_status() != ESP_BT_CONTROLLER_STATUS_ENABLED) {
             return BT_UART_ERR_RADIO;
@@ -275,22 +302,16 @@ bt_uart_err_t bt_uart_service_init(void)
         return BT_UART_ERR_BLUEDROID;
     }
 
-    g_initialized = true;
+    /* 显式设置 Classic BT 可连接且可被发现。
+     * BluetoothSerial::begin("M5Stick-P1") 已在内部设置设备名，但某些
+     * Arduino-ESP32 版本/状态下不会可靠地设置 inquiry/page scan，
+     * 导致主机搜索不到设备，因此这里再显式设置一次并打开发现模式。 */
+    esp_bt_dev_set_device_name("M5Stick-P1");
+    esp_bt_gap_set_scan_mode(ESP_BT_CONNECTABLE, ESP_BT_GENERAL_DISCOVERABLE);
 
-    /*
-     * ═══ 稳定延迟 ═══
-     * begin() 返回 true 后，Bluedroid 仍需时间完成 SPP 服务注册与
-     * BR/EDR inquiry scan 的启动。若立即返回，设备尚未进入可被发现状态，
-     * 导致 Mac 端搜索不到 "M5Stick-P1"。
-     *
-     * 500ms 延迟允许 Bluedroid 完成：
-     *   1. SPP RFCOMM 通道注册
-     *   2. BR/EDR 查询扫描 (inquiry scan) 启动
-     *   3. 寻呼扫描 (page scan) 启动
-     * （参考 ESP-IDF BT SPP initiator demo 中的 post-init delay） */
-    delay(500);
-    Serial.printf("[BT-INIT] post-begin delay done, ready. free_heap=%u\n",
-                  ESP.getFreeHeap());
+    g_state = BT_UART_STATE_READY;
+
+    Serial.printf("[BT-INIT] ready, free_heap=%u\n", ESP.getFreeHeap());
     Serial.flush();
 
     return BT_UART_OK;
@@ -298,43 +319,68 @@ bt_uart_err_t bt_uart_service_init(void)
 
 void bt_uart_service_deinit(void)
 {
-    if (!g_initialized) return;
-
-    /* ═══ 线程安全：先关标记，阻止 bt_uart_poll() 继续使用队列 ═══ */
-    g_initialized = false;
-
-    /* 等待当前正在执行的 bt_uart_poll() 给出完成信号，超时 100ms。
-     * poll 与 deinit 均在 loop() 任务中，此处阻塞不会导致死锁。 */
-    if (g_poll_done_sem) {
-        xSemaphoreTake(g_poll_done_sem, pdMS_TO_TICKS(100));
+    if (g_state != BT_UART_STATE_READY) {
+        /* 即使未 READY，也确保队列/信号量已清理 */
+        bt_uart_state_t old_state = g_state;
+        g_state = BT_UART_STATE_DEINITING;
+        if (g_rx_queue) {
+            vQueueDelete(g_rx_queue);
+            g_rx_queue = NULL;
+        }
+        g_state = old_state;
+        return;
     }
 
+    g_state = BT_UART_STATE_DEINITING;
+
+    /* 等待当前正在执行的 bt_uart_poll() 离开临界区，超时 200ms。
+     * poll 与 deinit 均在 loop() 任务中，此处阻塞不会导致死锁。 */
+    if (g_poll_done_sem) {
+        xSemaphoreTake(g_poll_done_sem, pdMS_TO_TICKS(200));
+    }
+
+    /* 断开现有 SPP 连接并释放 BluetoothSerial 资源 */
     g_bt_serial.end();
 
-    /* BluetoothSerial.end() 可能未完全释放 Bluedroid 栈，
-     * 导致下次 begin() 时栈状态不一致，SPP 连接无法建立。
-     * 手动释放 Bluedroid + BT Controller，确保下次 begin() 从零初始化。 */
-    esp_bluedroid_disable();
-    esp_bluedroid_deinit();
-    esp_bt_controller_disable();
-    esp_bt_controller_deinit();
-    /* 注意：g_initialized 已在上方提前置 false */
+    /* 给 Bluedroid 下层任务退出留出时间 */
+    delay(100);
+
+    /* 手动按正确顺序释放 Bluedroid + BT Controller，确保下次 begin()
+     * 从零初始化。每步后检查状态，避免在已反初始化状态下调用报错。 */
+    if (esp_bluedroid_get_status() == ESP_BLUEDROID_STATUS_ENABLED) {
+        esp_bluedroid_disable();
+    }
+    if (esp_bluedroid_get_status() == ESP_BLUEDROID_STATUS_INITIALIZED) {
+        esp_bluedroid_deinit();
+    }
+    if (esp_bt_controller_get_status() == ESP_BT_CONTROLLER_STATUS_ENABLED) {
+        esp_bt_controller_disable();
+    }
+    if (esp_bt_controller_get_status() == ESP_BT_CONTROLLER_STATUS_INITED) {
+        esp_bt_controller_deinit();
+    }
+
     g_connected      = false;
     g_prev_connected = false;
-    g_initialized    = false;
-    g_rx_cb          = NULL;
-    g_conn_cb        = NULL;
 
     /* 清空并删除 RX 队列 */
     if (g_rx_queue) {
         vQueueDelete(g_rx_queue);
         g_rx_queue = NULL;
     }
+
+    /* 重置信号量，避免残留状态影响下次 init */
+    if (g_poll_done_sem) {
+        xSemaphoreTake(g_poll_done_sem, 0);
+        xSemaphoreGive(g_poll_done_sem);
+    }
+
+    g_state = BT_UART_STATE_UNINIT;
 }
 
 uint16_t bt_uart_send(const uint8_t *data, uint16_t len)
 {
-    if (!data || len == 0 || !g_connected || !g_initialized) return 0;
+    if (!data || len == 0 || !g_connected || g_state != BT_UART_STATE_READY) return 0;
     size_t written = g_bt_serial.write(data, len);
     return (uint16_t)written;
 }
@@ -372,7 +418,7 @@ uint16_t bt_uart_get_rx_buffer_usage(void)
 
 void bt_uart_poll(void)
 {
-    if (!g_initialized) {
+    if (g_state != BT_UART_STATE_READY) {
         if (g_poll_done_sem) {
             xSemaphoreGive(g_poll_done_sem);
         }
@@ -393,9 +439,9 @@ void bt_uart_poll(void)
     bool print_state = (now_connected != g_prev_connected) || (s_poll_cnt % 50 == 1);
 
     if (print_state) {
-        Serial.printf("[BT-POLL] poll#%lu connected=%d initialized=%d free_heap=%u\n",
+        Serial.printf("[BT-POLL] poll#%lu connected=%d state=%d free_heap=%u\n",
                       (unsigned long)s_poll_cnt, (int)now_connected,
-                      (int)g_initialized, ESP.getFreeHeap());
+                      (int)g_state, ESP.getFreeHeap());
         Serial.flush();
     }
 

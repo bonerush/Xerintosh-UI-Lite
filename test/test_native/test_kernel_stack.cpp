@@ -288,3 +288,56 @@ TEST(KernelStackTest, StackGrowRunningTaskFails)
     bool ok = kern_task_stack_grow(g_current_task, 2048);
     EXPECT_FALSE(ok);
 }
+
+/* ═══ 栈使用画像测试 ═══ */
+
+TEST(KernelStackProfileTest, RecordNullNameDoesNotCrash)
+{
+    kern_task_stack_profile_record(NULL, 1024);
+    SUCCEED();
+}
+
+TEST(KernelStackProfileTest, RecommendByNameFallbackWithinBounds)
+{
+    size_t rec = kern_task_stack_recommend_by_name("unknown_task", 2048);
+    EXPECT_GE(rec, (size_t)KERN_STACK_MIN);
+    EXPECT_LE(rec, (size_t)KERN_STACK_MAX);
+}
+
+TEST(KernelStackProfileTest, RecommendByNameUsesProfile)
+{
+    kern_task_stack_profile_record("profiled_task", 3000);
+    size_t rec = kern_task_stack_recommend_by_name("profiled_task", 2048);
+    EXPECT_GE(rec, (size_t)(3000 + KERN_STACK_GROW * 2));
+    EXPECT_LE(rec, (size_t)KERN_STACK_MAX);
+}
+
+TEST(KernelStackProfileTest, ProfileUpdatesOnlyWhenHigher)
+{
+    kern_task_stack_profile_record("growth_task", 1000);
+    size_t rec1 = kern_task_stack_recommend_by_name("growth_task", 1024);
+
+    kern_task_stack_profile_record("growth_task", 500);   /* 应被忽略 */
+    size_t rec2 = kern_task_stack_recommend_by_name("growth_task", 1024);
+    EXPECT_EQ(rec2, rec1);
+
+    kern_task_stack_profile_record("growth_task", 2000);  /* 应更新 */
+    size_t rec3 = kern_task_stack_recommend_by_name("growth_task", 1024);
+    EXPECT_GT(rec3, rec2);
+}
+
+TEST(KernelStackProfileTest, DumpInvokesCallbackForEachEntry)
+{
+    kern_task_stack_profile_record("dump_a", 1500);
+    kern_task_stack_profile_record("dump_b", 2500);
+
+    int count = 0;
+    kern_task_stack_profile_dump([](const kern_task_stack_profile_t *profile, void *ud) {
+        int *c = (int *)ud;
+        EXPECT_NE(profile, nullptr);
+        EXPECT_GT(strlen(profile->name), (size_t)0);
+        (*c)++;
+    }, &count);
+
+    EXPECT_GE(count, 2);
+}

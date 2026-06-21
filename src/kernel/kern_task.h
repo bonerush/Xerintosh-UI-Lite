@@ -195,6 +195,38 @@ extern size_t kern_task_stack_highwater(kern_task_t *task);
  */
 extern size_t kern_task_stack_recommend(kern_task_t *task, size_t current_size);
 
+/* ═══ 栈使用画像（按任务名记录历史高水位，用于自动栈大小推荐）═══ */
+
+/** 栈画像条目 */
+typedef struct kern_task_stack_profile {
+    char   name[KERN_TASK_NAME_LEN + 1];  /**< 任务名 */
+    size_t highwater;                      /**< 历史最大栈使用量（字节） */
+    size_t recommended;                    /**< 推荐栈大小（字节） */
+} kern_task_stack_profile_t;
+
+/**
+ * @brief  记录某个任务名的栈高水位
+ * @param  name      任务名
+ * @param  highwater 栈使用量（字节）
+ * @note   若该任务名已有记录，仅当 highwater 更大时更新
+ */
+extern void kern_task_stack_profile_record(const char *name, size_t highwater);
+
+/**
+ * @brief  根据任务名历史画像推荐栈大小
+ * @param  name     任务名
+ * @param  fallback 无画像时的默认大小
+ * @return 推荐栈大小（字节），已 clamp 到 [KERN_STACK_MIN, KERN_STACK_MAX]
+ */
+extern size_t kern_task_stack_recommend_by_name(const char *name, size_t fallback);
+
+/**
+ * @brief  遍历所有栈画像条目
+ * @param  cb  回调函数，接收每个画像条目
+ * @param  ud  用户数据指针
+ */
+extern void kern_task_stack_profile_dump(void (*cb)(const kern_task_stack_profile_t *profile, void *ud), void *ud);
+
 /**
  * @brief  增长任务栈
  * @note   Native/XEROS_NATIVE_SCHED 后端：分配新栈、复制旧栈、更新上下文。

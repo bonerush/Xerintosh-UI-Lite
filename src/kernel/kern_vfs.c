@@ -18,7 +18,7 @@
 
 /* ═══ 常量 ═══ */
 
-#define MAX_DENTRY_CHILDREN 16        /* 每个 dentry 最大子节点数 */
+/* 根目录项最大子节点数已在 kern_vfs.h 中定义 */
 
 /* ═══ 根目录项 ═══ */
 
@@ -163,7 +163,7 @@ static kern_dentry_t *path_walk(kern_dentry_t *root, const char *path, bool auto
                 child->child_count = 0;
                 child->inode = NULL;
 
-                if (cur->child_count >= MAX_DENTRY_CHILDREN) {
+                if (cur->child_count >= KERN_MAX_DENTRY_CHILDREN) {
                     free(child);
                     return NULL;
                 }
@@ -183,9 +183,24 @@ static kern_dentry_t *path_walk(kern_dentry_t *root, const char *path, bool auto
 
 /* ═══ 初始化 ═══ */
 
+/* 关闭当前任务所有 FD，避免跨测试用例泄漏 idle 等任务的 FD 表状态 */
+static void vfs_close_all_current_fds(void)
+{
+    kern_task_t *cur = kern_task_current();
+    if (cur == NULL) return;
+
+    for (kern_fd_t i = 0; i < KERN_MAX_FD_PER_TASK; i++) {
+        if (cur->fd_table[i] != NULL) {
+            kern_close(i);
+        }
+    }
+}
+
 void kern_vfs_init(void)
 {
     if (g_vfs_initialized) {
+        /* 重复初始化时清理当前任务的 FD 表，保持测试隔离性 */
+        vfs_close_all_current_fds();
         return;
     }
 

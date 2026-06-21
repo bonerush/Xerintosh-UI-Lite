@@ -109,6 +109,8 @@ static void sched_notify_memory_pressure(void)
 #ifdef NATIVE_TEST
 ucontext_t     g_sched_ctx;
 kern_task_t   *g_switch_to_task = NULL;
+static uint8_t s_sched_stack[8192];  /* 调度器上下文专用栈 */
+static volatile bool s_switch_done = false;
 #elif defined(XEROS_NATIVE_SCHED)
 kern_ctx_t     g_sched_ctx;
 #endif
@@ -161,8 +163,15 @@ void kern_sched_init(void)
     sched_class_rr.task_list_tail = g_idle_task;
     g_idle_task->scheduler_class_id = KERN_SCHED_CLASS_RR_ID;
     g_task_count = 1;
+    g_task_list_tail = g_idle_task;
     g_current_task = g_idle_task;
     g_last_picked = g_idle_task;
+
+    /* 初始化调度器返回上下文：macOS setcontext 要求 uc_stack 有效 */
+    getcontext(&g_sched_ctx);
+    g_sched_ctx.uc_stack.ss_sp = s_sched_stack;
+    g_sched_ctx.uc_stack.ss_size = sizeof(s_sched_stack);
+    g_sched_ctx.uc_stack.ss_flags = 0;
 
     kern_log(KERN_LOG_DEBUG, "scheduler initialized (native)");
 }
@@ -202,6 +211,7 @@ void kern_sched_init(void) /* XEROS_NATIVE_SCHED */
     sched_class_rr.task_list_tail = g_idle_task;
     g_idle_task->scheduler_class_id = KERN_SCHED_CLASS_RR_ID;
     g_task_count = 1;
+    g_task_list_tail = g_idle_task;
     g_current_task = g_idle_task;
     g_last_picked = g_idle_task;
 
@@ -269,6 +279,7 @@ void kern_sched_init(void)
 
     sched_class_rr.task_list = g_task_list;
 		sched_class_rr.task_list_tail = g_task_list;  /* SMP: idle 在队尾 */
+    g_task_list_tail = g_task_list;
 
     /* ── per-CPU 初始状态 ── */
     g_per_cpu[0].current_task = g_per_cpu[0].idle_task;
@@ -280,6 +291,19 @@ void kern_sched_init(void)
     kern_smp_start_core(0, kern_smp_sched_loop);
 
     kern_log(KERN_LOG_DEBUG, "scheduler initialized (esp32-freertos, 2 cores)");
+}
+
+#endif
+
+/* ═══ Native 调度器入口（ucontext 专用栈）═══ */
+
+#ifdef NATIVE_TEST
+
+static void sched_entry(void)
+{
+    while (g_sched_initialized) {
+        kern_sched_tick();
+    }
 }
 
 #endif
@@ -309,11 +333,19 @@ void kern_sched_tick(void)
         g_need_resched = false;
         kern_task_t *next = pick_next_ready();
         if (next && next != g_current_task) {
+            kern_task_t *prev = g_current_task;
             g_current_task = next;
             kern_mpu_apply(next);
             g_switch_to_task = next;
             if (next->state != KERN_TASK_SLEEPING) next->state = KERN_TASK_RUNNING;
-            swapcontext(&g_sched_ctx, &next->ctx);
+            /* getcontext 会被恢复两次：一次直接返回，一次从任务 yield/exit 返回。
+             * 用静态标志确保 swapcontext 只执行一次，避免无限循环。 */
+            s_switch_done = false;
+            getcontext(&g_sched_ctx);
+            if (!s_switch_done) {
+                s_switch_done = true;
+                swapcontext(&prev->ctx, &next->ctx);
+            }
         }
     }
 }

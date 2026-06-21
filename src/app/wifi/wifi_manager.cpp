@@ -67,7 +67,7 @@ static bool             g_wifi_enabled    = false;            /* WiFi 是否已�
  * Arduino loop() 任务调用 process_requests() 统一执行 WiFi 驱动操作。 */
 static volatile bool g_enable_requested  = false;
 static volatile bool g_disable_requested = false;
-static volatile bool g_bt_was_on         = false; /* WiFi 启用前 BT 是否处于开启状态 */
+static bool          g_bt_was_on         = false; /* WiFi 启用前 BT 是否处于开启状态 */
 
 /* 连接状态 */
 static bool  g_connecting = false;                              /* 是否正在连接 */
@@ -220,12 +220,10 @@ void wifi_mgr_init(void)
  */
 void wifi_mgr_enable(void)
 {
-    /* BT/WiFi 双向互斥：BT 已启用时拒绝直接启用，应通过 process_requests 异步切换 */
-    if (bt_mgr_is_enabled()) {
-        wifi_popup_request("请先关闭蓝牙", 2000);
-        g_wifi_enabled = false;
-        g_state = WIFI_MGR_IDLE;
-        return;
+    /* BT/WiFi 互斥锁：BT 已启用时自动关闭 BT，腾出内存给 WiFi */
+    g_bt_was_on = bt_mgr_is_enabled();
+    if (g_bt_was_on) {
+        bt_mgr_disable();
     }
 
     Serial.printf("[WiFi] enable start free=%u max=%u\n",
@@ -334,6 +332,12 @@ void wifi_mgr_disable(void)
     esp_wifi_deinit();
     g_wifi_enabled = false;
 
+    /* BT/WiFi 互斥锁：WiFi 关闭后恢复之前被关闭的 BT */
+    if (g_bt_was_on) {
+        bt_mgr_enable();
+        g_bt_was_on = false;
+    }
+
     Serial.printf("[WiFi] disable done free=%u max=%u\n",
                   (uint32_t)ESP.getFreeHeap(), (uint32_t)ESP.getMaxAllocHeap());
     Serial.flush();
@@ -384,11 +388,6 @@ void wifi_mgr_process_requests(void)
     }
 
     if (g_enable_requested) {
-        /* BT/WiFi 双向互斥：若 BT 仍开启，先异步关闭 BT，下一帧再启用 WiFi */
-        if (bt_mgr_is_enabled()) {
-            bt_mgr_request_disable();
-            return;
-        }
         g_enable_requested = false;
         wifi_mgr_enable();
     }

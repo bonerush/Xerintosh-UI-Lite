@@ -60,6 +60,8 @@ static void sched_rr_enqueue(kern_task_t *task)
         }
         sched_class_rr.task_list_tail = task;
     }
+    /* RR 类为默认类，其链表与全局 g_task_list 共享，同步尾指针 */
+    g_task_list_tail = sched_class_rr.task_list_tail;
 
     task_list_unlock();
 }

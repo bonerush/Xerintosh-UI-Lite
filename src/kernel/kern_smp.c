@@ -22,11 +22,20 @@ kern_per_cpu_t g_per_cpu[KERN_MAX_CPUS];
 
 volatile uint8_t g_cpu_ready = 0;  /* SMP 就绪标志（供外部查询） */
 
+/* ESP32 为双核，确保 KERN_MAX_CPUS 至少为 2 */
+_Static_assert(KERN_MAX_CPUS >= 2, "KERN_MAX_CPUS must be at least 2 for ESP32 SMP");
+
 /* ═══ CPU ID ═══ */
 
 uint8_t kern_cpu_id(void)
 {
-    return (uint8_t)xPortGetCoreID();
+    uint8_t id = (uint8_t)xPortGetCoreID();
+    if (id >= KERN_MAX_CPUS) {
+        /* 不应该发生；若出现则记录并钳位，避免 g_per_cpu 越界 */
+        kern_log(KERN_LOG_ERROR, "SMP: invalid core id %u >= KERN_MAX_CPUS", (unsigned)id);
+        return 0;
+    }
+    return id;
 }
 
 /* ═══ SMP 初始化 ═══ */

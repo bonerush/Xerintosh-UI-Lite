@@ -280,9 +280,9 @@ void shell_complete_path(kern_fd_t tty, char *line, size_t *pos,
         }
     }
 
+    size_t base_len = strlen(base);
     const char *matches[16];
     int match_count = 0;
-    size_t base_len = strlen(base);
 
     for (uint8_t i = 0; i < dir->child_count && match_count < 16; i++) {
         kern_dentry_t *child = dir->children[i];
@@ -298,6 +298,18 @@ void shell_complete_path(kern_fd_t tty, char *line, size_t *pos,
     }
 
     if (match_count == 1) {
+        /* dir_only 且用户未输入前缀时，即使只有一个目录也不直接补全，
+         * 而是列出候选，避免 cd 命令在未输入前缀时意外进入子目录。 */
+        if (dir_only && base_len == 0) {
+            kern_shell_print(tty, "\r\n");
+            kern_shell_print(tty, "  ");
+            kern_shell_print(tty, matches[0]);
+            kern_shell_print(tty, "\r\n");
+            kern_shell_print_prompt(tty, cwd);
+            kern_shell_print(tty, line);
+            return;
+        }
+
         /* 单个匹配：补全 */
         const char *match = matches[0];
         const char *suffix = match + base_len;
@@ -378,12 +390,7 @@ void shell_complete_path(kern_fd_t tty, char *line, size_t *pos,
     kern_shell_print(tty, line);
 }
 
-/**
- * @brief 对命令名进行 Tab 补全
- * @param tty       终端 FD
- * @param line      输入行缓冲区
- * @param pos       当前输入位置（传入/传出）
- */
+
 void shell_complete_command(kern_fd_t tty, char *line, size_t *pos,
                             const char *cwd)
 {

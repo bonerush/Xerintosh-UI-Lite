@@ -110,6 +110,14 @@ kern_pid_t kern_spawn(const char *name, void (*entry)(void *arg),
     __sync_lock_release(&g_task_list_lock);
 #endif
 
+    /* 加入对应调度类的任务链表，使 pick_next_ready 能选到新任务 */
+    if (task->scheduler_class_id >= 0 && task->scheduler_class_id < KERN_SCHED_MAX_CLASSES) {
+        kern_sched_class_t *cls = g_sched_classes[task->scheduler_class_id];
+        if (cls != NULL && cls->enqueue != NULL) {
+            cls->enqueue(task);
+        }
+    }
+
     kern_log(KERN_LOG_DEBUG, "spawned task %d: %s", task->pid, task->name);
     return task->pid;
 }
@@ -172,6 +180,14 @@ kern_pid_t kern_spawn(const char *name, void (*entry)(void *arg),
         t->next = task;
     }
     g_task_count++;
+
+    /* 加入对应调度类的任务链表 */
+    if (task->scheduler_class_id >= 0 && task->scheduler_class_id < KERN_SCHED_MAX_CLASSES) {
+        kern_sched_class_t *cls = g_sched_classes[task->scheduler_class_id];
+        if (cls != NULL && cls->enqueue != NULL) {
+            cls->enqueue(task);
+        }
+    }
 
     kern_log(KERN_LOG_DEBUG, "spawned task %d: %s", task->pid, task->name);
     return task->pid;
@@ -260,6 +276,14 @@ kern_pid_t kern_spawn(const char *name, void (*entry)(void *arg),
     __sync_lock_release(&g_task_list_lock);
 #endif
 
+    /* 加入对应调度类的任务链表，使 pick_next_ready 能选到新任务 */
+    if (task->scheduler_class_id >= 0 && task->scheduler_class_id < KERN_SCHED_MAX_CLASSES) {
+        kern_sched_class_t *cls = g_sched_classes[task->scheduler_class_id];
+        if (cls != NULL && cls->enqueue != NULL) {
+            cls->enqueue(task);
+        }
+    }
+
     kern_mpu_setup_stack_guard(task, task->stack_base, task->stack_size);
 
     kern_log(KERN_LOG_DEBUG, "spawned task %d: %s", task->pid, task->name);
@@ -326,14 +350,18 @@ void kern_exit(void)
     kern_task_t *cur = g_current_task;
     if (cur == NULL) return;
 
-    kern_resource_release_all(cur);
+    /* Native 后端：不能在这里释放栈内存，因为当前正在该栈上运行。
+     * 资源回收推迟到 reap_zombies()，在任务已脱离调度链表、不会继续执行后再释放。 */
     cur->stack_base = NULL;
 
     cur->state = KERN_TASK_ZOMBIE;
     kern_log(KERN_LOG_DEBUG, "task %d (%s) exited", cur->pid, cur->name);
 
     g_current_task = g_idle_task;
-    setcontext(&g_sched_ctx);
+    /* 使用 swapcontext 切换回调度器上下文，避免 macOS setcontext 对
+     * 未初始化/无效 uc_stack 的严格检查导致 SIGTRAP。 */
+    swapcontext(&cur->ctx, &g_sched_ctx);
+    /* 不应到达此处 */
 }
 
 #elif defined(XEROS_NATIVE_SCHED)
@@ -515,7 +543,16 @@ void reap_zombies(void)
                 if (g_last_picked == zombie) g_last_picked = NULL;
                 /* 同步更新 g_task_list（如为此 list） */
                 if (g_task_list == zombie) g_task_list = t;
-                /* 栈内存已纳入资源追踪，由 kern_resource_release_all 释放 */
+                /* 同步更新调度类尾指针，避免后续 enqueue 使用已释放节点 */
+                if (cls->task_list_tail == zombie) {
+                    cls->task_list_tail = prev;
+                }
+                /* Native 后端将资源释放推迟到此处：任务已脱离链表，不会再运行，
+                 * 可以安全释放其栈等资源。其他后端 kern_exit/kill 已释放完毕，
+                 * resource_head 为 NULL，此处调用安全且幂等。 */
+                if (zombie->resource_head != NULL) {
+                    kern_resource_release_all(zombie);
+                }
                 g_task_count--;
                 kern_log(KERN_LOG_DEBUG, "reaped zombie %d (%s)", zombie->pid, zombie->name);
                 free(zombie);

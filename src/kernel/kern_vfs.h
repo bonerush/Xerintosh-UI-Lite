@@ -42,6 +42,10 @@ typedef struct kern_file_ops {
 #define KERN_O_WRONLY   0x02   /* 只写 */
 #define KERN_O_RDWR     (KERN_O_RDONLY | KERN_O_WRONLY)
 
+/* ═══ 目录项限制 ═══ */
+
+#define KERN_MAX_DENTRY_CHILDREN 256   /* 每个 dentry 最大子节点数 */
+
 /* ═══ 核心结构体 ═══ */
 
 /**
@@ -63,7 +67,7 @@ typedef struct kern_dentry {
     char name[KERN_NAME_MAX + 1];    /* 节点名称 */
     kern_inode_t *inode;             /* 关联的 inode */
     struct kern_dentry *parent;      /* 父节点 */
-    struct kern_dentry *children[16]; /* 子节点（目录最多 16 个子项） */
+    struct kern_dentry *children[KERN_MAX_DENTRY_CHILDREN]; /* 子节点 */
     uint8_t child_count;             /* 当前子节点数量 */
 } kern_dentry_t;
 

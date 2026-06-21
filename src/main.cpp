@@ -41,6 +41,7 @@ void bt_mgr_task_main(void *arg);
 /* Xeros 内核 */
 #include "kernel/kern_init.h"
 #include "kernel/kern_task.h"
+#include "kernel/kern_smp.h"
 #include "kernel/kern_kmalloc.h"
 #include "kernel/kern_vfs.h"
 #include "kernel/kern_devfs.h"
@@ -327,15 +328,20 @@ static void deferred_kernel_init(void)
     kern_shell_init();
     Serial.println("[  OK  ] Shell spawned on /dev/ttyS0");
 
-    /* ── 启动 UI 任务 ── */
-    kern_pid_t ui_pid = kern_spawn("ui", ui_task_main, NULL, UI_TASK_STACK_SIZE);
-    Serial.printf("[  OK  ] UI task spawned (pid=%d)\n", ui_pid);
+    /* ── 启动 UI/WiFi/BT 任务 ──
+     * 使用历史栈高水位画像推荐栈大小，首次启动无画像时回退到经验值。 */
+    size_t ui_stack   = kern_task_stack_recommend_by_name("ui",       UI_TASK_STACK_SIZE);
+    size_t wifi_stack = kern_task_stack_recommend_by_name("wifi-mgr", WIFI_MGR_STACK_SIZE);
+    size_t bt_stack   = kern_task_stack_recommend_by_name("bt-mgr",   BT_MGR_STACK_SIZE);
+
+    kern_pid_t ui_pid = kern_spawn("ui", ui_task_main, NULL, ui_stack);
+    Serial.printf("[  OK  ] UI task spawned (pid=%d, stack=%u)\n", ui_pid, (unsigned)ui_stack);
 
     /* WiFi/BT 管理器作为独立内核任务运行，与 UI 任务解耦 */
-    kern_spawn("wifi-mgr", wifi_mgr_task_main, NULL, WIFI_MGR_STACK_SIZE);
-    Serial.println("[  OK  ] WiFi manager spawned as kernel task");
-    kern_spawn("bt-mgr",   bt_mgr_task_main, NULL, BT_MGR_STACK_SIZE);
-    Serial.println("[  OK  ] BT manager spawned as kernel task");
+    kern_spawn("wifi-mgr", wifi_mgr_task_main, NULL, wifi_stack);
+    Serial.printf("[  OK  ] WiFi manager spawned as kernel task (stack=%u)\n", (unsigned)wifi_stack);
+    kern_spawn("bt-mgr",   bt_mgr_task_main, NULL, bt_stack);
+    Serial.printf("[  OK  ] BT manager spawned as kernel task (stack=%u)\n", (unsigned)bt_stack);
 
     /* 让出 CPU 给 FreeRTOS，使刚创建的任务有机会启动并阻塞在调度信号量上 */
     delay(10);
@@ -385,14 +391,27 @@ void loop()
         }
     }
 
+    /* 消费硬件定时器 ISR 设置的抢占 tick 请求，并在当前 CPU 触发重调度。
+     * 必须在 kern_sched_tick() 之前消费，确保 scheduler 在挑选下一个任务
+     * 前能看到最新的抢占状态，减少高优先级任务就绪后的调度延迟。 */
+    if (kern_port_preempt_consume()) {
+        g_need_resched = true;
+    }
+
     kern_sched_tick();
 
-    /*
-     * 抢占式调度钩子：当硬件定时器 ISR 激活时（CONFIG_PREEMPT_ENABLED），
-     * ISR 设置抢占标志。loop() 在每次迭代时消费此标志，
-     * 确保调度器对抢占请求的响应延迟不超过 1 次 loop 迭代。
-     */
-    (void)kern_port_preempt_consume();
+    /* 周期性记录当前任务的栈高水位，用于下次启动时自动推荐栈大小。
+     * 在调度 tick 之后执行，避免在任务上下文内部增加栈压力。 */
+    static uint32_t s_profile_last_ms = 0;
+    uint32_t profile_now = millis();
+    if (profile_now - s_profile_last_ms >= 1000) {
+        s_profile_last_ms = profile_now;
+        kern_task_t *cur = kern_task_current();
+        if (cur != NULL) {
+            kern_task_stack_profile_record(cur->name,
+                                           kern_task_stack_highwater(cur));
+        }
+    }
 }
 
 #endif /* NATIVE_TEST */
