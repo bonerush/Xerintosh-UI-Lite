@@ -38,8 +38,8 @@ void wifi_mgr_task_main(void *arg) { (void)arg; }
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 
-#include "hal_system.h"
-#include "hal_uart.h"
+#include "hal/hal_system.h"
+#include "hal/hal_uart.h"
 
 #include "app/wifi/wifi_manager.h"
 #include "app/wifi/wifi_menu.h"
@@ -225,7 +225,7 @@ void wifi_mgr_enable(void)
 
     char log_buf[128];
     snprintf(log_buf, sizeof(log_buf),
-             "[WiFi] enable start free=%u max=%u\n",
+             "[WiFi] enable start free=%lu max=%lu\n",
              (uint32_t)st.free_bytes,
              (uint32_t)st.largest_free_block);
     hal_uart0_write((const uint8_t *)log_buf, strlen(log_buf));
@@ -238,7 +238,7 @@ void wifi_mgr_enable(void)
     if (!xeros_mem_can_alloc(WIFI_MIN_FREE_HEAP, WIFI_MIN_MAX_ALLOC_HEAP)) {
         xeros_mem_get_stats(&st);
         snprintf(log_buf, sizeof(log_buf),
-                 "[WiFi] heap guard failed: free=%u max_alloc=%u reserved=%u\n",
+                 "[WiFi] heap guard failed: free=%lu max_alloc=%lu reserved=%lu\n",
                  (uint32_t)st.free_bytes,
                  (uint32_t)st.largest_free_block,
                  (uint32_t)kern_kmem_reserved_bytes());
@@ -320,7 +320,7 @@ void wifi_mgr_disable(void)
 
     char log_buf[128];
     snprintf(log_buf, sizeof(log_buf),
-             "[WiFi] disable start free=%u max=%u\n",
+             "[WiFi] disable start free=%lu max=%lu\n",
              (uint32_t)st.free_bytes,
              (uint32_t)st.largest_free_block);
     hal_uart0_write((const uint8_t *)log_buf, strlen(log_buf));
@@ -340,7 +340,7 @@ void wifi_mgr_disable(void)
 
     xeros_mem_get_stats(&st);
     snprintf(log_buf, sizeof(log_buf),
-             "[WiFi] disable done free=%u max=%u\n",
+             "[WiFi] disable done free=%lu max=%lu\n",
              (uint32_t)st.free_bytes,
              (uint32_t)st.largest_free_block);
     hal_uart0_write((const uint8_t *)log_buf, strlen(log_buf));

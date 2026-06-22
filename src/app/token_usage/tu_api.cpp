@@ -8,7 +8,7 @@
 #include <esp_http_client.h>
 #include <cJSON.h>
 
-#include "hal_system.h"
+#include "hal/hal_system.h"
 
 bool tu_api_fetch_deepseek(const char *api_key, tu_deepseek_balance_t *out) {
     if (!api_key || api_key[0] == '\0' || !out) return false;
