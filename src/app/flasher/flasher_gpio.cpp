@@ -82,7 +82,6 @@ void flasher_save_pin_config(void)
 #include "driver/uart.h"
 #include "driver/gpio.h"
 #include "hal/hal_system.h"
-#include "hal/hal_uart.h"
 
 #define FLASHER_UART_NUM UART_NUM_1
 
@@ -103,6 +102,10 @@ void flasher_init_pins(uint32_t baud_rate)
             .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
             .rx_flow_ctrl_thresh = 0,
             .source_clk = UART_SCLK_DEFAULT,
+            .flags = {
+                .allow_pd = 0,
+                .backup_before_sleep = 0,
+            },
         };
         uart_param_config(FLASHER_UART_NUM, &uart_cfg);
         uart_set_pin(FLASHER_UART_NUM, tx_pin, rx_pin, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);

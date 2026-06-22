@@ -71,7 +71,7 @@ bool g_flasher_bridge_active = false;
 #define FLASHER_DBG_ENABLED 0
 
 #ifndef NATIVE_TEST
-#include "hal/hal_uart.h"
+#include "driver/uart.h"
 #include "kernel/debug_serial.h"
 #endif
 
@@ -192,39 +192,37 @@ void flasher_loop(void *ud)
      */
 
     /* ── USB (PC) → UART (目标板) ── */
-    if (hal_uart0_available() > 0) {
+    {
         uint8_t usb_buf[64];
         int usb_len = 0;
-        while (usb_len < (int)sizeof(usb_buf) && hal_uart0_available() > 0) {
-            uint8_t byte;
-            if (hal_uart0_read(&byte, 1) > 0) {
-                usb_buf[usb_len++] = byte;
-            } else {
-                break;
-            }
+        uint8_t byte;
+        while (usb_len < (int)sizeof(usb_buf) && uart_read_bytes(UART_NUM_0, &byte, 1, 0) > 0) {
+            usb_buf[usb_len++] = byte;
         }
 
-        if (!s_pt_first_data) {
-            s_pt_first_data = true;
+        if (usb_len > 0) {
+            if (!s_pt_first_data) {
+                s_pt_first_data = true;
+                if (s_pt_phase == PT_PHASE_IDLE) {
+                    s_pt_phase = PT_PHASE_DTR_WAIT;
+                    s_pt_phase_until_ms = hal_get_ticks() + 1;
+                }
+            }
+
             if (s_pt_phase == PT_PHASE_IDLE) {
-                s_pt_phase = PT_PHASE_DTR_WAIT;
-                s_pt_phase_until_ms = hal_get_ticks() + 1;
-            }
-        }
-
-        if (s_pt_phase == PT_PHASE_IDLE) {
-            /* 协议自动识别 + 进度解析 */
-            for (int i = 0; i < usb_len; i++) {
-                flasher_proto_feed(usb_buf[i]);
-            }
-            flasher_uart_write(usb_buf, usb_len);
-            s_pt_tx_bytes += (uint32_t)usb_len;
-            s_pt_last_tx_ms = hal_get_ticks();
-        } else {
-            /* DTR 等待期间暂存 USB 数据，避免 esptool 同步帧因
-             * Serial 缓冲区溢出而丢失。进入 IDLE 后一次性转发 */
-            for (int i = 0; i < usb_len && s_usb_deferred_len < FLASHER_USB_DEFER_MAX; i++) {
-                s_usb_deferred[s_usb_deferred_len++] = usb_buf[i];
+                /* 协议自动识别 + 进度解析 */
+                for (int i = 0; i < usb_len; i++) {
+                    flasher_proto_feed(usb_buf[i]);
+                }
+                flasher_uart_write(usb_buf, usb_len);
+                s_pt_tx_bytes += (uint32_t)usb_len;
+                s_pt_last_tx_ms = hal_get_ticks();
+            } else {
+                /* DTR 等待期间暂存 USB 数据，避免 esptool 同步帧因
+                 * Serial 缓冲区溢出而丢失。进入 IDLE 后一次性转发 */
+                for (int i = 0; i < usb_len && s_usb_deferred_len < FLASHER_USB_DEFER_MAX; i++) {
+                    s_usb_deferred[s_usb_deferred_len++] = usb_buf[i];
+                }
             }
         }
     }
@@ -235,7 +233,7 @@ void flasher_loop(void *ud)
         int uart_len = flasher_uart_read(uart_buf, sizeof(uart_buf));
         if (uart_len > 0) {
             if (hal_get_ticks() - s_pt_last_tx_ms < 2000) {
-                hal_uart0_write(uart_buf, uart_len);
+                uart_write_bytes(UART_NUM_0, (const char *)uart_buf, uart_len);
             }
             s_pt_rx_bytes += (uint32_t)uart_len;
         }
