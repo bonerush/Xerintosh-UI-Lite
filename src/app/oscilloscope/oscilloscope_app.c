@@ -1,9 +1,10 @@
 /**
  * @file   oscilloscope_app.c
- * @brief  示波器 App ADC 采样、触发与测量引擎
- * @details 每帧线性采集 sample_count 个样本，上升沿触发在采集窗口内搜索，
- *          AC/GND 耦合输出以及 Vpp / 平均值 / 频率测量。
- *          本文件不包含生命周期与输入处理。
+ * @brief  Oscilloscope App ADC sampling, triggering, and measurement engine
+ * @details Linearly collects sample_count samples per frame, searches for rising edge
+ *          trigger within the acquisition window, AC/GND coupling output, and
+ *          Vpp / average / frequency measurements.
+ *          This file does not contain lifecycle or input handling.
  *
  * @copyright Copyright (c) 2026
  */
@@ -18,16 +19,22 @@
 #include "hal/hal_input.h"
 #include "hal/hal_screen.h"
 #include "ui/ui_item.h"
+#include "hal/hal_system.h"
 
 #include <string.h>
 
 #ifndef NATIVE_TEST
-#include <Arduino.h>
+#include "driver/adc_oneshot.h"
+#include "driver/gpio.h"
+#include "esp_timer.h"
 #endif
 
 #define SCOPE_PIN 36
 
-/* ═══ 模块状态 ═══ */
+/* ADC1 channel mapping for GPIO36 */
+#define SCOPE_ADC_CHANNEL ADC_CHANNEL_0
+
+/* ═══ Module State ═══ */
 
 scope_state_t g_scope = {
     .view = {
@@ -47,7 +54,7 @@ scope_state_t g_scope = {
 static const uint16_t *scope_get_display_buffer(uint8_t coupling);
 static void scope_update_measurements(const uint16_t *buf, uint16_t count);
 
-/* ═══ Native 测试桩（仅测试环境）═══ */
+/* ═══ Native test stubs (test environment only) ═══ */
 
 #ifdef NATIVE_TEST
 int __attribute__((weak)) analogRead(uint8_t pin)
@@ -74,11 +81,24 @@ void __attribute__((weak)) delayMicroseconds(uint32_t us)
 }
 #endif /* NATIVE_TEST */
 
-/* ═══ 采样 ═══ */
+#ifndef NATIVE_TEST
+/* ═══ ESP-IDF ADC handle (module scope) ═══ */
+static adc_oneshot_unit_handle_t s_adc_handle = NULL;
+#endif
+
+/* ═══ Sampling ═══ */
 
 static void scope_sample_one(uint16_t pos)
 {
+#ifndef NATIVE_TEST
+    int raw_adc = 0;
+    if (s_adc_handle != NULL) {
+        adc_oneshot_read(s_adc_handle, SCOPE_ADC_CHANNEL, &raw_adc);
+    }
+    uint16_t raw = (uint16_t)raw_adc;
+#else
     uint16_t raw = (uint16_t)analogRead(SCOPE_PIN);
+#endif
 
     uint8_t fidx = g_scope.view.filter_index;
     if (fidx >= SCOPE_FILTER_COUNT) {
@@ -99,7 +119,7 @@ static void scope_sample_one(uint16_t pos)
     g_scope.samples[pos] = filtered;
 }
 
-/* ═══ 触发 ═══ */
+/* ═══ Trigger ═══ */
 
 uint16_t scope_find_trigger_rising(const uint16_t *buf, uint16_t count,
                                    uint16_t start, uint16_t level)
@@ -151,7 +171,7 @@ static void scope_update_trigger(void)
     scope_update_measurements(buf, count);
 }
 
-/* ═══ 耦合输出 ═══ */
+/* ═══ Coupling Output ═══ */
 
 static int16_t scope_compute_ac_offset(void)
 {
@@ -164,7 +184,7 @@ static int16_t scope_compute_ac_offset(void)
         return 2048;
     }
 
-    /* AC 偏移窗口取 1/10 帧长或 32 的最小值，覆盖约 1 个信号周期 */
+    /* AC offset window takes 1/10 frame length or minimum of 32, covering ~1 signal period */
     n = count / 10U;
     if (n < 8U) {
         n = 8U;
@@ -211,9 +231,9 @@ static const uint16_t *scope_get_display_buffer(uint8_t coupling)
     return g_scope.ac_coupled;
 }
 
-/* ═══ 测量 ═══ */
+/* ═══ Measurements ═══ */
 
-/* ADC 满量程 4095 对应约 3.3V（含衰减），每 LSB ≈ 0.805 mV */
+/* ADC full scale 4095 corresponds to ~3.3V (with attenuation), per LSB ~ 0.805 mV */
 #define SCOPE_MV_PER_LSB_NUM 805
 #define SCOPE_MV_PER_LSB_DEN 1000
 
@@ -286,7 +306,7 @@ static void scope_update_measurements(const uint16_t *buf, uint16_t count)
     g_scope.view.freq_hz = ((uint32_t)crossings * sr) / (2U * count);
 }
 
-/* ═══ 生命周期 ═══ */
+/* ═══ Lifecycle ═══ */
 
 void oscilloscope_init(void *user_data)
 {
@@ -305,6 +325,29 @@ void oscilloscope_init(void *user_data)
     scope_sync_sample_rate();
 
 #ifndef NATIVE_TEST
+    /* Configure GPIO36 as input (no pull, analog pin) */
+    gpio_config_t io_conf = {
+        .pin_bit_mask = (1ULL << SCOPE_PIN),
+        .mode = GPIO_MODE_INPUT,
+        .pull_up_en = GPIO_PULLUP_DISABLE,
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        .intr_type = GPIO_INTR_DISABLE,
+    };
+    gpio_config(&io_conf);
+
+    /* Initialize ADC oneshot unit */
+    adc_oneshot_unit_init_cfg_t init_cfg = {
+        .unit_id = ADC_UNIT_1,
+    };
+    adc_oneshot_new_unit(&init_cfg, &s_adc_handle);
+
+    /* Configure ADC channel with 11dB attenuation (~3.3V full scale) */
+    adc_oneshot_chan_cfg_t chan_cfg = {
+        .atten = ADC_ATTEN_DB_11,
+        .bitwidth = ADC_BITWIDTH_12,
+    };
+    adc_oneshot_config_channel(s_adc_handle, SCOPE_ADC_CHANNEL, &chan_cfg);
+#else
     pinMode(SCOPE_PIN, INPUT);
     analogSetPinAttenuation(SCOPE_PIN, ADC_11db);
 #endif
@@ -316,11 +359,31 @@ void oscilloscope_init(void *user_data)
 void oscilloscope_exit(void *user_data)
 {
     (void)user_data;
+
+#ifndef NATIVE_TEST
+    if (s_adc_handle != NULL) {
+        adc_oneshot_del_unit(s_adc_handle);
+        s_adc_handle = NULL;
+    }
+#endif
+
     ui_service_user_item_exit();
     ui_service_exit_landscape();
 }
 
-/* ═══ 主循环 ═══ */
+/* ═══ Main Loop ═══ */
+
+static void scope_delay_us(uint32_t us)
+{
+#ifndef NATIVE_TEST
+    uint64_t start = esp_timer_get_time();
+    while ((esp_timer_get_time() - start) < (uint64_t)us) {
+        /* Busy-wait for microsecond precision */
+    }
+#else
+    delayMicroseconds(us);
+#endif
+}
 
 void oscilloscope_loop(void *user_data)
 {
@@ -332,7 +395,7 @@ void oscilloscope_loop(void *user_data)
         uint32_t sr      = g_scope.view.sample_rate_hz;
         uint16_t samples_to_take = SCOPE_SAMPLE_MAX;
         if (sr != 0U) {
-            uint32_t window_us = div_us * 10U;   /* 屏幕横向共 10 格 */
+            uint32_t window_us = div_us * 10U;   /* 10 horizontal divisions on screen */
             uint32_t need = (window_us * sr) / 1000000UL;
             if (need == 0U) {
                 need = 1U;
@@ -348,7 +411,7 @@ void oscilloscope_loop(void *user_data)
         for (uint16_t i = 0; i < samples_to_take; i++) {
             scope_sample_one(i);
             if (period_us > adc_overhead_us + 5U) {
-                delayMicroseconds((uint32_t)(period_us - adc_overhead_us));
+                scope_delay_us((uint32_t)(period_us - adc_overhead_us));
             }
         }
         g_scope.view.sample_count = samples_to_take;

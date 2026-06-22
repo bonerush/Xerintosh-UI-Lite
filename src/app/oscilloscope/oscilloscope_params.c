@@ -1,17 +1,17 @@
 /**
  * @file   oscilloscope_params.c
- * @brief  示波器参数表定义（时基/电压档/耦合/触发模式/采样率/滤波器）
- * @details 常量表供 UI 层、引擎层和测试代码使用。从 oscilloscope_app.c 拆分。
+ * @brief  Oscilloscope parameter table definitions (time base / voltage range / coupling / trigger mode / sample rate / filter)
+ * @details Constant tables for UI layer, engine layer, and test code. Split from oscilloscope_app.c.
  *
  * @copyright Copyright (c) 2026
  */
 
 #include "oscilloscope_engine.h"
 
-/* ═══ 参数表 ═══ */
+/* ═══ Parameter Tables ═══ */
 
-/* 屏幕横向约 10 格，time_per_div_us 为每格代表的时间。
- * 总窗口时间 = time_per_div_us * 10；在固定 SR 下所需样本数 = 窗口 * SR。 */
+/* Screen horizontal ~10 divisions, time_per_div_us is time per division.
+ * Total window time = time_per_div_us * 10; at fixed SR, required samples = window * SR. */
 const scope_time_base_t g_scope_time_bases[SCOPE_TIME_BASE_COUNT] = {
     { "50us",  50 },
     { "100us", 100 },
@@ -33,8 +33,8 @@ const char *g_scope_coupling_labels[SCOPE_COUPLING_COUNT] = { "DC", "AC", "GND" 
 
 const char *g_scope_trigger_mode_labels[SCOPE_TRIGGER_MODE_COUNT] = { "Auto", "Norm", "Scan" };
 
-/* analogRead 忙等约 90µs，轮询模式下最大可达 ~11kHz。
- * 20kHz 是 Polling 模式下的合理上限 */
+/* ADC oneshot read busy-wait ~30-90us; polling mode max ~11kHz.
+ * 20kHz is a reasonable upper limit for polling mode. */
 const scope_sample_rate_t g_scope_sample_rates[SCOPE_SAMPLE_RATE_COUNT] = {
     { "1kHz",   1000 },
     { "5kHz",   5000 },
@@ -42,8 +42,8 @@ const scope_sample_rate_t g_scope_sample_rates[SCOPE_SAMPLE_RATE_COUNT] = {
     { "20kHz", 20000 },
 };
 
-/* prev_weight: 历史值权重，当前原始值权重 = 8 - prev_weight
- * Low=弱滤波, Med=中, Hi=强滤波 */
+/* prev_weight: historical value weight, current raw value weight = 8 - prev_weight
+ * Low=weak filter, Med=medium, Hi=strong filter */
 const scope_filter_t g_scope_filters[SCOPE_FILTER_COUNT] = {
     { "Off", 0 },
     { "Low", 2 },
