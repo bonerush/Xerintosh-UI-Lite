@@ -88,13 +88,21 @@ uint32_t hal_input_get_press_duration(hal_button_t btn) {
 
 #else
 
-/* ═══ 硬件环境：M5Unified 按键处理 ═══ */
+/* ═══ 硬件环境：ESP-IDF GPIO 按键处理 ═══ */
 
-#include <M5Unified.h>
+#include "driver/gpio.h"
 
 #define BOOT_INPUT_GUARD_MS  300  /* 启动后首 300ms 忽略输入，防止 GPIO 上电毛刺 */
 
 static uint32_t g_boot_time_ms = 0;  /* hal_input_init 被调用时的毫秒时间戳 */
+
+/**
+ * @brief M5Stick-C 按键 GPIO 映射
+ */
+static const gpio_num_t g_btn_gpio[HAL_BTN_COUNT] = {
+    [HAL_BTN_A] = GPIO_NUM_36,  /* 侧键 */
+    [HAL_BTN_B] = GPIO_NUM_37,  /* 主键 */
+};
 
 /**
  * @brief 内部按键状态结构
@@ -102,10 +110,21 @@ static uint32_t g_boot_time_ms = 0;  /* hal_input_init 被调用时的毫秒时�
  */
 struct btn_state {
     hal_input_dc_state_t dc;  /* 双击检测状态机 */
+    bool prev_raw;            /* 上一次的原始 GPIO 电平 */
 };
 
 static struct btn_state g_btn_a;  /* 按键 A 状态 */
 static struct btn_state g_btn_b;  /* 按键 B 状态 */
+
+/**
+ * @brief 读取按键原始电平
+ * @return true 表示低电平（按下），false 表示高电平（释放）
+ * @note  M5Stick-C 按键为低电平有效。
+ */
+static bool btn_read_raw(hal_button_t btn) {
+    if (btn >= HAL_BTN_COUNT) return false;
+    return gpio_get_level(g_btn_gpio[btn]) == 0;
+}
 
 /**
  * @brief 初始化按键状态
@@ -113,17 +132,26 @@ static struct btn_state g_btn_b;  /* 按键 B 状态 */
 void hal_input_init(void) {
     hal_input_dc_init(&g_btn_a.dc);
     hal_input_dc_init(&g_btn_b.dc);
-    g_boot_time_ms = millis();
+    g_btn_a.prev_raw = false;
+    g_btn_b.prev_raw = false;
+
+    gpio_config_t io_conf = {
+        .pin_bit_mask = ((1ULL << GPIO_NUM_36) | (1ULL << GPIO_NUM_37)),
+        .mode = GPIO_MODE_INPUT,
+        .pull_up_en = GPIO_PULLUP_ENABLE,
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        .intr_type = GPIO_INTR_DISABLE,
+    };
+    gpio_config(&io_conf);
+
+    g_boot_time_ms = hal_get_ticks();
 }
 
 /**
  * @brief 更新输入状态
- * @note  调用 M5.update() 以刷新按键边沿标志。
- *        在微内核架构下，按键读取发生在 ui_task 中，
- *        必须在此处调用 M5.update() 以保证边沿标志最新。
+ * @note  ESP-IDF 下直接读取 GPIO，无需额外刷新。
  */
 void hal_input_update(void) {
-    M5.update();
 }
 
 /**
@@ -136,7 +164,7 @@ void hal_input_update(void) {
  */
 static hal_event_t check_button_event(struct btn_state *st, bool wasPressed, bool wasReleased)
 {
-    uint32_t now = millis();
+    uint32_t now = hal_get_ticks();
     if (g_double_click_enabled) {
         return hal_input_dc_process(&st->dc, wasPressed, wasReleased, now);
     }
@@ -149,7 +177,7 @@ static hal_event_t check_button_event(struct btn_state *st, bool wasPressed, boo
 hal_event_t hal_input_get_event(hal_button_t btn)
 {
   /* 启动保护：忽略开机后首 300ms 内的所有按键事件，防止 GPIO 上电毛刺触发 LONG_PRESS */
-  if (millis() - g_boot_time_ms < BOOT_INPUT_GUARD_MS) {
+  if (hal_get_ticks() - g_boot_time_ms < BOOT_INPUT_GUARD_MS) {
       return HAL_EVENT_NONE;
   }
 
@@ -158,14 +186,12 @@ hal_event_t hal_input_get_event(hal_button_t btn)
   else if (btn == HAL_BTN_B) st = &g_btn_b;
   else return HAL_EVENT_NONE;
 
-  if (btn == HAL_BTN_A)
-  {
-    return check_button_event(st, M5.BtnA.wasPressed(), M5.BtnA.wasReleased());
-  }
-  else
-  {
-    return check_button_event(st, M5.BtnB.wasPressed(), M5.BtnB.wasReleased());
-  }
+  bool raw = btn_read_raw(btn);
+  bool wasPressed = raw && !st->prev_raw;
+  bool wasReleased = !raw && st->prev_raw;
+  st->prev_raw = raw;
+
+  return check_button_event(st, wasPressed, wasReleased);
 }
 
 /**
@@ -175,21 +201,17 @@ bool hal_input_is_pressed(hal_button_t btn) {
     struct btn_state *st = NULL;
     if (btn == HAL_BTN_A) {
         st = &g_btn_a;
-        bool pressed = M5.BtnA.isPressed();
-        if (pressed && st->dc.pressed) {
-            st->dc.press_duration_ms = millis() - st->dc.press_time;
-        }
-        return pressed;
-    }
-    if (btn == HAL_BTN_B) {
+    } else if (btn == HAL_BTN_B) {
         st = &g_btn_b;
-        bool pressed = M5.BtnB.isPressed();
-        if (pressed && st->dc.pressed) {
-            st->dc.press_duration_ms = millis() - st->dc.press_time;
-        }
-        return pressed;
+    } else {
+        return false;
     }
-    return false;
+
+    bool pressed = btn_read_raw(btn);
+    if (pressed && st->dc.pressed) {
+        st->dc.press_duration_ms = hal_get_ticks() - st->dc.press_time;
+    }
+    return pressed;
 }
 
 /**
