@@ -26,7 +26,7 @@ bool serial_input_is_waiting(void) { return false; }
 
 #include "serial_input.h"
 #include "hal/hal_system.h"
-#include "driver/uart.h"
+#include "hal/hal_uart.h"
 #include <string.h>
 
 /* ═══ 常量 ═══ */
@@ -34,7 +34,6 @@ bool serial_input_is_waiting(void) { return false; }
 #define INPUT_BUFFER_SIZE   65   /* 64 字符 + 终止符 */
 #define PASSWORD_MAX_LEN    64   /* 密码最大长度 */
 #define TIMEOUT_MS          30000 /* 输入超时：30 秒 */
-#define SERIAL_INPUT_UART   UART_NUM_0
 
 /* ═══ 模块状态（文件作用域）═══ */
 
@@ -62,7 +61,7 @@ static void clear_buffer(void)
  */
 static void uart_print(const char *str)
 {
-    uart_write_bytes(SERIAL_INPUT_UART, str, strlen(str));
+    hal_uart0_write((const uint8_t *)str, (int)strlen(str));
 }
 
 /**
@@ -70,8 +69,8 @@ static void uart_print(const char *str)
  */
 static void uart_println(const char *str)
 {
-    uart_write_bytes(SERIAL_INPUT_UART, str, strlen(str));
-    uart_write_bytes(SERIAL_INPUT_UART, "\r\n", 2);
+    hal_uart0_write((const uint8_t *)str, (int)strlen(str));
+    hal_uart0_write((const uint8_t *)"\r\n", 2);
 }
 
 /* ═══ 公共 API ═══ */
@@ -138,7 +137,7 @@ serial_state_t serial_poll(void)
     while (true)
     {
         uint8_t byte;
-        int n = uart_read_bytes(SERIAL_INPUT_UART, &byte, 1, 0);
+        int n = hal_uart0_read(&byte, 1);
         if (n <= 0) {
             break;
         }

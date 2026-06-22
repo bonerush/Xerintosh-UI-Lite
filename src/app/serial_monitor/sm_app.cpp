@@ -37,7 +37,7 @@ static float       sm_btn_vel_0    = 0.0f;
 static float       sm_btn_vel_1    = 0.0f;
 
 #ifndef NATIVE_TEST
-#include <Arduino.h>
+#include "hal/hal_uart.h"
 static char        sm_rx_buf[SM_TERM_LINE_LEN];
 static uint8_t     sm_rx_len = 0;
 #endif
@@ -171,9 +171,11 @@ void serial_monitor_update(void)
     }
 
 #ifndef NATIVE_TEST
-    while (Serial.available() > 0) {
-        int c = Serial.read();
-        if (c < 0) break;
+    while (hal_uart0_available() > 0) {
+        uint8_t byte;
+        int n = hal_uart0_read(&byte, 1);
+        if (n <= 0) break;
+        char c = (char)byte;
 
         if (c == '\n' || c == '\r') {
             if (sm_rx_len > 0) {
@@ -182,7 +184,7 @@ void serial_monitor_update(void)
                 sm_rx_len = 0;
             }
         } else if (sm_rx_len < SM_TERM_LINE_LEN - 1) {
-            sm_rx_buf[sm_rx_len++] = (char)c;
+            sm_rx_buf[sm_rx_len++] = c;
         }
     }
 #endif

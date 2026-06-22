@@ -79,9 +79,14 @@ void flasher_save_pin_config(void)
 }
 
 #ifndef NATIVE_TEST
-#include <Arduino.h>
+#include "driver/uart.h"
+#include "driver/gpio.h"
+#include "hal/hal_system.h"
+#include "hal/hal_uart.h"
 
-static HardwareSerial *s_flasher_uart = nullptr;
+#define FLASHER_UART_NUM UART_NUM_1
+
+static bool s_flasher_uart_ready = false;
 
 void flasher_init_pins(uint32_t baud_rate)
 {
@@ -89,13 +94,29 @@ void flasher_init_pins(uint32_t baud_rate)
     uint8_t rx_pin = flasher_get_pin_for_signal(FLASHER_SIG_RX);
     if (tx_pin == 255 || rx_pin == 255) return;
 
-    if (s_flasher_uart == nullptr) {
-        s_flasher_uart = &Serial1;
+    if (!s_flasher_uart_ready) {
+        uart_config_t uart_cfg = {
+            .baud_rate = (int)baud_rate,
+            .data_bits = UART_DATA_8_BITS,
+            .parity    = UART_PARITY_DISABLE,
+            .stop_bits = UART_STOP_BITS_1,
+            .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
+            .rx_flow_ctrl_thresh = 0,
+            .source_clk = UART_SCLK_DEFAULT,
+        };
+        uart_param_config(FLASHER_UART_NUM, &uart_cfg);
+        uart_set_pin(FLASHER_UART_NUM, tx_pin, rx_pin, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
+        uart_driver_install(FLASHER_UART_NUM, 256, 256, 0, NULL, 0);
+        s_flasher_uart_ready = true;
+    } else {
+        uart_set_baudrate(FLASHER_UART_NUM, baud_rate);
     }
-    s_flasher_uart->begin(baud_rate, SERIAL_8N1, rx_pin, tx_pin);
 
     uint8_t boot_pin = flasher_get_pin_for_signal(FLASHER_SIG_BOOT);
-    if (boot_pin != 255) { pinMode(boot_pin, OUTPUT); digitalWrite(boot_pin, HIGH); }
+    if (boot_pin != 255) {
+        gpio_set_direction((gpio_num_t)boot_pin, GPIO_MODE_OUTPUT);
+        gpio_set_level((gpio_num_t)boot_pin, 1);
+    }
 }
 
 /**
@@ -105,36 +126,32 @@ void flasher_init_pins(uint32_t baud_rate)
  */
 void flasher_set_dtr(bool active) {
     uint8_t pin = flasher_get_pin_for_signal(FLASHER_SIG_BOOT);
-    if (pin != 255) digitalWrite(pin, active ? LOW : HIGH);
+    if (pin != 255) gpio_set_level((gpio_num_t)pin, active ? 0 : 1);
 }
 
 void flasher_set_boot(bool low) {
     uint8_t pin = flasher_get_pin_for_signal(FLASHER_SIG_BOOT);
-    if (pin != 255) digitalWrite(pin, low ? LOW : HIGH);
+    if (pin != 255) gpio_set_level((gpio_num_t)pin, low ? 0 : 1);
 }
 
 void flasher_enter_download_mode(void) {
     flasher_set_boot(true);  /* LOW */
-    delay(100);
+    hal_delay_ms(100);
 }
 
 void flasher_reset_target(void) {
     flasher_set_boot(false); /* HIGH */
-    delay(100);
+    hal_delay_ms(100);
 }
 
 int flasher_uart_write(const uint8_t *data, int len) {
-    if (!s_flasher_uart || !data || len <= 0) return 0;
-    return s_flasher_uart->write(data, len);
+    if (!s_flasher_uart_ready || !data || len <= 0) return 0;
+    return (int)uart_write_bytes(FLASHER_UART_NUM, (const char *)data, (size_t)len);
 }
 
 int flasher_uart_read(uint8_t *buf, int max_len) {
-    if (!s_flasher_uart || !buf || max_len <= 0) return 0;
-    int n = 0;
-    while (n < max_len && s_flasher_uart->available()) {
-        buf[n++] = s_flasher_uart->read();
-    }
-    return n;
+    if (!s_flasher_uart_ready || !buf || max_len <= 0) return 0;
+    return (int)uart_read_bytes(FLASHER_UART_NUM, buf, (size_t)max_len, 0);
 }
 
 #else /* NATIVE_TEST */

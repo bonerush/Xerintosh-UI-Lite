@@ -71,7 +71,8 @@ bool g_flasher_bridge_active = false;
 #define FLASHER_DBG_ENABLED 0
 
 #ifndef NATIVE_TEST
-#include <Arduino.h>
+#include "hal/hal_uart.h"
+#include "kernel/debug_serial.h"
 #endif
 
 
@@ -106,8 +107,7 @@ void flasher_init(void *ud)
     flasher_ui_set_status(&s_ui, FLASHER_UI_BRIDGE);
 
 #if FLASHER_DBG_ENABLED
-    Serial.printf("[FLASHER] init done: wired-bridge running=%d\n", (int)s_running);
-    Serial.flush();
+    debug_printf("[FLASHER] init done: wired-bridge running=%d\n", (int)s_running);
 #endif
 #endif
 }
@@ -126,8 +126,7 @@ void flasher_loop(void *ud)
         case PT_PHASE_DTR_WAIT:
             if (hal_get_ticks() >= s_pt_phase_until_ms) {
 #if FLASHER_DBG_ENABLED
-                Serial.printf("[FLASHER] DTR pulse (LOW 50ms)\n");
-                Serial.flush();
+                debug_printf("[FLASHER] DTR pulse (LOW 50ms)\n");
 #endif
                 flasher_set_dtr(true);
                 hal_delay_ms(50);
@@ -138,9 +137,8 @@ void flasher_loop(void *ud)
                 flasher_ui_set_progress(&s_ui, 0);
                 flasher_ui_set_status(&s_ui, FLASHER_UI_FLASHING);
 #if FLASHER_DBG_ENABLED
-                Serial.printf("[FLASHER] DTR done, waiting bootloader %ums\n",
+                debug_printf("[FLASHER] DTR done, waiting bootloader %ums\n",
                               (unsigned)FLASHER_BOOT_WAIT_MS);
-                Serial.flush();
 #endif
             }
             break;
@@ -158,8 +156,7 @@ void flasher_loop(void *ud)
                     s_usb_deferred_len = 0;
                 }
 #if FLASHER_DBG_ENABLED
-                Serial.printf("[FLASHER] bootloader wait done, BRIDGE ACTIVE\n");
-                Serial.flush();
+                debug_printf("[FLASHER] bootloader wait done, BRIDGE ACTIVE\n");
 #endif
             }
             break;
@@ -173,9 +170,8 @@ void flasher_loop(void *ud)
     /* ── 长按 A：手动复位 ── */
     if (event_a == HAL_EVENT_LONG_PRESS) {
 #if FLASHER_DBG_ENABLED
-        Serial.printf("[FLASHER] manual reset: DTR 50ms + wait %ums\n",
+        debug_printf("[FLASHER] manual reset: DTR 50ms + wait %ums\n",
                       (unsigned)FLASHER_BOOT_WAIT_MS);
-        Serial.flush();
 #endif
         flasher_set_dtr(true);
         hal_delay_ms(50);
@@ -196,11 +192,16 @@ void flasher_loop(void *ud)
      */
 
     /* ── USB (PC) → UART (目标板) ── */
-    if (Serial.available()) {
+    if (hal_uart0_available() > 0) {
         uint8_t usb_buf[64];
         int usb_len = 0;
-        while (usb_len < (int)sizeof(usb_buf) && Serial.available()) {
-            usb_buf[usb_len++] = Serial.read();
+        while (usb_len < (int)sizeof(usb_buf) && hal_uart0_available() > 0) {
+            uint8_t byte;
+            if (hal_uart0_read(&byte, 1) > 0) {
+                usb_buf[usb_len++] = byte;
+            } else {
+                break;
+            }
         }
 
         if (!s_pt_first_data) {
@@ -234,8 +235,7 @@ void flasher_loop(void *ud)
         int uart_len = flasher_uart_read(uart_buf, sizeof(uart_buf));
         if (uart_len > 0) {
             if (hal_get_ticks() - s_pt_last_tx_ms < 2000) {
-                Serial.write(uart_buf, uart_len);
-                Serial.flush();
+                hal_uart0_write(uart_buf, uart_len);
             }
             s_pt_rx_bytes += (uint32_t)uart_len;
         }
