@@ -295,7 +295,7 @@ static void deferred_kernel_init(void)
 
     /* -- 设置系统保留内存 --
      * 保留水位是系统应急缓冲，不应等于所有服务同时开启所需内存之和。
-     * 当前 DRAM 约 200KB，UI/M5GFX 已占约 140KB，空闲约 60KB，因此
+     * 当前 DRAM 约 200KB，UI/显示层已占约 140KB，空闲约 60KB，因此
      * 保留水位必须保持较小（8KB），否则 WiFi/BT 的正常启用都会被拒绝。 */
     kern_kmem_set_reserved_bytes(8 * 1024);
 

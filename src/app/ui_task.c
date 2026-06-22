@@ -76,7 +76,7 @@ void ui_task_main(void *arg)
 #ifndef NATIVE_TEST
         /* 释放 1ms 给 FreeRTOS idle 任务（优先级 0），
          * 确保 TG1 系统看门狗能被及时喂狗。
-         * 内核任务和 Arduino loop 都在优先级 1，
+         * 内核任务和 app_main 调度循环都在优先级 1，
          * 若无此让步则 idle 任务会被永久饿死。 */
         hal_delay_ms(1);
 #endif

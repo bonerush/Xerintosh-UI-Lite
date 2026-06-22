@@ -3,7 +3,7 @@
  * @brief  HAL 系统层实现
  * @details 双实现架构：
  *          - NATIVE_TEST 时：使用 std::chrono 提供高精度时间
- *          - 硬件环境时：使用 Arduino millis() / delay()
+ *          - 硬件环境时：使用 ESP-IDF esp_timer_get_time() / vTaskDelay()
  *
  * @copyright Copyright (c) 2026
  */

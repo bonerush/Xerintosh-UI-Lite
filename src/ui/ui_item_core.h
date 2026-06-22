@@ -73,7 +73,7 @@ typedef struct xerintosh_switch_item_t
 
 /**
  * @brief 按钮项（单次触发回调）
- * @warning 按钮回调中不能直接调用 xerintosh_push_pop_up() 或 M5GFX 绘制函数，
+ * @warning 按钮回调中不能直接调用 xerintosh_push_pop_up() 或显示层绘制函数，
  *          因其底层依赖 FreeRTOS 信号量，在调度上下文中会触发 task timeout。
  *          正确做法：设标志位，由主循环的 app_input_process() 统一处理。
  */
@@ -186,7 +186,7 @@ extern xerintosh_list_item_t *xerintosh_new_switch_item(const char *_content, bo
  * @param  _exit_function 按下时触发的回调函数
  * @param  icon           图标类型
  * @return 新创建的列表项指针；内存分配失败时返回 NULL
- * @warning 回调中禁止调用 xerintosh_push_pop_up() / M5GFX 绘制函数，
+ * @warning 回调中禁止调用 xerintosh_push_pop_up() / 显示层绘制函数，
  *          应设标志位由主循环 app_input_process() 统一处理。
  */
 extern xerintosh_list_item_t *xerintosh_new_button_item(const char *_content, xerintosh_cb_t _exit_function,
