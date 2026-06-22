@@ -46,6 +46,12 @@ void hal_uart0_init(void)
     s_uart0_ready = true;
 }
 
+void hal_uart0_set_baudrate(uint32_t baud_rate)
+{
+    if (!s_uart0_ready) hal_uart0_init();
+    uart_set_baudrate(HAL_UART0_NUM, (uint32_t)baud_rate);
+}
+
 int hal_uart0_read(uint8_t *buf, int len)
 {
     if (!s_uart0_ready) hal_uart0_init();
@@ -71,6 +77,7 @@ int hal_uart0_available(void)
 #else /* NATIVE_TEST */
 
 void hal_uart0_init(void) {}
+void hal_uart0_set_baudrate(uint32_t baud_rate) { (void)baud_rate; }
 int hal_uart0_read(uint8_t *buf, int len) { (void)buf; (void)len; return 0; }
 int hal_uart0_write(const uint8_t *data, int len) { (void)data; (void)len; return len; }
 int hal_uart0_available(void) { return 0; }

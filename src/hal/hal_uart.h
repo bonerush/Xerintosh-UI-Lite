@@ -24,6 +24,13 @@ extern "C" {
  */
 void hal_uart0_init(void);
 
+/**
+ * @brief  设置 UART0 波特率
+ * @param  baud_rate 目标波特率
+ * @note   重新配置前自动确保 UART0 已初始化
+ */
+void hal_uart0_set_baudrate(uint32_t baud_rate);
+
 /* ═══ 数据读写 ═══ */
 
 /**
