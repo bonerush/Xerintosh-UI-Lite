@@ -18,7 +18,7 @@
 #include <stdio.h>
 
 #ifndef NATIVE_TEST
-#include <Arduino.h>
+#include "driver/gpio.h"
 #endif
 
 /* ═══ 内部常量 ═══ */
@@ -97,7 +97,7 @@ static int gpio_pin_index(uint8_t pin)
 static int gpio_read(uint8_t pin)
 {
     GPIOFS_ENTER_CRITICAL();
-    int v = digitalRead(pin);
+    int v = gpio_get_level((gpio_num_t)pin);
     GPIOFS_EXIT_CRITICAL();
     return v;
 }
@@ -114,10 +114,10 @@ static void gpio_set_output(uint8_t pin, int value)
     GPIOFS_ENTER_CRITICAL();
     int idx = gpio_pin_index(pin);
     if (idx >= 0 && g_gpio_dir[idx] != 1) {
-        pinMode(pin, OUTPUT);
+        gpio_set_direction((gpio_num_t)pin, GPIO_MODE_OUTPUT);
         g_gpio_dir[idx] = 1;
     }
-    digitalWrite(pin, value ? HIGH : LOW);
+    gpio_set_level((gpio_num_t)pin, value ? 1 : 0);
     GPIOFS_EXIT_CRITICAL();
 }
 
