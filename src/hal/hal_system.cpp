@@ -43,12 +43,14 @@ void hal_delay_ms(uint32_t ms) {
 
 #else
 
-/* ═══ 硬件环境：Arduino 实现 ═══ */
+/* ═══ 硬件环境：ESP-IDF 实现 ═══ */
 
-#include <Arduino.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "esp_timer.h"
 
 /**
- * @brief 初始化系统（硬件环境无需额外操作）
+ * @brief 初始化系统（ESP-IDF 自动完成启动，此处留空兼容）
  */
 void hal_system_init(void) {
 }
@@ -57,14 +59,14 @@ void hal_system_init(void) {
  * @brief 获取系统启动后的毫秒数
  */
 uint32_t hal_get_ticks(void) {
-    return millis();
+    return (uint32_t)(esp_timer_get_time() / 1000ULL);
 }
 
 /**
  * @brief 延时指定的毫秒数
  */
 void hal_delay_ms(uint32_t ms) {
-    delay(ms);
+    vTaskDelay(pdMS_TO_TICKS(ms));
 }
 
 #endif
