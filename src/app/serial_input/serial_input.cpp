@@ -3,7 +3,7 @@
  * @brief  串口输入管理实现
  * @details 双实现架构：
  *          - NATIVE_TEST 时：所有函数为空桩
- *          - 硬件环境时：通过 Arduino Serial 实现非阻塞输入，
+ *          - 硬件环境时：通过 ESP-IDF UART 实现非阻塞输入，
  *            支持 WiFi 密码接收、退格编辑、超时自动取消及输入掩码（*）。
  *
  * @copyright Copyright (c) 2026
@@ -25,7 +25,8 @@ bool serial_input_is_waiting(void) { return false; }
 #else
 
 #include "serial_input.h"
-#include <Arduino.h>
+#include "hal/hal_system.h"
+#include "driver/uart.h"
 #include <string.h>
 
 /* ═══ 常量 ═══ */
@@ -33,6 +34,7 @@ bool serial_input_is_waiting(void) { return false; }
 #define INPUT_BUFFER_SIZE   65   /* 64 字符 + 终止符 */
 #define PASSWORD_MAX_LEN    64   /* 密码最大长度 */
 #define TIMEOUT_MS          30000 /* 输入超时：30 秒 */
+#define SERIAL_INPUT_UART   UART_NUM_0
 
 /* ═══ 模块状态（文件作用域）═══ */
 
@@ -55,6 +57,23 @@ static void clear_buffer(void)
     g_input_consumed  = false;
 }
 
+/**
+ * @brief 向 UART 输出字符串
+ */
+static void uart_print(const char *str)
+{
+    uart_write_bytes(SERIAL_INPUT_UART, str, strlen(str));
+}
+
+/**
+ * @brief 向 UART 输出字符串并换行
+ */
+static void uart_println(const char *str)
+{
+    uart_write_bytes(SERIAL_INPUT_UART, str, strlen(str));
+    uart_write_bytes(SERIAL_INPUT_UART, "\r\n", 2);
+}
+
 /* ═══ 公共 API ═══ */
 
 /**
@@ -62,16 +81,15 @@ static void clear_buffer(void)
  */
 void serial_request_wifi_password(const char *ssid)
 {
-    Serial.println();
-    Serial.print("PASSWORD for ");
-    Serial.print(ssid);
-    Serial.print(": ");
-    Serial.flush();
+    uart_println("");
+    uart_print("PASSWORD for ");
+    uart_print(ssid);
+    uart_print(": ");
 
     strlcpy(g_target_name, ssid, sizeof(g_target_name));
     clear_buffer();
     g_serial_state = SERIAL_STATE_WAITING_PASSWORD;
-    g_wait_start_ms = millis();
+    g_wait_start_ms = hal_get_ticks();
 }
 
 /**
@@ -108,29 +126,30 @@ serial_state_t serial_poll(void)
     }
 
     /* ─── 超时检查 ─── */
-    if ((millis() - g_wait_start_ms) >= TIMEOUT_MS)
+    if ((hal_get_ticks() - g_wait_start_ms) >= TIMEOUT_MS)
     {
-        Serial.println("\n[TIMEOUT]");
+        uart_println("\n[TIMEOUT]");
         g_serial_state = SERIAL_STATE_CANCELLED;
         clear_buffer();
         return g_serial_state;
     }
 
     /* ─── 逐字节读取串口（非阻塞）─── */
-    while (Serial.available() > 0)
+    while (true)
     {
-        int raw = Serial.read();
-        if (raw < 0) {
+        uint8_t byte;
+        int n = uart_read_bytes(SERIAL_INPUT_UART, &byte, 1, 0);
+        if (n <= 0) {
             break;
         }
 
-        char c = (char)raw;
+        char c = (char)byte;
 
         /* 回车/换行 -> 确认输入 */
         if (c == '\n' || c == '\r')
         {
             g_input_buffer[g_input_len] = '\0';
-            Serial.println(); /* 回显换行 */
+            uart_println(""); /* 回显换行 */
 
             g_serial_state = SERIAL_STATE_PASSWORD_RECEIVED;
             return g_serial_state;
@@ -144,7 +163,7 @@ serial_state_t serial_poll(void)
                 g_input_len--;
                 g_input_buffer[g_input_len] = '\0';
                 /* 回显退格序列：光标后退、空格覆盖、再后退 */
-                Serial.print("\b \b");
+                uart_print("\b \b");
             }
             continue;
         }
@@ -159,7 +178,7 @@ serial_state_t serial_poll(void)
         {
             g_input_buffer[g_input_len++] = c;
             g_input_buffer[g_input_len]   = '\0';
-            Serial.print('*'); /* 掩码显示 */
+            uart_print("*"); /* 掩码显示 */
         }
     }
 
