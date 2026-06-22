@@ -1,8 +1,8 @@
 /**
  * @file   app_input.c
- * @brief  App 每帧输入处理实现
- * @details 将硬件按键事件映射到 UI 选择器导航，
- *          并调度各模块状态机（电源键弹窗、WiFi 弹窗、烧录器强制解除等）。
+ * @brief  App per-frame input processing implementation
+ * @details Maps hardware button events to UI selector navigation,
+ *          and dispatches module state machines (power key popup, WiFi popup, flasher force release, etc.).
  *
  * @copyright Copyright (c) 2026
  */
@@ -21,50 +21,50 @@
 #include "hal/hal_input.h"
 #include "hal/hal_system.h"
 
-/* WiFi 弹窗刷新（定义在 wifi_manager.cpp，UI 任务每帧调用） */
+/* WiFi popup refresh (defined in wifi_manager.cpp, called by UI task every frame) */
 extern void wifi_popup_refresh(void);
 
 /**
- * @brief 处理按键输入事件，映射到 UI 选择器操作
- * @note  按键映射：
- *        - Btn B 短按：选择器上移（上一项）
- *        - Btn B 长按：退出当前项 / 取消输入
- *        - Btn A 短按：选择器下移（下一项）
- *        - Btn A 长按：确认/进入当前项
+ * @brief Process button input events, mapped to UI selector operations
+ * @note  Button mapping:
+ *        - Btn B short press: selector up (previous item)
+ *        - Btn B long press: exit current item / cancel input
+ *        - Btn A short press: selector down (next item)
+ *        - Btn A long press: confirm/enter current item
  */
 void app_input_process(void)
 {
-    /* 无论处于何种模式，每帧都必须调用 hal_input_update()，
-       确保 GPIO 按键边沿标志被刷新。
-       user_item 内部虽然不处理框架导航，但 user_item 自身
-       的 loop 会调用 hal_input_get_event() 读取按键。 */
+    /* Regardless of mode, hal_input_update() must be called every frame
+       to ensure GPIO button edge flags are refreshed.
+       user_item internally does not handle framework navigation, but user_item's
+       own loop calls hal_input_get_event() to read buttons. */
     hal_input_update();
 
-    /* 更新电源键弹窗（检测 A+B 双键关机事件） */
+    /* Update power key popup (detect A+B dual-key shutdown event) */
     power_key_popup_update();
 
-    /* 刷新 WiFi 弹窗（跨任务弹窗，每帧 push 以保持显示） */
+    /* Refresh WiFi popup (cross-task popup, pushed every frame to keep display) */
     wifi_popup_refresh();
 
-    /* 烧录器引脚菜单：延迟弹窗 + 强制解除状态机 */
+    /* Flasher pin menu: delayed popup + force release state machine */
     flasher_menu_process_input();
 
-    /* 双键按住模式下，隔离所有正常按钮事件，防止 UI 抖动 */
+    /* In dual-key hold mode, isolate all normal button events to prevent UI jitter */
     if (power_key_popup_is_dual_active()) {
         return;
     }
 
-    /* 若处于 user_item 内部，框架输入由 App 自身接管 */
+    /* If inside user_item, framework input is taken over by the App itself */
     if (xerintosh_is_in_user_item()) {
         return;
     }
 
-    /* 进/退场动画期间禁止框架输入，避免误触发 */
+    /* Block framework input during enter/exit animations to avoid accidental triggers */
     if (!g_xerintosh_exit_animation_finished) {
         return;
     }
 
-    /* 烧录器强制解除状态机激活时，跳过框架导航 */
+    /* Skip framework navigation when flasher force release state machine is active */
     if (flasher_menu_is_active()) {
         return;
     }
@@ -78,7 +78,7 @@ void app_input_process(void)
     }
     else if (event_b == HAL_EVENT_LONG_PRESS)
     {
-        /* 若 WiFi 正在等待串口输入，先取消输入 */
+        /* If WiFi is waiting for serial input, cancel input first */
         if (wifi_mgr_is_waiting_input()) {
             serial_cancel();
         }
