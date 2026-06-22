@@ -1,7 +1,7 @@
 /**
  * @file   main.cpp
- * @brief  M5Stick-C 固件主入口
- * @details 硬件环境主程序：初始化 M5Unified、NVS 存储、设置、显示驱动、
+ * @brief  M5Stick-C 固件主入口 (ESP-IDF)
+ * @details 硬件环境主程序：初始化 ESP-IDF 子系统、NVS 存储、设置、显示驱动、
  *          UI 菜单及管理器，进入主循环处理输入、更新状态机及渲染 UI。
  *
  * @copyright Copyright (c) 2026
@@ -21,12 +21,16 @@ void wifi_mgr_task_main(void *arg);
 
 #ifndef NATIVE_TEST
 
-#include <M5Unified.h>
-#include <M5GFX.h>
-
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "esp_timer.h"
+#include "esp_heap_caps.h"
+#include "nvs_flash.h"
 #include "hal/hal_system.h"
 #include "hal/hal_display.h"
 #include "hal/hal_input.h"
+#include "hal/hal_uart.h"
+#include "kernel/debug_serial.h"
 #include "ui/ui_core.h"
 #include "ui/ui_item.h"
 #include "ui/ui_drawer.h"
@@ -131,23 +135,22 @@ extern "C" void on_spring_damping_change_cb(void *ud)
 
 /**
  * @brief 波特率变更回调
- * @note  保存新波特率等级到 NVS，并重新初始化 Serial
+ * @note  保存新波特率等级到 NVS，并重新初始化 UART
  */
 extern "C" void on_serial_baud_change_cb(void *ud)
 {
     (void)ud;
     storage_set_serial_baud_rate(g_serial_baud_rate);
-    Serial.end();
-    Serial.begin(settings_serial_baud_hw_value(g_serial_baud_rate));
+    hal_uart0_set_baudrate((uint32_t)settings_serial_baud_hw_value(g_serial_baud_rate));
 }
 
 /**
  * @brief 屏幕方向变更回调
  * @note  M5StickC 实测 rotation 效果：
- *        setRotation(0) → 正常竖屏 (portrait)
- *        setRotation(1) → 正常横屏 (landscape)
- *        setRotation(2) → 反向竖屏
- *        setRotation(3) → 反向横屏
+ *        setRotation(0) -> 正常竖屏 (portrait)
+ *        setRotation(1) -> 正常横屏 (landscape)
+ *        setRotation(2) -> 反向竖屏
+ *        setRotation(3) -> 反向横屏
  */
 extern "C" void on_screen_rotation_change_cb(void *ud)
 {
@@ -169,60 +172,107 @@ extern "C" void on_screen_rotation_change_cb(void *ud)
 /* ═══ 入口 ═══ */
 
 /**
- * @brief Arduino setup()：系统初始化
- * @note  初始化顺序：M5 硬件 → 串口 → 存储 → 设置 → 显示 → UI → 管理器
+ * @brief ESP-IDF app_main()：系统初始化
+ * @note  初始化顺序：UART -> 存储 -> 设置 -> 显示 -> UI -> 管理器
  */
-void setup()
+extern "C" void app_main(void)
 {
-    /* 最早进行串口初始化，确保后续 printf/日志能立即输出 */
-    Serial.begin(115200);
-    delay(100);
-    Serial.println("\n[  BOOT] M5Stick-P1 kernel starting...");
+    /* 最早进行 UART 初始化，确保后续 printf/日志能立即输出 */
+    hal_uart0_init();
+    hal_delay_ms(100);
+    debug_printf("\n[  BOOT] M5Stick-P1 kernel starting...\n");
 
-    M5.begin();
-    Serial.println("[  OK  ] M5.begin()");
+    debug_printf("[  OK  ] UART initialized\n");
+
+    /* 初始化 ESP-IDF NVS（替代 Arduino Preferences 底层） */
+    esp_err_t nvs_rc = nvs_flash_init();
+    if (nvs_rc == ESP_ERR_NVS_NO_FREE_PAGES || nvs_rc == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+        nvs_flash_erase();
+        nvs_rc = nvs_flash_init();
+    }
+    if (nvs_rc != ESP_OK) {
+        debug_printf("[ FAIL ] NVS flash init: %d\n", nvs_rc);
+    }
 
     storage_init();
-    Serial.println("[  OK  ] NVS storage");
+    debug_printf("[  OK  ] NVS storage\n");
     settings_load_from_storage();
-    Serial.println("[  OK  ] Settings loaded from NVS");
+    debug_printf("[  OK  ] Settings loaded from NVS\n");
 
     brightness = settings_brightness_hw_value();
     hal_display_set_brightness((uint8_t)brightness);
     g_anim_speed = settings_anim_speed_value();
 
     /* M5StickC 实测 rotation 效果：
-     *   setRotation(0) → 正常竖屏 (portrait)
-     *   setRotation(1) → 正常横屏 (landscape) */
+     *   setRotation(0) -> 正常竖屏 (portrait)
+     *   setRotation(1) -> 正常横屏 (landscape) */
     g_is_landscape = (g_screen_rotation_level == ORIENTATION_LANDSCAPE);
     int16_t gfx_rotation = g_is_landscape ? 1 : 0;
     hal_display_set_rotation(gfx_rotation);
 
-    Serial.printf("[  OK  ] Display driver, free_heap=%u\n", ESP.getFreeHeap());
+    debug_printf("[  OK  ] Display driver, free_heap=%u\n",
+               (unsigned)heap_caps_get_free_size(MALLOC_CAP_DEFAULT));
     hal_display_init();
     hal_system_init();
     hal_input_init();
 
     boot_screen_show();
-    Serial.println("[  OK  ] Boot screen");
+    debug_printf("[  OK  ] Boot screen\n");
 
     app_init_ui();
-    Serial.println("[  OK  ] UI initialised");
+    debug_printf("[  OK  ] UI initialised\n");
 
-    Serial.printf("[  OK  ] App managers, free_heap=%u\n", ESP.getFreeHeap());
+    debug_printf("[  OK  ] App managers, free_heap=%u\n",
+               (unsigned)heap_caps_get_free_size(MALLOC_CAP_DEFAULT));
 
     app_init_managers();
 
     xerintosh_init_core();
-    Serial.println("[  OK  ] Xeros core");
+    debug_printf("[  OK  ] Xeros core\n");
     g_in_xerintosh = true;
 
     /* 内核初始化延迟到 loop() 第一帧，避免 setup() 累积时间
      * 触发 TG1 系统看门狗（FreeRTOS idle 任务在 setup 返回后喂狗） */
-    Serial.println("[  OK  ] Hardware init complete, deferring kernel init");
+    debug_printf("[  OK  ] Hardware init complete, deferring kernel init\n");
+
+    /* 主循环 */
+    for (;;) {
+        deferred_kernel_init();
+
+        dev_ttyS0_poll();
+        serial_monitor_update();
+
+        /* 处理 WiFi 启用/禁用异步请求。必须在 loop() 上下文中执行，
+         * 避免 UI 任务 / Xeros 任务直接调用 WiFi 驱动导致死锁或 TWDT 复位。 */
+        wifi_mgr_process_requests();
+
+        /* 消费硬件定时器 ISR 设置的抢占 tick 请求，并在当前 CPU 触发重调度。
+         * 必须在 kern_sched_tick() 之前消费，确保 scheduler 在挑选下一个任务
+         * 前能看到最新的抢占状态，减少高优先级任务就绪后的调度延迟。 */
+        if (kern_port_preempt_consume()) {
+            g_need_resched = true;
+        }
+
+        kern_sched_tick();
+
+        /* 周期性记录当前任务的栈高水位，用于下次启动时自动推荐栈大小。
+         * 在调度 tick 之后执行，避免在任务上下文内部增加栈压力。 */
+        static uint32_t s_profile_last_ms = 0;
+        uint32_t profile_now = hal_get_ticks();
+        if (profile_now - s_profile_last_ms >= 1000) {
+            s_profile_last_ms = profile_now;
+            kern_task_t *cur = kern_task_current();
+            if (cur != NULL) {
+                kern_task_stack_profile_record(cur->name,
+                                               kern_task_stack_highwater(cur));
+            }
+        }
+        /* 让出 CPU，避免看门狗复位并允许低优先级任务运行 */
+        vTaskDelay(pdMS_TO_TICKS(1));
+    }
 }
 
-/* ═══ 延迟内核初始化（loop() 第一帧）═══ */
+/* ═══ 延迟内核初始化（第一帧）═══ */
 
 static bool g_kernel_inited = false;
 
@@ -235,7 +285,7 @@ static void deferred_kernel_init(void)
     if (g_kernel_inited) return;
     g_kernel_inited = true;
 
-    /* ── 内核子系统初始化 ── */
+    /* -- 内核子系统初始化 -- */
     kern_init();
     kern_log_set_level(KERN_LOG_INFO);
     kern_vfs_init();
@@ -243,33 +293,33 @@ static void deferred_kernel_init(void)
     kern_procfs_init();
     kern_sysfs_init();
 
-    /* ── 设置系统保留内存 ──
+    /* -- 设置系统保留内存 --
      * 保留水位是系统应急缓冲，不应等于所有服务同时开启所需内存之和。
      * 当前 DRAM 约 200KB，UI/M5GFX 已占约 140KB，空闲约 60KB，因此
      * 保留水位必须保持较小（8KB），否则 WiFi/BT 的正常启用都会被拒绝。 */
     kern_kmem_set_reserved_bytes(8 * 1024);
 
-    /* ── GPIO 文件系统 ── */
+    /* -- GPIO 文件系统 -- */
     kern_err_t gpio_rc = kern_gpiofs_init();
     if (gpio_rc != KERN_OK) {
         kern_log(KERN_LOG_ERROR, "gpiofs init failed: %d", gpio_rc);
     }
 
-    /* ── sysfs → 硬件双向绑定 ── */
+    /* -- sysfs -> 硬件双向绑定 -- */
 
-    /* brightness: sysfs 写入时同步到 M5 屏幕背光 */
+    /* brightness: sysfs 写入时同步到屏幕背光 */
     kern_sysfs_bind(KERN_SYSFS_BRIGHTNESS,
         [](kern_sysfs_attr_t attr, int32_t val, void *ud) {
             (void)attr; (void)ud;
             uint8_t hw = (uint8_t)(val > 255 ? 255 : val);
             hal_display_set_brightness(hw);
             brightness = (int16_t)val;
-            /* sysfs  brightness 是 0-255 HW 值，storage 期望 1-10 level */
+            /* sysfs brightness 是 0-255 HW 值，storage 期望 1-10 level */
             int16_t level = settings_brightness_level_from_hw((int16_t)val);
             storage_set_brightness((uint8_t)level);
         }, NULL);
 
-    /* rotation: sysfs 写入时同步到 M5 屏幕方向 */
+    /* rotation: sysfs 写入时同步到屏幕方向 */
     kern_sysfs_bind(KERN_SYSFS_ROTATION,
         [](kern_sysfs_attr_t attr, int32_t val, void *ud) {
             (void)attr; (void)ud;
@@ -310,70 +360,30 @@ static void deferred_kernel_init(void)
     kern_sysfs_update(KERN_SYSFS_ANIM_ENABLED, g_anim_enabled ? 1 : 0);
 
     kern_devices_init();
-    Serial.printf("[  OK  ] Kernel subsystems, free_heap=%u\n", ESP.getFreeHeap());
+    debug_printf("[  OK  ] Kernel subsystems, free_heap=%u\n",
+               (unsigned)heap_caps_get_free_size(MALLOC_CAP_DEFAULT));
 
-    /* ── 启动 Shell ── */
+    /* -- 启动 Shell -- */
     kern_shell_init();
-    Serial.println("[  OK  ] Shell spawned on /dev/ttyS0");
+    debug_printf("[  OK  ] Shell spawned on /dev/ttyS0\n");
 
-    /* ── 启动 UI/WiFi/BT 任务 ──
+    /* -- 启动 UI/WiFi/BT 任务 --
      * 使用历史栈高水位画像推荐栈大小，首次启动无画像时回退到经验值。 */
     size_t ui_stack   = kern_task_stack_recommend_by_name("ui",       UI_TASK_STACK_SIZE);
     size_t wifi_stack = kern_task_stack_recommend_by_name("wifi-mgr", WIFI_MGR_STACK_SIZE);
 
     kern_pid_t ui_pid = kern_spawn("ui", ui_task_main, NULL, ui_stack);
-    Serial.printf("[  OK  ] UI task spawned (pid=%d, stack=%u)\n", ui_pid, (unsigned)ui_stack);
+    debug_printf("[  OK  ] UI task spawned (pid=%d, stack=%u)\n", ui_pid, (unsigned)ui_stack);
 
     /* WiFi 管理器作为独立内核任务运行，与 UI 任务解耦 */
     kern_spawn("wifi-mgr", wifi_mgr_task_main, NULL, wifi_stack);
-    Serial.printf("[  OK  ] WiFi manager spawned as kernel task (stack=%u)\n", (unsigned)wifi_stack);
+    debug_printf("[  OK  ] WiFi manager spawned as kernel task (stack=%u)\n", (unsigned)wifi_stack);
 
     /* 让出 CPU 给 FreeRTOS，使刚创建的任务有机会启动并阻塞在调度信号量上 */
-    delay(10);
+    hal_delay_ms(10);
 
     kern_log(KERN_LOG_INFO, "Xeros kernel boot complete, entering scheduler");
-    Serial.println("[  OK  ] Kernel boot complete, entering scheduler loop");
-}
-
-/**
- * @brief Arduino loop()：Xeros 内核调度入口
- * @note  M5.update() 已迁移至 hal_input_update()（由 ui_task 在按键读取前调用），
- *        避免 FreeRTOS 多任务环境下跨任务边沿标志丢失。
- *        每个 kern_sched_tick() 运行一个任务切片后返回。
- */
-void loop()
-{
-    deferred_kernel_init();
-
-
-    dev_ttyS0_poll();
-    serial_monitor_update();
-
-    /* 处理 WiFi 启用/禁用异步请求。必须在 loop() 上下文中执行，
-     * 避免 UI 任务 / Xeros 任务直接调用 WiFi 驱动导致死锁或 TWDT 复位。 */
-    wifi_mgr_process_requests();
-
-    /* 消费硬件定时器 ISR 设置的抢占 tick 请求，并在当前 CPU 触发重调度。
-     * 必须在 kern_sched_tick() 之前消费，确保 scheduler 在挑选下一个任务
-     * 前能看到最新的抢占状态，减少高优先级任务就绪后的调度延迟。 */
-    if (kern_port_preempt_consume()) {
-        g_need_resched = true;
-    }
-
-    kern_sched_tick();
-
-    /* 周期性记录当前任务的栈高水位，用于下次启动时自动推荐栈大小。
-     * 在调度 tick 之后执行，避免在任务上下文内部增加栈压力。 */
-    static uint32_t s_profile_last_ms = 0;
-    uint32_t profile_now = millis();
-    if (profile_now - s_profile_last_ms >= 1000) {
-        s_profile_last_ms = profile_now;
-        kern_task_t *cur = kern_task_current();
-        if (cur != NULL) {
-            kern_task_stack_profile_record(cur->name,
-                                           kern_task_stack_highwater(cur));
-        }
-    }
+    debug_printf("[  OK  ] Kernel boot complete, entering scheduler loop\n");
 }
 
 #endif /* NATIVE_TEST */
