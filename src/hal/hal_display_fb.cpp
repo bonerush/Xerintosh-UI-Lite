@@ -132,7 +132,7 @@ public:
             _light_instance.config(cfg);
         }
         setPanel(&_panel_instance);
-        setLight(&_light_instance);
+        _panel_instance.setLight(&_light_instance);
     }
 };
 
