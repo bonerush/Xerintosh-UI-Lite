@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0d1117; color: #c9d1d9; padding: 40px; }
+h1 { color: #58a6ff; font-size: 24px; margin-bottom: 8px; }
+.subtitle { color: #8b949e; font-size: 14px; margin-bottom: 32px; }
+.compare { display: flex; gap: 24px; margin-bottom: 40px; }
+.panel { flex: 1; background: #161b22; border: 1px solid #30363d; border-radius: 8px; overflow: hidden; }
+.panel-header { padding: 12px 16px; font-weight: 600; font-size: 15px; }
+.panel.old .panel-header { background: #da363310; color: #f85149; border-bottom: 1px solid #da363340; }
+.panel.new .panel-header { background: #23863610; color: #3fb950; border-bottom: 1px solid #23863640; }
+.panel-body { padding: 16px; }
+.layer { padding: 10px 14px; margin: 4px 0; border-radius: 4px; font-size: 13px; display: flex; align-items: center; gap: 10px; }
+.layer .tag { font-size: 10px; padding: 2px 6px; border-radius: 3px; font-weight: 600; white-space: nowrap; min-width: 48px; text-align: center; }
+.tag.keep { background: #30363d; color: #8b949e; }
+.tag.change { background: #d2992230; color: #d29922; }
+.tag.rewrite { background: #f8514930; color: #f85149; }
+.tag.new { background: #23863630; color: #3fb950; }
+.tag.remove { background: #da363330; color: #da3633; text-decoration: line-through; }
+.layer.app { background: #1c2128; border-left: 3px solid #8b949e; }
+.layer.hal { background: #1c2128; border-left: 3px solid #8b949e; }
+.layer.vfs { background: #1c2128; border-left: 3px solid #8b949e; }
+.layer.task { background: #1c2128; border-left: 3px solid #d29922; }
+.layer.sched { background: #1c2128; border-left: 3px solid #f85149; }
+.layer.port { background: #1c2128; border-left: 3px solid #f85149; }
+.layer.cpu { background: #1c2128; border-left: 3px solid #3fb950; }
+.layer.ctx { background: #1c2128; border-left: 3px solid #3fb950; }
+.layer.sync { background: #1c2128; border-left: 3px solid #3fb950; }
+.layer.fr { background: #1c2128; border-left: 3px solid #da3633; }
+.arrow { text-align: center; color: #58a6ff; font-size: 20px; margin: 4px 0; }
+.section { margin-bottom: 32px; }
+.section h2 { color: #58a6ff; font-size: 18px; margin-bottom: 12px; border-bottom: 1px solid #30363d; padding-bottom: 8px; }
+.detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 16px; }
+.card h3 { font-size: 14px; color: #58a6ff; margin-bottom: 8px; }
+.card p, .card li { font-size: 13px; color: #8b949e; line-height: 1.6; }
+.card ul { padding-left: 18px; }
+.code { background: #0d1117; border: 1px solid #30363d; border-radius: 4px; padding: 8px 12px; font-family: 'SF Mono', Menlo, monospace; font-size: 12px; color: #c9d1d9; overflow-x: auto; margin: 8px 0; }
+</style>
+</head>
+<body>
+<h1>Xeros 内核架构：FreeRTOS → Bare-Metal 迁移</h1>
+<p class="subtitle">方案 B：调度核心重写，保持 VFS / Device / HAL / App 层不变</p>
+
+<div class="compare">
+  <div class="panel old">
+    <div class="panel-header">◀ 当前架构（FreeRTOS 依赖）</div>
+    <div class="panel-body">
+      <div class="layer app"><span class="tag keep">不变</span> App 层 (ui_task, wifi, apps)</div>
+      <div class="layer hal"><span class="tag keep">不变</span> HAL 层 (display, input, uart, power)</div>
+      <div class="layer vfs"><span class="tag keep">不变</span> Xeros VFS + Device Model</div>
+      <div class="layer task"><span class="tag change">小幅改</span> kern_task (TCB 管理)</div>
+      <div class="layer sched"><span class="tag change">小幅改</span> kern_sched (调度循环)</div>
+      <div class="layer port"><span class="tag rewrite">重写</span> kern_port (令牌协议→真正的上下文切换)</div>
+      <div class="arrow">↓ 依赖 ↓</div>
+      <div class="layer fr"><span class="tag remove">移除</span> FreeRTOS (xTaskCreate, vTaskDelay, Semaphore)</div>
+      <div class="layer fr"><span class="tag remove">移除</span> GPTimer ISR</div>
+    </div>
+  </div>
+  <div class="panel new">
+    <div class="panel-header">▶ 新架构（Bare-Metal）</div>
+    <div class="panel-body">
+      <div class="layer app"><span class="tag keep">不变</span> App 层 (ui_task, wifi, apps)</div>
+      <div class="layer hal"><span class="tag keep">不变</span> HAL 层 (display, input, uart, power)</div>
+      <div class="layer vfs"><span class="tag keep">不变</span> Xeros VFS + Device Model</div>
+      <div class="layer task"><span class="tag change">小幅改</span> kern_task (新 TCB 字段，栈自管理)</div>
+      <div class="layer sched"><span class="tag rewrite">重写</span> kern_sched (O(1) 优先级调度器)</div>
+      <div class="layer cpu"><span class="tag new">新增</span> kern_runq (Per-CPU 就绪队列 + bitmap)</div>
+      <div class="layer ctx"><span class="tag new">新增</span> kern_ctx (Xtensa 汇编上下文切换)</div>
+      <div class="layer sync"><span class="tag new">新增</span> kern_sync (spinlock / mutex / sem)</div>
+      <div class="arrow">↓ 硬件层 ↓</div>
+      <div class="layer cpu"><span class="tag new">新增</span> CCOMPARE0 定时器 (每核独立)</div>
+      <div class="layer cpu"><span class="tag new">新增</span> 核间中断 IPI</div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h2>新增 / 重写模块总览</h2>
+  <div class="detail-grid">
+    <div class="card">
+      <h3>kern_ctx — 上下文切换</h3>
+      <ul>
+        <li>Xtensa LX6 完整寄存器保存/恢复（32 GPR + SAR + Loop + PS）</li>
+        <li>汇编实现 kern_ctx_switch(from, to)</li>
+        <li>栈溢出 canary + guard page（MPU）</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>kern_runq — Per-CPU 就绪队列</h3>
+      <ul>
+        <li>32 级优先级 bitmap，O(1) 查找最高优先级</li>
+        <li>每优先级 FIFO 队列，O(1) 入队/出队</li>
+        <li>Per-CPU 独立，无锁访问</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>kern_sync — 同步原语</h3>
+      <ul>
+        <li>Spinlock：__sync_lock_test_and_set + 内存屏障</li>
+        <li>Mutex：递归锁 + 优先级继承</li>
+        <li>Semaphore：原子计数 + 等待队列</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>kern_timer — 定时器系统</h3>
+      <ul>
+        <li>SysTick：CCOMPARE0 定时器，1kHz</li>
+        <li>抢占：ISR 设置 need_resched 标志</li>
+        <li>软件定时器：排序链表</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>kern_smp — 双核管理</h3>
+      <ul>
+        <li>Core 0 启动 Core 1</li>
+        <li>IPI 核间中断：跨核 reschedule / task kill</li>
+        <li>任务 affinity mask</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>kern_sleep — 睡眠/唤醒</h3>
+      <ul>
+        <li>kern_sleep_ms(ms)：任务标记 SLEEPING</li>
+        <li>排序唤醒链表，每 tick 检查头部</li>
+        <li>替代所有 vTaskDelay 调用</li>
+      </ul>
+    </div>
+  </div>
+</div>
+</body>
+</html>

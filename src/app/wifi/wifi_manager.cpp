@@ -64,6 +64,7 @@ static portMUX_TYPE g_popup_spinlock = portMUX_INITIALIZER_UNLOCKED;
 
 static wifi_mgr_state_t g_state           = WIFI_MGR_IDLE;    /* 状态机当前状态 */
 static bool             g_wifi_enabled    = false;            /* WiFi 是否已启用 */
+static bool             g_wifi_driver_inited = false;         /* WiFi 驱动是否已初始化 */
 
 /* ═══ 异步请求标志（线程安全）═══
  * UI 任务 / Xeros 任务通过 request_*() 设置标志，
@@ -252,6 +253,14 @@ void wifi_mgr_enable(void)
     }
 
     /* 使用 ESP-IDF 原生 WiFi API 初始化驱动 */
+    if (!g_wifi_driver_inited) {
+        ESP_ERROR_CHECK(esp_netif_init());
+        ESP_ERROR_CHECK(esp_event_loop_create_default());
+        wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
+        ESP_ERROR_CHECK(esp_wifi_init(&cfg));
+        g_wifi_driver_inited = true;
+    }
+
     esp_wifi_set_storage(WIFI_STORAGE_RAM);
     esp_wifi_set_ps(WIFI_PS_NONE);
 

@@ -84,13 +84,13 @@ void hal_display_flush(void) {
 #include "driver/gpio.h"
 #include "hal_system.h"
 #include "hal_axp192.h"
+#include "kernel/debug_serial.h"
 
 /* ── M5StickC 显示配置（ST7735S） ── */
 
 class LGFX_M5StickC : public lgfx::LGFX_Device {
     lgfx::Panel_ST7735S _panel_instance;
     lgfx::Bus_SPI       _bus_instance;
-    lgfx::Light_PWM     _light_instance;
 
 public:
     LGFX_M5StickC(void) {
@@ -98,12 +98,13 @@ public:
             auto cfg = _bus_instance.config();
             cfg.spi_host = SPI2_HOST;
             cfg.spi_mode = 0;
-            cfg.freq_write = 40000000;
-            cfg.freq_read  = 16000000;
+            cfg.freq_write = 27000000;
+            cfg.freq_read  = 14000000;
             cfg.pin_sclk = GPIO_NUM_13;
             cfg.pin_mosi = GPIO_NUM_15;
             cfg.pin_miso = GPIO_NUM_14;
             cfg.pin_dc   = GPIO_NUM_23;
+            cfg.spi_3wire = true;
             _bus_instance.config(cfg);
             _panel_instance.setBus(&_bus_instance);
         }
@@ -115,7 +116,7 @@ public:
             cfg.panel_height = 160;
             cfg.offset_x = 26;
             cfg.offset_y = 1;
-            cfg.offset_rotation = 0;
+            cfg.offset_rotation = 2;
             cfg.readable = false;
             cfg.invert = true;
             cfg.rgb_order = false;
@@ -123,16 +124,7 @@ public:
             cfg.bus_shared = true;
             _panel_instance.config(cfg);
         }
-        {
-            auto cfg = _light_instance.config();
-            cfg.pin_bl = GPIO_NUM_32;
-            cfg.invert = false;
-            cfg.freq   = 44100;
-            cfg.pwm_channel = 7;
-            _light_instance.config(cfg);
-        }
         setPanel(&_panel_instance);
-        _panel_instance.setLight(&_light_instance);
     }
 };
 
@@ -140,6 +132,7 @@ static LGFX_M5StickC g_lgfx;      /* LovyanGFX 显示实例 */
 lgfx::LGFX_Sprite* g_canvas = nullptr;  /* 离屏画布 */
 static int g_rotation = 0;          /* 当前屏幕方向 */
 static uint8_t g_brightness = 128;  /* 当前背光亮度 */
+static bool g_power_inited = false; /* AXP192 显示电源是否已初始化 */
 
 /**
  * @brief 统一封装 LovyanGFX Sprite 创建顺序：必须先设置色深再创建精灵。
@@ -153,6 +146,87 @@ static void hal_display_create_sprite(lgfx::LGFX_Sprite* canvas,
     canvas->createSprite(w, h);
 }
 
+/* ── AXP192 显示电源/背光辅助函数 ── */
+
+/**
+ * @brief 设置 AXP192 LDO3 电压（M5StickC 的 LCD 供电）
+ * @param mv 目标电压，单位 mV，范围 1800-3300
+ */
+static void axp192_set_ldo3(uint16_t mv)
+{
+    uint8_t val = (mv > 3300) ? 15 : (mv < 1800) ? 0 : (uint8_t)((mv - 1800) / 100);
+    uint8_t reg28 = 0;
+    hal_axp192_read_reg(0x28, &reg28);
+    reg28 = (reg28 & 0xF0) | (val & 0x0F);
+    hal_axp192_write_reg(0x28, reg28);
+
+    uint8_t reg12 = 0;
+    hal_axp192_read_reg(0x12, &reg12);
+    hal_axp192_write_reg(0x12, reg12 | (1 << 3)); /* LDO3 enable */
+}
+
+/**
+ * @brief 关闭 AXP192 DCDC3（M5StickC 启动后需关闭以匹配 M5Unified 配置）
+ */
+static void axp192_disable_dcdc3(void)
+{
+    hal_axp192_write_reg(0x27, 0x00);
+    uint8_t reg12 = 0;
+    hal_axp192_read_reg(0x12, &reg12);
+    hal_axp192_write_reg(0x12, reg12 & ~(1 << 1)); /* DCDC3 disable */
+}
+
+/**
+ * @brief 通过 AXP192 设置背光亮度
+ * @param level 0-255；M5StickC 背光由 AXP192 LDO2 控制
+ */
+static void axp192_set_backlight(uint8_t level)
+{
+    uint8_t reg12 = 0;
+    hal_axp192_read_reg(0x12, &reg12);
+
+    if (level == 0) {
+        hal_axp192_write_reg(0x12, reg12 & ~(1 << 2)); /* LDO2 disable */
+        return;
+    }
+
+    uint8_t duty = (((level >> 1) + 8) / 13) + 5;
+    if (duty > 15) duty = 15;
+
+    uint8_t reg28 = 0;
+    hal_axp192_read_reg(0x28, &reg28);
+    reg28 = (reg28 & 0x0F) | ((duty & 0x0F) << 4);
+    hal_axp192_write_reg(0x28, reg28);
+
+    hal_axp192_write_reg(0x12, reg12 | (1 << 2)); /* LDO2 enable */
+}
+
+/**
+ * @brief M5StickC 显示上电序列
+ * @note  移植自 M5Unified Power.begin() + M5GFX Light_M5StickC，
+ *        不执行此序列时 LCD 无供电，屏幕保持黑屏。
+ */
+static void axp192_power_on_display(void)
+{
+    if (g_power_inited) return;
+    g_power_inited = true;
+
+    if (hal_axp192_init() != ESP_OK) {
+        debug_printf("[ FAIL ] AXP192 I2C init failed\n");
+        return;
+    }
+
+    hal_axp192_write_reg(0x30, 0x80); /* VBUS-IPSOUT Pass-Through Management */
+    axp192_disable_dcdc3();
+    axp192_set_ldo3(3000);            /* LCD power 3.0V */
+    hal_axp192_write_reg(0x12, 0x4D); /* DCDC1/LDO2/LDO3/EXTEN enable */
+
+    hal_delay_ms(10);
+    axp192_set_backlight(g_brightness);
+    debug_printf("[ DIAG ] AXP192 display power on, LDO3=3000mV, LDO2 duty=%d\n",
+                 (int)g_brightness);
+}
+
 /**
  * @brief 初始化显示：创建 LovyanGFX Sprite 并设置颜色深度为 8bit（RGB332, 256 色）
  * @note  8-bit 帧缓冲 80×160×1 = 12.8KB，相比 16-bit 节省 12.8KB，
@@ -160,12 +234,23 @@ static void hal_display_create_sprite(lgfx::LGFX_Sprite* canvas,
  *        使 ESP32-PICO 无 PSRAM 也能同时运行 Classic BT SPP + UI 渲染。
  */
 void hal_display_init(void) {
+    axp192_power_on_display();
+
     if (!g_canvas) {
         g_canvas = new lgfx::LGFX_Sprite(&g_lgfx);
     }
+    if (!g_lgfx.init()) {
+        debug_printf("[ FAIL ] LGFX init failed\n");
+    }
+
     g_screen_width = g_lgfx.width();
     g_screen_height = g_lgfx.height();
     hal_display_create_sprite(g_canvas, g_screen_width, g_screen_height, 8);
+
+    /* Diagnostic: fill sprite white then push to panel */
+    g_canvas->fillScreen(0xFFFF);
+    g_canvas->pushSprite(&g_lgfx, 0, 0);
+    debug_printf("[ DIAG ] display init: w=%d h=%d\n", g_screen_width, g_screen_height);
 }
 
 /**
@@ -202,7 +287,7 @@ int hal_display_get_rotation(void) {
 
 void hal_display_set_brightness(uint8_t level) {
     g_brightness = level;
-    g_lgfx.setBrightness(level);
+    axp192_set_backlight(level);
 }
 
 uint8_t hal_display_get_brightness(void) {

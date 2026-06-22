@@ -23,6 +23,11 @@
 #include "kernel/kern_task.h"
 #include "kernel/kern_init.h"
 
+#ifndef NATIVE_TEST
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#endif
+
 /* ─── 外部函数 ─── */
 extern void app_input_process(void);
 /* WiFi 管理器已作为独立内核任务运行（wifi_mgr_task_main），
@@ -74,11 +79,11 @@ void ui_task_main(void *arg)
         }
 
 #ifndef NATIVE_TEST
-        /* 释放 1ms 给 FreeRTOS idle 任务（优先级 0），
+        /* 释放时间给 FreeRTOS idle 任务（优先级 0），
          * 确保 TG1 系统看门狗能被及时喂狗。
-         * 内核任务和 app_main 调度循环都在优先级 1，
-         * 若无此让步则 idle 任务会被永久饿死。 */
-        hal_delay_ms(1);
+         * 使用 vTaskDelay 替代 hal_delay_ms+taskYIELD，在保持流畅帧率的同时
+         * 让出 CPU 给低优先级任务。 */
+        vTaskDelay(pdMS_TO_TICKS(5));
 #endif
 
         /* 让出 CPU */

@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0d1117; color: #c9d1d9; padding: 40px; }
+h1 { color: #58a6ff; font-size: 24px; margin-bottom: 8px; }
+.subtitle { color: #8b949e; font-size: 14px; margin-bottom: 32px; }
+h2 { color: #58a6ff; font-size: 18px; margin: 28px 0 12px; border-bottom: 1px solid #30363d; padding-bottom: 8px; }
+h3 { font-size: 14px; color: #c9d1d9; margin: 20px 0 10px; }
+.code { background: #161b22; border: 1px solid #30363d; border-radius: 4px; padding: 12px 16px; font-family: 'SF Mono', Menlo, monospace; font-size: 12px; line-height: 1.7; margin: 8px 0; overflow-x: auto; }
+.code .kw { color: #ff7b72; }
+.code .type { color: #79c0ff; }
+.code .fn { color: #d2a8ff; }
+.code .cmt { color: #8b949e; }
+.code .num { color: #a5d6ff; }
+.code .macro { color: #ffa657; }
+.code .reg { color: #7ee787; }
+.diagram { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 20px; margin: 12px 0; font-family: 'SF Mono', monospace; font-size: 12px; line-height: 1.8; white-space: pre; color: #c9d1d9; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 16px; }
+.card h3 { font-size: 14px; color: #58a6ff; margin-bottom: 10px; }
+li { font-size: 13px; color: #8b949e; line-height: 1.7; margin-left: 16px; }
+.note { background: #1f2a3710; border: 1px solid #30363d; border-radius: 6px; padding: 12px 16px; margin: 16px 0; font-size: 13px; color: #8b949e; }
+.note strong { color: #d29922; }
+table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+th, td { border: 1px solid #30363d; padding: 8px 12px; font-size: 13px; text-align: left; }
+th { background: #161b22; color: #58a6ff; }
+td { color: #8b949e; }
+</style>
+</head>
+<body>
+<h1>第 4 部分：定时器 & 抢占系统 (kern_timer)</h1>
+<p class="subtitle">CCOMPARE0 硬件定时器 · 每核独立 SysTick · 软件定时器链表</p>
+
+<h2>硬件定时器：ESP32 CCOMPARE0</h2>
+
+<div class="code">
+<span class="cmt">/* kern_timer.c — 使用 Xtensa 内部 CCOMPARE0 定时器 */</span>
+
+<span class="macro">#define TICK_HZ</span> <span class="num">1000</span>   <span class="cmt">// 1kHz = 1ms tick</span>
+<span class="macro">#define TICK_US</span> <span class="num">1000</span>
+
+<span class="cmt">/* Xtensa 特殊寄存器 */</span>
+<span class="macro">#define XT_CCOUNT</span>   <span class="num">234</span>   <span class="cmt">// 周期计数（自动递增，每 CPU 周期 +1）</span>
+<span class="macro">#define XT_CCOMPARE0</span> <span class="num">240</span>  <span class="cmt">// 比较器 0：ccount == ccompare0 → 中断</span>
+
+<span class="type">void</span> <span class="fn">kern_timer_init_per_cpu</span>(<span class="type">uint8_t</span> cpu) {
+    <span class="type">uint32_t</span> ticks_per_ms = <span class="fn">esp_rom_get_cpu_ticks_per_us</span>() * <span class="num">1000</span>;
+
+    <span class="cmt">// 设置下次中断 = 当前计数值 + ticks_per_ms</span>
+    <span class="type">uint32_t</span> ccount;
+    <span class="kw">asm</span> <span class="kw">volatile</span>(<span class="str">"rsr.ccount %0"</span> : <span class="str">"=r"</span>(ccount));
+    <span class="kw">asm</span> <span class="kw">volatile</span>(<span class="str">"wsr.ccompare0 %0"</span> :: <span class="str">"r"</span>(ccount + ticks_per_ms));
+
+    <span class="cmt">// 使能 CCOMPARE0 中断（level 1，低优先级）</span>
+    <span class="fn">xt_set_interrupt_handler</span>(ETS_CCOMPARE0_INUM, <span class="fn">kern_timer_isr_per_cpu</span>, ...);
+    <span class="fn">xt_ints_on</span>(<span class="num">1</span> << ETS_CCOMPARE0_INUM);
+}
+</div>
+
+<div class="note">
+  <strong>为什么选 CCOMPARE0 而非 GPTimer？</strong><br>
+  • CCOMPARE0 是 Xtensa 核心内部定时器，零外设依赖，不经过 APB 总线<br>
+  • 直接读写特殊寄存器（rsr/wsr），延迟确定（~4 周期）<br>
+  • 每个核心有独立的 CCOUNT/CCOMPARE 寄存器，天然 Per-CPU<br>
+  • GPTimer 是 ESP-IDF 外设驱动，内部可能依赖 FreeRTOS
+</div>
+
+<h2>Timer ISR 流程</h2>
+<div class="diagram">
+kern_timer_isr_per_cpu(cpu):
+    │
+    ├── 1. 重装载 CCOMPARE0
+    │      ccount = rsr.ccount
+    │      wsr.ccompare0 = ccount + ticks_per_ms
+    │
+    ├── 2. 更新 tick 计数
+    │      g_per_cpu[cpu].sched_ticks++
+    │
+    ├── 3. 时间片递减
+    │      if (current != NULL && --current->slice_remaining == 0)
+    │          g_per_cpu[cpu].need_resched = true
+    │
+    ├── 4. 处理软件定时器（仅 Core 0）
+    │      kern_soft_timer_tick()  // 检查到期，回调
+    │
+    └── 5. ISR 返回
+           if (need_resched && 不是嵌套中断)
+               kern_ctx_switch_isr(current.ctx, idle_ctx)
+               ─── 跳到调度循环，重新选择任务 ───
+</div>
+
+<h2>抢占触发条件</h2>
+<table>
+<tr><th>触发条件</th><th>处理</th></tr>
+<tr><td>时间片耗尽 (slice_remaining == 0)</td><td>need_resched = true, ISR 返回时切换</td></tr>
+<tr><td>高优先级任务就绪 (ISR/另一核唤醒)</td><td>need_resched = true, ISR 返回时立即切换</td></tr>
+<tr><td>当前任务调用 yield()</td><td>直接 kern_ctx_switch 回调度循环</td></tr>
+<tr><td>当前任务调用 sleep_ms()</td><td>标记 SLEEPING, kern_ctx_switch 回调度循环</td></tr>
+</table>
+
+<h2>软件定时器</h2>
+<div class="code">
+<span class="cmt">/* 按到期时间排序的单向链表 */</span>
+<span class="kw">typedef struct</span> <span class="type">kern_soft_timer</span> {
+    <span class="type">uint64_t</span>              expire_tick;  <span class="cmt">// 绝对到期 tick 数</span>
+    <span class="type">void</span>               (*callback)(<span class="type">void</span> *arg);
+    <span class="type">void</span>                *arg;
+    <span class="type">bool</span>                 periodic;
+    <span class="type">uint32_t</span>             period_ticks;  <span class="cmt">// 如果是周期性的</span>
+    <span class="kw">struct</span> <span class="type">kern_soft_timer</span> *next;
+} <span class="type">kern_soft_timer_t</span>;
+
+<span class="cmt">/* 每 tick 只检查链表头部（O(1) 均摊）*/</span>
+<span class="type">void</span> <span class="fn">kern_soft_timer_tick</span>(<span class="type">void</span>) {
+    <span class="type">uint64_t</span> now = <span class="fn">kern_ticks</span>();
+    <span class="kw">while</span> (g_timer_head && g_timer_head->expire_tick <= now) {
+        <span class="type">kern_soft_timer_t</span> *t = g_timer_head;
+        g_timer_head = t->next;
+        <span class="kw">if</span> (t->callback) t->callback(t->arg);
+        <span class="kw">if</span> (t->periodic) <span class="fn">kern_soft_timer_add</span>(t);  <span class="cmt">// 重新插入</span>
+    }
+}
+</div>
+
+</body>
+</html>

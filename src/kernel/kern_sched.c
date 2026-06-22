@@ -289,7 +289,9 @@ void kern_sched_init(void)
     g_per_cpu[1].task_count = 1;  /* idle 计入 */
 
     /* ── 启动 Core 0 调度器核心 ── */
+#ifdef CONFIG_SMP_ENABLED
     kern_smp_start_core(0, kern_smp_sched_loop);
+#endif
 
     kern_log(KERN_LOG_DEBUG, "scheduler initialized (esp32-freertos, 2 cores)");
 }

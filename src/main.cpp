@@ -201,20 +201,21 @@ extern "C" void app_main(void)
     settings_load_from_storage();
     debug_printf("[  OK  ] Settings loaded from NVS\n");
 
-    brightness = settings_brightness_hw_value();
-    hal_display_set_brightness((uint8_t)brightness);
-    g_anim_speed = settings_anim_speed_value();
-
     /* M5StickC 实测 rotation 效果：
      *   setRotation(0) -> 正常竖屏 (portrait)
-     *   setRotation(1) -> 正常横屏 (landscape) */
-    g_is_landscape = (g_screen_rotation_level == ORIENTATION_LANDSCAPE);
+     *   setRotation(1) -> 正常横屏 (landscape)
+     * 默认使用与 Arduino 版本一致的横屏方向。 */
     int16_t gfx_rotation = g_is_landscape ? 1 : 0;
     hal_display_set_rotation(gfx_rotation);
 
     debug_printf("[  OK  ] Display driver, free_heap=%u\n",
                (unsigned)heap_caps_get_free_size(MALLOC_CAP_DEFAULT));
     hal_display_init();
+
+    brightness = settings_brightness_hw_value();
+    hal_display_set_brightness((uint8_t)brightness);
+    g_anim_speed = settings_anim_speed_value();
+
     hal_system_init();
     hal_input_init();
 

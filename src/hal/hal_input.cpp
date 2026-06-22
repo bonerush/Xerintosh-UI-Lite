@@ -98,10 +98,12 @@ static uint32_t g_boot_time_ms = 0;  /* hal_input_init 被调用时的毫秒时�
 
 /**
  * @brief M5Stick-C 按键 GPIO 映射
+ * @note  参考 M5Unified：M5StickC 的 BtnA 对应 GPIO37，BtnB 对应 GPIO39。
+ *        之前使用 GPIO36/37 的映射会导致返回键（BtnB）失效并误触发进入 App。
  */
 static const gpio_num_t g_btn_gpio[HAL_BTN_COUNT] = {
-    [HAL_BTN_A] = GPIO_NUM_36,  /* 侧键 */
-    [HAL_BTN_B] = GPIO_NUM_37,  /* 主键 */
+    [HAL_BTN_A] = GPIO_NUM_37,  /* 侧键（M5Unified BtnA） */
+    [HAL_BTN_B] = GPIO_NUM_39,  /* 主键/返回键（M5Unified BtnB） */
 };
 
 /**
@@ -136,9 +138,9 @@ void hal_input_init(void) {
     g_btn_b.prev_raw = false;
 
     gpio_config_t io_conf = {
-        .pin_bit_mask = ((1ULL << GPIO_NUM_36) | (1ULL << GPIO_NUM_37)),
+        .pin_bit_mask = ((1ULL << GPIO_NUM_37) | (1ULL << GPIO_NUM_39)),
         .mode = GPIO_MODE_INPUT,
-        .pull_up_en = GPIO_PULLUP_ENABLE,
+        .pull_up_en = GPIO_PULLUP_DISABLE,
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
         .intr_type = GPIO_INTR_DISABLE,
     };
