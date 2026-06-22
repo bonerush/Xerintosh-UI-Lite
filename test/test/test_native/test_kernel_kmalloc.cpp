@@ -1,0 +1,401 @@
+/**
+ * @file   test_kernel_kmalloc.cpp
+ * @brief  Xeros 内核分配器单元测试
+ * @details 测试 kern_kmalloc / kern_kfree / kern_kcalloc / kern_krealloc。
+ *          验证分配头正确性、资源追踪自动关联、释放后清理。
+ *
+ * @copyright Copyright (c) 2026
+ */
+
+#include <gtest/gtest.h>
+#include <cstring>
+
+extern "C" {
+#include "kernel/kern_types.h"
+#include "kernel/kern_task.h"
+#include "kernel/kern_sched.h"
+#include "kernel/kern_resource.h"
+#include "kernel/kern_kmalloc.h"
+#include "kernel/kern_init.h"
+}
+
+/* ═══ 辅助任务入口 ═══ */
+
+static void noop_task(void *arg)
+{
+    (void)arg;
+    kern_exit();
+}
+
+/* ═══ 基本分配测试 ═══ */
+
+TEST(KernelKmallocTest, KmallocReturnsNonNull)
+{
+    kern_init();
+    kern_sched_init();
+
+    void *ptr = kern_kmalloc(64);
+    ASSERT_NE(ptr, nullptr);
+    kern_kfree(ptr);
+}
+
+TEST(KernelKmallocTest, KmallocZeroSizeReturnsNull)
+{
+    kern_init();
+    kern_sched_init();
+
+    void *ptr = kern_kmalloc(0);
+    EXPECT_EQ(ptr, nullptr);
+}
+
+TEST(KernelKmallocTest, KfreeNullDoesNotCrash)
+{
+    kern_kfree(NULL);
+    /* 不应崩溃 */
+}
+
+TEST(KernelKmallocTest, KcallocReturnsZeroedMemory)
+{
+    kern_init();
+    kern_sched_init();
+
+    void *ptr = kern_kcalloc(16, 4);
+    ASSERT_NE(ptr, nullptr);
+
+    uint8_t *bytes = (uint8_t *)ptr;
+    for (int i = 0; i < 64; i++) {
+        EXPECT_EQ(bytes[i], 0) << "Byte " << i << " is not zero";
+    }
+
+    kern_kfree(ptr);
+}
+
+TEST(KernelKmallocTest, KcallocZeroNmembReturnsNull)
+{
+    kern_init();
+    kern_sched_init();
+
+    void *ptr = kern_kcalloc(0, 100);
+    EXPECT_EQ(ptr, nullptr);
+}
+
+TEST(KernelKmallocTest, KcallocOverflowReturnsNull)
+{
+    kern_init();
+    kern_sched_init();
+
+    /* 2 * SIZE_MAX/2+1 会产生溢出 */
+    void *ptr = kern_kcalloc(2, (size_t)(-1) / 2 + 1);
+    EXPECT_EQ(ptr, nullptr);
+}
+
+/* ═══ 资源追踪集成测试 ═══ */
+
+TEST(KernelKmallocTest, AllocatedMemoryTrackedToTask)
+{
+    kern_init();
+    kern_sched_init();
+
+    kern_task_t *task = kern_task_current();
+    ASSERT_NE(task, nullptr);
+
+    /* 隔离 idle 任务栈资源，避免影响测试计数 */
+    kern_resource_t *idle_stack_res = task->resource_head;
+    task->resource_head = nullptr;
+
+    EXPECT_EQ(task->resource_head, nullptr);
+
+    void *ptr = kern_kmalloc(128);
+    ASSERT_NE(ptr, nullptr);
+
+    /* 分配后任务应有资源追踪记录 */
+    EXPECT_NE(task->resource_head, nullptr);
+
+    kern_kfree(ptr);
+
+    /* 释放后资源追踪应清除 */
+    EXPECT_EQ(task->resource_head, nullptr);
+
+    /* 恢复 idle 栈资源 */
+    task->resource_head = idle_stack_res;
+}
+
+TEST(KernelKmallocTest, MultipleAllocationsAreTracked)
+{
+    kern_init();
+    kern_sched_init();
+
+    kern_task_t *task = kern_task_current();
+    ASSERT_NE(task, nullptr);
+
+    /* 隔离 idle 任务栈资源 */
+    kern_resource_t *idle_stack_res = task->resource_head;
+    task->resource_head = nullptr;
+
+    void *p1 = kern_kmalloc(32);
+    void *p2 = kern_kmalloc(64);
+    void *p3 = kern_kmalloc(128);
+    ASSERT_NE(p1, nullptr);
+    ASSERT_NE(p2, nullptr);
+    ASSERT_NE(p3, nullptr);
+
+    /* 链表应有 3 个节点 */
+    int count = 0;
+    kern_resource_t *cur = task->resource_head;
+    while (cur != NULL) {
+        EXPECT_EQ(cur->type, KERN_RES_MEMORY);
+        count++;
+        cur = cur->next;
+    }
+    EXPECT_EQ(count, 3);
+
+    kern_kfree(p1);
+    kern_kfree(p2);
+    kern_kfree(p3);
+    EXPECT_EQ(task->resource_head, nullptr);
+
+    /* 恢复 idle 栈资源 */
+    task->resource_head = idle_stack_res;
+}
+
+/* ═══ untracked 分配测试 ═══ */
+
+TEST(KernelKmallocTest, UntrackedAllocNotTracked)
+{
+    kern_init();
+    kern_sched_init();
+
+    kern_task_t *task = kern_task_current();
+    ASSERT_NE(task, nullptr);
+
+    /* 隔离 idle 任务栈资源 */
+    kern_resource_t *idle_stack_res = task->resource_head;
+    task->resource_head = nullptr;
+
+    EXPECT_EQ(task->resource_head, nullptr);
+
+    void *ptr = kern_kmalloc_untracked(64);
+    ASSERT_NE(ptr, nullptr);
+
+    /* untracked 分配不应增加资源链表长度 */
+    int count = 0;
+    for (kern_resource_t *cur = task->resource_head; cur != NULL; cur = cur->next) {
+        count++;
+    }
+    EXPECT_EQ(count, 0);
+
+    kern_kfree_untracked(ptr);
+
+    /* 恢复 idle 栈资源 */
+    task->resource_head = idle_stack_res;
+}
+
+TEST(KernelKmallocTest, UntrackedFreeDoesNotCrash)
+{
+    kern_init();
+    kern_sched_init();
+
+    kern_kfree_untracked(NULL);
+
+    void *ptr = kern_kmalloc_untracked(32);
+    ASSERT_NE(ptr, nullptr);
+    kern_kfree_untracked(ptr);
+}
+
+TEST(KernelKmallocTest, TrackedAllocIsTracked)
+{
+    kern_init();
+    kern_sched_init();
+
+    kern_task_t *task = kern_task_current();
+    ASSERT_NE(task, nullptr);
+
+    /* 隔离 idle 任务栈资源 */
+    kern_resource_t *idle_stack_res = task->resource_head;
+    task->resource_head = nullptr;
+
+    EXPECT_EQ(task->resource_head, nullptr);
+
+    void *ptr = kern_kmalloc(64);
+    ASSERT_NE(ptr, nullptr);
+
+    int count = 0;
+    for (kern_resource_t *cur = task->resource_head; cur != NULL; cur = cur->next) {
+        count++;
+    }
+    EXPECT_EQ(count, 1);
+
+    kern_kfree(ptr);
+
+    /* 恢复 idle 栈资源 */
+    task->resource_head = idle_stack_res;
+}
+
+/* ═══ realloc 测试 ═══ */
+
+TEST(KernelKmallocTest, KreallocNullBehavesLikeMalloc)
+{
+    kern_init();
+    kern_sched_init();
+
+    void *ptr = kern_krealloc(NULL, 128);
+    ASSERT_NE(ptr, nullptr);
+    kern_kfree(ptr);
+}
+
+TEST(KernelKmallocTest, KreallocZeroSizeBehavesLikeFree)
+{
+    kern_init();
+    kern_sched_init();
+
+    kern_task_t *task = kern_task_current();
+    ASSERT_NE(task, nullptr);
+
+    /* 隔离 idle 任务栈资源 */
+    kern_resource_t *idle_stack_res = task->resource_head;
+    task->resource_head = nullptr;
+
+    void *ptr = kern_kmalloc(128);
+    ASSERT_NE(ptr, nullptr);
+
+    void *result = kern_krealloc(ptr, 0);
+    EXPECT_EQ(result, nullptr);
+    /* ptr 应已释放，任务资源链表为空 */
+    EXPECT_EQ(task->resource_head, nullptr);
+
+    /* 恢复 idle 栈资源 */
+    task->resource_head = idle_stack_res;
+}
+
+TEST(KernelKmallocTest, KreallocGrow)
+{
+    kern_init();
+    kern_sched_init();
+
+    void *ptr = kern_kmalloc(32);
+    ASSERT_NE(ptr, nullptr);
+
+    /* 写入旧数据 */
+    memset(ptr, 0xAB, 32);
+
+    void *new_ptr = kern_krealloc(ptr, 128);
+    ASSERT_NE(new_ptr, nullptr);
+
+    /* 前 32 字节应保留 */
+    uint8_t *bytes = (uint8_t *)new_ptr;
+    for (int i = 0; i < 32; i++) {
+        EXPECT_EQ(bytes[i], 0xAB) << "Byte " << i << " lost in realloc";
+    }
+
+    kern_kfree(new_ptr);
+}
+
+/* ═══ 便捷宏测试 ═══ */
+
+TEST(KernelKmallocTest, KmallocMacrosWork)
+{
+    kern_init();
+    kern_sched_init();
+
+    void *ptr = kmalloc(64);
+    ASSERT_NE(ptr, nullptr);
+    kfree(ptr);
+    /* 不应崩溃 */
+}
+
+/* ═══ 边界条件测试 ═══ */
+
+TEST(KernelKmallocTest, LargeAllocation)
+{
+    kern_init();
+    kern_sched_init();
+
+    void *ptr = kern_kmalloc(1024 * 1024);  /* 1 MB */
+    ASSERT_NE(ptr, nullptr);
+    kern_kfree(ptr);
+}
+
+TEST(KernelKmallocTest, MemoryStatsBasic)
+{
+    kern_init();
+    kern_sched_init();
+
+    kern_kmem_stat_t before;
+    ASSERT_TRUE(kern_kmem_get_stats(&before));
+
+    void *ptr = kern_kmalloc(256);
+    ASSERT_NE(ptr, nullptr);
+
+    kern_kmem_stat_t after;
+    ASSERT_TRUE(kern_kmem_get_stats(&after));
+    EXPECT_GE(after.allocated_bytes, before.allocated_bytes + 256)
+        << "allocated_bytes 应反映新增分配";
+
+    kern_kfree(ptr);
+
+    kern_kmem_stat_t freed;
+    ASSERT_TRUE(kern_kmem_get_stats(&freed));
+    EXPECT_LE(freed.allocated_bytes, after.allocated_bytes)
+        << "释放后 allocated_bytes 应下降";
+}
+
+TEST(KernelKmallocTest, MemoryStatsFragmentation)
+{
+    kern_init();
+    kern_sched_init();
+
+    kern_kmem_stat_t st;
+    ASSERT_TRUE(kern_kmem_get_stats(&st));
+    EXPECT_LE(st.fragmentation_percent, (size_t)100)
+        << "碎片率应在 0-100 之间";
+}
+
+TEST(KernelKmallocTest, MemoryStatsNullOut)
+{
+    EXPECT_FALSE(kern_kmem_get_stats(NULL));
+}
+
+TEST(KernelKmallocTest, ReservedBytesDefaultZero)
+{
+    EXPECT_EQ(kern_kmem_reserved_bytes(), (size_t)0);
+}
+
+TEST(KernelKmallocTest, ReservedBytesCanBeSet)
+{
+    kern_kmem_set_reserved_bytes(12345);
+    EXPECT_EQ(kern_kmem_reserved_bytes(), (size_t)12345);
+
+    /* 恢复默认，避免影响其他测试 */
+    kern_kmem_set_reserved_bytes(0);
+}
+
+TEST(KernelKmallocTest, MemoryPressureLevelLow)
+{
+    kern_init();
+    kern_sched_init();
+
+    /* 默认保留水位为 0，应返回 LOW */
+    kern_kmem_set_reserved_bytes(0);
+    EXPECT_EQ(kern_kmem_pressure_level(), KERN_KMEM_PRESSURE_LOW);
+}
+
+TEST(KernelKmallocTest, MemoryPressureLevelHighWhenOverReserved)
+{
+    kern_init();
+    kern_sched_init();
+
+    kern_kmem_stat_t before;
+    ASSERT_TRUE(kern_kmem_get_stats(&before));
+
+    /* 设置一个较低的保留水位，然后分配超过它 */
+    kern_kmem_set_reserved_bytes(before.allocated_bytes + 64);
+
+    void *ptr = kern_kmalloc(128);
+    ASSERT_NE(ptr, nullptr);
+
+    EXPECT_EQ(kern_kmem_pressure_level(), KERN_KMEM_PRESSURE_HIGH);
+
+    kern_kfree(ptr);
+    kern_kmem_set_reserved_bytes(0);
+}
+

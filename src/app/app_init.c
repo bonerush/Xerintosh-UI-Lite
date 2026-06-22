@@ -1,0 +1,37 @@
+/**
+ * @file   app_init.c
+ * @brief  App 初始化入口封装
+ * @details 提供向后兼容的 `app_init_ui()` / `app_init_managers()` /
+ *          `app_input_process()` 入口，实际实现分别位于
+ *          app_menu.c、app_input.c 与各管理器模块。
+ *
+ * @copyright Copyright (c) 2026
+ */
+
+#include "app_init.h"
+
+#include "app_menu.h"
+#include "app_input.h"
+#include "settings/settings.h"
+#include "wifi/wifi_manager.h"
+#include "app/shutdown/power_key_popup.h"
+#include "ui/ui_core.h"
+
+void app_init_ui(void)
+{
+    app_menu_build();
+}
+
+void app_init_managers(void)
+{
+    wifi_mgr_init();
+    power_key_popup_init();
+
+    /* 将双键检测回调注册到 UI 核心，解除 UI 核心对 App 的反向依赖 */
+    xerintosh_set_dual_key_callback(power_key_popup_is_dual_active);
+
+    if (g_wifi_on) wifi_mgr_enable();
+
+    /* WiFi 内核任务由 setup() 在 xerintosh_init_core() 之后启动，
+       确保 g_xerintosh_selector 已初始化，避免 LoadStoreError */
+}
