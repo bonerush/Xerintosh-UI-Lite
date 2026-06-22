@@ -648,10 +648,6 @@ static void cmd_history(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t
 
 /* ═══ date — 运行时间（新增）═══ */
 
-#ifndef NATIVE_TEST
-#include <Arduino.h>
-#endif
-
 static void cmd_date(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_size)
 {
     (void)argc; (void)argv; (void)cwd; (void)cwd_size;
