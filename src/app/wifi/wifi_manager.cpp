@@ -3,7 +3,7 @@
  * @brief  WiFi 管理器实现
  * @details 双实现架构：
  *          - NATIVE_TEST 时：所有函数为空桩
- *          - 硬件环境时：基于 ESP32 WiFi 库的完整状态机实现，
+ *          - 硬件环境时：基于 ESP-IDF WiFi 库的完整状态机实现，
  *            支持异步扫描、串口密码输入、已保存网络管理及 UI 菜单动态构建。
  *
  * @copyright Copyright (c) 2026
@@ -30,12 +30,16 @@ void wifi_mgr_task_main(void *arg) { (void)arg; }
 
 #else
 
-#include <WiFi.h>
-#include <Arduino.h>
 #include <string.h>
 #include <esp_log.h>
 #include <esp_wifi.h>
 #include <esp_event.h>
+#include <esp_netif.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+
+#include "hal_system.h"
+#include "hal_uart.h"
 
 #include "app/wifi/wifi_manager.h"
 #include "app/wifi/wifi_menu.h"
@@ -63,7 +67,7 @@ static bool             g_wifi_enabled    = false;            /* WiFi 是否已�
 
 /* ═══ 异步请求标志（线程安全）═══
  * UI 任务 / Xeros 任务通过 request_*() 设置标志，
- * Arduino loop() 任务调用 process_requests() 统一执行 WiFi 驱动操作。 */
+ * 主任务调用 process_requests() 统一执行 WiFi 驱动操作。 */
 static volatile bool g_enable_requested  = false;
 static volatile bool g_disable_requested = false;
 
@@ -73,23 +77,22 @@ static char  g_connecting_ssid[STORAGE_SSID_MAX_LEN] = {0};     /* 正在连接�
 static char  g_connecting_pass[STORAGE_PASS_MAX_LEN] = {0};     /* 正在连接的密码 */
 
 /* 时序控制 */
-static unsigned long g_wifi_scan_start_time = 0;   /* 扫描开始时间 */
-static unsigned long g_warmup_start_time   = 0;    /* 预热开始时间 */
-static unsigned long g_connect_start_time  = 0;    /* 连接开始时间 */
+static uint32_t g_wifi_scan_start_time = 0;   /* 扫描开始时间 */
+static uint32_t g_warmup_start_time   = 0;    /* 预热开始时间 */
+static uint32_t g_connect_start_time  = 0;    /* 连接开始时间 */
 static bool g_initial_scan_shown = false;           /* 首次启动扫描弹窗是否已显示 */
 static bool g_auto_connect_done = false;            /* 本次 enable 周期内是否已尝试自动连接 */
 static bool g_is_auto_connect   = false;            /* 当前连接是否为自动连接（抑制弹窗） */
 
-/* ESP-IDF 异步扫描回调标志 */
+/* ESP-IDF 异步扫描结果缓存 */
 static volatile bool g_scan_done = false;
-static volatile uint16_t g_scan_ap_count = 0;
+static uint16_t g_scan_ap_count = 0;
+static wifi_ap_record_t *g_scan_ap_records = NULL;
+#define WIFI_SCAN_MAX_AP 32
 
-/* ESP-IDF 扫描完成回调（WiFi 事件驱动）
- * 只设标志，不读取 AP 数量——Arduino WiFi 库的内部处理器先于回调执行，
- * 会消费掉 esp_wifi_scan_get_ap_records 的内部缓冲区。
- * 改为在 wifi_mgr_update() 中用 esp_wifi_scan_get_ap_records() 一次性读取。 */
+/* ESP-IDF 扫描完成回调（WiFi 事件驱动） */
 static void wifi_scan_done_handler(void* arg, esp_event_base_t base,
-                                   int32_t event_id, void* data)
+                                   int32_t event_id, void *data)
 {
     (void)arg; (void)base; (void)event_id; (void)data;
     g_scan_done = true;
@@ -125,7 +128,7 @@ static void wifi_popup_request(const char *msg, uint16_t span_ms)
     g_popup_content[sizeof(g_popup_content) - 1] = '\0';
     g_popup_span = span_ms;
     portEXIT_CRITICAL(&g_popup_spinlock);
-    g_popup_start = millis();
+    g_popup_start = hal_get_ticks();
     g_popup_active = true;
 }
 
@@ -149,7 +152,7 @@ extern "C" void wifi_popup_refresh(void)
     if (!g_popup_active) return;
 
     /* 超时检查：span 到期后触发动画退场 */
-    if (millis() - g_popup_start >= g_popup_span) {
+    if (hal_get_ticks() - g_popup_start >= g_popup_span) {
         wifi_popup_dismiss();
         return;
     }
@@ -183,7 +186,7 @@ uint32_t wifi_mgr_needed_heap(void) { return WIFI_MIN_FREE_HEAP; }
 /**
  * @brief 初始化 WiFi 管理器
  * @note  获取设置菜单指针，用于后续动态挂载网络子菜单。
- *        注意：不在此处自动连接，避免 WiFi.disconnect() 导致驱动不稳定。
+ *        注意：不在此处自动连接，避免 WiFi 断开导致驱动不稳定。
  */
 void wifi_mgr_init(void)
 {
@@ -205,8 +208,8 @@ void wifi_mgr_init(void)
     }
 
     /* 注意：自动连接已移除。g_wifi_on 默认 true (WiFi 开机自启)，
-       此处不调用 WiFi.begin() 因为后续扫描会失败（
-       WiFi.disconnect() 会使驱动处于不稳定状态）。
+       此处不调用 WiFi 连接因为后续扫描会失败（
+       断开会使驱动处于不稳定状态）。
        连接逻辑改为用户选择网络时触发。 */
 }
 
@@ -217,9 +220,15 @@ void wifi_mgr_init(void)
  */
 void wifi_mgr_enable(void)
 {
-    Serial.printf("[WiFi] enable start free=%u max=%u\n",
-                  (uint32_t)ESP.getFreeHeap(), (uint32_t)ESP.getMaxAllocHeap());
-    Serial.flush();
+    kern_kmem_stat_t st;
+    xeros_mem_get_stats(&st);
+
+    char log_buf[128];
+    snprintf(log_buf, sizeof(log_buf),
+             "[WiFi] enable start free=%u max=%u\n",
+             (uint32_t)st.free_bytes,
+             (uint32_t)st.largest_free_block);
+    hal_uart0_write((const uint8_t *)log_buf, strlen(log_buf));
 
     g_wifi_enabled = true;
 
@@ -227,12 +236,13 @@ void wifi_mgr_enable(void)
      * 使用 xeros_mem_can_alloc() 统一检查总空闲、最大连续块与保留水位。
      * BT 默认关闭时堆约 163KB，BT 按需加载后堆约 132KB，仍需留足余量 */
     if (!xeros_mem_can_alloc(WIFI_MIN_FREE_HEAP, WIFI_MIN_MAX_ALLOC_HEAP)) {
-        kern_kmem_stat_t st;
         xeros_mem_get_stats(&st);
-        Serial.printf("[WiFi] heap guard failed: free=%u max_alloc=%u reserved=%u\n",
-                      (uint32_t)st.free_bytes,
-                      (uint32_t)st.largest_free_block,
-                      (uint32_t)kern_kmem_reserved_bytes());
+        snprintf(log_buf, sizeof(log_buf),
+                 "[WiFi] heap guard failed: free=%u max_alloc=%u reserved=%u\n",
+                 (uint32_t)st.free_bytes,
+                 (uint32_t)st.largest_free_block,
+                 (uint32_t)kern_kmem_reserved_bytes());
+        hal_uart0_write((const uint8_t *)log_buf, strlen(log_buf));
         wifi_popup_request("内存不足", 2000);
         g_wifi_enabled = false;
         g_wifi_on = false;   /* A9: 回写状态 */
@@ -241,20 +251,20 @@ void wifi_mgr_enable(void)
         return;
     }
 
-    WiFi.persistent(false);
-
-    /* 使用标准 Arduino WiFi API 初始化驱动 */
-    WiFi.mode(WIFI_STA);
-    WiFi.disconnect();
+    /* 使用 ESP-IDF 原生 WiFi API 初始化驱动 */
+    esp_wifi_set_storage(WIFI_STORAGE_RAM);
     esp_wifi_set_ps(WIFI_PS_NONE);
 
-    /* 注册 ESP-IDF 扫描完成事件回调（Arduino WiFi.scanNetworks 在非主任务中不工作） */
+    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
+    ESP_ERROR_CHECK(esp_wifi_start());
+
+    /* 注册 ESP-IDF 扫描完成事件回调 */
     g_scan_done = false;
     g_scan_ap_count = 0;
     esp_event_handler_register(WIFI_EVENT, WIFI_EVENT_SCAN_DONE,
                                wifi_scan_done_handler, NULL);
 
-    g_warmup_start_time = millis();
+    g_warmup_start_time = hal_get_ticks();
     g_state = WIFI_MGR_WARMUP;
     g_auto_connect_done = false;
     g_is_auto_connect = false;
@@ -291,8 +301,11 @@ static void restore_wifi_logs(void)
 extern "C" const char *wifi_mgr_get_scan_ssid(int index)
 {
     static char buf[33];
-    String ssid = WiFi.SSID(index);
-    strncpy(buf, ssid.c_str(), sizeof(buf) - 1);
+    if (index < 0 || index >= (int)g_scan_ap_count || g_scan_ap_records == NULL) {
+        buf[0] = '\0';
+        return buf;
+    }
+    strncpy(buf, (const char *)g_scan_ap_records[index].ssid, sizeof(buf) - 1);
     buf[sizeof(buf) - 1] = '\0';
     return buf;
 }
@@ -302,9 +315,15 @@ extern "C" const char *wifi_mgr_get_scan_ssid(int index)
  */
 void wifi_mgr_disable(void)
 {
-    Serial.printf("[WiFi] disable start free=%u max=%u\n",
-                  (uint32_t)ESP.getFreeHeap(), (uint32_t)ESP.getMaxAllocHeap());
-    Serial.flush();
+    kern_kmem_stat_t st;
+    xeros_mem_get_stats(&st);
+
+    char log_buf[128];
+    snprintf(log_buf, sizeof(log_buf),
+             "[WiFi] disable start free=%u max=%u\n",
+             (uint32_t)st.free_bytes,
+             (uint32_t)st.largest_free_block);
+    hal_uart0_write((const uint8_t *)log_buf, strlen(log_buf));
 
     wifi_popup_dismiss();
     if (g_connecting) {
@@ -313,19 +332,18 @@ void wifi_mgr_disable(void)
     /* 注销扫描完成事件回调 */
     esp_event_handler_unregister(WIFI_EVENT, WIFI_EVENT_SCAN_DONE,
                                  wifi_scan_done_handler);
-    WiFi.disconnect(true);
-    WiFi.mode(WIFI_OFF);
-    /* 显式释放 WiFi 驱动内存（~38KB）。
-     * WiFi.mode(WIFI_OFF) 内部会调用 esp_wifi_deinit()，但某些 Arduino
-     * 封装版本可能不完全释放。显式二次调用确保内存在 BT 启用前回收。
-     * esp_wifi_deinit() 在已反初始化状态下是安全的（返回 ESP_ERR_WIFI_NOT_INIT）。 */
+    esp_wifi_disconnect();
     esp_wifi_stop();
     esp_wifi_deinit();
+
     g_wifi_enabled = false;
 
-    Serial.printf("[WiFi] disable done free=%u max=%u\n",
-                  (uint32_t)ESP.getFreeHeap(), (uint32_t)ESP.getMaxAllocHeap());
-    Serial.flush();
+    xeros_mem_get_stats(&st);
+    snprintf(log_buf, sizeof(log_buf),
+             "[WiFi] disable done free=%u max=%u\n",
+             (uint32_t)st.free_bytes,
+             (uint32_t)st.largest_free_block);
+    hal_uart0_write((const uint8_t *)log_buf, strlen(log_buf));
 
     if (g_networks_list) {
         /* 若选择器当前位于网络子树内，将其移回设置项 */
@@ -343,6 +361,13 @@ void wifi_mgr_disable(void)
     g_state               = WIFI_MGR_IDLE;
     g_auto_connect_done   = false;
     g_is_auto_connect     = false;
+
+    /* 释放扫描结果缓存 */
+    if (g_scan_ap_records) {
+        free(g_scan_ap_records);
+        g_scan_ap_records = NULL;
+    }
+    g_scan_ap_count = 0;
 }
 
 /* ═══ 异步请求接口（线程安全）═══ */
@@ -360,8 +385,8 @@ void wifi_mgr_request_disable(void)
 }
 
 /**
- * @brief 在 Arduino loop() 任务上下文中统一处理 WiFi 启用/禁用请求
- * @note  WiFi 驱动操作（WiFi.mode/esp_wifi_scan_start 等）必须在该上下文中执行，
+ * @brief 在主任务上下文中统一处理 WiFi 启用/禁用请求
+ * @note  WiFi 驱动操作（esp_wifi_scan_start 等）必须在该上下文中执行，
  *        避免跨任务调用导致 FreeRTOS 死锁或 TWDT 复位。
  */
 void wifi_mgr_process_requests(void)
@@ -432,13 +457,19 @@ void wifi_menu_on_saved_connect_pressed(void *ud)
         return;
     }
     suppress_wifi_logs();
-    WiFi.disconnect();
-    delay(1);  /* 喂狗：BT 活跃时 WiFi 操作可能阻塞 */
-    WiFi.begin(ssid, pass);
+    esp_wifi_disconnect();
+    vTaskDelay(pdMS_TO_TICKS(1));  /* 喂狗：BT 活跃时 WiFi 操作可能阻塞 */
+
+    wifi_config_t wifi_cfg = {};
+    strncpy((char *)wifi_cfg.sta.ssid, ssid, sizeof(wifi_cfg.sta.ssid) - 1);
+    strncpy((char *)wifi_cfg.sta.password, pass, sizeof(wifi_cfg.sta.password) - 1);
+    esp_wifi_set_config(WIFI_IF_STA, &wifi_cfg);
+    esp_wifi_connect();
+
     strncpy(g_connecting_ssid, ssid, STORAGE_SSID_MAX_LEN);
     strncpy(g_connecting_pass, pass,  STORAGE_PASS_MAX_LEN);
     g_connecting = true;
-    g_connect_start_time = millis();
+    g_connect_start_time = hal_get_ticks();
     g_is_auto_connect = false;
     g_state = WIFI_MGR_CONNECTING;
     wifi_popup_request("连接中...", 15000);
@@ -474,7 +505,7 @@ void wifi_menu_on_scan_pressed(void *ud)
 {
     (void)ud;
     if (g_connecting) {
-        WiFi.disconnect();
+        esp_wifi_disconnect();
         restore_wifi_logs();
         g_connecting = false;
     }
@@ -489,7 +520,7 @@ void wifi_menu_on_scan_pressed(void *ud)
         g_state = WIFI_MGR_SCAN_DONE;
     } else {
         g_state = WIFI_MGR_SCANNING;
-        g_wifi_scan_start_time = millis();
+        g_wifi_scan_start_time = hal_get_ticks();
         wifi_popup_request("扫描中...", WIFI_SCAN_TIMEOUT_MS);
     }
 }
@@ -507,8 +538,7 @@ static bool try_auto_connect(void)
     int saved_count = storage_wifi_get_count();
     if (saved_count <= 0) return false;
 
-    int16_t scan_count = WiFi.scanComplete();
-    if (scan_count <= 0) return false;
+    if (g_scan_ap_count == 0) return false;
 
     /* 在扫描结果中查找已保存网络，选择信号最强的 */
     int best_saved_idx = -1;
@@ -519,11 +549,10 @@ static bool try_auto_connect(void)
         char pass[STORAGE_PASS_MAX_LEN];
         if (!storage_wifi_get(i, ssid, pass)) continue;
 
-        for (int j = 0; j < scan_count; j++) {
-            String scanned = WiFi.SSID(j);
-            if (scanned.length() == 0) continue;
-            if (scanned.equals(ssid)) {
-                int8_t rssi = WiFi.RSSI(j);
+        for (int j = 0; j < (int)g_scan_ap_count; j++) {
+            if (g_scan_ap_records[j].ssid[0] == '\0') continue;
+            if (strcmp((const char *)g_scan_ap_records[j].ssid, ssid) == 0) {
+                int8_t rssi = g_scan_ap_records[j].rssi;
                 if (rssi > best_rssi) {
                     best_rssi = rssi;
                     best_saved_idx = i;
@@ -541,13 +570,19 @@ static bool try_auto_connect(void)
     if (!storage_wifi_get(best_saved_idx, ssid, pass)) return false;
 
     suppress_wifi_logs();
-    WiFi.disconnect();
-    delay(1);
-    WiFi.begin(ssid, pass);
+    esp_wifi_disconnect();
+    vTaskDelay(pdMS_TO_TICKS(1));
+
+    wifi_config_t wifi_cfg = {};
+    strncpy((char *)wifi_cfg.sta.ssid, ssid, sizeof(wifi_cfg.sta.ssid) - 1);
+    strncpy((char *)wifi_cfg.sta.password, pass, sizeof(wifi_cfg.sta.password) - 1);
+    esp_wifi_set_config(WIFI_IF_STA, &wifi_cfg);
+    esp_wifi_connect();
+
     strncpy(g_connecting_ssid, ssid, STORAGE_SSID_MAX_LEN);
     strncpy(g_connecting_pass, pass,  STORAGE_PASS_MAX_LEN);
     g_connecting = true;
-    g_connect_start_time = millis();
+    g_connect_start_time = hal_get_ticks();
     g_is_auto_connect = true;
     g_state = WIFI_MGR_CONNECTING;
     return true;
@@ -573,7 +608,7 @@ void wifi_mgr_update(void)
 
     case WIFI_MGR_WARMUP: {
         /* 预热完成后启动 ESP-IDF 异步扫描 */
-        if (millis() - g_warmup_start_time >= WIFI_WARMUP_DELAY_MS) {
+        if (hal_get_ticks() - g_warmup_start_time >= WIFI_WARMUP_DELAY_MS) {
             g_scan_done = false;
             g_scan_ap_count = 0;
             wifi_scan_config_t scan_cfg = {};
@@ -587,7 +622,7 @@ void wifi_mgr_update(void)
                 g_initial_scan_shown = true;
             } else {
                 g_state = WIFI_MGR_SCANNING;
-                g_wifi_scan_start_time = millis();
+                g_wifi_scan_start_time = hal_get_ticks();
                 if (!g_initial_scan_shown) {
                     wifi_popup_request("扫描中...", WIFI_SCAN_TIMEOUT_MS);
                 }
@@ -598,7 +633,7 @@ void wifi_mgr_update(void)
 
     case WIFI_MGR_SCANNING: {
         /* 扫描超时检查 */
-        if (millis() - g_wifi_scan_start_time >= WIFI_SCAN_TIMEOUT_MS) {
+        if (hal_get_ticks() - g_wifi_scan_start_time >= WIFI_SCAN_TIMEOUT_MS) {
             if (!g_initial_scan_shown) {
                 wifi_popup_dismiss();
             }
@@ -609,14 +644,24 @@ void wifi_mgr_update(void)
         }
 
         if (g_scan_done) {
-            /* 回调已触发。Arduino WiFi 库内部已缓存扫描结果，
-             * 用 WiFi.scanComplete() 读取缓存的数量。 */
-            int16_t result = WiFi.scanComplete();
+            /* 读取扫描结果 */
+            uint16_t ap_count = WIFI_SCAN_MAX_AP;
+            if (g_scan_ap_records == NULL) {
+                g_scan_ap_records = (wifi_ap_record_t *)malloc(
+                    sizeof(wifi_ap_record_t) * WIFI_SCAN_MAX_AP);
+            }
+            if (g_scan_ap_records) {
+                esp_wifi_scan_get_ap_records(&ap_count, g_scan_ap_records);
+                g_scan_ap_count = ap_count;
+            } else {
+                g_scan_ap_count = 0;
+            }
+
             if (!g_initial_scan_shown) {
                 wifi_popup_dismiss();
             }
-            wifi_menu_rebuild_list(result >= 0 ? result : 0);
-            if (result > 0 && !g_initial_scan_shown) {
+            wifi_menu_rebuild_list(g_scan_ap_count);
+            if (g_scan_ap_count > 0 && !g_initial_scan_shown) {
                 wifi_popup_request("扫描完毕", 1500);
             }
             g_state = WIFI_MGR_SCAN_DONE;
@@ -634,12 +679,18 @@ void wifi_mgr_update(void)
             const char *target = serial_get_target_name();
             if (input && target) {
                 suppress_wifi_logs();
-                WiFi.disconnect();
-                WiFi.begin(target, input);
+                esp_wifi_disconnect();
+
+                wifi_config_t wifi_cfg = {};
+                strncpy((char *)wifi_cfg.sta.ssid, target, sizeof(wifi_cfg.sta.ssid) - 1);
+                strncpy((char *)wifi_cfg.sta.password, input, sizeof(wifi_cfg.sta.password) - 1);
+                esp_wifi_set_config(WIFI_IF_STA, &wifi_cfg);
+                esp_wifi_connect();
+
                 strncpy(g_connecting_ssid, target, STORAGE_SSID_MAX_LEN);
                 strncpy(g_connecting_pass, input,  STORAGE_PASS_MAX_LEN);
                 g_connecting = true;
-                g_connect_start_time = millis();
+                g_connect_start_time = hal_get_ticks();
                 wifi_popup_request("连接中...", 15000);
             }
         } else if (ss == SERIAL_STATE_CANCELLED) {
@@ -652,8 +703,8 @@ void wifi_mgr_update(void)
         /* 检查 WiFi 连接状态 */
         if (g_connecting) {
             /* 连接超时检查 */
-            if (millis() - g_connect_start_time >= WIFI_CONNECT_TIMEOUT_MS) {
-                WiFi.disconnect();
+            if (hal_get_ticks() - g_connect_start_time >= WIFI_CONNECT_TIMEOUT_MS) {
+                esp_wifi_disconnect();
                 restore_wifi_logs();
                 g_connecting = false;
                 if (!g_is_auto_connect) {
@@ -663,8 +714,9 @@ void wifi_mgr_update(void)
                 break;
             }
 
-            wl_status_t status = WiFi.status();
-            if (status == WL_CONNECTED) {
+            wifi_ap_record_t ap_info;
+            esp_err_t status = esp_wifi_sta_get_ap_info(&ap_info);
+            if (status == ESP_OK) {
                 restore_wifi_logs();
                 g_connecting = false;
                 storage_wifi_add(g_connecting_ssid, g_connecting_pass);
@@ -673,16 +725,9 @@ void wifi_mgr_update(void)
                 }
                 g_state = WIFI_MGR_CONNECTED;
                 wifi_menu_rebuild_list(0);
-            } else if (status == WL_CONNECT_FAILED ||
-                       status == WL_NO_SSID_AVAIL) {
-                restore_wifi_logs();
-                g_connecting = false;
-                if (!g_is_auto_connect) {
-                    wifi_popup_request("连接失败", 2000);
-                }
-                g_state = WIFI_MGR_CONNECT_FAILED;
+            } else {
+                /* 仍在尝试中 */
             }
-            /* WL_IDLE_STATUS / WL_DISCONNECTED => 仍在尝试中 */
         }
         break;
     }
