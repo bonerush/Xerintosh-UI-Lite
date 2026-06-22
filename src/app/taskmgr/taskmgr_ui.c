@@ -131,7 +131,6 @@ static void format_right_text(kern_task_t *t, char *buf, size_t size)
 
 static void draw_header(void)
 {
-    int16_t fh = hal_get_font_height();
     hal_set_font(hal_get_cn_font());
 
     int16_t title_w = hal_get_string_width("Task Manager");
@@ -282,7 +281,7 @@ static void draw_confirm_overlay(void)
 
 /* ═══ 底部信息栏跑马灯 ═══ */
 
-static char     s_footer_info[64];
+static char     s_footer_info[96];
 static int16_t  s_footer_text_width;
 static int16_t  s_footer_avail_width;
 static bool     s_footer_is_scrolling;
@@ -318,7 +317,6 @@ static void update_footer_info(kern_task_t *t, bool is_prot)
 
 static void draw_footer(void)
 {
-    int16_t fh = hal_get_font_height();
     hal_set_font(hal_get_cn_font());
 
     int selected = taskmgr_get_selected();

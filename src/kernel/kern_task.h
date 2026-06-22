@@ -261,7 +261,7 @@ extern void kern_task_unregister_virtual(kern_pid_t pid);
  * @return true  系统关键任务，不可终止
  * @return false 普通任务，可以终止
  */
-extern bool kern_task_is_protected(kern_task_t *task);
+extern bool kern_task_is_protected(const kern_task_t *task);
 
 #ifdef __cplusplus
 }

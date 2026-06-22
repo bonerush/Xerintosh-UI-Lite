@@ -95,7 +95,7 @@ const kern_port_ops_t g_kern_port_ops = {
 #include <freertos/semphr.h>
 
 #ifdef CONFIG_PREEMPT_ENABLED
-#include <driver/timer.h>
+#include <driver/gptimer.h>
 #include <esp_attr.h>
 #endif
 
@@ -107,9 +107,10 @@ static SemaphoreHandle_t g_done_sem[KERN_MAX_CPUS];   /* 每核任务完成通�
 #ifdef CONFIG_PREEMPT_ENABLED
 static volatile bool g_preempt_tick_pending = false;  /* ISR → loop() 通知标志 */
 static volatile bool g_timer_active = false;
+static gptimer_handle_t g_sched_timer = NULL;
 
 /*
- * ESP32 硬件定时器 ISR（timer_group0, timer0, 1ms 周期）
+ * ESP32 GPTimer ISR（1ms 周期）
  *
  * ═══ ISR 安全原则 ═══
  * 本 ISR 仅执行最小化工作：设置抢占标志。
@@ -117,15 +118,13 @@ static volatile bool g_timer_active = false;
  * 严禁在 ISR 中调用：① xSemaphoreTake（阻塞）；② free/malloc；
  * ③ 不可预测长度的链表遍历；④ 非 FromISR 的 FreeRTOS API。
  */
-static bool IRAM_ATTR sched_timer_isr(void *arg)
+static bool IRAM_ATTR sched_timer_isr(gptimer_handle_t timer, const gptimer_alarm_event_data_t *edata, void *arg)
 {
+    (void)timer;
+    (void)edata;
     (void)arg;
     g_preempt_tick_pending = true;
-
-    /* 清除中断标志 */
-    TIMERG0.int_clr_timers.t0 = 1;
-    TIMERG0.hw_timer[0].update = 1;
-    return true;
+    return false;
 }
 
 static int kern_port_freertos_timer_set(uint32_t period_us)
@@ -134,34 +133,68 @@ static int kern_port_freertos_timer_set(uint32_t period_us)
 
     g_preempt_tick_pending = false;
 
-    timer_config_t config = {
-        .divider     = 80,   /* 80MHz / 80 = 1MHz → 1 tick = 1us */
-        .counter_dir = TIMER_COUNT_UP,
-        .counter_en  = TIMER_PAUSE,
-        .alarm_en    = TIMER_ALARM_EN,
-        .auto_reload = true,
-        .intr_type   = TIMER_INTR_LEVEL,
+    gptimer_config_t timer_config = {
+        .clk_src = GPTIMER_CLK_SRC_DEFAULT,
+        .direction = GPTIMER_COUNT_UP,
+        .resolution_hz = 1000000,  /* 1MHz → 1 tick = 1us */
+        .intr_priority = 0,
+        .flags = {
+            .intr_shared = 0,
+        },
     };
 
-    if (timer_init(TIMER_GROUP_0, TIMER_0, &config) != ESP_OK) {
+    if (gptimer_new_timer(&timer_config, &g_sched_timer) != ESP_OK) {
         return -1;
     }
 
-    timer_set_counter_value(TIMER_GROUP_0, TIMER_0, 0);
-    timer_set_alarm_value(TIMER_GROUP_0, TIMER_0, period_us);
+    gptimer_alarm_config_t alarm_config = {
+        .alarm_count = period_us,
+        .reload_count = 0,
+        .flags = {
+            .auto_reload_on_alarm = true,
+        },
+    };
 
-    timer_isr_callback_add(TIMER_GROUP_0, TIMER_0, sched_timer_isr, NULL, 0);
-    timer_start(TIMER_GROUP_0, TIMER_0);
+    if (gptimer_set_alarm_action(g_sched_timer, &alarm_config) != ESP_OK) {
+        gptimer_del_timer(g_sched_timer);
+        g_sched_timer = NULL;
+        return -1;
+    }
+
+    gptimer_event_callbacks_t cbs = {
+        .on_alarm = sched_timer_isr,
+    };
+
+    if (gptimer_register_event_callbacks(g_sched_timer, &cbs, NULL) != ESP_OK) {
+        gptimer_del_timer(g_sched_timer);
+        g_sched_timer = NULL;
+        return -1;
+    }
+
+    if (gptimer_enable(g_sched_timer) != ESP_OK) {
+        gptimer_del_timer(g_sched_timer);
+        g_sched_timer = NULL;
+        return -1;
+    }
+
+    if (gptimer_start(g_sched_timer) != ESP_OK) {
+        gptimer_disable(g_sched_timer);
+        gptimer_del_timer(g_sched_timer);
+        g_sched_timer = NULL;
+        return -1;
+    }
+
     g_timer_active = true;
-
     return 0;
 }
 
 static void kern_port_freertos_timer_stop(void)
 {
-    if (!g_timer_active) return;
-    timer_pause(TIMER_GROUP_0, TIMER_0);
-    timer_isr_callback_remove(TIMER_GROUP_0, TIMER_0);
+    if (!g_timer_active || g_sched_timer == NULL) return;
+    gptimer_stop(g_sched_timer);
+    gptimer_disable(g_sched_timer);
+    gptimer_del_timer(g_sched_timer);
+    g_sched_timer = NULL;
     g_timer_active = false;
     g_preempt_tick_pending = false;
 }

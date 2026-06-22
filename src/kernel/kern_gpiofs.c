@@ -18,6 +18,7 @@
 #include <stdio.h>
 
 #ifndef NATIVE_TEST
+#include "freertos/FreeRTOS.h"
 #include "driver/gpio.h"
 #endif
 

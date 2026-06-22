@@ -74,7 +74,7 @@ void power_key_popup_update(void)
         }
         else if (!g_dual_shutdown_triggered)
         {
-            static char msg[32];
+            static char msg[48];
             uint32_t sec = remaining_ms / 1000;
             uint32_t tenth = (remaining_ms % 1000) / 100;
             snprintf(msg, sizeof(msg), "长按AB键关机,还需%lu.%lus",

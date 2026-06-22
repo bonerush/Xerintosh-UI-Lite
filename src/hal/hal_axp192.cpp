@@ -35,6 +35,7 @@ esp_err_t hal_axp192_init(void) {
         .trans_queue_depth = 0,
         .flags = {
             .enable_internal_pullup = true,
+            .allow_pd = 0,
         },
     };
 

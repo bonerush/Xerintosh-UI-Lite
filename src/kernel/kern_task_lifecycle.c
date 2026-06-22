@@ -455,7 +455,7 @@ void kern_sleep_ms(uint32_t ms)
 
 /* ═══ 系统任务保护检查 ═══ */
 
-bool kern_task_is_protected(kern_task_t *task)
+bool kern_task_is_protected(const kern_task_t *task)
 {
     if (task == NULL) return false;
 

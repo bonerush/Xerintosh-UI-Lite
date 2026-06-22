@@ -30,6 +30,10 @@ void hal_uart0_init(void)
         .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
         .rx_flow_ctrl_thresh = 0,
         .source_clk = UART_SCLK_DEFAULT,
+        .flags = {
+            .allow_pd = 0,
+            .backup_before_sleep = 0,
+        },
     };
 
     esp_err_t err = uart_param_config(HAL_UART0_NUM, &uart_cfg);

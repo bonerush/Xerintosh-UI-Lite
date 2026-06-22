@@ -68,7 +68,7 @@ typedef struct kern_dentry {
     kern_inode_t *inode;             /* 关联的 inode */
     struct kern_dentry *parent;      /* 父节点 */
     struct kern_dentry *children[KERN_MAX_DENTRY_CHILDREN]; /* 子节点 */
-    uint8_t child_count;             /* 当前子节点数量 */
+    uint16_t child_count;             /* 当前子节点数量 */
 } kern_dentry_t;
 
 /**

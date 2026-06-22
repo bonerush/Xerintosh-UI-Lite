@@ -35,8 +35,9 @@ static volatile uint16_t g_tx_tail = 0;
 static volatile uint16_t g_tx_count = 0;
 
 #ifndef NATIVE_TEST
+#include "freertos/FreeRTOS.h"
 #include "hal/hal_uart.h"
-#include "hal_system.h"
+#include "hal/hal_system.h"
 static portMUX_TYPE g_ttyS0_mux = portMUX_INITIALIZER_UNLOCKED;
 #define TTY_ENTER_CRITICAL() portENTER_CRITICAL(&g_ttyS0_mux)
 #define TTY_EXIT_CRITICAL()  portEXIT_CRITICAL(&g_ttyS0_mux)

@@ -284,7 +284,7 @@ void shell_complete_path(kern_fd_t tty, char *line, size_t *pos,
     const char *matches[16];
     int match_count = 0;
 
-    for (uint8_t i = 0; i < dir->child_count && match_count < 16; i++) {
+    for (uint16_t i = 0; i < dir->child_count && match_count < 16; i++) {
         kern_dentry_t *child = dir->children[i];
         if (child == NULL) continue;
         if (dir_only && !shell_is_dir(child)) continue;
@@ -316,7 +316,7 @@ void shell_complete_path(kern_fd_t tty, char *line, size_t *pos,
 
         /* 找到匹配的 dentry 以判断类型 */
         kern_dentry_t *matched_d = NULL;
-        for (uint8_t i = 0; i < dir->child_count; i++) {
+        for (uint16_t i = 0; i < dir->child_count; i++) {
             if (dir->children[i] != NULL
                 && strcmp(dir->children[i]->name, match) == 0) {
                 matched_d = dir->children[i];

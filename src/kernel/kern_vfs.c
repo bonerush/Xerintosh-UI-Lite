@@ -142,7 +142,7 @@ static kern_dentry_t *path_walk(kern_dentry_t *root, const char *path, bool auto
 
         /* 在当前节点的子节点中查找 */
         kern_dentry_t *child = NULL;
-        for (uint8_t i = 0; i < cur->child_count; i++) {
+        for (uint16_t i = 0; i < cur->child_count; i++) {
             if (strncmp(cur->children[i]->name, start, name_len) == 0
                 && cur->children[i]->name[name_len] == '\0') {
                 child = cur->children[i];
@@ -301,7 +301,7 @@ kern_err_t kern_vfs_unlink(const char *path)
     for (uint8_t i = 0; i < parent->child_count; i++) {
         if (parent->children[i] == dentry) {
             /* 将后续元素前移 */
-            for (uint8_t j = i; j < parent->child_count - 1; j++) {
+            for (uint16_t j = i; j < parent->child_count - 1; j++) {
                 parent->children[j] = parent->children[j + 1];
             }
             parent->children[parent->child_count - 1] = NULL;

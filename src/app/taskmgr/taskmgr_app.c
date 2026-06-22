@@ -174,7 +174,7 @@ bool taskmgr_task_protected(const kern_task_t *task)
     return kern_task_is_protected(task);
 }
 
-size_t taskmgr_task_stack_usage(const kern_task_t *task)
+size_t taskmgr_task_stack_usage(kern_task_t *task)
 {
     if (task == NULL) return 0;
     return kern_task_stack_usage(task);

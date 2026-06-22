@@ -137,7 +137,7 @@ public:
 };
 
 static LGFX_M5StickC g_lgfx;      /* LovyanGFX 显示实例 */
-static lgfx::LGFX_Sprite* g_canvas = nullptr;  /* 离屏画布 */
+lgfx::LGFX_Sprite* g_canvas = nullptr;  /* 离屏画布 */
 static int g_rotation = 0;          /* 当前屏幕方向 */
 static uint8_t g_brightness = 128;  /* 当前背光亮度 */
 
