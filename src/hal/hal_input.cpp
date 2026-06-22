@@ -3,7 +3,7 @@
  * @brief  HAL 输入层实现
  * @details 双实现架构：
  *          - NATIVE_TEST 时：所有输入函数返回空状态（桩实现）
- *          - 硬件环境时：基于 M5Unified 按键事件，实现消抖、短按/长按检测
+ *          - 硬件环境时：基于 ESP-IDF GPIO 直接读取按键电平，实现消抖、短按/长按检测
  *
  * @copyright Copyright (c) 2026
  */

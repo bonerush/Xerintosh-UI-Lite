@@ -2,8 +2,8 @@
  * @file   debug_serial.h
  * @brief  C-compatible debug serial output
  * @details Provides debug_printf() callable from both C and C++ code,
- *          using Serial.printf internally.  This avoids the issues with
- *          stdout/printf not being connected to the hardware UART.
+ *          using stdout/vprintf internally. Output appears on the
+ *          default console UART (UART0).
  */
 #ifndef DEBUG_SERIAL_H
 #define DEBUG_SERIAL_H

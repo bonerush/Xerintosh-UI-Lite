@@ -49,7 +49,7 @@ extern void hal_input_init(void);
 
 /**
  * @brief  更新输入状态（应在主循环每帧调用）
- * @note   native 环境为空操作；硬件环境依赖 M5.update() 在 main 循环中先行调用
+ * @note   native 环境为空操作；硬件环境直接读取 GPIO，无需额外刷新
  */
 extern void hal_input_update(void);
 
