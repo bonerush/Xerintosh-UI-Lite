@@ -35,10 +35,13 @@ static volatile uint16_t g_tx_tail = 0;
 static volatile uint16_t g_tx_count = 0;
 
 #ifndef NATIVE_TEST
-#include <Arduino.h>
+#include "driver/uart.h"
+#include "hal_system.h"
 static portMUX_TYPE g_ttyS0_mux = portMUX_INITIALIZER_UNLOCKED;
 #define TTY_ENTER_CRITICAL() portENTER_CRITICAL(&g_ttyS0_mux)
 #define TTY_EXIT_CRITICAL()  portEXIT_CRITICAL(&g_ttyS0_mux)
+#define TTY_UART_NUM         UART_NUM_0
+#define TTY_UART_BUF_SIZE    256
 #else
 #define TTY_ENTER_CRITICAL() do {} while (0)
 #define TTY_EXIT_CRITICAL()  do {} while (0)
@@ -199,27 +202,57 @@ static struct TtyS0DevInitializer {
     }
 } g_ttyS0_dev_initializer;
 
+/* ═══ UART 初始化（仅 ESP32） ═══ */
+
+#ifndef NATIVE_TEST
+static bool s_ttyS0_uart_ready = false;
+
+static void dev_ttyS0_uart_init(void)
+{
+    if (s_ttyS0_uart_ready) return;
+
+    uart_config_t uart_cfg = {
+        .baud_rate = 115200,
+        .data_bits = UART_DATA_8_BITS,
+        .parity    = UART_PARITY_DISABLE,
+        .stop_bits = UART_STOP_BITS_1,
+        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
+        .rx_flow_ctrl_thresh = 0,
+        .source_clk = UART_SCLK_DEFAULT,
+    };
+    ESP_ERROR_CHECK(uart_param_config(TTY_UART_NUM, &uart_cfg));
+    ESP_ERROR_CHECK(uart_set_pin(TTY_UART_NUM, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
+    ESP_ERROR_CHECK(uart_driver_install(TTY_UART_NUM, TTY_UART_BUF_SIZE, TTY_UART_BUF_SIZE, 0, NULL, 0));
+    s_ttyS0_uart_ready = true;
+}
+#endif
+
 /* ═══ 设备轮询（仅 ESP32） ═══ */
 
 #ifndef NATIVE_TEST
 void dev_ttyS0_poll(void)
 {
+    dev_ttyS0_uart_init();
+
     /*
      * RX: 从硬件串口读取数据，写入环形缓冲区供任务消费。
      *
-     * 在以下三种情况下跳过 RX，将字符留在硬件 Serial 缓冲区:
+     * 在以下三种情况下跳过 RX，将字符留在硬件 UART 缓冲区:
      * 1. serial_input 正在等待密码/配对码（由 serial_poll() 直接消费）
      * 2. 串口监视器正在运行（由 serial_monitor_update() 直接消费）
      * 3. 烧录器有线桥接激活（由 flasher_app 的 flasher_loop 直接消费）
-     * 否则 Serial 字节会被此处消耗并进入 ring buffer，
+     * 否则 UART 字节会被此处消耗并进入 ring buffer，
      * Shell 和 serial_input/serial_monitor/flasher 会竞争同一份数据。
      */
     int rx_limit = 32;
     TTY_ENTER_CRITICAL();
     if (!serial_input_is_waiting() && !serial_monitor_is_active() &&
         !s_ttyS0_bridge_active && !g_flasher_bridge_active) {
-        while (rx_limit > 0 && Serial.available() > 0 && g_rx_count < TTY_RX_BUF_SIZE) {
-            g_rx_buf[g_rx_head] = (char)Serial.read();
+        while (rx_limit > 0 && g_rx_count < TTY_RX_BUF_SIZE) {
+            uint8_t byte;
+            int n = uart_read_bytes(TTY_UART_NUM, &byte, 1, 0);
+            if (n <= 0) break;
+            g_rx_buf[g_rx_head] = (char)byte;
             g_rx_head = (uint16_t)((g_rx_head + 1) % TTY_RX_BUF_SIZE);
             __atomic_fetch_add(&g_rx_count, 1, __ATOMIC_RELAXED);
             rx_limit--;
@@ -242,7 +275,7 @@ void dev_ttyS0_poll(void)
         g_tx_tail = (uint16_t)((g_tx_tail + 1) % TTY_TX_BUF_SIZE);
         __atomic_fetch_sub(&g_tx_count, 1, __ATOMIC_RELAXED);
         TTY_EXIT_CRITICAL();
-        Serial.write((uint8_t)ch);
+        uart_write_bytes(TTY_UART_NUM, &ch, 1);
         tx_limit--;
     }
 }

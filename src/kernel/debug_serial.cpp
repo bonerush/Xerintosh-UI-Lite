@@ -6,23 +6,22 @@
 #include "debug_serial.h"
 
 #ifndef NATIVE_TEST
-#include <Arduino.h>
+
+#include <stdio.h>
 
 void debug_printf(const char *fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
-    char buf[256];
-    vsnprintf(buf, sizeof(buf), fmt, args);
+    vprintf(fmt, args);
     va_end(args);
-    Serial.print(buf);
+    fflush(stdout);
 }
 
 void debug_vprintf(const char *fmt, va_list args)
 {
-    char buf[256];
-    vsnprintf(buf, sizeof(buf), fmt, args);
-    Serial.print(buf);
+    vprintf(fmt, args);
+    fflush(stdout);
 }
 
 #else /* NATIVE_TEST */
