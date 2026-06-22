@@ -2,7 +2,7 @@
  * @file   hal_display.h
  * @brief  HAL 显示层头文件
  * @details 定义屏幕尺寸常量、颜色常量、绘制原语、字体操作及裁剪接口。
- *          提供统一 API，底层在 native 环境使用内存帧缓冲，在硬件环境使用 M5GFX。
+ *          提供统一 API，底层在 native 环境使用内存帧缓冲，在硬件环境使用 LovyanGFX。
  *
  * @copyright Copyright (c) 2026
  */
@@ -40,7 +40,7 @@ extern "C" {
 extern void hal_display_init(void);
 
 /**
- * @brief 反初始化显示子系统，释放 M5Canvas 帧缓冲内存
+ * @brief 反初始化显示子系统，释放 LovyanGFX 帧缓冲内存
  * @note  调用后所有绘制操作变为空操作（安全跳过）。
  *        可随后再次调用 hal_display_init() 重新创建。
  */
@@ -170,7 +170,7 @@ extern void hal_draw_string(int16_t x, int16_t y, const char* str, uint16_t colo
 
 /**
  * @brief  绘制 UTF-8 字符串
- * @note   hal_draw_utf8 是 hal_draw_string 的别名（M5GFX drawString 本身即 UTF-8 兼容）
+ * @note   hal_draw_utf8 是 hal_draw_string 的别名（LovyanGFX drawString 本身即 UTF-8 兼容）
  */
 #define hal_draw_utf8(x, y, str, color) hal_draw_string(x, y, str, color)
 
@@ -238,7 +238,7 @@ extern void hal_clear_clip_rect(void);
 
 /**
  * @brief 设置屏幕方向
- * @param rotation 方向值（0-3），与 M5GFX setRotation 语义一致：
+ * @param rotation 方向值（0-3），与 LovyanGFX setRotation 语义一致：
  *                 0=竖屏, 1=横屏, 2=反向竖屏, 3=反向横屏
  */
 void hal_display_set_rotation(int rotation);

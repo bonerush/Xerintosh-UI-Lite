@@ -217,12 +217,11 @@ void hal_draw_circle(int16_t x, int16_t y, int16_t r, uint16_t color) {
 
 #else
 
-/* ═══ 硬件环境：M5GFX 加速 ═══ */
+/* ═══ 硬件环境：LovyanGFX 加速 ═══ */
 
-#include <M5Unified.h>
-#include <M5GFX.h>
+#include <LovyanGFX.hpp>
 
-extern M5Canvas* g_canvas;
+extern lgfx::LGFX_Sprite* g_canvas;
 
 void hal_draw_pixel(int16_t x, int16_t y, uint16_t color) {
     if (g_canvas) g_canvas->drawPixel(x, y, color);

@@ -88,17 +88,16 @@ uint16_t hal_test_fb_read(int16_t x, int16_t y)
 
 #else
 
-/* ═══ 硬件环境：M5GFX 加速 ═══ */
+/* ═══ 硬件环境：LovyanGFX 加速 ═══ */
 
-#include <M5Unified.h>
-#include <M5GFX.h>
+#include <LovyanGFX.hpp>
 
 #include "fonts/cn_font_subset.h"
 
 /* 子集中文字体对象（U8G2 格式，仅包含源码使用的 844 个汉字） */
 const lgfx::U8g2font cn_font = { lgfx_cn_font_subset };
 
-extern M5Canvas* g_canvas;
+extern lgfx::LGFX_Sprite* g_canvas;
 
 void hal_draw_xor_rect(int16_t x, int16_t y, int16_t w, int16_t h) {
     if (!g_canvas || w <= 0 || h <= 0) return;
