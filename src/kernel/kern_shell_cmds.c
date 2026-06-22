@@ -227,7 +227,7 @@ static void cmd_ls(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_
     snprintf(header, sizeof(header), "%s (%u entries):", target, dir->child_count);
     kern_shell_println(tty, header);
 
-    for (uint8_t i = 0; i < dir->child_count; i++) {
+    for (uint16_t i = 0; i < dir->child_count; i++) {
         kern_dentry_t *child = dir->children[i];
         if (child == NULL) continue;
 
@@ -604,7 +604,7 @@ static void count_dentries(kern_dentry_t *root, int *dentries, int *inodes)
     (*dentries)++;
     if (root->inode != NULL) (*inodes)++;
 
-    for (uint8_t i = 0; i < root->child_count; i++) {
+    for (uint16_t i = 0; i < root->child_count; i++) {
         kern_yield();  /* 防止深层递归触发看门狗 */
         count_dentries(root->children[i], dentries, inodes);
     }
@@ -692,7 +692,7 @@ static void cmd_hexdump(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t
 
     while ((n = kern_read(fd, (char *)buf, sizeof(buf))) > 0) {
         /* 偏移 */
-        int pos = snprintf(line, sizeof(line), "%08x  ", offset);
+        int pos = snprintf(line, sizeof(line), "%08lx  ", offset);
 
         /* 十六进制部分 */
         for (ssize_t i = 0; i < 16; i++) {
@@ -1043,7 +1043,7 @@ static void tree_recurse(kern_fd_t tty, kern_dentry_t *dir, int depth, const cha
 {
     if (dir == NULL) return;
 
-    for (uint8_t i = 0; i < dir->child_count; i++) {
+    for (uint16_t i = 0; i < dir->child_count; i++) {
         kern_dentry_t *child = dir->children[i];
         if (child == NULL) continue;
 

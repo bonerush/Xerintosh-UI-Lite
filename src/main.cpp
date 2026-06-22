@@ -171,6 +171,8 @@ extern "C" void on_screen_rotation_change_cb(void *ud)
 
 /* ═══ 入口 ═══ */
 
+static void deferred_kernel_init(void);
+
 /**
  * @brief ESP-IDF app_main()：系统初始化
  * @note  初始化顺序：UART -> 存储 -> 设置 -> 显示 -> UI -> 管理器
