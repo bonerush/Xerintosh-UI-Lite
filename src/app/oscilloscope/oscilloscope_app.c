@@ -24,7 +24,7 @@
 #include <string.h>
 
 #ifndef NATIVE_TEST
-#include "driver/adc_oneshot.h"
+#include "esp_adc/adc_oneshot.h"
 #include "driver/gpio.h"
 #include "esp_timer.h"
 #endif
@@ -338,12 +338,14 @@ void oscilloscope_init(void *user_data)
     /* Initialize ADC oneshot unit */
     adc_oneshot_unit_init_cfg_t init_cfg = {
         .unit_id = ADC_UNIT_1,
+        .clk_src = ADC_RTC_CLK_SRC_DEFAULT,
+        .ulp_mode = ADC_ULP_MODE_DISABLE,
     };
     adc_oneshot_new_unit(&init_cfg, &s_adc_handle);
 
-    /* Configure ADC channel with 11dB attenuation (~3.3V full scale) */
+    /* Configure ADC channel with 12dB attenuation (~3.3V full scale) */
     adc_oneshot_chan_cfg_t chan_cfg = {
-        .atten = ADC_ATTEN_DB_11,
+        .atten = ADC_ATTEN_DB_12,
         .bitwidth = ADC_BITWIDTH_12,
     };
     adc_oneshot_config_channel(s_adc_handle, SCOPE_ADC_CHANNEL, &chan_cfg);
