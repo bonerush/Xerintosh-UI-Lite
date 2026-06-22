@@ -35,7 +35,7 @@ extern void wifi_popup_refresh(void);
 void app_input_process(void)
 {
     /* 无论处于何种模式，每帧都必须调用 hal_input_update()，
-       确保 M5.update() 刷新按键边沿标志。
+       确保 GPIO 按键边沿标志被刷新。
        user_item 内部虽然不处理框架导航，但 user_item 自身
        的 loop 会调用 hal_input_get_event() 读取按键。 */
     hal_input_update();
