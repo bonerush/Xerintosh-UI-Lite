@@ -348,8 +348,8 @@ void oscilloscope_init(void *user_data)
     };
     adc_oneshot_config_channel(s_adc_handle, SCOPE_ADC_CHANNEL, &chan_cfg);
 #else
-    pinMode(SCOPE_PIN, INPUT);
-    analogSetPinAttenuation(SCOPE_PIN, ADC_11db);
+    pinMode(SCOPE_PIN, 0);              /* INPUT */
+    analogSetPinAttenuation(SCOPE_PIN, 3); /* ADC_11db */
 #endif
 
     ui_service_enter_landscape();

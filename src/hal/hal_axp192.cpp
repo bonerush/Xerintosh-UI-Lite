@@ -1,12 +1,16 @@
 /**
  * @file   hal_axp192.cpp
  * @brief  AXP192 PMIC 底层 I2C 实现
- * @details ESP-IDF I2C master 驱动封装。
+ * @details 双实现架构：
+ *          - NATIVE_TEST 时：返回固定成功/失败的桩实现
+ *          - 硬件环境时：使用 ESP-IDF I2C master 驱动封装
  *
  * @copyright Copyright (c) 2026
  */
 
 #include "hal_axp192.h"
+
+#ifndef NATIVE_TEST
 
 #include "driver/i2c_master.h"
 #include "esp_log.h"
@@ -79,3 +83,21 @@ esp_err_t hal_axp192_write_reg(uint8_t reg, uint8_t val) {
     uint8_t buf[2] = { reg, val };
     return i2c_master_transmit(g_axp192_dev, buf, sizeof(buf), 100);
 }
+
+#else /* NATIVE_TEST */
+
+esp_err_t hal_axp192_init(void) { return ESP_OK; }
+
+esp_err_t hal_axp192_read_reg(uint8_t reg, uint8_t *out) {
+    (void)reg;
+    if (out) *out = 0;
+    return ESP_OK;
+}
+
+esp_err_t hal_axp192_write_reg(uint8_t reg, uint8_t val) {
+    (void)reg;
+    (void)val;
+    return ESP_OK;
+}
+
+#endif /* NATIVE_TEST */

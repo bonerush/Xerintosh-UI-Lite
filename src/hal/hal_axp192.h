@@ -13,7 +13,16 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#ifndef NATIVE_TEST
 #include "esp_err.h"
+#include "driver/gpio.h"
+#else
+/* Native 测试环境：提供最小化的 ESP-IDF 类型/常量桩 */
+typedef int esp_err_t;
+#define GPIO_NUM_21 21
+#define GPIO_NUM_22 22
+#define ESP_OK      0
+#endif
 
 #ifdef __cplusplus
 extern "C" {
