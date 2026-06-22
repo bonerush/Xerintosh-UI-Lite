@@ -1,18 +1,25 @@
 /**
  * @file   hal_power_off.cpp
  * @brief  硬件关机 C++ 包装
- * @details 封装 M5.Power.powerOff() 为 C 可调用函数，
- *          通过 AXP192 寄存器实现真正硬件断电。
+ * @details 通过 AXP192 寄存器实现真正硬件断电。
+ *          显示休眠功能暂时留空，待 display HAL 迁移完成后接入。
  */
 
 #ifndef NATIVE_TEST
 
-#include <M5Unified.h>
+#include "hal_axp192.h"
 
 extern "C" void hal_power_off_hw(void)
 {
-    M5.Display.sleep();
-    M5.Power.powerOff();
+    /* TODO: 待 display HAL 迁移完成后调用显示休眠 */
+    /* hal_display_sleep(); */
+
+    /* AXP192 reg 0x32 bit 7: 关机 */
+    uint8_t val = 0;
+    if (hal_axp192_read_reg(AXP192_REG_POWER_OFF, &val) == ESP_OK) {
+        val |= 0x80;
+        hal_axp192_write_reg(AXP192_REG_POWER_OFF, val);
+    }
 }
 
 #else

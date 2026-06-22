@@ -174,9 +174,10 @@ void hal_power_key_test_reset(void)
 
 #else
 
-/* ═══ 硬件环境：AXP192 轮询实现 ═══ */
+/* ═══ 硬件环境：AXP192 I2C 轮询实现 ═══ */
 
-#include <M5Unified.h>
+#include "hal_system.h"
+#include "hal_axp192.h"
 
 /**
  * @brief AXP192 PEK（Power Enable Key）返回值
@@ -189,13 +190,13 @@ void hal_power_key_test_reset(void)
  *
  * 函数 初始化电源键() {
  *     重置所有状态
- *     // AXP192 PEK 中断在 M5.begin() 时已默认启用
+ *     // AXP192 PEK 中断在 AXP192 上电时已默认启用
  *     // 清除可能残留的中断标志
- *     读取并丢弃 getPekPress()
+ *     读取并丢弃 hal_axp192_read_reg(0x46)
  * }
  *
  * 函数 获取电源键事件() {
- *     读取 pek = getPekPress()
+ *     读取 pek = hal_axp192_read_reg(0x46)
  *
  *     if (pek != 0) {
  *         // 检测到按下边沿
@@ -241,7 +242,7 @@ void hal_power_key_test_reset(void)
 
 /**
  * @brief  获取电源键事件（非阻塞，每帧调用）
- * @details 轮询 AXP192 的 getPekPress() 方法（读取寄存器 0x46），
+ * @details 轮询 AXP192 的 0x46 寄存器，
  *          结合时间推算检测短按、长按和持续按住事件。
  */
 hal_pwr_key_event_t hal_power_key_get_event(void)
@@ -253,17 +254,19 @@ hal_pwr_key_event_t hal_power_key_get_event(void)
         return ev;
     }
 
-    uint32_t now_ms = millis();
-    /* 使用 M5.Power.getKeyState() 而不是 M5.Power.Axp192.getPekPress()
-     * 返回值：0=none / 1=long pressed / 2=short clicked / 3=both */
-    uint8_t pek = M5.Power.getKeyState();
+    uint32_t now_ms = hal_get_ticks();
 
-    /* 检测按下边沿：getKeyState() 非零表示新的按键事件 */
+    uint8_t pek = 0;
+    if (hal_axp192_read_reg(AXP192_REG_IRQ_STATUS3, &pek) != ESP_OK) {
+        return HAL_PWR_KEY_NONE;
+    }
+
+    /* 检测按下边沿：IRQ3 非零表示新的按键事件 */
     if (pek != 0) {
         g_pwr.pressed = true;
         g_pwr.press_time = now_ms;
 
-        if (pek == 0x02) {
+        if (pek == AXP192_PEK_SHORT_PRESS) {
             /* 短按事件（按下 < 1.5s 时触发）
              * 但此时键可能仍被按住，等待释放或超时升级为长按 */
             g_pwr.state = PWR_STATE_PRESSED;
@@ -318,7 +321,7 @@ hal_pwr_key_event_t hal_power_key_get_event(void)
 uint32_t hal_power_key_get_hold_duration_ms(void)
 {
     if (!g_pwr.pressed) return 0;
-    return millis() - g_pwr.press_time;
+    return hal_get_ticks() - g_pwr.press_time;
 }
 
 /**
