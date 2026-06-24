@@ -348,6 +348,156 @@ jx      a0                      /* 跳转到保存的 PC */
 
 ---
 
+## 崩溃复现 (2026-06-25)
+
+### 崩溃日志
+
+```
+[INFO] switch_to pid=3 name=wifi-mgr
+[D] restore ctx: pc=1074270580 a0=1074270580 a1=1073601840 a5=1074630368 a6=0 a13=1074630368 a14=0 ps=0x00040020
+Guru Meditation Error: Core  0 panic'ed (InstrFetchProhibited). Exception was unhandled.
+
+Core  0 register dump:
+PC      : 0x800dc90d  PS      : 0x00060630  A0      : 0x800dc90d  A1      : 0x3ffc2e30
+A2      : 0x00000001  A3      : 0x40081174  A4      : 0x40081174  A5      : 0x3ffddd30
+A6      : 0x400d8ee0  A7      : 0x00000000  A8      : 0x800dac50  A9      : 0x3ffc2de0
+A10     : 0x00000000  A11     : 0x3ffc2e30  A12     : 0x3ffc2e10  A13     : 0x00000004
+A14     : 0x00000008  A15     : 0x00000000  SAR     : 0x00000005  EXCCAUSE: 0x00000014
+EXCVADDR: 0x800dc90c  LBEG    : 0x4000c2e0  LEND    : 0x4000c2f6  LCOUNT  : 0xffffffff
+
+Backtrace: 0x400dc90a:0x3ffc2e30 0x400dc90a:0x3ffddcd0 0x400d88c8:0x3ffddcf0 0x400d8ee8:0x3ffddd10 0x40081176:0x3ffddd30 0x40081171:0x3ffc2e50 0x400e0278:0x3ffc2e80 0x400f784b:0x3ffc2ea0 0x40194dea:0x3ffc2ec0
+```
+
+### 崩溃分析
+
+| 寄存器 | 值 | 含义 |
+|--------|-----|------|
+| EXCCAUSE | 0x00000014 | InstrFetchProhibited (指令取指被禁止) |
+| EXCVADDR | 0x800dc90c | 尝试从无效地址取指令 |
+| PC | 0x800dc90d | 程序计数器指向无效地址 |
+
+**ESP32 内存映射:**
+- `0x3FFxxxxx` - DRAM (数据)
+- `0x400xxxxx` - IRAM (指令)
+- `0x400Dxxxx` - Flash (指令)
+- `0x800xxxxx` - **无效区域** (会导致异常)
+
+### 上下文切换日志
+
+```
+switch_to pid=3 name=wifi-mgr
+restore ctx: pc=1074270580 = 0x40081174 (IRAM - 有效)
+             a0=1074270580 = 0x40081174 (与 pc 相同)
+             a1=1073601840 = 0x3FFC2E60 (栈指针)
+             a5=1074630368 = 0x400DC720 (entry 函数)
+             ps=0x00040020 (WOE=1, UM=1, INTLEVEL=0)
+```
+
+**问题:** PC 从有效地址 `0x40081174` 跳转到了无效地址 `0x800dc90d`
+
+### 根本原因分析
+
+#### 假设 1: 窗口溢出异常 (Window Overflow Exception)
+
+**证据:**
+- PS.WOE=1 (启用窗口溢出异常)
+- `xeros_ctx_restore` 使用 `entry sp, 32` 旋转窗口
+- 如果旧窗口的 SP 无效，会触发窗口溢出异常
+
+**问题:**
+- `xeros_ctx_restore` 在 `entry` 后旋转窗口
+- 此时 a2 = 原来的 a10 = ctx 指针
+- 但 `entry` 可能触发窗口溢出，如果溢出处理器引用无效 SP
+
+**验证:**
+- 检查 `xeros_task_trampoline` 是否正确初始化了栈
+- 检查 `xeros_ctx_init` 是否设置了正确的 PS
+
+#### 假设 2: trampoline 窗口管理
+
+**证据:**
+- `xeros_task_trampoline` 使用 `callx8 a5` 调用 entry
+- `callx8` 设置 CALLINC=2，旋转窗口
+- 如果此时 WOE=1，可能触发窗口溢出
+
+**问题:**
+- trampoline 从 `xeros_ctx_restore` 恢复后执行
+- 此时 PS.WOE=1
+- `callx8` 旋转窗口，可能触发溢出
+
+**验证:**
+- 检查 trampoline 是否禁用了 WOE
+- 检查 FreeRTOS 如何处理这个问题
+
+#### 假设 3: 上下文结构体被破坏
+
+**证据:**
+- 恢复前 pc=0x40081174 (有效)
+- 恢复后 PC=0x800dc90d (无效)
+- 差值: 0x800dc90d - 0x40081174 = 0x4005B799
+
+**问题:**
+- ctx 结构体可能被栈溢出破坏
+- 或者内存损坏
+
+**验证:**
+- 检查 wifi-mgr 任务的栈大小
+- 检查是否有栈溢出保护
+
+### 修复方案
+
+#### 方案 1: 禁用 WOE (推荐)
+
+在 `xeros_ctx_restore` 前禁用 WOE，防止窗口溢出异常：
+
+```asm
+xeros_ctx_restore:
+    entry   sp, 32
+    
+    /* 禁用 WOE，防止窗口溢出异常 */
+    rsr     a3, PS
+    movi    a4, ~(1 << 18)  /* PS_WOE_MASK */
+    and     a3, a3, a4
+    wsr     a3, PS
+    rsync
+    
+    /* 继续恢复... */
+```
+
+#### 方案 2: 使用 Call0 ABI
+
+将所有上下文切换函数改为 Call0 ABI，避免窗口旋转：
+
+```asm
+    .option call0
+xeros_ctx_save:
+    /* 无需 entry，直接保存寄存器 */
+    ...
+```
+
+#### 方案 3: 清理窗口 (参考 FreeRTOS)
+
+在切换前调用 `xthal_window_spill_nw` 清理窗口：
+
+```asm
+xeros_ctx_restore:
+    entry   sp, 32
+    
+    /* 清理窗口 */
+    call0   xthal_window_spill_nw
+    
+    /* 继续恢复... */
+```
+
+### 下一步行动
+
+1. **验证假设 1**: 检查 `xeros_ctx_init` 中的 PS 设置
+2. **验证假设 2**: 检查 trampoline 是否禁用了 WOE
+3. **实现修复**: 尝试方案 1 (禁用 WOE)
+4. **测试**: 重新构建并测试
+
+---
+
 ## 调试笔记
 
 ### 关于 Xtensa call8 ABI
