@@ -524,3 +524,87 @@ FreeRTOS ESP32 port 使用:
 | 上下文保存 | 手动 (宏) | 汇编函数 |
 | 窗口管理 | 禁用 WOE | 启用 WOE |
 | 中断处理 | 直接 | 通过 ISR 标志 |
+
+---
+
+## 根因分析：callx8 + entry 双重窗口旋转导致寄存器映射错误 (2026-06-24)
+
+### 问题描述
+
+修复 WOE 后，系统仍然崩溃，报 `IllegalInstruction` 或 `InstrFetchProhibited`。
+根本原因不是 WOE，而是 `callx8` + `entry sp,32` 的**双重窗口旋转**导致 callee 收到错误的栈指针和参数。
+
+### 寄存器映射分析
+
+*Xtensa call8 ABI 窗口旋转机制：*
+
+```
+callx8 a5：旋转窗口 +8（CALLINC=2 × 4 = 8）
+entry sp,32：再旋转 +8（CALLINC=2 × 4 = 8）
+总计：+16 = 回到原始物理寄存器窗口
+```
+
+这意味着 callee 的寄存器**直接映射到 trampoline 的原始寄存器（即 ctx 结构体中的值）**：
+
+| callee 寄存器 | 物理寄存器 | 来源 | 修复前的值 | 修复后 |
+|---|---|---|---|---|
+| a0 (返回地址) | W+0 | callx8 自动写入 | ✓ 正确 | ✓ |
+| a1 (栈指针) | W+1 | entry: ctx->a9 - 32 | **0 - 32 = 无效!** | stack_top - 32 ✓ |
+| a2 (第一个参数) | W+2 | ctx->a2 | **0 (丢失!)** | arg ✓ |
+
+### 中文伪代码拆解
+
+```
+函数 xeros_ctx_init_assembler(ctx, stack_base, stack_size, entry, arg) {
+
+    // 第一步：清零上下文
+    memset(ctx, 0, sizeof(ctx))
+
+    // 第二步：计算栈顶
+    栈顶 = (stack_base + stack_size) & ~0xF
+
+    // 第三步：设置 trampoline 相关寄存器
+    ctx->a0 = trampoline地址     // 返回地址
+    ctx->a1 = 栈顶              // trampoline 自己的 sp
+    ctx->a5 = entry             // 蹦床 callx8 的目标
+    ctx->a6 = arg               // 蹦床 mov a10, a6 的源
+    ctx->pc = trampoline地址    // 首次恢复的执行入口
+    ctx->ps = 0x00000020        // 用户模式，WOE=0
+
+    // ★ 关键修复：双重旋转后的 callee 寄存器映射 ★
+    //
+    // callx8 a5 把窗口旋转了 8 个寄存器
+    // callee 的 entry sp,32 又旋转了 8 个
+    // 总共旋转 16 = 回到原点
+    // 所以 callee 的 a1 = ctx->a9, a2 = ctx->a2
+
+    ctx->a2 = arg               // callee 的第一个参数
+    ctx->a9 = 栈顶              // callee 的 entry 会做 sp = a9 - 32
+}
+```
+
+### 修复内容
+
+**文件 `ctx_init.c`（C 封装版）：**
+- 新增 `ctx->a2 = (uint32_t)arg`
+- 新增 `ctx->a9 = stack_top`
+
+**文件 `ctx_switch.S`（汇编版）：**
+- 新增 `s32i a6, a2, 8`（ctx->a2 = arg）
+- 新增 `s32i a3, a2, 36`（ctx->a9 = stack_top）
+
+### 修复原理
+
+callx8 旋转 +8 后，callee 的 a1 = trampoline 的 a9（= ctx->a9）。
+callee 的 entry sp,32 执行 `sp = a1 - 32`。
+如果 a9=0，则 sp = -32 = 0xFFFFFFE0（无效地址）→ 崩溃。
+
+修复后 a9 = stack_top，所以 sp = stack_top - 32（正确的满递减栈初始位置）。
+
+同理，callee 的 a2 = ctx->a2。如果不设置，callee 收到 arg=0 而非正确参数。
+
+### 状态
+
+- [x] WOE 修复（PS = 0x00000020）
+- [x] 双重旋转寄存器映射修复（ctx->a2 = arg, ctx->a9 = stack_top）
+- [ ] 实机验证（需要烧录测试）

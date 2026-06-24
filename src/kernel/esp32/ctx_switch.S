@@ -54,23 +54,24 @@
 
 /**
  * Processor State value for new tasks.
- *   PS.WOE   = 1  (window overflow exceptions ENABLED)
+ *   PS.WOE   = 0  (window overflow exceptions DISABLED)
  *   PS.CALLINC = 0  (trampoline uses callx8 which sets CALLINC automatically)
  *   PS.OWB   = 0  (overflow window base = 0)
  *   PS.UM    = 1  (user mode)
  *   PS.EXCM  = 0  (not in exception mode)
  *   PS.INTLEVEL = 0 (interrupts enabled)
- *   Bit 18 (WOE) = 1, Bit 5 (UM) = 1 => 0x00040020
+ *   Bit 18 (WOE) = 0, Bit 5 (UM) = 1 => 0x00000020
  *
- * The trampoline uses `callx8 a5` which sets CALLINC=2 and preserves WOE.
- * The callee's `entry sp, 32` may trigger a window overflow; WOE=1 ensures
- * the CPU traps to the overflow handler instead of IllegalInstruction.
+ * NOTE: WOE is disabled to prevent Window Overflow Exceptions during
+ * context switch. The FreeRTOS ESP32 port also disables WOE and uses
+ * call0 ABI for context switching. If windowed ABI is needed, call
+ * xthal_window_spill_nw() before context switch.
  */
     .global xeros_ps_init
     .type   xeros_ps_init, @object
     .align  4
 xeros_ps_init:
-    .word   0x00040020
+    .word   0x00000020
     .size   xeros_ps_init, . - xeros_ps_init
 
 /* ========================================================================== */
@@ -140,8 +141,15 @@ xeros_ctx_init:
     s32i    a4, a2, 84              /* ctx->exccause = 0 */
     s32i    a4, a2, 88              /* ctx->excvaddr = 0 */
 
-    /* Step 3: Set stack pointer (ctx->a1) */
+    /* Step 3: Set stack pointer (ctx->a1) and pre-rotation stack top (ctx->a9)
+     *
+     * callx8 + entry sp,32 双重窗口旋转后 callee 的寄存器映射回原始窗口：
+     *   callee a1 = ctx->a9 (callx8 旋转), entry 做 sp = a1 - 32
+     *   callee a2 = ctx->a2 (callx8+entry 双重旋转)
+     * 因此必须设置 ctx->a9 = stack_top, ctx->a2 = arg */
     s32i    a3, a2, 4               /* ctx->a1 = stack_top */
+    s32i    a3, a2, 36              /* ctx->a9 = stack_top (callee pre-entry sp) */
+    s32i    a6, a2, 8               /* ctx->a2 = arg (callee first argument) */
 
     /* Step 4: Set return address to trampoline (ctx->a0) */
     movi    a7, xeros_task_trampoline
@@ -149,8 +157,7 @@ xeros_ctx_init:
 
     /* Step 5: Set entry point and arg for the trampoline
      * After ctx_restore, a5=entry and a6=arg are loaded from context.
-     * The trampoline's `entry sp, 32` rotates window: a5→a13, a6→a14.
-     * Then `call8 a13` invokes entry(arg) with arg in a10. */
+     * The trampoline does: mov a10, a6; callx8 a5 */
     s32i    a5, a2, 20              /* ctx->a5 = entry */
     s32i    a6, a2, 24              /* ctx->a6 = arg */
 
@@ -159,10 +166,10 @@ xeros_ctx_init:
      * The trampoline will call entry(arg) via call8. */
     s32i    a7, a2, 92              /* ctx->pc = &xeros_task_trampoline */
 
-    /* Step 7: Set processor state (PS = 0x20, user mode, interrupts on) */
+    /* Step 7: Set processor state (PS = 0x20, user mode, interrupts on, WOE disabled) */
     movi    a3, xeros_ps_init
     l32i    a3, a3, 0
-    s32i    a3, a2, 80              /* ctx->ps = 0x00000020 */
+    s32i    a3, a2, 80              /* ctx->ps = 0x00000020 (WOE=0, UM=1) */
 
     retw                            /* return (call8 windowed return) */
 
@@ -336,6 +343,8 @@ xeros_ctx_restore:
 
     /* ------------------------------------------------------------------ */
     /* Step 2: Restore special registers from context                     */
+    /*   NOTE: We restore PS with WOE disabled to prevent Window Overflow */
+    /*   Exceptions during the register restore sequence.                 */
     /* ------------------------------------------------------------------ */
     l32i    a3, a2, 64              /* a3 = ctx->sar */
     wsr     a3, SAR
@@ -349,7 +358,10 @@ xeros_ctx_restore:
     l32i    a3, a2, 76              /* a3 = ctx->lcount */
     wsr     a3, LCOUNT
 
+    /* Restore PS but clear WOE bit to prevent window overflow exceptions */
     l32i    a3, a2, 80              /* a3 = ctx->ps */
+    movi    a4, ~(1 << 18)          /* PS_WOE_MASK = bit 18 */
+    and     a3, a3, a4              /* Clear WOE bit */
     wsr     a3, PS
 
     /* ------------------------------------------------------------------ */

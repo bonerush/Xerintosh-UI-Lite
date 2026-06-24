@@ -128,22 +128,36 @@ void xeros_ctx_init_assembler(kern_ctx_native_t *ctx,
     /* a0 = 蹦床：entry() 返回后的着陆点（call8 ABI 返回地址寄存器） */
     ctx->a0 = (uint32_t)xeros_task_trampoline;
 
+    /* callx8 + entry sp,32 双重窗口旋转后的寄存器映射：
+     *
+     * callx8 a5 旋转窗口 +8：callee a1 = trampoline a9, callee a2 = trampoline a10
+     * entry sp,32 再旋转 +8：总计 +16 = 回到原始窗口
+     * 因此 callee 最终看到的 a1 = ctx->a9, a2 = ctx->a2
+     *
+     * 必须正确设置 a2（参数）和 a9（栈顶），否则 callee 收到错误的参数和栈指针。 */
+
+    /* a2 = arg：callx8+entry 双重旋转后 callee 的 a2 映射到 ctx->a2 */
+    ctx->a2  = (uint32_t)arg;
+
     /* a5 = entry, a6 = arg：蹦床通过这些寄存器调用 entry(arg)。
-     * 同时存入 a13/a14：xeros_ctx_restore 从偏移 52/56 加载 a13/a14，
-     * 蹦床的 entry sp,32 旋转窗口后 a13=entry, a14=arg。 */
+     * 同时存入 a13/a14：xeros_ctx_restore 从偏移 52/56 加载 a13/a14。 */
     ctx->a5  = (uint32_t)entry;
     ctx->a6  = (uint32_t)arg;
     ctx->a13 = (uint32_t)entry;
     ctx->a14 = (uint32_t)arg;
 
+    /* a9 = 栈顶：callx8 旋转后 callee 的 a1 = trampoline a9，
+     * entry sp,32 会执行 sp = a1 - 32，因此 a9 必须是栈顶地址。
+     * 这样 callee 获得 sp = stack_top - 32（正确的满递减栈初始位置）。 */
+    ctx->a9  = stack_top;
+
     /* PC = 蹦床：xeros_ctx_restore() 首次恢复时跳转到蹦床 */
     ctx->pc = (uint32_t)xeros_task_trampoline;
 
-    /* PS = 0x00040020：用户模式，中断使能，WOE=1。
-     * 蹦床使用 callx8 调用 entry 函数，callx8 设置 CALLINC=2 并保留 WOE。
-     * entry 函数的 entry sp, 32 指令旋转窗口时可能触发溢出，
-     * WOE=1 允许 CPU 通过溢出处理函数保存寄存器窗口。 */
-    ctx->ps = 0x00040020;
+    /* PS = 0x00000020：用户模式，中断使能，WOE=0。
+     * WOE=0 禁用窗口溢出异常，防止上下文切换时触发异常。
+     * 参考 FreeRTOS ESP32 port 的做法：使用 call0 ABI 或禁用 WOE。 */
+    ctx->ps = 0x00000020;
 }
 
 #endif /* !NATIVE_TEST */
