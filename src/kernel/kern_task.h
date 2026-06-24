@@ -32,6 +32,7 @@ extern "C" {
 typedef ucontext_t    kern_ctx_t;
 #elif defined(XEROS_NATIVE_SCHED)
 #include "kern_ctx_esp32.h"
+#include "esp32/ctx_switch.h"
 #endif
 
 /* ═══ 前向声明（避免 kern_task.h 与 kern_vfs.h 循环包含） ═══ */
@@ -59,7 +60,8 @@ typedef struct kern_task {
 #if defined(NATIVE_TEST)
     kern_ctx_t          ctx;            /* ucontext */
 #elif defined(XEROS_NATIVE_SCHED)
-    kern_ctx_t          ctx;            /* setjmp/longjmp */
+    kern_ctx_native_t  *native_ctx;     /* pointer to native context (heap-allocated) */
+    uint8_t            *native_stack;   /* native task stack (heap-allocated) */
 #else
     kern_port_thread_t  port_thread;    /* 底层执行上下文句柄 */
 #endif

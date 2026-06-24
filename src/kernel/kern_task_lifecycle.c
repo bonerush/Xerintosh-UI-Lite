@@ -21,8 +21,7 @@
 #ifdef NATIVE_TEST
 #include <ucontext.h>
 #elif defined(XEROS_NATIVE_SCHED)
-#include "kern_ctx_esp32.h"
-#include <setjmp.h>
+#include "esp32/ctx_switch.h"
 #endif
 
 /* ═══ 任务创建 ═══ */
@@ -124,6 +123,8 @@ kern_pid_t kern_spawn(const char *name, void (*entry)(void *arg),
 
 #elif defined(XEROS_NATIVE_SCHED)
 
+#include "debug_serial.h"
+
 kern_pid_t kern_spawn(const char *name, void (*entry)(void *arg),
                        void *arg, size_t stack_min)
 {
@@ -160,11 +161,30 @@ kern_pid_t kern_spawn(const char *name, void (*entry)(void *arg),
     /* 默认加入 RR 调度类 */
     task->scheduler_class_id = KERN_SCHED_CLASS_RR_ID;
 
-    /* 手动分配栈 + setjmp/longjmp 上下文 */
-    task_stack_init(task, (stack_min > 0) ? stack_min : KERN_STACK_MIN);
-
-    uint8_t *stack_top = task->stack_base + task->stack_size;
-    kern_ctx_init(&task->ctx, task->stack_base, stack_top, entry, arg);
+    /* 使用 call0 原生上下文切换：分配原生上下文和独立栈 */
+    size_t stack_sz = (stack_min > 0) ? stack_min : (size_t)KERN_STACK_MIN;
+    if (stack_sz > KERN_STACK_MAX) stack_sz = KERN_STACK_MAX;
+    if (stack_sz < KERN_STACK_MIN) stack_sz = KERN_STACK_MIN;
+    task->native_ctx = (kern_ctx_native_t *)kern_kmalloc_for_task(task, sizeof(kern_ctx_native_t));
+    task->native_stack = (uint8_t *)kern_kmalloc_for_task(task, stack_sz);
+    if (task->native_ctx == NULL || task->native_stack == NULL) {
+        kern_resource_release_all(task);
+        free(task);
+        return KERN_ENOMEM;
+    }
+    task->stack_base = task->native_stack;
+    task->stack_size = stack_sz;
+    memset(task->stack_base, 0xAA, stack_sz);
+    debug_printf("[D] spawn %s: entry=%p arg=%p\n",
+        task->name, (void*)entry, arg);
+    xeros_ctx_init_assembler(task->native_ctx, task->native_stack, stack_sz, entry, arg);
+    debug_printf("[D] spawn %s: ctx=%p pc=%u a0=%u a1=%u a5=%u a6=%u\n",
+        task->name, (void*)task->native_ctx,
+        (unsigned)task->native_ctx->pc,
+        (unsigned)task->native_ctx->a0,
+        (unsigned)task->native_ctx->a1,
+        (unsigned)task->native_ctx->a5,
+        (unsigned)task->native_ctx->a6);
     task_write_canary(task);
 
     kern_mpu_setup_stack_guard(task, task->stack_base, task->stack_size);
@@ -189,6 +209,7 @@ kern_pid_t kern_spawn(const char *name, void (*entry)(void *arg),
         }
     }
 
+    debug_printf("[OK] spawned %d: %s\n", task->pid, task->name);
     kern_log(KERN_LOG_DEBUG, "spawned task %d: %s", task->pid, task->name);
     return task->pid;
 }
@@ -317,11 +338,11 @@ void kern_yield(void)
     cur->state = KERN_TASK_READY;
     g_current_task = g_idle_task;
 
-    /* setjmp 保存当前任务上下文，longjmp 回到调度器 */
-    if (setjmp(cur->ctx.jmp) == 0) {
-        longjmp(g_sched_ctx.jmp, 1);
+    /* call0 上下文切换：保存当前任务，恢复调度器 */
+    if (xeros_ctx_save(cur->native_ctx) == 0) {
+        xeros_ctx_restore(&g_sched_ctx);
     }
-    /* setjmp 返回 1：调度器重新给了我们 CPU */
+    /* 返回 1：调度器重新给了我们 CPU */
 }
 
 #else /* ESP32: yield = 通过可移植层释放 CPU */
@@ -372,6 +393,8 @@ void kern_exit(void)
     if (cur == NULL) return;
 
     kern_resource_release_all(cur);
+    cur->native_ctx = NULL;
+    cur->native_stack = NULL;
     cur->stack_base = NULL;
 
     cur->state = KERN_TASK_ZOMBIE;
@@ -379,8 +402,8 @@ void kern_exit(void)
 
     g_current_task = g_idle_task;
 
-    /* 不保存上下文，直接跳转回调度器（任务已死亡） */
-    longjmp(g_sched_ctx.jmp, 1);
+    /* 不保存上下文，直接恢复调度器（任务已死亡） */
+    xeros_ctx_restore(&g_sched_ctx);
 }
 
 #else /* ESP32: exit = 标记 ZOMBIE，通过可移植层销毁自身 */
@@ -431,9 +454,9 @@ void kern_sleep_ms(uint32_t ms)
     cur->wake_time = g_sched_ticks + ms;
     g_current_task = g_idle_task;
 
-    /* 与 kern_yield 相同：保存上下文，跳回调度器 */
-    if (setjmp(cur->ctx.jmp) == 0) {
-        longjmp(g_sched_ctx.jmp, 1);
+    /* 与 kern_yield 相同：保存上下文，恢复调度器 */
+    if (xeros_ctx_save(cur->native_ctx) == 0) {
+        xeros_ctx_restore(&g_sched_ctx);
     }
 }
 

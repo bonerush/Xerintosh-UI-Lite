@@ -23,8 +23,8 @@
 #ifdef NATIVE_TEST
 #include <ucontext.h>
 #elif defined(XEROS_NATIVE_SCHED)
-#include "kern_ctx_esp32.h"
-#include <setjmp.h>
+#include "esp32/ctx_switch.h"
+#include "debug_serial.h"
 #endif
 
 #include "kern_sched_fifo.h"
@@ -113,7 +113,7 @@ kern_task_t   *g_switch_to_task = NULL;
 static uint8_t s_sched_stack[8192];  /* 调度器上下文专用栈 */
 static volatile bool s_switch_done = false;
 #elif defined(XEROS_NATIVE_SCHED)
-kern_ctx_t     g_sched_ctx;
+kern_ctx_native_t g_sched_ctx;
 #endif
 
 /* ═══ 初始化 ═══ */
@@ -200,11 +200,30 @@ void kern_sched_init(void) /* XEROS_NATIVE_SCHED */
     strncpy(g_idle_task->name, "idle", KERN_TASK_NAME_LEN);
     g_idle_task->entry = idle_entry;
     g_idle_task->arg = NULL;
-    task_stack_init(g_idle_task, IDLE_STACK_MIN);
 
-    uint8_t *stack_top = g_idle_task->stack_base + g_idle_task->stack_size;
-    kern_ctx_init(&g_idle_task->ctx, g_idle_task->stack_base, stack_top,
-                  idle_entry, NULL);
+    /* 分配原生上下文和栈 */
+    g_idle_task->native_ctx = (kern_ctx_native_t *)calloc(1, sizeof(kern_ctx_native_t));
+    g_idle_task->native_stack = (uint8_t *)malloc(IDLE_STACK_MIN);
+    if (g_idle_task->native_ctx == NULL || g_idle_task->native_stack == NULL) {
+        kern_panic("failed to allocate idle task context/stack");
+        return;
+    }
+    g_idle_task->stack_base = g_idle_task->native_stack;
+    g_idle_task->stack_size = IDLE_STACK_MIN;
+    memset(g_idle_task->stack_base, 0xAA, IDLE_STACK_MIN);
+
+    debug_printf("[D] ctx_init: ctx=%p stack=%p sz=%d entry=%p arg=%p\n",
+        (void*)g_idle_task->native_ctx, (void*)g_idle_task->native_stack,
+        (int)IDLE_STACK_MIN, (void*)idle_entry, (void*)NULL);
+
+    xeros_ctx_init_assembler(g_idle_task->native_ctx, g_idle_task->native_stack,
+                             IDLE_STACK_MIN, idle_entry, NULL);
+    debug_printf("[D] ctx_init done, pc=%u a0=%u a1=%u a5=%u a6=%u\n",
+        (unsigned)g_idle_task->native_ctx->pc,
+        (unsigned)g_idle_task->native_ctx->a0,
+        (unsigned)g_idle_task->native_ctx->a1,
+        (unsigned)g_idle_task->native_ctx->a5,
+        (unsigned)g_idle_task->native_ctx->a6);
     task_write_canary(g_idle_task);
 
     g_task_list = g_idle_task;
@@ -377,7 +396,29 @@ void kern_sched_tick(void)
             g_current_task = next;
             kern_mpu_apply(next);
             if (next->state != KERN_TASK_SLEEPING) next->state = KERN_TASK_RUNNING;
-            if (setjmp(g_sched_ctx.jmp) == 0) longjmp(next->ctx.jmp, 1);
+            static int s_switch_dbg = 0;
+            if (s_switch_dbg < 3) {
+                kern_log(KERN_LOG_INFO, "switch_to pid=%d name=%s",
+                         next->pid, next->name);
+                s_switch_dbg++;
+            }
+            /* 调试：打印即将恢复的上下文 */
+            debug_printf("[D] restore ctx: pc=%u a0=%u a1=%u a5=%u a6=%u a13=%u a14=%u ps=0x%08x\n",
+                (unsigned)next->native_ctx->pc,
+                (unsigned)next->native_ctx->a0,
+                (unsigned)next->native_ctx->a1,
+                (unsigned)next->native_ctx->a5,
+                (unsigned)next->native_ctx->a6,
+                (unsigned)next->native_ctx->a13,
+                (unsigned)next->native_ctx->a14,
+                (unsigned)next->native_ctx->ps);
+            if (xeros_ctx_save(&g_sched_ctx) == 0) {
+                xeros_ctx_restore(next->native_ctx);
+            }
+            /* 返回 1：任务 yield/exit 后回到这里 */
+            if (s_switch_dbg <= 3) {
+                kern_log(KERN_LOG_INFO, "returned from task");
+            }
         }
         return;
     }

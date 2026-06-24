@@ -245,8 +245,10 @@ bool kern_task_stack_grow(kern_task_t *task, size_t new_size)
     g_switch_to_task = task;
     makecontext(&task->ctx, task_entry_trampoline, 0);
 #elif defined(XEROS_NATIVE_SCHED)
-    uint8_t *stack_top = new_base + new_size;
-    kern_ctx_init(&task->ctx, new_base, stack_top, task->entry, task->arg);
+    /* 重新初始化原生上下文 */
+    if (task->native_ctx != NULL) {
+        xeros_ctx_init_assembler(task->native_ctx, new_base, new_size, task->entry, task->arg);
+    }
 #endif
 
     /* makecontext/kern_ctx_init 可能触及栈底，最后重写 canary */

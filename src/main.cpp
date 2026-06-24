@@ -258,6 +258,14 @@ extern "C" void app_main(void)
 
         kern_sched_tick();
 
+        /*
+         * 显式让出 CPU 给 FreeRTOS idle 任务，确保中断看门狗（INT_WDT, 300ms）
+         * 能被喂食。Without this, the Xeros scheduler task (priority 1) would
+         * starve the FreeRTOS idle task (priority 0) on Core 0, causing INT_WDT
+         * to fire and reset the system.
+         */
+        vTaskDelay(pdMS_TO_TICKS(1));
+
         /* 周期性记录当前任务的栈高水位，用于下次启动时自动推荐栈大小。
          * 在调度 tick 之后执行，避免在任务上下文内部增加栈压力。 */
         static uint32_t s_profile_last_ms = 0;
@@ -368,7 +376,6 @@ static void deferred_kernel_init(void)
 
     /* -- 启动 Shell -- */
     kern_shell_init();
-    debug_printf("[  OK  ] Shell spawned on /dev/ttyS0\n");
 
     /* -- 启动 UI/WiFi/BT 任务 --
      * 使用历史栈高水位画像推荐栈大小，首次启动无画像时回退到经验值。 */
