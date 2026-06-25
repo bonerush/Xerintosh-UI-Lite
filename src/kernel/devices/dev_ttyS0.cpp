@@ -38,9 +38,9 @@ static volatile uint16_t g_tx_count = 0;
 #include "kernel/kern_sync.h"
 #include "hal/hal_uart.h"
 #include "hal/hal_system.h"
-static spinlock_t g_ttyS0_mux;
-#define TTY_ENTER_CRITICAL() spinlock_lock(&g_ttyS0_mux)
-#define TTY_EXIT_CRITICAL()  spinlock_unlock(&g_ttyS0_mux)
+static xeros_spinlock_t g_ttyS0_mux;
+#define TTY_ENTER_CRITICAL() xeros_spinlock_lock(&g_ttyS0_mux)
+#define TTY_EXIT_CRITICAL()  xeros_spinlock_unlock(&g_ttyS0_mux)
 #else
 #define TTY_ENTER_CRITICAL() do {} while (0)
 #define TTY_EXIT_CRITICAL()  do {} while (0)
@@ -198,7 +198,7 @@ static struct TtyS0DevInitializer {
         g_ttyS0_dev.name[KERN_NAME_MAX] = '\0';
         g_ttyS0_dev.type = KERN_DEV_CHAR;
         g_ttyS0_dev.ops  = &g_ttyS0_ops;
-        spinlock_init(&g_ttyS0_mux);
+        xeros_spinlock_init(&g_ttyS0_mux);
     }
 } g_ttyS0_dev_initializer;
 

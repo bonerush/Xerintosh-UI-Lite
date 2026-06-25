@@ -57,9 +57,9 @@ static bool g_gpiofs_initialized = false;
 static uint8_t g_gpio_dir[GPIOFS_PIN_COUNT];  /* 0=INPUT, 1=OUTPUT */
 
 #ifndef NATIVE_TEST
-static spinlock_t g_gpiofs_mux;
-#define GPIOFS_ENTER_CRITICAL() spinlock_lock(&g_gpiofs_mux)
-#define GPIOFS_EXIT_CRITICAL()  spinlock_unlock(&g_gpiofs_mux)
+static xeros_spinlock_t g_gpiofs_mux;
+#define GPIOFS_ENTER_CRITICAL() xeros_spinlock_lock(&g_gpiofs_mux)
+#define GPIOFS_EXIT_CRITICAL()  xeros_spinlock_unlock(&g_gpiofs_mux)
 #else
 #define GPIOFS_ENTER_CRITICAL() do {} while (0)
 #define GPIOFS_EXIT_CRITICAL()  do {} while (0)
@@ -304,7 +304,7 @@ kern_err_t kern_gpiofs_init(void)
 
     /* 初始化 GPIOFS 自旋锁 */
 #ifndef NATIVE_TEST
-    spinlock_init(&g_gpiofs_mux);
+    xeros_spinlock_init(&g_gpiofs_mux);
 #endif
 
     /* 注册汇总文件 */
