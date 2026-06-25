@@ -4,12 +4,12 @@
 
 #ifndef NATIVE_TEST
 
-#include "kernel/freertos_compat.h"
 #include <esp_log.h>
 #include <esp_http_client.h>
 #include <cJSON.h>
 
 #include "hal/hal_system.h"
+#include "kernel/kern_task.h"
 
 bool tu_api_fetch_deepseek(const char *api_key, tu_deepseek_balance_t *out) {
     if (!api_key || api_key[0] == '\0' || !out) return false;
@@ -35,7 +35,7 @@ bool tu_api_fetch_deepseek(const char *api_key, tu_deepseek_balance_t *out) {
     }
 
     int code = esp_http_client_get_status_code(client);
-    vTaskDelay(pdMS_TO_TICKS(1));  /* yield 给调度器，防止看门狗超时 */
+    kern_sleep_ms(1);  /* yield 给调度器，防止看门狗超时 */
     if (code != 200) {
         esp_http_client_cleanup(client);
         return false;
@@ -55,7 +55,7 @@ bool tu_api_fetch_deepseek(const char *api_key, tu_deepseek_balance_t *out) {
 
     int read_len = esp_http_client_read_response(client, payload, content_length);
     esp_http_client_cleanup(client);
-    vTaskDelay(pdMS_TO_TICKS(1));
+    kern_sleep_ms(1);
 
     if (read_len <= 0) {
         free(payload);

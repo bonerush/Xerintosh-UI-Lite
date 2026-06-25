@@ -22,10 +22,7 @@
 #include "ui/ui_drawer.h"
 #include "kernel/kern_task.h"
 #include "kernel/kern_init.h"
-
-#ifndef NATIVE_TEST
-#include "kernel/freertos_compat.h"
-#endif
+#include "kernel/kern_sync.h"
 
 /* ─── 外部函数 ─── */
 extern void app_input_process(void);
@@ -42,13 +39,6 @@ void ui_task_main(void *arg)
 {
     (void)arg;
     static int frame = 0;
-
-    /* DEBUG: direct UART write to confirm UI task starts */
-    volatile uint32_t *uart = (volatile uint32_t *)0x3FF40000;
-    *uart = 'U';
-    *uart = 'I';
-    *uart = ':';
-    *uart = '\n';
 
     kern_log(KERN_LOG_INFO, "ui_task_main started");
 
@@ -85,11 +75,10 @@ void ui_task_main(void *arg)
         }
 
 #ifndef NATIVE_TEST
-        /* 释放时间给 FreeRTOS idle 任务（优先级 0），
-         * 确保 TG1 系统看门狗能被及时喂狗。
-         * 使用 vTaskDelay 替代 hal_delay_ms+taskYIELD，在保持流畅帧率的同时
-         * 让出 CPU 给低优先级任务。 */
-        vTaskDelay(pdMS_TO_TICKS(5));
+        /* 释放时间给 Xeros 内核调度器，确保 TG1 系统看门狗能被及时喂狗。
+         * 使用 kern_sleep_ms 替代 vTaskDelay，在保持流畅帧率的同时
+         * 让出 CPU 给其他任务。 */
+        kern_sleep_ms(5);
 #endif
 
         /* 让出 CPU */

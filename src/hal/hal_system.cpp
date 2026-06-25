@@ -45,8 +45,11 @@ void hal_delay_ms(uint32_t ms) {
 
 /* ═══ 硬件环境：ESP-IDF 实现 ═══ */
 
-#include "kernel/freertos_compat.h"
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 #include "esp_timer.h"
+#include "kernel/kern_smp.h"
+#include "kernel/kern_task.h"
 
 /**
  * @brief 初始化系统（ESP-IDF 自动完成启动，此处留空兼容）
@@ -65,7 +68,11 @@ uint32_t hal_get_ticks(void) {
  * @brief 延时指定的毫秒数
  */
 void hal_delay_ms(uint32_t ms) {
-    vTaskDelay(pdMS_TO_TICKS(ms));
+    if (g_current_task != NULL) {
+        kern_sleep_ms(ms);
+    } else {
+        vTaskDelay(pdMS_TO_TICKS(ms));
+    }
 }
 
 #endif

@@ -35,8 +35,7 @@ void wifi_mgr_task_main(void *arg) { (void)arg; }
 #include <esp_wifi.h>
 #include <esp_event.h>
 #include <esp_netif.h>
-#include "kernel/freertos_compat.h"
-
+#include <esp_timer.h>
 #include "hal/hal_system.h"
 #include "hal/hal_uart.h"
 
@@ -51,6 +50,7 @@ extern "C" {
 #include "ui/ui_item.h"
 #include "ui/ui_core.h"
 #include "kernel/kern_task.h"
+#include "kernel/kern_sync.h"
 }
 
 /* ═══ 外部全局变量 ═══ */
@@ -59,7 +59,7 @@ extern "C" {
 
 /* ═══ 模块状态 ═══ */
 
-static portMUX_TYPE g_popup_spinlock = portMUX_INITIALIZER_UNLOCKED;
+static xeros_spinlock_t g_popup_spinlock;
 
 static wifi_mgr_state_t g_state           = WIFI_MGR_IDLE;    /* 状态机当前状态 */
 static bool             g_wifi_enabled    = false;            /* WiFi 是否已启用 */
@@ -110,7 +110,7 @@ static void wifi_scan_done_handler(void* arg, esp_event_base_t base,
 /* ═══ 跨任务弹窗辅助 ═══
  * 与 power_key_popup 同模式：UI 任务每帧 push_pop_up 保持弹窗存活，
  * 自行管理超时退场（span 到期后 dismiss_pop_up 触发动画退出）。
- * g_popup_content 使用 portMUX_TYPE spinlock 保护跨任务读写。 */
+ * g_popup_content 使用 xeros_spinlock_t 保护跨任务读写。 */
 
 static volatile bool     g_popup_active = false;   /* 弹窗是否激活 */
 static volatile uint16_t g_popup_span   = 0;        /* 显示时长（毫秒） */
@@ -123,11 +123,11 @@ static char              g_popup_content[48] = {0};  /* 弹窗文本 */
  */
 static void wifi_popup_request(const char *msg, uint16_t span_ms)
 {
-    portENTER_CRITICAL(&g_popup_spinlock);
+    xeros_spinlock_lock(&g_popup_spinlock);
     strncpy(g_popup_content, msg, sizeof(g_popup_content) - 1);
     g_popup_content[sizeof(g_popup_content) - 1] = '\0';
     g_popup_span = span_ms;
-    portEXIT_CRITICAL(&g_popup_spinlock);
+    xeros_spinlock_unlock(&g_popup_spinlock);
     g_popup_start = hal_get_ticks();
     g_popup_active = true;
 }
@@ -158,9 +158,9 @@ extern "C" void wifi_popup_refresh(void)
     }
 
     /* 每帧 push 保持弹窗存活（重置 time_start 防止弹窗自身超时） */
-    portENTER_CRITICAL(&g_popup_spinlock);
+    xeros_spinlock_lock(&g_popup_spinlock);
     xerintosh_push_pop_up(g_popup_content, g_popup_span);
-    portEXIT_CRITICAL(&g_popup_spinlock);
+    xeros_spinlock_unlock(&g_popup_spinlock);
 }
 
 /* ═══ 前向声明（回调函数）═══ */
@@ -190,6 +190,7 @@ uint32_t wifi_mgr_needed_heap(void) { return WIFI_MIN_FREE_HEAP; }
  */
 void wifi_mgr_init(void)
 {
+    xeros_spinlock_init(&g_popup_spinlock);
     g_enable_requested  = false;
     g_disable_requested = false;
 
@@ -466,7 +467,10 @@ void wifi_menu_on_saved_connect_pressed(void *ud)
     }
     suppress_wifi_logs();
     esp_wifi_disconnect();
-    vTaskDelay(pdMS_TO_TICKS(1));  /* 喂狗：BT 活跃时 WiFi 操作可能阻塞 */
+    {
+        uint64_t _start = esp_timer_get_time();
+        while (esp_timer_get_time() - _start < 1000ULL) {}
+    }  /* 喂狗：BT 活跃时 WiFi 操作可能阻塞 */
 
     wifi_config_t wifi_cfg = {};
     strncpy((char *)wifi_cfg.sta.ssid, ssid, sizeof(wifi_cfg.sta.ssid) - 1);
@@ -579,7 +583,10 @@ static bool try_auto_connect(void)
 
     suppress_wifi_logs();
     esp_wifi_disconnect();
-    vTaskDelay(pdMS_TO_TICKS(1));
+    {
+        uint64_t _start = esp_timer_get_time();
+        while (esp_timer_get_time() - _start < 1000ULL) {}
+    }
 
     wifi_config_t wifi_cfg = {};
     strncpy((char *)wifi_cfg.sta.ssid, ssid, sizeof(wifi_cfg.sta.ssid) - 1);
