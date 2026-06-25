@@ -105,7 +105,9 @@ void xeros_ctx_init_assembler(kern_ctx_native_t *ctx,
      * 第一次旋转后：trampoline a4 = old a8, a5 = old a9, a6 = old a10, a7 = old a11。
      * 第二次旋转后：wrapper a0 = trampoline a4, a1 = a5, a2 = a6, a3 = a7。 */
     ctx->a1 = stack_top;                              /* 旧窗口 SP：蹦床 entry 旋转时需要有效 SP */
-    ctx->a5 = stack_top;                              /* 溢出处理器 S32E 保存基址：entry 中止时 a5 未定义，必须预设 */
+    ctx->a5 = stack_top;                              /* 溢出处理器 S32E 保存基址：窗口旋转时溢出处理器
+                                                         使用 a5 计算 S32E 目标地址 (a5 - 16)。
+                                                         必须为有效地址，否则溢出写入无效内存导致崩溃。 */
     ctx->a8 = (uint32_t)xeros_task_cleanup_handler;  /* → 蹦床 a4 → 包装函数 a0 = retw 返回地址 */
     ctx->a9 = stack_top;                              /* → 蹦床 a5 → 包装函数 a1 = SP */
     ctx->a10 = (uint32_t)entry;                       /* → 蹦床 a6 → 包装函数 a2 = pxCode */

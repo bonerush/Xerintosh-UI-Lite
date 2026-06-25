@@ -390,7 +390,7 @@ void kern_sched_tick(void)
     if (g_need_resched || (g_current_task && g_current_task->state != KERN_TASK_RUNNING)) {
         g_need_resched = false;
         kern_task_t *next = pick_next_ready();
-        if (next) {
+        if (next && next != g_current_task) {
             /* DEBUG: trace task pick */
             if (s_dbg_tick < 20) {
                 volatile uint32_t *uart = (volatile uint32_t *)0x3FF40000;

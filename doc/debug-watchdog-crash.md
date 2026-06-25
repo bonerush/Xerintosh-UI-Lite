@@ -1088,3 +1088,70 @@ wsr     a3, WINDOWSTART
 - [x] 调试输出已添加（待设备连接后验证）
 - [ ] 需要刷入固件并验证 UI 任务正常执行
 - [x] 实机验证：设备稳定启动，30 秒无 watchdog 崩溃 ✅
+
+---
+
+## 会话 9: rsil 特权指令崩溃 + self-switch guard (2026-06-25)
+
+### 现象
+
+设备稳定启动后，串口输出始终停在 `T>sR`：
+- `T` = kern_sched_tick 入口
+- `>` = pick_next_ready 返回
+- `s` = 选中 shell 任务（name[0]='s'）
+- `R` = 即将调用 xeros_ctx_restore
+
+之后无任何输出，shell 从未执行，idle 也从未执行。
+
+### 根因分析
+
+通过逐步添加 UART 调试点，定位到 `xeros_ctx_restore_impl` 入口处：
+
+```asm
+xeros_ctx_restore_impl:
+    movi    a3, 0x3FF40000
+    movi    a4, 48                  /* '0' */
+    s8i     a4, a3, 0              /* ← 输出 '0'，成功 */
+
+    rsil    a3, 3                   /* ← 执行后挂起！ */
+
+    movi    a3, 0x3FF40000
+    movi    a4, 65                  /* 'A' */
+    s8i     a4, a3, 0              /* ← 从未执行 */
+```
+
+**`rsil` (Read and Set Interrupt Level) 是 Xtensa 特权指令**，只能在以下条件执行：
+- PS.UM = 0（内核模式）
+- PS.EXCM = 1（异常模式）
+
+调度器从 `kern_smp_sched_loop`（FreeRTOS 任务）中调用，运行在**用户模式 (PS.UM=1)**。
+执行 `rsil` 触发 PrivilegedInstructionException，异常处理程序死循环。
+
+### 修复
+
+**ctx_switch.S：移除 `rsil a3, 3`**
+
+后续的 PS 写入（`wsr a3, PS`）已设置 INTLEVEL=3，覆盖整个上下文恢复流程。
+`rsil` 是多余的，且在用户模式下非法。
+
+在 PS 写入之前的几条指令（SAR/LBEG/LEND/LCOUNT/WINDOWSTART 恢复）期间，
+即使有中断到达，中断处理器也会正确保存和恢复所有寄存器，不影响正确性。
+
+**kern_sched.c：添加 self-switch guard**
+
+```c
+// 修复前：
+if (next) {
+
+// 修复后：
+if (next && next != g_current_task) {
+```
+
+缺少 guard 时，`pick_next_ready()` 返回当前任务会导致不必要的
+`xeros_ctx_save`/`xeros_ctx_restore` 往返，新任务路径会从头重启。
+
+### 状态
+
+- [x] rsil 特权指令移除
+- [x] self-switch guard 添加
+- [ ] 实机验证（需要烧录测试）

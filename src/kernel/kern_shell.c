@@ -473,7 +473,13 @@ static void shell_task_main(void *arg)
     (void)arg;
 
 #if defined(XEROS_NATIVE_SCHED) || defined(NATIVE_TEST)
-    debug_printf("[D] shell_task_main entered\n");
+    /* NOTE: debug_printf uses vfprintf which needs FreeRTOS locks.
+     * Use direct UART write instead to avoid lock_acquire abort. */
+    {
+        volatile uint32_t *uart = (volatile uint32_t *)0x3FF40000;
+        const char *msg = "[D] shell_task_main entered\n";
+        for (int i = 0; msg[i]; i++) *uart = msg[i];
+    }
 #endif
 
     kern_fd_t tty = kern_open("/dev/ttyS0", KERN_O_RDWR);

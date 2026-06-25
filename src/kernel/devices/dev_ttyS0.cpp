@@ -35,7 +35,7 @@ static volatile uint16_t g_tx_tail = 0;
 static volatile uint16_t g_tx_count = 0;
 
 #ifndef NATIVE_TEST
-#include "freertos/FreeRTOS.h"
+#include "kernel/freertos_compat.h"
 #include "hal/hal_uart.h"
 #include "hal/hal_system.h"
 static portMUX_TYPE g_ttyS0_mux = portMUX_INITIALIZER_UNLOCKED;

@@ -35,8 +35,7 @@ void wifi_mgr_task_main(void *arg) { (void)arg; }
 #include <esp_wifi.h>
 #include <esp_event.h>
 #include <esp_netif.h>
-#include <freertos/FreeRTOS.h>
-#include <freertos/task.h>
+#include "kernel/freertos_compat.h"
 
 #include "hal/hal_system.h"
 #include "hal/hal_uart.h"

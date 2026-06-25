@@ -57,6 +57,7 @@ static bool g_gpiofs_initialized = false;
 static uint8_t g_gpio_dir[GPIOFS_PIN_COUNT];  /* 0=INPUT, 1=OUTPUT */
 
 #ifndef NATIVE_TEST
+#include "freertos_compat.h"
 static portMUX_TYPE g_gpiofs_mux = portMUX_INITIALIZER_UNLOCKED;
 #define GPIOFS_ENTER_CRITICAL() portENTER_CRITICAL(&g_gpiofs_mux)
 #define GPIOFS_EXIT_CRITICAL()  portEXIT_CRITICAL(&g_gpiofs_mux)

@@ -24,8 +24,7 @@
 #include "kernel/kern_init.h"
 
 #ifndef NATIVE_TEST
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
+#include "kernel/freertos_compat.h"
 #endif
 
 /* ─── 外部函数 ─── */

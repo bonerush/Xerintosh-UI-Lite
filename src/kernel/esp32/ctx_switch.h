@@ -76,6 +76,10 @@ typedef struct {
     /* ---- 程序计数器 ---- */
 
     uint32_t pc;       /**< 程序计数器 / 上下文恢复入口地址 (Program Counter) */
+
+    /* ---- 窗口寄存器 ---- */
+
+    uint32_t windowbase; /**< 窗口基址寄存器 (Window Base, SR 72) */
 } kern_ctx_native_t;
 
 /**
@@ -84,7 +88,7 @@ typedef struct {
  * 等于 24 个 uint32_t 字段 = 96 字节。汇编代码中使用此常量
  * 计算各寄存器在结构体内的偏移量。
  */
-#define KERN_CTX_NATIVE_SIZE   (24 * sizeof(uint32_t))
+#define KERN_CTX_NATIVE_SIZE   (25 * sizeof(uint32_t))
 
 /* ========================================================================== */
 /*  函数声明                                                                   */

@@ -237,9 +237,14 @@ xeros_task_trampoline:
      *   - Rotates window +1 (WB: K → K+1)
      *   - Allocates 0 bytes on stack (SP unchanged)
      *
-     * After rotation: a2 = ctx->a2 (cleanup), a3 = ctx->a3 (stack_top),
-     * a4 = ctx->a4 (entry), a5 = ctx->a5 (arg). */
+     * After rotation: a4 = old a8 (cleanup), a5 = old a9 (stack_top),
+     * a6 = old a10 (entry), a7 = old a11 (arg). */
     entry   sp, 0                   /* CALLINC=1: rotate +1, alloc 0 bytes */
+
+    /* DEBUG: write '2' to UART0 TX FIFO */
+    movi    a2, 0x3FF40000
+    movi    a3, 50                  /* '2' */
+    s8i     a3, a2, 0
 
     /* call4 xeros_task_wrapper: maps a2→a0, a3→a1, a4→a2, a5→a3.
      * Wrapper sees: a0=cleanup, a1=stack_top, a2=pxCode, a3=pvParameters.
@@ -291,6 +296,11 @@ xeros_task_trampoline:
     .align  4
 xeros_task_wrapper:
     entry   a1, 16                  /* CALLINC=1: rotate +1, alloc 16-byte frame */
+
+    /* DEBUG: write '3' to UART0 TX FIFO */
+    movi    a4, 0x3FF40000
+    movi    a5, 51                  /* '3' */
+    s8i     a5, a4, 0
 
     /* After entry: a2 = pxCode, a3 = pvParameters.
      * Set up a2 = pvParameters (arg), call pxCode via callx4. */
@@ -407,6 +417,7 @@ xeros_ctx_save:
     rsr     a3, PS;     s32i a3, a10, 80
     rsr     a3, EXCCAUSE; s32i a3, a10, 84
     rsr     a3, EXCVADDR; s32i a3, a10, 88
+    rsr     a3, WINDOWBASE; s32i a3, a10, 96  /* ctx->windowbase */
 
     /* Step 4: Restore clobbered registers and return
      * a3 and a9 were used as scratch. a10 = return value (0 = save path).
@@ -481,8 +492,18 @@ xeros_ctx_restore:
 xeros_ctx_restore_impl:
     /* No entry instruction -- we stay in the caller's window. */
 
+    /* DEBUG: write '0' to UART0 TX FIFO (impl entry) */
+    movi    a3, 0x3FF40000
+    movi    a4, 48                  /* '0' */
+    s8i     a4, a3, 0
+
     /* ------------------------------------------------------------------ */
-    /* Step 1: Disable interrupts to prevent corruption during restore    */
+    /* Step 1: Interrupt masking                                          */
+    /*   We do NOT use rsil here — it is a privileged instruction and    */
+    /*   the scheduler may run in user mode (PS.UM=1) under FreeRTOS.   */
+    /*   The PS write below sets INTLEVEL=3, which masks interrupts      */
+    /*   for the duration of the context switch.                         */
+    /*                                                                    */
     /*   NOTE: We do NOT call xthal_window_spill_nw here.                */
     /*   That function assumes a9 register chain is set up by normal     */
     /*   function calls, but our windows were created by ctx_save which  */
@@ -491,7 +512,6 @@ xeros_ctx_restore_impl:
     /*   that the trampoline's `entry` instruction can trigger a window  */
     /*   overflow exception that correctly spills the old window.         */
     /* ------------------------------------------------------------------ */
-    rsil    a3, 3                   /* INTLEVEL = XCHAL_EXCM_LEVEL */
 
     /* ------------------------------------------------------------------ */
     /* Step 3: Restore special registers from context                     */
@@ -500,40 +520,53 @@ xeros_ctx_restore_impl:
     l32i    a3, a2, 64              /* a3 = ctx->sar */
     wsr     a3, SAR
 
+    /* DEBUG: write '1' after SAR */
+    movi    a3, 0x3FF40000
+    movi    a4, 49                  /* '1' */
+    s8i     a4, a3, 0
+
     l32i    a3, a2, 68              /* a3 = ctx->lbeg */
     wsr     a3, LBEG
+
+    /* DEBUG: write '2' after LBEG */
+    movi    a3, 0x3FF40000
+    movi    a4, 50                  /* '2' */
+    s8i     a4, a3, 0
 
     l32i    a3, a2, 72              /* a3 = ctx->lend */
     wsr     a3, LEND
 
+    /* DEBUG: write '3' after LEND */
+    movi    a3, 0x3FF40000
+    movi    a4, 51                  /* '3' */
+    s8i     a4, a3, 0
+
     l32i    a3, a2, 76              /* a3 = ctx->lcount */
     wsr     a3, LCOUNT
 
+    /* DEBUG: write '4' after LCOUNT */
+    movi    a3, 0x3FF40000
+    movi    a4, 52                  /* '4' */
+    s8i     a4, a3, 0
+
     /* ------------------------------------------------------------------ */
-    /* Step 2b: Fix WINDOWSTART for new tasks (while interrupts masked)   */
-    /*   Set ALL 16 window bits as valid (0xFFFF).                        */
-    /*                                                                  */
-    /*   The full call chain rotates through 5 windows:                  */
-    /*     K → K+1 (trampoline entry)                                   */
-    /*     K+1 → K+2 (trampoline callx4 → wrapper)                      */
-    /*     K+2 → K+3 (wrapper entry)                                    */
-    /*     K+3 → K+4 (wrapper callx4 → pxCode)                          */
-    /*     K+4 → K+3 (pxCode retw → wrapper)                            */
-    /*     K+3 → K+2 (wrapper retw → trampoline cleanup)                */
-    /*                                                                  */
-    /*   A targeted 3-window mask (WB, WB+1, WB+2) was insufficient:   */
-    /*   the wrapper's entry instruction rotates to K+3, which was NOT  */
-    /*   in the mask, causing a window underflow exception.              */
-    /*                                                                  */
-    /*   0xFFFF is safe: overflow handler spills using a5 = stack_top   */
-    /*   (set by ctx_init), so even unused windows spill harmlessly.    */
-    /*   FreeRTOS uses the same 0xFFFF approach for new tasks.          */
-    /*                                                                  */
-    /*   For resumed tasks, WS is already correct — skip the write.     */
+    /* Step 2b: Restore WINDOWBASE from context                           */
+    /*   Must be done BEFORE PS restore (PS.OWB is a shadow used by       */
+    /*   exception handlers; the real WINDOWBASE controls which physical   */
+    /*   registers are visible as a0-a15).                                 */
     /* ------------------------------------------------------------------ */
+    l32i    a3, a2, 96              /* a3 = ctx->windowbase */
+    wsr     a3, WINDOWBASE
+
+    /* Re-enable all 16 window positions so window rotations don't trap */
     movi    a3, 0xFFFF
     wsr     a3, WINDOWSTART
     rsync
+
+    /* DEBUG: write 'C' (reached WINDOWSTART section) */
+    movi    a3, 0x3FF40000
+    movi    a4, 67                  /* 'C' */
+    s8i     a4, a3, 0
 
 .L_ws_done:
 
@@ -570,6 +603,11 @@ xeros_ctx_restore_impl:
 .L_ps_write:
     wsr     a3, PS
     rsync                           /* PS takes effect */
+
+    /* DEBUG: write 'P' to UART0 TX FIFO (after PS rsync) */
+    movi    a3, 0x3FF40000
+    movi    a4, 80                  /* 'P' */
+    s8i     a4, a3, 0
 
     /* Padding: ensure instruction alignment after PS restore */
     nop
@@ -630,6 +668,12 @@ xeros_ctx_restore_impl:
     l32i    a13, a2, 52             /* a13 = ctx->a13 */
     l32i    a14, a2, 56             /* a14 = ctx->a14 */
     l32i    a15, a2, 60             /* a15 = ctx->a15 */
+
+    /* DEBUG: write '1' to UART0 TX FIFO */
+    movi    a3, 0x3FF40000
+    movi    a4, 49                  /* '1' */
+    s8i     a4, a3, 0
+
     jx      a0                      /* jump to trampoline (a2 not needed, trampoline uses a4-a7 after rotation) */
 
     .size   xeros_ctx_restore_impl, . - xeros_ctx_restore_impl

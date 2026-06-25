@@ -21,8 +21,7 @@ void wifi_mgr_task_main(void *arg);
 
 #ifndef NATIVE_TEST
 
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
+#include "kernel/freertos_compat.h"
 #include "esp_timer.h"
 #include "esp_heap_caps.h"
 #include "nvs_flash.h"

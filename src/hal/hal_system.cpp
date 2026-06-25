@@ -45,8 +45,7 @@ void hal_delay_ms(uint32_t ms) {
 
 /* ═══ 硬件环境：ESP-IDF 实现 ═══ */
 
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
+#include "kernel/freertos_compat.h"
 #include "esp_timer.h"
 
 /**
