@@ -57,7 +57,6 @@ static bool g_gpiofs_initialized = false;
 static uint8_t g_gpio_dir[GPIOFS_PIN_COUNT];  /* 0=INPUT, 1=OUTPUT */
 
 #ifndef NATIVE_TEST
-#include "kernel/kern_sync.h"
 static spinlock_t g_gpiofs_mux;
 #define GPIOFS_ENTER_CRITICAL() spinlock_lock(&g_gpiofs_mux)
 #define GPIOFS_EXIT_CRITICAL()  spinlock_unlock(&g_gpiofs_mux)
