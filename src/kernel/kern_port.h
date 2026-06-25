@@ -40,6 +40,7 @@ struct kern_task;
   #define KERN_PORT_STACK_MIN  1024
 #elif defined(XEROS_NATIVE_SCHED)
   /* ESP32 原生调度器：自定义上下文切换（ctx_switch.S） */
+  #include "esp32/ctx_switch.h"
   #define KERN_PORT_STACK_MIN  4096
 #else
   /* ESP32 + FreeRTOS 任务容器（默认） */

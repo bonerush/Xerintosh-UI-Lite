@@ -12,13 +12,13 @@
 #include "kern_vfs.h"
 #include "kern_init.h"
 #include "kern_types.h"
+#include "kern_sync.h"
 
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
 
 #ifndef NATIVE_TEST
-#include "freertos/FreeRTOS.h"
 #include "driver/gpio.h"
 #endif
 
@@ -57,10 +57,10 @@ static bool g_gpiofs_initialized = false;
 static uint8_t g_gpio_dir[GPIOFS_PIN_COUNT];  /* 0=INPUT, 1=OUTPUT */
 
 #ifndef NATIVE_TEST
-#include "freertos_compat.h"
-static portMUX_TYPE g_gpiofs_mux = portMUX_INITIALIZER_UNLOCKED;
-#define GPIOFS_ENTER_CRITICAL() portENTER_CRITICAL(&g_gpiofs_mux)
-#define GPIOFS_EXIT_CRITICAL()  portEXIT_CRITICAL(&g_gpiofs_mux)
+#include "kernel/kern_sync.h"
+static spinlock_t g_gpiofs_mux;
+#define GPIOFS_ENTER_CRITICAL() spinlock_lock(&g_gpiofs_mux)
+#define GPIOFS_EXIT_CRITICAL()  spinlock_unlock(&g_gpiofs_mux)
 #else
 #define GPIOFS_ENTER_CRITICAL() do {} while (0)
 #define GPIOFS_EXIT_CRITICAL()  do {} while (0)
@@ -302,6 +302,11 @@ kern_err_t kern_gpiofs_init(void)
 
     /* 创建 /sys/gpio 目录 */
     kern_vfs_mkdir("/sys/gpio");
+
+    /* 初始化 GPIOFS 自旋锁 */
+#ifndef NATIVE_TEST
+    spinlock_init(&g_gpiofs_mux);
+#endif
 
     /* 注册汇总文件 */
     kern_err_t rc = gpiofs_register_file("list", -1);
