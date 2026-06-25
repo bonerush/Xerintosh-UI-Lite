@@ -175,41 +175,22 @@ kern_pid_t kern_spawn(const char *name, void (*entry)(void *arg),
     task->stack_base = task->native_stack;
     task->stack_size = stack_sz;
     memset(task->stack_base, 0xAA, stack_sz);
-    debug_printf("[D] spawn %s: entry=%p arg=%p\n",
-        task->name, (void*)entry, arg);
     xeros_ctx_init_assembler(task->native_ctx, task->native_stack, stack_sz, entry, arg);
-    debug_printf("[D] spawn %s: ctx=%p pc=%u a0=%u a1=%u a5=%u a6=%u\n",
-        task->name, (void*)task->native_ctx,
-        (unsigned)task->native_ctx->pc,
-        (unsigned)task->native_ctx->a0,
-        (unsigned)task->native_ctx->a1,
-        (unsigned)task->native_ctx->a5,
-        (unsigned)task->native_ctx->a6);
     task_write_canary(task);
 
     kern_mpu_setup_stack_guard(task, task->stack_base, task->stack_size);
 
-    /* 插入任务链表（头部插入，保证 idle 保持在最前面） */
-    if (g_task_list == NULL) {
-        g_task_list = task;
-    } else {
-        kern_task_t *t = g_task_list;
-        /* 跳过 idle（pid 0），其余从 idle 之后插入 */
-        while (t->next != NULL && t->next->pid == 0) t = t->next;
-        task->next = t->next;
-        t->next = task;
-    }
-    g_task_count++;
-
-    /* 加入对应调度类的任务链表 */
+    /* 加入调度类任务链表（enqueue 内部管理链表 next 指针和尾指针，
+     * 同时同步 g_task_list / g_task_list_tail，因此这里不再单独
+     * 操作全局链表，避免与 enqueue 的 next 指针冲突导致任务丢失）。 */
     if (task->scheduler_class_id >= 0 && task->scheduler_class_id < KERN_SCHED_MAX_CLASSES) {
         kern_sched_class_t *cls = g_sched_classes[task->scheduler_class_id];
         if (cls != NULL && cls->enqueue != NULL) {
             cls->enqueue(task);
         }
     }
+    g_task_count++;
 
-    debug_printf("[OK] spawned %d: %s\n", task->pid, task->name);
     kern_log(KERN_LOG_DEBUG, "spawned task %d: %s", task->pid, task->name);
     return task->pid;
 }

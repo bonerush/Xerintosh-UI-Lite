@@ -28,8 +28,17 @@ extern "C" {
  * 共保存 24 个 32 位寄存器，总计 96 字节。
  * 布局必须与 ctx_switch.S 中的汇编偏移量严格一致。
  *
- * 对于新任务，a5/a6 存放 entry/arg，pc 指向蹦床函数。
- * 蹦床通过 `call8 a5` 调用 entry(arg)，然后调用 kern_exit(0)。
+ * 对于新任务：
+ *   a0 指向清理处理器（entry 返回后调用 kern_exit）
+ *   a2/a6 存放 arg，a5 存放 entry，pc 指向蹦床函数。
+ *   蹦床通过 `mov a2, a6; callx8 a5` 调用 entry(arg)（CALLINC=2，正确设置调用帧）。
+ *
+ * @note ctx_save 使用 call8 ABI 保存寄存器，然后清除 CALLINC 后通过
+ *       call0 子函数返回（避免 retw 旋转窗口）。
+ *       ctx_restore 通过 call8 包装器调用 call0 实现函数，
+ *       恢复 PS（包含 CALLINC=2）后通过 jx 跳转（不触发窗口旋转）。
+ *       这与 FreeRTOS ESP32 port 的方案一致：上下文保存/恢复使用 call0，
+ *       任务级代码使用 call8（窗口化调用约定）。
  */
 typedef struct {
     /* ---- 通用寄存器 (a0-a15) ---- */
@@ -115,12 +124,17 @@ void xeros_ctx_init_assembler(kern_ctx_native_t *ctx,
                               void *arg);
 
 /**
- * @brief 保存当前上下文
+ * @brief 保存当前上下文（setjmp 语义，纯汇编实现）
  *
- * 将当前所有 callee-saved 寄存器和特殊寄存器保存到 @p ctx 中。
+ * 将当前所有通用寄存器和特殊寄存器保存到 @p ctx 中。
  * 该函数使用 setjmp 语义：
  *   - 首次调用（保存时）返回 0
  *   - 后续从 xeros_ctx_restore() 恢复时返回 1
+ *
+ * @note 纯汇编实现（ctx_switch.S）。内部使用 call0 ABI 进行实际的
+ *       寄存器保存操作，通过 call8 包装器从 C 代码调用。
+ *       call0 不旋转寄存器窗口，避免了恢复不同任务上下文时
+ *       旧窗口栈指针无效导致的 WindowOverflow 崩溃。
  *
  * @param[out] ctx 指向用于保存寄存器状态的上下文结构体
  * @return 0 表示刚完成保存；1 表示从恢复路径返回
@@ -128,10 +142,14 @@ void xeros_ctx_init_assembler(kern_ctx_native_t *ctx,
 int xeros_ctx_save(kern_ctx_native_t *ctx);
 
 /**
- * @brief 恢复一个已保存的上下文
+ * @brief 恢复一个已保存的上下文（longjmp 语义，纯汇编实现）
  *
  * 从 @p ctx 中恢复所有寄存器状态，并跳转到之前保存的 PC 位置继续执行。
  * 该函数不会返回到调用者，而是直接切换到目标上下文。
+ *
+ * @note 纯汇编实现（ctx_switch.S）。内部使用 call0 ABI 进行实际的
+ *       寄存器恢复操作，通过 call8 包装器从 C 代码调用。
+ *       对于恢复的任务，PS.CALLINC=2 确保后续 retw 正确旋转回调用者窗口。
  *
  * @param[in] ctx 指向要恢复的上下文结构体
  *

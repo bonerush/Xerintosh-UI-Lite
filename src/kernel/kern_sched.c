@@ -212,18 +212,8 @@ void kern_sched_init(void) /* XEROS_NATIVE_SCHED */
     g_idle_task->stack_size = IDLE_STACK_MIN;
     memset(g_idle_task->stack_base, 0xAA, IDLE_STACK_MIN);
 
-    debug_printf("[D] ctx_init: ctx=%p stack=%p sz=%d entry=%p arg=%p\n",
-        (void*)g_idle_task->native_ctx, (void*)g_idle_task->native_stack,
-        (int)IDLE_STACK_MIN, (void*)idle_entry, (void*)NULL);
-
     xeros_ctx_init_assembler(g_idle_task->native_ctx, g_idle_task->native_stack,
                              IDLE_STACK_MIN, idle_entry, NULL);
-    debug_printf("[D] ctx_init done, pc=%u a0=%u a1=%u a5=%u a6=%u\n",
-        (unsigned)g_idle_task->native_ctx->pc,
-        (unsigned)g_idle_task->native_ctx->a0,
-        (unsigned)g_idle_task->native_ctx->a1,
-        (unsigned)g_idle_task->native_ctx->a5,
-        (unsigned)g_idle_task->native_ctx->a6);
     task_write_canary(g_idle_task);
 
     g_task_list = g_idle_task;
@@ -396,28 +386,9 @@ void kern_sched_tick(void)
             g_current_task = next;
             kern_mpu_apply(next);
             if (next->state != KERN_TASK_SLEEPING) next->state = KERN_TASK_RUNNING;
-            static int s_switch_dbg = 0;
-            if (s_switch_dbg < 3) {
-                kern_log(KERN_LOG_INFO, "switch_to pid=%d name=%s",
-                         next->pid, next->name);
-                s_switch_dbg++;
-            }
-            /* 调试：打印即将恢复的上下文 */
-            debug_printf("[D] restore ctx: pc=%u a0=%u a1=%u a5=%u a6=%u a13=%u a14=%u ps=0x%08x\n",
-                (unsigned)next->native_ctx->pc,
-                (unsigned)next->native_ctx->a0,
-                (unsigned)next->native_ctx->a1,
-                (unsigned)next->native_ctx->a5,
-                (unsigned)next->native_ctx->a6,
-                (unsigned)next->native_ctx->a13,
-                (unsigned)next->native_ctx->a14,
-                (unsigned)next->native_ctx->ps);
-            if (xeros_ctx_save(&g_sched_ctx) == 0) {
+            int save_ret = xeros_ctx_save(&g_sched_ctx);
+            if (save_ret == 0) {
                 xeros_ctx_restore(next->native_ctx);
-            }
-            /* 返回 1：任务 yield/exit 后回到这里 */
-            if (s_switch_dbg <= 3) {
-                kern_log(KERN_LOG_INFO, "returned from task");
             }
         }
         return;
@@ -461,6 +432,8 @@ void kern_sched_tick(void) /* ESP32: FreeRTOS */
 void idle_entry(void *arg)
 {
     (void)arg;
+    volatile uint32_t *uart_fifo = (volatile uint32_t *)0x3FF40000;
+    *uart_fifo = 'I';
     while (1) {
         kern_yield();
     }

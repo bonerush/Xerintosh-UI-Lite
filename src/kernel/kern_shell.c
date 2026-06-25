@@ -21,6 +21,10 @@
 #include <string.h>
 #include <stdio.h>
 
+#if defined(XEROS_NATIVE_SCHED) || defined(NATIVE_TEST)
+#include "debug_serial.h"
+#endif
+
 /* ═══ 常量 ═══ */
 
 #define SHELL_BUF_SIZE    128      /* 输入行缓冲区 */
@@ -467,6 +471,8 @@ void shell_complete_command(kern_fd_t tty, char *line, size_t *pos,
 static void shell_task_main(void *arg)
 {
     (void)arg;
+
+    debug_printf("[D] shell_task_main entered\n");
 
     kern_fd_t tty = kern_open("/dev/ttyS0", KERN_O_RDWR);
     if (tty < 0) return;
