@@ -83,7 +83,9 @@
  * WINDOWSTART = 0xFFFF ensures all windows are valid during rotation.
  *
  * Window count: kern_sched(K) -> ctx_restore(K) -> trampoline(K) ->
- *   wrapper(K+1) -> task_entry(K+2). Overflow handler spills K at K+2.
+ *   wrapper(K+1 via entry) -> wrapper(K+2 via callx4) -> task_entry(K+3 via entry).
+ *   Overflow handler spills using a5 (= stack_top, set by ctx_init).
+ *   WINDOWSTART = 0xFFFF covers all rotations.
  */
     .global xeros_ps_init
     .type   xeros_ps_init, @object
@@ -201,7 +203,7 @@ xeros_ctx_init:
  * @brief Trampoline for newly created tasks
  *
  * Reached via jx a0 from ctx_restore_impl. PS.CALLINC=1, WOE=1.
- * WINDOWSTART marks only WB, WB+1, WB+2 as valid (targeted 3-window mask).
+ * WINDOWSTART = 0xFFFF (all 16 windows valid).
  *
  * After ctx_restore_impl loads all GPR and jumps here (WB = K):
  *   a8  = ctx->a8  = cleanup handler
@@ -461,13 +463,13 @@ xeros_ctx_restore:
  *   to kern_sched_tick. After jx a0, execution resumes in kern_sched_tick.
  *
  * For NEW tasks: ctx->ps has CALLINC=1, WOE=1, UM=1, INTLEVEL=3.
- *   WINDOWSTART is set to 3-window mask: WB, WB+1, WB+2.
+ *   WINDOWSTART = 0xFFFF (all 16 windows valid).
  *   After jx a0, execution begins at the trampoline (= ctx->pc).
  *   The trampoline's `entry sp, 0` (CALLINC=1) rotates +1 (WB: K → K+1).
  *   Trampoline calls xeros_task_wrapper via callx4 (CALLINC=1).
- *   callx4 maps: a4→a0(cleanup), a5→a1(stack_top), a6→a2(pxCode), a7→a3(arg).
- *   Wrapper is __attribute__((call4)): compiler generates callx4 for pxCode.
- *   Wrapper calls pxCode(pvParameters), then kern_exit().
+ *   Wrapper's `entry a1, 16` rotates +1 (WB: K+1 → K+2).
+ *   Wrapper calls pxCode(pvParameters) via callx4 (CALLINC=1).
+ *   Wrapper calls kern_exit() via callx4 (CALLINC=1).
  *   kern_exit returns to cleanup handler via retw.
  *   Cleanup: call0 xeros_ctx_restore_impl with g_sched_ctx.
  *
@@ -509,32 +511,28 @@ xeros_ctx_restore_impl:
 
     /* ------------------------------------------------------------------ */
     /* Step 2b: Fix WINDOWSTART for new tasks (while interrupts masked)   */
-    /*   Set WS to mark only 3 windows as valid: WB, WB+1, WB+2.        */
-    /*   This covers the trampoline (entry + callx4) rotations.          */
-    /*   Only the first two rotations trigger window overflow:            */
-    /*     K→K+1: overflow saves K using a5 from K (= ctx->a5 = stack_top) */
-    /*     K+1→K+2: overflow saves K+1 using a5 from K+1 (= ctx->a9 = stack_top) */
-    /*   Subsequent rotations (wrapper entry, pxCode calls) go into       */
-    /*   windows NOT in WS, so no overflow occurs.                        */
-    /*   For resumed tasks, WS is already correct — skip the write.      */
+    /*   Set ALL 16 window bits as valid (0xFFFF).                        */
+    /*                                                                  */
+    /*   The full call chain rotates through 5 windows:                  */
+    /*     K → K+1 (trampoline entry)                                   */
+    /*     K+1 → K+2 (trampoline callx4 → wrapper)                      */
+    /*     K+2 → K+3 (wrapper entry)                                    */
+    /*     K+3 → K+4 (wrapper callx4 → pxCode)                          */
+    /*     K+4 → K+3 (pxCode retw → wrapper)                            */
+    /*     K+3 → K+2 (wrapper retw → trampoline cleanup)                */
+    /*                                                                  */
+    /*   A targeted 3-window mask (WB, WB+1, WB+2) was insufficient:   */
+    /*   the wrapper's entry instruction rotates to K+3, which was NOT  */
+    /*   in the mask, causing a window underflow exception.              */
+    /*                                                                  */
+    /*   0xFFFF is safe: overflow handler spills using a5 = stack_top   */
+    /*   (set by ctx_init), so even unused windows spill harmlessly.    */
+    /*   FreeRTOS uses the same 0xFFFF approach for new tasks.          */
+    /*                                                                  */
+    /*   For resumed tasks, WS is already correct — skip the write.     */
     /* ------------------------------------------------------------------ */
-    rsr     a3, WINDOWBASE          /* a3 = current WB (0-15) */
-    movi    a4, 1
-    movi    a5, 0                   /* a5 = accumulator */
-    ssl     a3                      /* SAR = WB */
-    sll     a6, a4                  /* a6 = 1 << WB */
-    or      a5, a5, a6
-    addi    a3, a3, 1
-    extui   a3, a3, 0, 4            /* a3 = (WB+1) & 0xF */
-    ssl     a3
-    sll     a6, a4                  /* a6 = 1 << ((WB+1) & 0xF) */
-    or      a5, a5, a6
-    addi    a3, a3, 1
-    extui   a3, a3, 0, 4            /* a3 = (WB+2) & 0xF */
-    ssl     a3
-    sll     a6, a4                  /* a6 = 1 << ((WB+2) & 0xF) */
-    or      a5, a5, a6              /* a5 = (1<<WB)|(1<<(WB+1))|(1<<(WB+2)) */
-    wsr     a5, WINDOWSTART
+    movi    a3, 0xFFFF
+    wsr     a3, WINDOWSTART
     rsync
 
 .L_ws_done:

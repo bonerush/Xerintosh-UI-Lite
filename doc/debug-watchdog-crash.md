@@ -1022,4 +1022,69 @@ xeros_task_wrapper:
 - [x] wrapper 改为汇编实现，使用 callx4（修复 callx8/call4 不匹配）
 - [x] trampoline 改为 callx4（跨段可靠调用）
 - [x] 移除调试标记
+
+---
+
+### 会话 8: UI 任务不执行 — WINDOWSTART 掩码不足 (2026-06-25)
+
+**现象:** 看门狗崩溃修复后，设备正常启动到 "Kernel boot complete, entering scheduler loop"，
+但 UI 任务和 idle 任务从未执行（无 UART 输出）。
+
+**对比 FreeRTOS 版本:**
+- FreeRTOS 版本的 `main.cpp` 主循环与原生调度器共享同一代码路径
+- `kern_port_preempt_consume()` 通过 `tick_timer_consume()` 工作（GPTimer ISR 设置标志）
+- `kern_mpu_apply()` 是空操作（ESP32 无 MPU）
+- 调度逻辑本身正确：RR 时间片递减 → `g_need_resched = true` → `pick_next_ready()`
+
+**根因分析:**
+
+WINDOWSTART 掩码只设置了 3 个窗口位（K, K+1, K+2），但完整的调用链需要 5 个窗口：
+
+```
+ctx_restore_impl (WB=K)
+  → jx trampoline (WB=K)
+    → entry sp, 0 (WB=K→K+1, 旋转 +1)
+      → callx4 wrapper (WB=K+1→K+2, 旋转 +1)
+        → entry a1, 16 (WB=K+2→K+3, 旋转 +1)  ← K+3 不在 WINDOWSTART 中!
+          → callx4 pxCode (WB=K+3→K+4, 旋转 +1)
+```
+
+当 wrapper 的 `entry` 指令尝试旋转到 K+3 时，WINDOWSTART 的 bit K+3 = 0，
+触发窗口下溢异常（window underflow exception）。异常处理器尝试从溢出区恢复寄存器，
+但该窗口从未被溢出保存，导致加载垃圾数据 → 崩溃或挂起。
+
+**代码中的矛盾:**
+- 注释（第 83 行）说 "WINDOWSTART = 0xFFFF ensures all windows are valid"
+- 但实际代码只设置了 3 个位
+- FreeRTOS 使用 0xFFFF 设置所有 16 个窗口位
+
+**修复:** 将 WINDOWSTART 从定向 3 窗口掩码改为 0xFFFF（所有 16 个窗口有效）：
+
+```asm
+/* 修复前：只设置 3 个窗口 */
+rsr     a3, WINDOWBASE
+movi    a4, 1
+movi    a5, 0
+ssl     a3
+sll     a6, a4
+or      a5, a5, a6
+/* ... 设置 WB+1, WB+2 ... */
+wsr     a5, WINDOWSTART
+
+/* 修复后：设置所有 16 个窗口 */
+movi    a3, 0xFFFF
+wsr     a3, WINDOWSTART
+```
+
+0xFFFF 是安全的：溢出处理器使用 a5 = stack_top（由 ctx_init 设置）作为保存基址，
+即使未使用的窗口被溢出，也只是将栈顶附近的内存写入溢出区（无害）。
+
+**验证方法:** 在 kern_sched_tick()、idle_entry()、ui_task_main() 中添加直接 UART 输出
+（写入 0x3FF40000），追踪调度器是否在运行、任务是否被选中、上下文切换是否成功。
+
+### 会话 8 最终状态
+
+- [x] WINDOWSTART 改为 0xFFFF（修复窗口下溢异常）
+- [x] 调试输出已添加（待设备连接后验证）
+- [ ] 需要刷入固件并验证 UI 任务正常执行
 - [x] 实机验证：设备稳定启动，30 秒无 watchdog 崩溃 ✅

@@ -44,6 +44,13 @@ void ui_task_main(void *arg)
     (void)arg;
     static int frame = 0;
 
+    /* DEBUG: direct UART write to confirm UI task starts */
+    volatile uint32_t *uart = (volatile uint32_t *)0x3FF40000;
+    *uart = 'U';
+    *uart = 'I';
+    *uart = ':';
+    *uart = '\n';
+
     kern_log(KERN_LOG_INFO, "ui_task_main started");
 
     for (;;) {
