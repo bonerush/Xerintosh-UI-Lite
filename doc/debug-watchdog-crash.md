@@ -777,8 +777,7 @@ mov     a2, a15                 /* 恢复 ctx 指针 */
 
 - [x] CALLINC=1 call4 trampoline 实现
 - [x] a1 (SP) 加载修复
-- [x] xthal_window_spill_nw 修复
-- [ ] 实机验证（需要烧录测试）
+- [x] xthal_window_spill_nw 修复（已撤回，见会话 5）
 
 ### 下次调试排除路径
 
@@ -786,3 +785,129 @@ mov     a2, a15                 /* 恢复 ctx 指针 */
 2. ✅ ~~call0 ABI~~ — call4 trampoline 方案可行，只需修复 SP
 3. ✅ ~~ctx 结构体被破坏~~ — 结构体本身没问题，是寄存器未加载
 4. 待验证：蹦床的 entry sp, 0 窗口旋转是否还需要其他修复
+
+---
+
+## 会话 5: xthal_window_spill_nw 反汇编分析与撤回 (2026-06-25)
+
+### 思路
+
+会话 4 添加了 `xthal_window_spill_nw` 调用，但设备仍未验证。进一步分析该函数的
+实际实现，发现它**不适合在上下文切换代码中使用**。
+
+### 反汇编分析
+
+对 ESP-IDF 中的 `xthal_window_spill_nw` 进行反汇编分析，发现：
+
+```
+xthal_window_spill_nw:
+    # 注意：没有 entry 指令！
+    # 内部使用 rotw 旋转窗口
+    # 使用 a9 作为 SP 链的基址
+    ...
+```
+
+**关键发现：**
+
+1. **无 entry 指令**：该函数使用 `call0` 调用约定，不旋转窗口
+2. **内部使用 rotw**：手动旋转窗口来遍历所有窗口
+3. **依赖 a9 寄存器链**：使用 a9 作为每个窗口的 SP 来计算刷写目标地址
+4. **假设正常调用链**：a9 由正常的 `entry` 指令在函数调用时设置
+
+### 问题所在
+
+我们的上下文切换通过 `ctx_save` 创建窗口，**不是**通过正常的函数调用链。
+这意味着：
+
+```
+正常函数调用链：
+  main() → task_A() → task_B()
+  每个 entry 指令都会设置 a9 = sp - N
+  a9 链正确，xthal_window_spill_nw 可以找到每个窗口的 SP
+
+我们的 ctx_save：
+  kern_sched_tick() → ctx_save() → [保存寄存器到 ctx]
+  ctx 中的 a9 值可能是 0 或垃圾值
+  xthal_window_spill_nw 使用垃圾 a9 作为刷写目标 → 内存损坏！
+```
+
+### 中文伪代码拆解
+
+```
+函数 xthal_window_spill_nw() {
+
+    // 该函数没有 entry 指令，使用 call0 ABI
+    // 内部逻辑：
+
+    当前WB = 读取 WINDOWBASE 寄存器
+
+    遍历每个窗口 (i = 0 到 15) {
+        目标WB = (当前WB + i) % 16
+
+        // ★ 关键问题：使用 a9 作为该窗口的 SP
+        // a9 在正常调用链中由 entry 指令设置
+        // 但我们通过 ctx_save 创建的窗口没有正确的 a9！
+
+        SP_该窗口 = a9  // ← 这个 a9 可能是垃圾值！
+
+        if (窗口脏了) {
+            将 a0-a3 写入到 SP_该窗口 - 16  // ← 写入垃圾地址！
+        }
+
+        rotw(1)  // 旋转到下一个窗口
+    }
+}
+```
+
+### 修复
+
+**移除 `xthal_window_spill_nw` 调用**。改为依赖蹦床的 `entry sp, 0` 指令
+触发的窗口溢出异常处理器来正确刷写旧窗口。
+
+```asm
+/* 旧代码（已移除）：*/
+mov     a15, a2
+rsr     a3, PS
+/* ... 清除 WOE, 设置 INTLEVEL=3 ... */
+wsr     a3, PS
+rsync
+call0   xthal_window_spill_nw   /* ← 危险！a9 链不正确 */
+mov     a2, a15
+rsil    a3, 3
+
+/* 新代码：*/
+rsil    a3, 3                   /* INTLEVEL = XCHAL_EXCM_LEVEL */
+```
+
+### 窗口溢出异常处理器的工作原理
+
+当蹦床执行 `entry sp, 0` (CALLINC=1) 时：
+
+1. 窗口旋转：WB = K → K+1
+2. 旧窗口 (K) 的寄存器需要刷写到内存
+3. 硬件触发窗口溢出异常
+4. **异常处理器使用旧窗口的 SP（物理寄存器 R[K*4+1]）**
+5. 我们在 ctx_restore_impl 中加载了 `a1 = ctx->a1 = stack_top`
+6. stack_top 是有效的栈地址 → 刷写成功！
+
+**关键区别：**
+- `xthal_window_spill_nw` 使用 **a9** 作为 SP（需要正确的调用链）
+- 窗口溢出异常处理器使用 **物理寄存器 R[K*4+1]**（即旧窗口的 a1）
+- 我们确保了 ctx->a1 = stack_top，所以旧窗口的 a1 是有效的
+
+### 下次调试排除路径（更新）
+
+1. ✅ ~~禁用 WOE~~ — 不是 WOE 的问题
+2. ✅ ~~call0 ABI~~ — call4 trampoline 方案可行
+3. ✅ ~~ctx 结构体被破坏~~ — 结构体本身没问题
+4. ✅ ~~xthal_window_spill_nw~~ — 不安全，a9 链不正确
+5. 待验证：蹦床的 entry sp, 0 窗口溢出异常处理器能否正确刷写旧窗口
+6. 待验证：WINDOWSTART 设置为 0xFFFF 是否能防止窗口下溢异常
+
+### 状态
+
+- [x] CALLINC=1 call4 trampoline 实现
+- [x] a1 (SP) 加载修复
+- [x] xthal_window_spill_nw 移除（不安全）
+- [x] WINDOWSTART = 0xFFFF 设置
+- [ ] 实机验证（需要烧录测试）

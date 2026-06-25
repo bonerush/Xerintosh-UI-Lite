@@ -426,31 +426,14 @@ xeros_ctx_restore_impl:
     s32i    a4, a3, 0
 
     /* ------------------------------------------------------------------ */
-    /* Step 1: Spill all register windows (FreeRTOS pattern)              */
-    /*   Must spill BEFORE restoring context to prevent window overflow   */
-    /*   exceptions during the restore process.                           */
-    /*   xthal_window_spill_nw clobbers a2-a5, so save ctx first.        */
-    /* ------------------------------------------------------------------ */
-    mov     a15, a2                 /* save ctx pointer in callee-saved a15 */
-    rsr     a3, PS                  /* get current PS */
-    /* Clear WOE (bit 18 = 0x40000) */
-    movi    a4, 0x40
-    slli    a4, a4, 12              /* a4 = 0x00040000 */
-    movi    a5, -1
-    xor     a4, a5, a4              /* a4 = ~0x00040000 = 0xFFFBFFFF */
-    and     a3, a3, a4              /* clear WOE */
-    /* Clear INTLEVEL (bits 3:0) and set to 3 */
-    movi    a4, 0xF
-    xor     a4, a5, a4              /* a4 = ~0xF = 0xFFFFFFF0 */
-    and     a3, a3, a4              /* clear INTLEVEL */
-    addi    a3, a3, 3               /* INTLEVEL=3 (mask interrupts) */
-    wsr     a3, PS
-    rsync
-    call0   xthal_window_spill_nw   /* spill all windows to memory */
-    mov     a2, a15                 /* restore ctx pointer */
-
-    /* ------------------------------------------------------------------ */
-    /* Step 2: Disable interrupts to prevent corruption during restore    */
+    /* Step 1: Disable interrupts to prevent corruption during restore    */
+    /*   NOTE: We do NOT call xthal_window_spill_nw here.                */
+    /*   That function assumes a9 register chain is set up by normal     */
+    /*   function calls, but our windows were created by ctx_save which  */
+    /*   doesn't establish the a9 chain. Calling it would corrupt memory. */
+    /*   Instead, we ensure the old window's SP (ctx->a1) is valid so    */
+    /*   that the trampoline's `entry` instruction can trigger a window  */
+    /*   overflow exception that correctly spills the old window.         */
     /* ------------------------------------------------------------------ */
     rsil    a3, 3                   /* INTLEVEL = XCHAL_EXCM_LEVEL */
 
