@@ -94,16 +94,16 @@ void xeros_set_ps(uint32_t ps)
  *   2. ctx_restore_impl 设置 WINDOWSTART=0xFFFF
  *   3. ctx_restore_impl 恢复 GPR 后 jx 到蹦床
  *   4. 蹦床: entry sp, 0 (CALLINC=1: 旋转窗口 +1)
- *   5. 蹦床: call4 xeros_task_wrapper
- *   6. 包装函数: entry a1, N (CALLINC=1: 旋转窗口 +1)
- *   7. 包装函数: pxCode(pvParameters) → 任务执行
- *   8. 任务返回后: kern_exit()
+ *   5. 蹦床: call4 xeros_task_wrapper (CALLINC=1: 旋转窗口 +1)
+ *   6. 包装函数: pxCode(pvParameters) → 任务执行
+ *   7. 任务返回后: kern_exit()
  *
- * 寄存器映射（ctx_restore_impl 加载后 → 蹦床 call4 后 → 包装函数看到）：
- *   ctx->a2 = 清理处理器地址 → 蹦床 a2 → 包装函数 a0 (retw 返回地址)
- *   ctx->a3 = 栈顶          → 蹦床 a3 → 包装函数 a1 (SP)
- *   ctx->a4 = entry 函数     → 蹦床 a4 → 包装函数 a2 (pxCode)
- *   ctx->a5 = arg            → 蹦床 a5 → 包装函数 a3 (pvParameters)
+ * 寄存器映射（关键：两次旋转，每次 +1，共 +2）：
+ *   ctx_restore_impl 加载后 (WB=K) → entry 旋转后 (WB=K+1) → call4 旋转后 (WB=K+2)：
+ *   ctx->a8 → 蹦床 a4 → 包装函数 a0 (retw 返回地址 = 清理处理器)
+ *   ctx->a9 → 蹦床 a5 → 包装函数 a1 (SP = 栈顶)
+ *   ctx->a10 → 蹦床 a6 → 包装函数 a2 (pxCode = entry 函数)
+ *   ctx->a11 → 蹦床 a7 → 包装函数 a3 (pvParameters = arg)
  *
  * @param[out] ctx         指向要初始化的上下文结构体
  * @param[in]  stack_base  栈内存的起始地址（低地址端）
@@ -121,16 +121,14 @@ void xeros_ctx_init_assembler(kern_ctx_native_t *ctx,
 
     uint32_t stack_top = ((uint32_t)stack_base + stack_size) & ~(uint32_t)0xF;
 
-    /* 蹦床通过 call4 调用包装函数。call4 的寄存器映射：
-     *   蹦床 a2 → 包装函数 a0 = 清理处理器（retw 返回地址）
-     *   蹦床 a3 → 包装函数 a1 = 栈顶（SP）
-     *   蹦床 a4 → 包装函数 a2 = pxCode（entry 函数）
-     *   蹦床 a5 → 包装函数 a3 = pvParameters（arg） */
+    /* 两次窗口旋转 (entry + call4)，每次 CALLINC=1，共旋转 +2。
+     * 第一次旋转后：trampoline a4 = old a8, a5 = old a9, a6 = old a10, a7 = old a11。
+     * 第二次旋转后：wrapper a0 = trampoline a4, a1 = a5, a2 = a6, a3 = a7。 */
     ctx->a1 = stack_top;                              /* 旧窗口 SP：蹦床 entry 旋转时需要有效 SP */
-    ctx->a2 = (uint32_t)xeros_task_cleanup_handler;  /* → 包装函数 a0 = retw 返回地址 */
-    ctx->a3 = stack_top;                              /* → 包装函数 a1 = SP */
-    ctx->a4 = (uint32_t)entry;                        /* → 包装函数 a2 = pxCode */
-    ctx->a5 = (uint32_t)arg;                          /* → 包装函数 a3 = pvParameters */
+    ctx->a8 = (uint32_t)xeros_task_cleanup_handler;  /* → 蹦床 a4 → 包装函数 a0 = retw 返回地址 */
+    ctx->a9 = stack_top;                              /* → 蹦床 a5 → 包装函数 a1 = SP */
+    ctx->a10 = (uint32_t)entry;                       /* → 蹦床 a6 → 包装函数 a2 = pxCode */
+    ctx->a11 = (uint32_t)arg;                         /* → 蹦床 a7 → 包装函数 a3 = pvParameters */
 
     ctx->pc = (uint32_t)xeros_task_trampoline;        /* 新/旧任务检测标记 */
     ctx->ps = 0x00040023;                             /* CALLINC=1, WOE=1, UM=1, INTLEVEL=3 */

@@ -110,20 +110,26 @@ xeros_ps_init:
  *   a2 = ctx, a3 = stack_base, a4 = stack_size, a5 = entry, a6 = arg
  *
  * New task context layout (CALLINC=1, trampoline + call4 wrapper):
- *   ctx->a2 = &xeros_task_cleanup_handler  (→ wrapper a0 = retw return addr)
- *   ctx->a3 = aligned stack top            (→ wrapper a1 = SP)
- *   ctx->a4 = entry function               (→ wrapper a2 = pxCode)
- *   ctx->a5 = arg                          (→ wrapper a3 = pvParameters)
+ *   ctx->a8 = &xeros_task_cleanup_handler  (→ wrapper a0 = retw return addr)
+ *   ctx->a9 = aligned stack top            (→ wrapper a1 = SP)
+ *   ctx->a10 = entry function              (→ wrapper a2 = pxCode)
+ *   ctx->a11 = arg                         (→ wrapper a3 = pvParameters)
  *   ctx->pc = &xeros_task_trampoline       (marker to detect new vs resumed)
  *   ctx->ps = 0x00040023                   (CALLINC=1, WOE=1, UM=1, INTLEVEL=3)
  *
  * Execution flow for new tasks (CALLINC=1, WOE=1):
  *   ctx_restore_impl(call0) sets PS.CALLINC=1, WOE=1, INTLEVEL=3
  *   ctx_restore_impl sets WINDOWSTART=0xFFFF (all windows valid)
- *   ctx_restore_impl loads all GPR from ctx, then jx a5 (= trampoline)
+ *   ctx_restore_impl loads all GPR from ctx, then jx a0 (= trampoline)
  *   trampoline: entry sp, 0 (CALLINC=1: rotate +1)
- *   trampoline: call4 xeros_task_wrapper (CALLINC=1 matches)
- *   wrapper: entry a1, N (CALLINC=1: rotate +1); pxCode(pvParameters); kern_exit()
+ *   trampoline: call4 xeros_task_wrapper (CALLINC=1: rotate +1)
+ *   wrapper: pxCode(pvParameters); kern_exit()
+ *
+ * Register mapping (two rotations of +1 each = total +2):
+ *   ctx->a8  → trampoline a4 → wrapper a0 (cleanup handler)
+ *   ctx->a9  → trampoline a5 → wrapper a1 (stack_top / SP)
+ *   ctx->a10 → trampoline a6 → wrapper a2 (pxCode)
+ *   ctx->a11 → trampoline a7 → wrapper a3 (pvParameters)
  */
     .global xeros_ctx_init
     .type   xeros_ctx_init, @function
@@ -149,9 +155,9 @@ xeros_ctx_init:
     s32i    a4, a2, 32              /* ctx->a8  = 0 (overwritten below) */
     s32i    a4, a2, 36              /* ctx->a9  = 0 (overwritten below) */
     s32i    a4, a2, 40              /* ctx->a10 = 0 (overwritten below) */
-    s32i    a4, a2, 44              /* ctx->a11 = 0 */
+    s32i    a4, a2, 44              /* ctx->a11 = 0 (overwritten below) */
     s32i    a4, a2, 48              /* ctx->a12 = 0 */
-    s32i    a4, a2, 52              /* ctx->a13 = 0 (overwritten below) */
+    s32i    a4, a2, 52              /* ctx->a13 = 0 */
     s32i    a4, a2, 56              /* ctx->a14 = 0 */
     s32i    a4, a2, 60              /* ctx->a15 = 0 */
     s32i    a4, a2, 64              /* ctx->sar      = 0 */
@@ -163,16 +169,15 @@ xeros_ctx_init:
 
     /* Step 3: Set register targets for CALLINC=1 trampoline + call4 wrapper
      *
-     * ctx_restore_impl loads all GPR, then jumps to trampoline.
-     * Trampoline's entry sp, 0 (CALLINC=1) rotates window +1.
-     * After rotation, trampoline calls wrapper via call4.
-     * call4 maps: trampoline a2→wrapper a0, a3→a1, a4→a2, a5→a3. */
+     * Two rotations of CALLINC=1 = total rotation +2.
+     * First rotation (entry): a4←old a8, a5←old a9, a6←old a10, a7←old a11
+     * Second rotation (call4): wrapper a0←trampoline a4, a1←a5, a2←a6, a3←a7 */
     s32i    a3, a2, 4               /* ctx->a1 = stack_top (SP for old window spill during trampoline entry) */
     movi    a7, xeros_task_cleanup_handler
-    s32i    a7, a2, 8               /* ctx->a2 = cleanup handler (→ wrapper a0 = retw addr) */
-    s32i    a3, a2, 12              /* ctx->a3 = stack_top (→ wrapper a1 = SP) */
-    s32i    a5, a2, 16              /* ctx->a4 = entry function (→ wrapper a2 = pxCode) */
-    s32i    a6, a2, 20              /* ctx->a5 = arg (→ wrapper a3 = pvParameters) */
+    s32i    a7, a2, 32              /* ctx->a8 = cleanup handler (→ trampoline a4 → wrapper a0) */
+    s32i    a3, a2, 36              /* ctx->a9 = stack_top (→ trampoline a5 → wrapper a1 = SP) */
+    s32i    a5, a2, 40              /* ctx->a10 = entry function (→ trampoline a6 → wrapper a2 = pxCode) */
+    s32i    a6, a2, 44              /* ctx->a11 = arg (→ trampoline a7 → wrapper a3 = pvParameters) */
 
     /* Step 4: Set trampoline as PC (ctx_restore_impl uses this to detect new tasks) */
     movi    a7, xeros_task_trampoline
@@ -421,12 +426,36 @@ xeros_ctx_restore_impl:
     s32i    a4, a3, 0
 
     /* ------------------------------------------------------------------ */
-    /* Step 1: Disable interrupts to prevent corruption during restore    */
+    /* Step 1: Spill all register windows (FreeRTOS pattern)              */
+    /*   Must spill BEFORE restoring context to prevent window overflow   */
+    /*   exceptions during the restore process.                           */
+    /*   xthal_window_spill_nw clobbers a2-a5, so save ctx first.        */
+    /* ------------------------------------------------------------------ */
+    mov     a15, a2                 /* save ctx pointer in callee-saved a15 */
+    rsr     a3, PS                  /* get current PS */
+    /* Clear WOE (bit 18 = 0x40000) */
+    movi    a4, 0x40
+    slli    a4, a4, 12              /* a4 = 0x00040000 */
+    movi    a5, -1
+    xor     a4, a5, a4              /* a4 = ~0x00040000 = 0xFFFBFFFF */
+    and     a3, a3, a4              /* clear WOE */
+    /* Clear INTLEVEL (bits 3:0) and set to 3 */
+    movi    a4, 0xF
+    xor     a4, a5, a4              /* a4 = ~0xF = 0xFFFFFFF0 */
+    and     a3, a3, a4              /* clear INTLEVEL */
+    addi    a3, a3, 3               /* INTLEVEL=3 (mask interrupts) */
+    wsr     a3, PS
+    rsync
+    call0   xthal_window_spill_nw   /* spill all windows to memory */
+    mov     a2, a15                 /* restore ctx pointer */
+
+    /* ------------------------------------------------------------------ */
+    /* Step 2: Disable interrupts to prevent corruption during restore    */
     /* ------------------------------------------------------------------ */
     rsil    a3, 3                   /* INTLEVEL = XCHAL_EXCM_LEVEL */
 
     /* ------------------------------------------------------------------ */
-    /* Step 2: Restore special registers from context                     */
+    /* Step 3: Restore special registers from context                     */
     /*   a2 = ctx (call0 arg register). a3 used as scratch.              */
     /* ------------------------------------------------------------------ */
     l32i    a3, a2, 64              /* a3 = ctx->sar */
@@ -542,28 +571,27 @@ xeros_ctx_restore_impl:
     /* New task: CALLINC=1, jump to trampoline.
      *
      * Load all GPR from context. a0 = trampoline address (jx target).
-     * a2 = ctx->a2 (cleanup), a3 = ctx->a3 (stack_top),
-     * a4 = ctx->a4 (entry/pxCode), a5 = ctx->a5 (arg/pvParameters).
-     *
-     * Trampoline uses a2/a3/a4/a5 after its `entry sp, 0` rotation.
-     * Then call4 maps: a2→a0, a3→a1, a4→a2, a5→a3 for the wrapper. */
+     * Two rotations (entry + call4) shift registers by +2:
+     *   ctx->a8  → trampoline a4 → wrapper a0 (cleanup handler)
+     *   ctx->a9  → trampoline a5 → wrapper a1 (stack_top / SP)
+     *   ctx->a10 → trampoline a6 → wrapper a2 (pxCode)
+     *   ctx->a11 → trampoline a7 → wrapper a3 (pvParameters) */
     l32i    a0, a2, 92              /* a0 = ctx->pc = trampoline (jx target) */
     l32i    a1, a2, 4               /* a1 = ctx->a1 (SP: old window needs valid SP for entry spill) */
-    l32i    a3, a2, 12              /* a3 = ctx->a3 (stack_top) */
-    l32i    a4, a2, 16              /* a4 = ctx->a4 (entry/pxCode) */
-    l32i    a5, a2, 20              /* a5 = ctx->a5 (arg/pvParameters) */
+    l32i    a3, a2, 12              /* a3 = ctx->a3 */
+    l32i    a4, a2, 16              /* a4 = ctx->a4 */
+    l32i    a5, a2, 20              /* a5 = ctx->a5 */
     l32i    a6, a2, 24              /* a6 = ctx->a6 */
     l32i    a7, a2, 28              /* a7 = ctx->a7 */
-    l32i    a8, a2, 32              /* a8 = ctx->a8 */
-    l32i    a9, a2, 36              /* a9 = ctx->a9 */
-    l32i    a10, a2, 40             /* a10 = ctx->a10 */
-    l32i    a11, a2, 44             /* a11 = ctx->a11 */
+    l32i    a8, a2, 32              /* a8 = ctx->a8 (cleanup handler) */
+    l32i    a9, a2, 36              /* a9 = ctx->a9 (stack_top) */
+    l32i    a10, a2, 40             /* a10 = ctx->a10 (entry/pxCode) */
+    l32i    a11, a2, 44             /* a11 = ctx->a11 (arg/pvParameters) */
     l32i    a12, a2, 48             /* a12 = ctx->a12 */
     l32i    a13, a2, 52             /* a13 = ctx->a13 */
     l32i    a14, a2, 56             /* a14 = ctx->a14 */
     l32i    a15, a2, 60             /* a15 = ctx->a15 */
-    l32i    a2, a2, 8               /* a2 = ctx->a2 (cleanup handler, overwrites base -- LAST) */
-    jx      a0                      /* jump to trampoline */
+    jx      a0                      /* jump to trampoline (a2 not needed, trampoline uses a4-a7 after rotation) */
 
     .size   xeros_ctx_restore_impl, . - xeros_ctx_restore_impl
 

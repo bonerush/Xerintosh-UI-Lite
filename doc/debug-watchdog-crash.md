@@ -608,3 +608,181 @@ callee 的 entry sp,32 执行 `sp = a1 - 32`。
 - [x] WOE 修复（PS = 0x00000020）
 - [x] 双重旋转寄存器映射修复（ctx->a2 = arg, ctx->a9 = stack_top）
 - [ ] 实机验证（需要烧录测试）
+
+---
+
+## 会话 3: CALLINC=1 call4 trampoline 实现与调试 (2026-06-25)
+
+### 思路
+
+将上下文切换从 callx8+entry（双重窗口旋转）改为 call4 trampoline + C wrapper 方案，
+与 FreeRTOS ESP32 port 的 vPortTaskWrapper 模式一致。
+
+### 实现内容
+
+**ctx_switch.S 重写：**
+- `xeros_ctx_save`: 无 entry 指令，停留在 kern_sched_tick 的寄存器窗口
+- `xeros_ctx_restore`: call8 薄包装器 → call0 实现
+- `xeros_ctx_restore_impl`: call0 ABI，无窗口旋转
+- `xeros_task_trampoline`: entry sp, 0 (CALLINC=1) + call4 xeros_task_wrapper
+- PS = 0x00040023 (CALLINC=1, WOE=1, UM=1, INTLEVEL=3)
+
+**寄存器映射（ctx → 蹦床 → 包装函数）：**
+- ctx->a2 = 清理处理器 → 蹦床 a2 → 包装函数 a0 (retw 返回地址)
+- ctx->a3 = 栈顶 → 蹦床 a3 → 包装函数 a1 (SP)
+- ctx->a4 = entry 函数 → 蹦床 a4 → 包装函数 a2 (pxCode)
+- ctx->a5 = arg → 蹦床 a5 → 包装函数 a3 (pvParameters)
+
+### 崩溃日志 (第一次实机测试)
+
+```
+[  OK  ] Kernel boot complete, entering scheduler loop
+RNGuru Meditation Error: Core  0 panic'ed (Double exception).
+
+PC      : 0x40097cee  PS      : 0x00040636
+EXCCAUSE: 0x00000002  (InstrFetchProhibited)
+EXCVADDR: 0xffffffe0  (-32 = 无效地址)
+
+Backtrace: 0x40097ceb:_xt_context_save 0x400dc8c1:kern_sched_tick
+```
+
+### 崩溃分析
+
+**关键观察：**
+1. `EXCVADDR = 0xffffffe0` (-32) — 典型的空/无效栈指针问题
+2. 输出 "RNG" — 调试标记 'R' (ctx_restore_impl) + 'N' (新任务路径)
+3. Double Exception — 异常处理器本身崩溃（栈指针无效）
+4. Backtrace 显示 `_xt_context_save` — ESP-IDF 异常处理器的上下文保存
+
+**根本原因：**
+
+`ctx_restore_impl` 的新任务路径没有加载 a1（栈指针）！
+
+```asm
+.L_new_task:
+    l32i    a0, a2, 92    /* a0 = trampoline 地址 */
+    /* ★ 缺少: l32i a1, a2, 4  — 没有加载栈指针！ */
+    l32i    a3, a2, 12    /* a3 = stack_top */
+    ...
+    jx      a0            /* 跳转到蹦床 */
+```
+
+当蹦床执行 `entry sp, 0` (CALLINC=1) 时：
+1. 窗口旋转：WB = K → K+1
+2. 旧窗口 (K) 的寄存器需要刷写到内存
+3. 刷写使用旧窗口的 SP（物理寄存器 R[K*4+1]）
+4. **该 SP 从未被加载，是垃圾值 0**
+5. 写入地址 0 - 32 = 0xffffffe0 → 触发异常
+6. 异常处理器尝试保存上下文，但 SP 也是无效的 → Double Exception
+
+### 修复
+
+**ctx_init.c / ctx_switch.S：**
+- `ctx->a1 = stack_top` — 初始化时设置有效的栈指针
+- `ctx_restore_impl`: `l32i a1, a2, 4` — 恢复时加载栈指针
+
+### 状态
+
+- [x] CALLINC=1 call4 trampoline 实现
+- [x] a1 (SP) 加载修复
+- [ ] 实机验证（设备断开，需要重新连接）
+
+---
+
+### 会话 4: xthal_window_spill_nw 修复 (2026-06-25)
+
+### 思路
+
+研究 FreeRTOS ESP32 port 的上下文切换实现，发现关键差异：
+FreeRTOS 在切换上下文前调用 `xthal_window_spill_nw` 刷写所有寄存器窗口，
+而我们的实现没有这一步骤。
+
+### FreeRTOS 的关键模式
+
+```asm
+/* FreeRTOS vPortYield 中的窗口刷写 (portasm.S:568-579) */
+movi    a6,  ~(PS_WOE_MASK|PS_INTLEVEL_MASK)  /* 清除 WOE 和 INTLEVEL */
+and     a2,  a2, a6
+addi    a2,  a2, XCHAL_EXCM_LEVEL             /* 设置 INTLEVEL */
+wsr     a2,  XT_REG_PS
+rsync
+call0   xthal_window_spill_nw                 /* 刷写所有窗口 */
+l32i    a2,  sp, XT_SOL_PS                    /* 恢复 PS */
+wsr     a2,  XT_REG_PS
+```
+
+### 崩溃分析 (第二次实机测试)
+
+```
+[  OK  ] Kernel boot complete, entering scheduler loop
+RNGuru Meditation Error: Core  0 panic'ed (Double exception).
+
+PC      : 0x40097cee  PS      : 0x00040636
+EXCCAUSE: 0x00000002  (InstrFetchProhibited)
+EXCVADDR: 0x0000024a  (低地址，可能是旋转后的寄存器映射问题)
+
+Backtrace: 0x40097ceb:_xt_context_save 0x400dc8c1:kern_sched_tick
+```
+
+**关键观察：**
+1. EXCVADDR 从 0xffffffe0 变为 0x0000024a — SP 修复部分生效
+2. A0 = 0x800dc8c8 — 带有 CALLINC 位的地址（0x80xxxxxx = CALLINC=2）
+3. 仍然是 Double Exception — 异常处理器崩溃
+
+**根本原因分析：**
+
+蹦床的 `entry sp, 0` (CALLINC=1) 会旋转窗口。旋转时，旧窗口的寄存器
+需要刷写到内存。如果旧窗口的 SP 无效或内存不可写，就会触发异常。
+
+问题在于：我们没有在恢复上下文前刷写所有寄存器窗口。当蹦床旋转窗口时，
+硬件尝试刷写旧窗口，但旧窗口的 SP 可能指向无效内存。
+
+### 修复
+
+**ctx_switch.S：**
+在 `xeros_ctx_restore_impl` 开头添加 `xthal_window_spill_nw` 调用：
+
+```asm
+/* Step 1: Spill all register windows (FreeRTOS pattern) */
+mov     a15, a2                 /* 保存 ctx 指针到 callee-saved a15 */
+rsr     a3, PS                  /* 读取当前 PS */
+/* 清除 WOE (bit 18 = 0x40000) */
+movi    a4, 0x40
+slli    a4, a4, 12              /* a4 = 0x00040000 */
+movi    a5, -1
+xor     a4, a5, a4              /* a4 = ~0x00040000 = 0xFFFBFFFF */
+and     a3, a3, a4              /* 清除 WOE */
+/* 清除 INTLEVEL (bits 3:0) 并设置为 3 */
+movi    a4, 0xF
+xor     a4, a5, a4              /* a4 = ~0xF = 0xFFFFFFF0 */
+and     a3, a3, a4              /* 清除 INTLEVEL */
+addi    a3, a3, 3               /* INTLEVEL=3 (屏蔽中断) */
+wsr     a3, PS
+rsync
+call0   xthal_window_spill_nw   /* 刷写所有窗口到内存 */
+mov     a2, a15                 /* 恢复 ctx 指针 */
+```
+
+### 原理
+
+1. **清除 WOE**：防止刷写过程中触发窗口溢出异常
+2. **设置 INTLEVEL=3**：屏蔽中断，防止刷写过程中被中断
+3. **调用 xthal_window_spill_nw**：将所有寄存器窗口刷写到内存
+4. **恢复 ctx 指针**：因为 xthal_window_spill_nw 会破坏 a2-a5
+
+刷写后，所有窗口都在内存中，蹦床的 `entry sp, 0` 旋转窗口时
+不会触发溢出异常（因为窗口已经在内存中了）。
+
+### 状态
+
+- [x] CALLINC=1 call4 trampoline 实现
+- [x] a1 (SP) 加载修复
+- [x] xthal_window_spill_nw 修复
+- [ ] 实机验证（需要烧录测试）
+
+### 下次调试排除路径
+
+1. ✅ ~~禁用 WOE~~ — 不是 WOE 的问题，是 SP 未加载
+2. ✅ ~~call0 ABI~~ — call4 trampoline 方案可行，只需修复 SP
+3. ✅ ~~ctx 结构体被破坏~~ — 结构体本身没问题，是寄存器未加载
+4. 待验证：蹦床的 entry sp, 0 窗口旋转是否还需要其他修复

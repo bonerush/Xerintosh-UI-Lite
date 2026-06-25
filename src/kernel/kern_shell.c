@@ -472,7 +472,9 @@ static void shell_task_main(void *arg)
 {
     (void)arg;
 
+#if defined(XEROS_NATIVE_SCHED) || defined(NATIVE_TEST)
     debug_printf("[D] shell_task_main entered\n");
+#endif
 
     kern_fd_t tty = kern_open("/dev/ttyS0", KERN_O_RDWR);
     if (tty < 0) return;
