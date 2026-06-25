@@ -175,7 +175,7 @@ kern_pid_t kern_spawn(const char *name, void (*entry)(void *arg),
     task->stack_base = task->native_stack;
     task->stack_size = stack_sz;
     memset(task->stack_base, 0xAA, stack_sz);
-    xeros_ctx_init_assembler(task->native_ctx, task->native_stack, stack_sz, entry, arg);
+    xeros_ctx_init(task->native_ctx, task->native_stack, stack_sz, entry, arg);
     task_write_canary(task);
 
     kern_mpu_setup_stack_guard(task, task->stack_base, task->stack_size);

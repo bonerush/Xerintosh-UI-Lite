@@ -39,8 +39,7 @@ struct kern_task;
   /* Native: 使用 POSIX ucontext（无 FreeRTOS） */
   #define KERN_PORT_STACK_MIN  1024
 #elif defined(XEROS_NATIVE_SCHED)
-  /* ESP32 原生调度器：setjmp/longjmp + 手动栈管理 */
-  #include "kern_ctx_esp32.h"
+  /* ESP32 原生调度器：自定义上下文切换（ctx_switch.S） */
   #define KERN_PORT_STACK_MIN  4096
 #else
   /* ESP32 + FreeRTOS 任务容器（默认） */

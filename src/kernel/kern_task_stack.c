@@ -18,7 +18,6 @@
 #if defined(NATIVE_TEST)
 #include <ucontext.h>
 #elif defined(XEROS_NATIVE_SCHED)
-#include "kern_ctx_esp32.h"
 #include <setjmp.h>
 #endif
 
@@ -247,7 +246,7 @@ bool kern_task_stack_grow(kern_task_t *task, size_t new_size)
 #elif defined(XEROS_NATIVE_SCHED)
     /* 重新初始化原生上下文 */
     if (task->native_ctx != NULL) {
-        xeros_ctx_init_assembler(task->native_ctx, new_base, new_size, task->entry, task->arg);
+        xeros_ctx_init(task->native_ctx, new_base, new_size, task->entry, task->arg);
     }
 #endif
 

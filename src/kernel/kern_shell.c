@@ -21,10 +21,6 @@
 #include <string.h>
 #include <stdio.h>
 
-#if defined(XEROS_NATIVE_SCHED) || defined(NATIVE_TEST)
-#include "debug_serial.h"
-#endif
-
 /* ═══ 常量 ═══ */
 
 #define SHELL_BUF_SIZE    128      /* 输入行缓冲区 */
@@ -471,16 +467,6 @@ void shell_complete_command(kern_fd_t tty, char *line, size_t *pos,
 static void shell_task_main(void *arg)
 {
     (void)arg;
-
-#if defined(XEROS_NATIVE_SCHED) || defined(NATIVE_TEST)
-    /* NOTE: debug_printf uses vfprintf which needs FreeRTOS locks.
-     * Use direct UART write instead to avoid lock_acquire abort. */
-    {
-        volatile uint32_t *uart = (volatile uint32_t *)0x3FF40000;
-        const char *msg = "[D] shell_task_main entered\n";
-        for (int i = 0; msg[i]; i++) *uart = msg[i];
-    }
-#endif
 
     kern_fd_t tty = kern_open("/dev/ttyS0", KERN_O_RDWR);
     if (tty < 0) return;

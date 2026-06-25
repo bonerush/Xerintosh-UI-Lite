@@ -241,11 +241,6 @@ xeros_task_trampoline:
      * a6 = old a10 (entry), a7 = old a11 (arg). */
     entry   sp, 0                   /* CALLINC=1: rotate +1, alloc 0 bytes */
 
-    /* DEBUG: write '2' to UART0 TX FIFO */
-    movi    a2, 0x3FF40000
-    movi    a3, 50                  /* '2' */
-    s8i     a3, a2, 0
-
     /* call4 xeros_task_wrapper: maps a2→a0, a3→a1, a4→a2, a5→a3.
      * Wrapper sees: a0=cleanup, a1=stack_top, a2=pxCode, a3=pvParameters.
      * Wrapper's __attribute__((call4)) ensures callx4 for pxCode (CALLINC=1).
@@ -296,11 +291,6 @@ xeros_task_trampoline:
     .align  4
 xeros_task_wrapper:
     entry   a1, 16                  /* CALLINC=1: rotate +1, alloc 16-byte frame */
-
-    /* DEBUG: write '3' to UART0 TX FIFO */
-    movi    a4, 0x3FF40000
-    movi    a5, 51                  /* '3' */
-    s8i     a5, a4, 0
 
     /* After entry: a2 = pxCode, a3 = pvParameters.
      * Set up a2 = pvParameters (arg), call pxCode via callx4. */
@@ -492,11 +482,6 @@ xeros_ctx_restore:
 xeros_ctx_restore_impl:
     /* No entry instruction -- we stay in the caller's window. */
 
-    /* DEBUG: write '0' to UART0 TX FIFO (impl entry) */
-    movi    a3, 0x3FF40000
-    movi    a4, 48                  /* '0' */
-    s8i     a4, a3, 0
-
     /* ------------------------------------------------------------------ */
     /* Step 1: Interrupt masking                                          */
     /*   We do NOT use rsil here — it is a privileged instruction and    */
@@ -520,34 +505,14 @@ xeros_ctx_restore_impl:
     l32i    a3, a2, 64              /* a3 = ctx->sar */
     wsr     a3, SAR
 
-    /* DEBUG: write '1' after SAR */
-    movi    a3, 0x3FF40000
-    movi    a4, 49                  /* '1' */
-    s8i     a4, a3, 0
-
     l32i    a3, a2, 68              /* a3 = ctx->lbeg */
     wsr     a3, LBEG
-
-    /* DEBUG: write '2' after LBEG */
-    movi    a3, 0x3FF40000
-    movi    a4, 50                  /* '2' */
-    s8i     a4, a3, 0
 
     l32i    a3, a2, 72              /* a3 = ctx->lend */
     wsr     a3, LEND
 
-    /* DEBUG: write '3' after LEND */
-    movi    a3, 0x3FF40000
-    movi    a4, 51                  /* '3' */
-    s8i     a4, a3, 0
-
     l32i    a3, a2, 76              /* a3 = ctx->lcount */
     wsr     a3, LCOUNT
-
-    /* DEBUG: write '4' after LCOUNT */
-    movi    a3, 0x3FF40000
-    movi    a4, 52                  /* '4' */
-    s8i     a4, a3, 0
 
     /* ------------------------------------------------------------------ */
     /* Step 2b: Restore WINDOWBASE from context                           */
@@ -562,11 +527,6 @@ xeros_ctx_restore_impl:
     movi    a3, 0xFFFF
     wsr     a3, WINDOWSTART
     rsync
-
-    /* DEBUG: write 'C' (reached WINDOWSTART section) */
-    movi    a3, 0x3FF40000
-    movi    a4, 67                  /* 'C' */
-    s8i     a4, a3, 0
 
 .L_ws_done:
 
@@ -603,11 +563,6 @@ xeros_ctx_restore_impl:
 .L_ps_write:
     wsr     a3, PS
     rsync                           /* PS takes effect */
-
-    /* DEBUG: write 'P' to UART0 TX FIFO (after PS rsync) */
-    movi    a3, 0x3FF40000
-    movi    a4, 80                  /* 'P' */
-    s8i     a4, a3, 0
 
     /* Padding: ensure instruction alignment after PS restore */
     nop
@@ -668,11 +623,6 @@ xeros_ctx_restore_impl:
     l32i    a13, a2, 52             /* a13 = ctx->a13 */
     l32i    a14, a2, 56             /* a14 = ctx->a14 */
     l32i    a15, a2, 60             /* a15 = ctx->a15 */
-
-    /* DEBUG: write '1' to UART0 TX FIFO */
-    movi    a3, 0x3FF40000
-    movi    a4, 49                  /* '1' */
-    s8i     a4, a3, 0
 
     jx      a0                      /* jump to trampoline (a2 not needed, trampoline uses a4-a7 after rotation) */
 

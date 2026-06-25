@@ -116,18 +116,6 @@ void xeros_ctx_init(kern_ctx_native_t *ctx,
                     void *arg);
 
 /**
- * @brief 初始化新任务的上下文结构体（C 语言封装版）
- *
- * 与 xeros_ctx_init 功能完全等价的 C 实现，不依赖汇编。
- * 用于调试汇编版本问题时的替代方案。
- */
-void xeros_ctx_init_assembler(kern_ctx_native_t *ctx,
-                              void *stack_base,
-                              size_t stack_size,
-                              void (*entry)(void *),
-                              void *arg);
-
-/**
  * @brief 保存当前上下文（setjmp 语义，纯汇编实现）
  *
  * 将当前所有通用寄存器和特殊寄存器保存到 @p ctx 中。

@@ -212,8 +212,8 @@ void kern_sched_init(void) /* XEROS_NATIVE_SCHED */
     g_idle_task->stack_size = IDLE_STACK_MIN;
     memset(g_idle_task->stack_base, 0xAA, IDLE_STACK_MIN);
 
-    xeros_ctx_init_assembler(g_idle_task->native_ctx, g_idle_task->native_stack,
-                             IDLE_STACK_MIN, idle_entry, NULL);
+    xeros_ctx_init(g_idle_task->native_ctx, g_idle_task->native_stack,
+                   IDLE_STACK_MIN, idle_entry, NULL);
     task_write_canary(g_idle_task);
 
     g_task_list = g_idle_task;
@@ -379,39 +379,16 @@ void kern_sched_tick(void)
     sched_check_stack_pressure(g_current_task);
     sched_notify_memory_pressure();
 
-    /* DEBUG: trace scheduler entry */
-    static int s_dbg_tick = 0;
-    if (s_dbg_tick < 20) {
-        volatile uint32_t *uart = (volatile uint32_t *)0x3FF40000;
-        *uart = 'T';
-        s_dbg_tick++;
-    }
-
     if (g_need_resched || (g_current_task && g_current_task->state != KERN_TASK_RUNNING)) {
         g_need_resched = false;
         kern_task_t *next = pick_next_ready();
         if (next && next != g_current_task) {
-            /* DEBUG: trace task pick */
-            if (s_dbg_tick < 20) {
-                volatile uint32_t *uart = (volatile uint32_t *)0x3FF40000;
-                *uart = '>';
-                if (next->name[0]) *uart = next->name[0];
-            }
             g_current_task = next;
             kern_mpu_apply(next);
             if (next->state != KERN_TASK_SLEEPING) next->state = KERN_TASK_RUNNING;
             int save_ret = xeros_ctx_save(&g_sched_ctx);
             if (save_ret == 0) {
-                if (s_dbg_tick < 20) {
-                    volatile uint32_t *uart = (volatile uint32_t *)0x3FF40000;
-                    *uart = 'R';  /* about to restore */
-                }
                 xeros_ctx_restore(next->native_ctx);
-            }
-            /* returned from task yield/exit */
-            if (s_dbg_tick < 20) {
-                volatile uint32_t *uart = (volatile uint32_t *)0x3FF40000;
-                *uart = 'B';  /* back from task */
             }
         }
         return;
@@ -455,11 +432,6 @@ void kern_sched_tick(void) /* ESP32: FreeRTOS */
 void idle_entry(void *arg)
 {
     (void)arg;
-    volatile uint32_t *uart_fifo = (volatile uint32_t *)0x3FF40000;
-    *uart_fifo = 'I';
-    *uart_fifo = 'D';
-    *uart_fifo = 'L';
-    *uart_fifo = '\n';
     while (1) {
         kern_yield();
     }

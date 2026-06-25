@@ -31,7 +31,6 @@ extern "C" {
 #ifdef NATIVE_TEST
 typedef ucontext_t    kern_ctx_t;
 #elif defined(XEROS_NATIVE_SCHED)
-#include "kern_ctx_esp32.h"
 #include "esp32/ctx_switch.h"
 #endif
 
