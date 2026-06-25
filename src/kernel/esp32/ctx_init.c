@@ -126,6 +126,7 @@ void xeros_ctx_init_assembler(kern_ctx_native_t *ctx,
      *   蹦床 a3 → 包装函数 a1 = 栈顶（SP）
      *   蹦床 a4 → 包装函数 a2 = pxCode（entry 函数）
      *   蹦床 a5 → 包装函数 a3 = pvParameters（arg） */
+    ctx->a1 = stack_top;                              /* 旧窗口 SP：蹦床 entry 旋转时需要有效 SP */
     ctx->a2 = (uint32_t)xeros_task_cleanup_handler;  /* → 包装函数 a0 = retw 返回地址 */
     ctx->a3 = stack_top;                              /* → 包装函数 a1 = SP */
     ctx->a4 = (uint32_t)entry;                        /* → 包装函数 a2 = pxCode */

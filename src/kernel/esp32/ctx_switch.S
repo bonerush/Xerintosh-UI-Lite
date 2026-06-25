@@ -140,7 +140,6 @@ xeros_ctx_init:
     /* Step 2: Zero all registers in context */
     movi    a4, 0
     s32i    a4, a2, 0               /* ctx->a0  = 0 */
-    s32i    a4, a2, 4               /* ctx->a1  = 0 */
     s32i    a4, a2, 8               /* ctx->a2  = 0 */
     s32i    a4, a2, 12              /* ctx->a3  = 0 */
     s32i    a4, a2, 16              /* ctx->a4  = 0 */
@@ -168,6 +167,7 @@ xeros_ctx_init:
      * Trampoline's entry sp, 0 (CALLINC=1) rotates window +1.
      * After rotation, trampoline calls wrapper via call4.
      * call4 maps: trampoline a2→wrapper a0, a3→a1, a4→a2, a5→a3. */
+    s32i    a3, a2, 4               /* ctx->a1 = stack_top (SP for old window spill during trampoline entry) */
     movi    a7, xeros_task_cleanup_handler
     s32i    a7, a2, 8               /* ctx->a2 = cleanup handler (→ wrapper a0 = retw addr) */
     s32i    a3, a2, 12              /* ctx->a3 = stack_top (→ wrapper a1 = SP) */
@@ -548,6 +548,7 @@ xeros_ctx_restore_impl:
      * Trampoline uses a2/a3/a4/a5 after its `entry sp, 0` rotation.
      * Then call4 maps: a2→a0, a3→a1, a4→a2, a5→a3 for the wrapper. */
     l32i    a0, a2, 92              /* a0 = ctx->pc = trampoline (jx target) */
+    l32i    a1, a2, 4               /* a1 = ctx->a1 (SP: old window needs valid SP for entry spill) */
     l32i    a3, a2, 12              /* a3 = ctx->a3 (stack_top) */
     l32i    a4, a2, 16              /* a4 = ctx->a4 (entry/pxCode) */
     l32i    a5, a2, 20              /* a5 = ctx->a5 (arg/pvParameters) */
