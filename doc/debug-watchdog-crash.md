@@ -911,3 +911,115 @@ rsil    a3, 3                   /* INTLEVEL = XCHAL_EXCM_LEVEL */
 - [x] xthal_window_spill_nw 移除（不安全）
 - [x] WINDOWSTART = 0xFFFF 设置
 - [ ] 实机验证（需要烧录测试）
+
+---
+
+### 会话 7: CALLINC、WINDOWSTART 和调用约定修复 (2026-06-25)
+
+**思路:** 继续调试，修复三个关键问题。
+
+#### 问题 1: PS 常量中 CALLINC=0
+
+**现象:** PS 值 `0x00040023` 的 bits[17:16] = 00 (CALLINC=0)，但注释声称 CALLINC=1。
+
+**影响:** 蹦床的 `entry sp, 0` 指令在 CALLINC=0 时行为未定义，可能触发
+IllegalInstruction 异常。
+
+**修复:** 将 PS 常量改为 `0x00050023` (bits[17:16] = 01, CALLINC=1)。
+修改位置：
+- `ctx_switch.S` 行 92 (rodata 常量)
+- `ctx_switch.S` 行 188-189 (xeros_ctx_init)
+- `ctx_switch.S` 行 510 (ctx_restore_impl 新任务 PS 计算)
+- `ctx_init.c` 行 135 (xeros_ctx_init_assembler)
+
+#### 问题 2: WINDOWSTART=0xFFFF 导致无法修复的溢出
+
+**现象:** 设置 `WINDOWSTART=0xFFFF` 标记所有 16 个窗口为有效，导致每次旋转
+都触发窗口溢出。溢出处理器使用 OWB 窗口的 a5 作为 S32E 的基址。
+
+**分析:** 我们只能从当前窗口 (W) 设置 3 个窗口的 a5：
+- ctx->a5 (offset 20) → 窗口 W 的 a5
+- ctx->a9 (offset 36) → 窗口 W+1 的 a5
+- ctx->a13 (offset 52) → 窗口 W+2 的 a5
+
+窗口 W+3 到 W+15 的 a5 值无法控制（memset 清零或未初始化）。
+任何旋转到这些窗口都会用无效的 a5 执行 S32E → 写入 0xFFFFFFF0 → 崩溃。
+
+**修复:** 替换为定向 3 窗口掩码：
+```asm
+rsr     a3, WINDOWBASE          /* a3 = 当前 WB (0-15) */
+movi    a4, 1
+movi    a5, 0                   /* a5 = 累加器 */
+ssl     a3                      /* SAR = WB */
+sll     a6, a4                  /* a6 = 1 << WB */
+or      a5, a5, a6
+addi    a3, a3, 1
+extui   a3, a3, 0, 4            /* a3 = (WB+1) & 0xF */
+ssl     a3
+sll     a6, a4                  /* a6 = 1 << ((WB+1) & 0xF) */
+or      a5, a5, a6
+addi    a3, a3, 1
+extui   a3, a3, 0, 4            /* a3 = (WB+2) & 0xF */
+ssl     a3
+sll     a6, a4                  /* a6 = 1 << ((WB+2) & 0xF) */
+or      a5, a5, a6              /* a5 = (1<<WB)|(1<<(WB+1))|(1<<(WB+2)) */
+wsr     a5, WINDOWSTART
+rsync
+```
+
+**为什么 3 个窗口足够:**
+蹦床执行两次 CALLINC=1 旋转（entry + callx4）：
+1. K→K+1: 溢出保存 K，使用 a5 from K (= ctx->a5 = stack_top) ✓
+2. K+1→K+2: 溢出保存 K+1，使用 a5 from K+1 (= ctx->a9 = stack_top) ✓
+3. K+2→K+3: WINDOWSTART[K+3]=0，无溢出 ✓
+
+#### 问题 3: wrapper 使用 callx8 调用 call4 函数（根本原因）
+
+**现象:** 即使修复了 CALLINC 和 WINDOWSTART，设备仍然崩溃。
+
+**根本原因分析:**
+
+通过反汇编发现 wrapper 编译为 call4 ABI（entry 指令的 CALLINC=1），但内部使用
+`callx8` 调用 pxCode：
+
+```
+xeros_task_wrapper:
+   0:	004136    entry   a1, 32      ; CALLINC=1 (call4)
+   3:	03ad      mov.n   a10, a3     ; a10 = pvParameters
+   5:	0002e0    callx8  a2          ; callx8 pxCode ← 问题！
+   8:	000081    l32r    a8, ...
+   b:	0008e0    callx8  a8          ; callx8 kern_exit
+   e:	f01d      retw.n
+```
+
+`callx8` 设置 PS.CALLINC=2 并将返回地址存入 a8。但 pxCode（如 `idle_entry`）
+是 call4 函数，其 `retw.n` 从 a0 加载返回地址（CALLINC=1）。
+
+**返回地址不匹配:**
+- callx8 存储: a8 (CALLINC=2)
+- call4 的 retw.n 加载: a0 (CALLINC=1)
+- 结果: 跳转到错误地址 → 崩溃
+
+**修复:** 将 wrapper 移到汇编中（ctx_switch.S），显式使用 `callx4`：
+
+```asm
+xeros_task_wrapper:
+    entry   a1, 16              /* CALLINC=1: rotate +1 */
+    mov     a6, a2              /* a6 = pxCode */
+    mov     a2, a3              /* a2 = pvParameters */
+    callx4  a6                  /* CALLINC=1: call pxCode */
+    movi    a2, kern_exit
+    callx4  a2                  /* CALLINC=1: call kern_exit */
+```
+
+同时将蹦床从 `call4 xeros_task_wrapper` 改为 `callx4`（通过 literal pool），
+确保跨 IRAM/flash 段的调用可靠。
+
+### 最终状态
+
+- [x] CALLINC=1 PS 常量修复 (0x00040023 → 0x00050023)
+- [x] WINDOWSTART 定向 3 窗口掩码（替换 0xFFFF）
+- [x] wrapper 改为汇编实现，使用 callx4（修复 callx8/call4 不匹配）
+- [x] trampoline 改为 callx4（跨段可靠调用）
+- [x] 移除调试标记
+- [x] 实机验证：设备稳定启动，30 秒无 watchdog 崩溃 ✅

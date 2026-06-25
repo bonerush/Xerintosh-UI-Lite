@@ -25,34 +25,14 @@
  * @brief 任务蹦床符号（定义在 ctx_switch.S 中）
  *
  * ctx_restore_impl 通过 pc == xeros_task_trampoline 判断是否为新任务。
- * 蹦床通过 call4 调用 xeros_task_wrapper，使用 CALLINC=1 窗口旋转。
+ * 蹦床通过 callx4 调用 xeros_task_wrapper，使用 CALLINC=1 窗口旋转。
  * 蹦床符号仅用于新/旧任务判断。
  */
 extern void xeros_task_trampoline(void);
 extern void xeros_task_cleanup_handler(void);
 
-/* ========================================================================== */
-/*  任务包装函数                                                                */
-/* ========================================================================== */
-
-/**
- * @brief 任务包装函数 — 类似 FreeRTOS 的 vPortTaskWrapper
- *
- * 由蹦床通过 call4 调用，编译器生成 CALLINC=1 的 entry 指令。
- * 包装函数调用实际的任务入口函数，任务返回后调用 kern_exit() 清理。
- *
- * 调用链：
- *   蹦床 (call4) → 包装函数 (call4) → 任务入口函数
- *   窗口旋转：K → K+1(蹦床) → K+2(包装) → K+3(任务)
- *
- * @param pxCode      任务入口函数（call4 第一个参数，a0 旋转后）
- * @param pvParameters 任务参数（call4 第二个参数，a1 旋转后）
- */
-void xeros_task_wrapper(void (*pxCode)(void *), void *pvParameters)
-{
-    pxCode(pvParameters);
-    kern_exit();
-}
+/* xeros_task_wrapper 现在在 ctx_switch.S 中以汇编实现，
+ * 确保 callx4 调用 pxCode（而非编译器默认的 callx8）。 */
 
 /* ========================================================================== */
 /*  处理器状态寄存器 (PS) 读写辅助                                               */
@@ -125,13 +105,14 @@ void xeros_ctx_init_assembler(kern_ctx_native_t *ctx,
      * 第一次旋转后：trampoline a4 = old a8, a5 = old a9, a6 = old a10, a7 = old a11。
      * 第二次旋转后：wrapper a0 = trampoline a4, a1 = a5, a2 = a6, a3 = a7。 */
     ctx->a1 = stack_top;                              /* 旧窗口 SP：蹦床 entry 旋转时需要有效 SP */
+    ctx->a5 = stack_top;                              /* 溢出处理器 S32E 保存基址：entry 中止时 a5 未定义，必须预设 */
     ctx->a8 = (uint32_t)xeros_task_cleanup_handler;  /* → 蹦床 a4 → 包装函数 a0 = retw 返回地址 */
     ctx->a9 = stack_top;                              /* → 蹦床 a5 → 包装函数 a1 = SP */
     ctx->a10 = (uint32_t)entry;                       /* → 蹦床 a6 → 包装函数 a2 = pxCode */
     ctx->a11 = (uint32_t)arg;                         /* → 蹦床 a7 → 包装函数 a3 = pvParameters */
 
     ctx->pc = (uint32_t)xeros_task_trampoline;        /* 新/旧任务检测标记 */
-    ctx->ps = 0x00040023;                             /* CALLINC=1, WOE=1, UM=1, INTLEVEL=3 */
+    ctx->ps = 0x00050023;                             /* CALLINC=1, WOE=1, UM=1, INTLEVEL=3 */
 }
 
 #endif /* !NATIVE_TEST */
