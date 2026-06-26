@@ -198,7 +198,9 @@ static struct TtyS0DevInitializer {
         g_ttyS0_dev.name[KERN_NAME_MAX] = '\0';
         g_ttyS0_dev.type = KERN_DEV_CHAR;
         g_ttyS0_dev.ops  = &g_ttyS0_ops;
+#ifndef NATIVE_TEST
         xeros_spinlock_init(&g_ttyS0_mux);
+#endif
     }
 } g_ttyS0_dev_initializer;
 

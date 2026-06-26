@@ -12,6 +12,7 @@
 
 #include "kern_types.h"
 #include "kern_task.h"
+#include "kern_sync.h"
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -43,14 +44,16 @@ typedef struct kern_wait_node {
  */
 typedef struct {
     volatile int32_t   count;       /* 0 或 1 */
+    xeros_spinlock_t   lock;        /* SMP 保护 */
     kern_wait_node_t  *wait_queue;  /* 等待队列 */
 } kern_bin_sem_t;
 
-#define KERN_BIN_SEM_INIT(name)  { .count = 0, .wait_queue = NULL }
+#define KERN_BIN_SEM_INIT(name)  { .count = 0, .lock = { .locked = false }, .wait_queue = NULL }
 
 static inline void kern_bin_sem_init(kern_bin_sem_t *sem, int32_t initial)
 {
     sem->count = (initial != 0) ? 1 : 0;
+    xeros_spinlock_init(&sem->lock);
     sem->wait_queue = NULL;
 }
 
@@ -69,6 +72,7 @@ extern kern_err_t kern_bin_sem_take(kern_bin_sem_t *sem, uint32_t timeout_ms);
 typedef struct {
     volatile int32_t   count;
     int32_t            max_count;
+    xeros_spinlock_t   lock;        /* SMP 保护 */
     kern_wait_node_t  *wait_queue;
 } kern_sem_t;
 
@@ -88,6 +92,7 @@ extern int32_t     kern_sem_get_count(kern_sem_t *sem);
  */
 typedef struct {
     volatile bool     locked;           /* 是否被持有 */
+    xeros_spinlock_t  lock;             /* SMP 保护 */
     kern_task_t      *owner;            /* 持有者 TCB */
     uint8_t           recursive_count;  /* 递归加锁计数 */
     uint8_t           orig_priority;    /* 持有者原始优先级（PI 提升前） */
@@ -112,6 +117,7 @@ typedef struct {
     size_t            count;        /* 当前消息数 */
     size_t            head;         /* 读索引 */
     size_t            tail;         /* 写索引 */
+    xeros_spinlock_t  lock;         /* SMP 保护 */
     kern_wait_node_t *recv_wait;    /* 等待接收的队列 */
     kern_wait_node_t *send_wait;    /* 等待发送的队列 */
 } kern_queue_t;
@@ -133,6 +139,7 @@ extern size_t     kern_queue_count(kern_queue_t *q);
  */
 typedef struct {
     volatile uint32_t  bits;         /* 当前事件位 */
+    xeros_spinlock_t   lock;         /* SMP 保护 */
     kern_wait_node_t  *wait_queue;   /* 等待队列 */
 } kern_event_t;
 

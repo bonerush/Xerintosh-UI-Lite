@@ -24,19 +24,19 @@ extern "C" {
 
 TEST(KernelSyncTest, SpinlockInitDoesNotCrash)
 {
-    spinlock_t lock;
-    spinlock_init(&lock);
+    xeros_spinlock_t lock;
+    xeros_spinlock_init(&lock);
     EXPECT_FALSE(lock.locked);
 }
 
 TEST(KernelSyncTest, SpinlockLockUnlockDoesNotCrash)
 {
-    spinlock_t lock;
-    spinlock_init(&lock);
+    xeros_spinlock_t lock;
+    xeros_spinlock_init(&lock);
 
-    spinlock_lock(&lock);
+    xeros_spinlock_lock(&lock);
     /* 单核下 spinlock_lock 为 no-op，不会自旋 */
-    spinlock_unlock(&lock);
+    xeros_spinlock_unlock(&lock);
 
     /* 无论如何不应崩溃 */
     EXPECT_FALSE(lock.locked);
@@ -44,12 +44,12 @@ TEST(KernelSyncTest, SpinlockLockUnlockDoesNotCrash)
 
 TEST(KernelSyncTest, SpinlockReentrantDoesNotCrash)
 {
-    spinlock_t lock;
-    spinlock_init(&lock);
+    xeros_spinlock_t lock;
+    xeros_spinlock_init(&lock);
 
-    spinlock_lock(&lock);
-    spinlock_lock(&lock);  /* 重入不应崩溃 */
-    spinlock_unlock(&lock);
+    xeros_spinlock_lock(&lock);
+    xeros_spinlock_lock(&lock);  /* 重入不应崩溃 */
+    xeros_spinlock_unlock(&lock);
 }
 
 /* ═══ 互斥锁测试 ═══ */
