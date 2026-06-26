@@ -29,7 +29,7 @@ void hal_system_init(void) {
 /**
  * @brief 获取系统启动后的毫秒数
  */
-uint32_t hal_get_ticks(void) {
+uint32_t hal_get_ticks_ms(void) {
     auto now = std::chrono::steady_clock::now();
     return std::chrono::duration_cast<std::chrono::milliseconds>(now - g_start_time).count();
 }
@@ -64,7 +64,7 @@ void hal_system_init(void) {
 /**
  * @brief 获取系统启动后的毫秒数
  */
-uint32_t hal_get_ticks(void) {
+uint32_t hal_get_ticks_ms(void) {
     return (uint32_t)(esp_timer_get_time() / 1000ULL);
 }
 

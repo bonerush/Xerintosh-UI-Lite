@@ -146,7 +146,7 @@ void hal_input_init(void) {
     };
     gpio_config(&io_conf);
 
-    g_boot_time_ms = hal_get_ticks();
+    g_boot_time_ms = hal_get_ticks_ms();
 }
 
 /**
@@ -166,7 +166,7 @@ void hal_input_update(void) {
  */
 static hal_event_t check_button_event(struct btn_state *st, bool wasPressed, bool wasReleased)
 {
-    uint32_t now = hal_get_ticks();
+    uint32_t now = hal_get_ticks_ms();
     if (g_double_click_enabled) {
         return hal_input_dc_process(&st->dc, wasPressed, wasReleased, now);
     }
@@ -179,7 +179,7 @@ static hal_event_t check_button_event(struct btn_state *st, bool wasPressed, boo
 hal_event_t hal_input_get_event(hal_button_t btn)
 {
   /* 启动保护：忽略开机后首 300ms 内的所有按键事件，防止 GPIO 上电毛刺触发 LONG_PRESS */
-  if (hal_get_ticks() - g_boot_time_ms < BOOT_INPUT_GUARD_MS) {
+  if (hal_get_ticks_ms() - g_boot_time_ms < BOOT_INPUT_GUARD_MS) {
       return HAL_EVENT_NONE;
   }
 
@@ -211,7 +211,7 @@ bool hal_input_is_pressed(hal_button_t btn) {
 
     bool pressed = btn_read_raw(btn);
     if (pressed && st->dc.pressed) {
-        st->dc.press_duration_ms = hal_get_ticks() - st->dc.press_time;
+        st->dc.press_duration_ms = hal_get_ticks_ms() - st->dc.press_time;
     }
     return pressed;
 }
