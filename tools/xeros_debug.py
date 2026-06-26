@@ -73,19 +73,18 @@ class XerosDebugger:
             print(f"[OK] 已断开 {self.port}")
 
     def reset(self):
-        """复位设备 (通过 DTR 信号)"""
+        """复位设备 (通过 RTS 脉冲拉低 EN)"""
         if not self.ser:
             print("[FAIL] 未连接")
             return False
 
         print("[...] 正在复位设备...")
-        self.ser.dtr = False
+        # RTS=True 拉低 EN 使设备复位；保持 200ms 后释放。
+        # 不碰 DTR，避免 GPIO0 被拉低进入下载模式导致二次复位。
         self.ser.rts = True
-        time.sleep(0.1)
-        self.ser.dtr = True
+        time.sleep(0.2)
         self.ser.rts = False
-        time.sleep(0.5)
-        self.ser.dtr = False
+        time.sleep(0.1)
         print("[OK] 设备已复位")
         return True
 

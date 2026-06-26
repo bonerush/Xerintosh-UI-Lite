@@ -57,7 +57,9 @@ Xerintosh 项目
 - **WiFi**: 在原生调度器下已启用 `wifi-mgr` 任务，ESP-IDF WiFi 驱动内部 FreeRTOS 任务与 Xeros 原生任务共存
 - **IPC/SMP 安全**: 已给所有 IPC 原语加 SMP 自旋锁，修复 tickless idle 遍历任务链表的原子性、修复 CPU 分配的原子性；**IPI 已实现**，IPC 唤醒与任务创建时会通知远程核心重新调度
 - **VFS 并发**: 已添加全局 `g_vfs_lock` 自旋锁保护 dentry 树与 inode 引用计数，`kern_open`/`kern_close` 等路径已加锁
-- **目标**: 继续验证 UI/WiFi 实际屏幕操作，处理剩余遗留风险
+- **调度器状态修复**: 已修复 `kern_sched_tick` 未设置 RUNNING 状态、`kern_sleep_ms` yield 覆盖 SLEEPING、GPTimer tick 未启动等 bug
+- **调试工具完善**: `xeros_debug.py` 启动检测、复位序列、正则匹配已修复，支持 `--reset --wait-boot --cmd ps` 端到端自动化
+- **目标**: 继续验证 UI/WiFi 实际屏幕操作（调度器层面已稳定，需用户现场确认显示渲染与 WiFi 菜单交互）
 
 ## 相关源文件
 

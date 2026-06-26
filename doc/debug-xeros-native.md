@@ -1166,4 +1166,63 @@ g_task_list = idle;
 
 ---
 
+### 2026-06-27：修复调度器状态、sleep/yield 竞态、GPTimer 启动与调试工具
+
+#### 发现的问题
+
+1. **`kern_sched_tick` 未设置 `next->state = KERN_TASK_RUNNING`**
+
+   在 ESP32 fallback 分支（含 `XEROS_NATIVE_SCHED`）中，切换到新任务后没有将其状态标记为 RUNNING。结果 `ps` 命令中所有任务永远显示 READY/SLEEP，从未出现 RUNNING；且每次 tick 都因 `g_current_task->state != KERN_TASK_RUNNING` 条件为真而触发无效重调度。
+
+   *📄 Source: [kern_sched.c](../src/kernel/kern_sched.c#L419-L425)（修复前）*
+
+2. **`kern_sleep_ms` 调用 `kern_yield()` 覆盖 SLEEPING 状态**
+
+   `kern_yield()` 无条件将 `cur->state = KERN_TASK_READY`。`kern_sleep_ms()` 先设置 SLEEPING 再调用 `kern_yield()`，结果 yield 立刻把状态改回 READY，睡眠任务永远不会真正休眠。`wifi-mgr` 任务调用 `kern_sleep_ms(10)` 后实际一直处于 READY，无法进入 SLEEP 从而让 tickless idle 生效。
+
+   *📄 Source: [kern_task_lifecycle.c](../src/kernel/kern_task_lifecycle.c)（修复前）*
+
+3. **GPTimer 周期 tick 从未启动**
+
+   `kern_port_timer_set_periodic()` 定义了完整的 GPTimer 初始化/启动流程，但在 `kern_sched_init()` 的任何分支中都没有被调用。结果是：抢占式 tick 从未生效，`kern_port_preempt_consume()` 始终返回 false；tickless idle 的 `tick_timer_set_next_alarm()` 因 timer 未运行而成为空操作。
+
+   *📄 Source: [kern_sched.c](../src/kernel/kern_sched.c#L191-L200)（修复前）*
+
+4. **`xeros_debug.py --wait-boot` 启动检测失败**
+
+   三个问题叠加：(a) 启动标记正则只匹配 `[BOOT]`，而实际输出为 `[  BOOT]`（带空格）；(b) `reset()` 使用了 esptool 风格的三级序列（DTR/RTS 交替），在退出时额外触发了下载模式→复位，导致设备二次复位；(c) `main()` 在 `dbg.reset()` 之后 `time.sleep(1)` 才开始读取，期间串口缓冲区被启动日志淹没，`[  BOOT]` 标记被覆盖丢失。
+
+#### 修复
+
+1. 在 `kern_sched.c` ESP32 fallback 分支的 `kern_sched_tick()` 中，`g_current_task = next` 后增加 `next->state = KERN_TASK_RUNNING`。
+
+   *📄 Source: [kern_sched.c](../src/kernel/kern_sched.c#L423)*
+
+2. 将 `kern_sleep_ms()` 中的 `kern_yield()` 替换为 `kern_port_task_yield()`，直接让出 CPU 而不重置状态。
+
+   *📄 Source: [kern_task_lifecycle.c](../src/kernel/kern_task_lifecycle.c)*
+
+3. 在 `kern_sched_init()` 的 `XEROS_NATIVE_SCHED` 分支中，`kern_port_init()` 之后调用 `kern_port_timer_set_periodic(1000)`，启动 1ms GPTimer tick。
+
+   *📄 Source: [kern_sched.c](../src/kernel/kern_sched.c#L193-L197)*
+
+4. 三修 `xeros_debug.py`：
+   - 启动正则改为 `r'\[\s*BOOT\s*\]|app_main|Xeros'`。
+   - `reset()` 简化为单次 RTS 脉冲（`rts=True, 0.2s, rts=False`），不碰 DTR。
+   - 移除 `main()` 中 `reset()` 后的 `time.sleep(1)`，让 `wait_for_boot` 立即开始读取。
+
+   *📄 Source: [xeros_debug.py](../tools/xeros_debug.py#L75-L89)*
+
+#### 验证结果
+
+| 检查项 | 命令 | 结果 |
+|--------|------|------|
+| native 编译 | `pio run -e native` | **通过** |
+| m5stick-c-native 编译 | `pio run -e m5stick-c-native` | **通过** |
+| 烧录 | `pio run -e m5stick-c-native -t upload` | **通过** |
+| 启动检测 | `python3 tools/xeros_debug.py ... --reset --wait-boot` | **`[OK] 设备已启动 (检测到: [  BOOT] M5Stick-P1 kernel starting...)`** |
+| GPTimer 启动 | 启动日志 | **`tick_timer: timer initialized: period=1000 us ... timer started`** |
+| Shell `ps` 任务状态 | 串口发送 `ps` | **shell/ui 显示 RUNNING，wifi-mgr 显示 SLEEP** |
+| 调试工具端到端 | `--reset --wait-boot --cmd ps` | **正常复位→检测启动→发送命令→解析输出** |
+
 > **See Also:** [原生内核架构](architecture/xeros-native-kernel.md) | [实施计划](../implementation-plan.md) | [FreeRTOS 剩余引用](../freertos-remaining-references.md)
