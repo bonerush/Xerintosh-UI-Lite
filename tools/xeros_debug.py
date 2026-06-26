@@ -201,7 +201,7 @@ class XerosDebugger:
     def wait_for_boot(self, timeout=15.0):
         """等待设备启动完成"""
         print("[...] 等待设备启动...")
-        result = self.read_until(r'\[BOOT\]|app_main|Xeros', timeout)
+        result = self.read_until(r'\[\s*BOOT\s*\]|app_main|Xeros', timeout)
         if result:
             print(f"[OK] 设备已启动 (检测到: {result[-1][:50]})")
             return True
@@ -353,7 +353,6 @@ def main():
     try:
         if args.reset:
             dbg.reset()
-            time.sleep(1)
 
         if args.wait_boot:
             dbg.wait_for_boot(args.timeout)

@@ -190,6 +190,12 @@ void kern_sched_init(void)
 
     kern_port_init();
 
+    /* 启动原生调度器的硬件 tick（1ms）。FreeRTOS 后端依赖 FreeRTOS 调度器自带
+     * 时间片，因此只在 XEROS_NATIVE_SCHED 下显式启动 GPTimer。 */
+#ifdef XEROS_NATIVE_SCHED
+    kern_port_timer_set_periodic(1000);
+#endif
+
     /* 注册调度类：RR 为默认，FIFO 为抢占优化 */
     kern_sched_class_register(&sched_class_rr);
     kern_sched_class_register(&sched_class_fifo);
@@ -421,6 +427,7 @@ void kern_sched_tick(void) /* ESP32: FreeRTOS / XEROS_NATIVE_SCHED fallback */
                 prev->state = KERN_TASK_READY;
             }
             g_current_task = next;
+            next->state = KERN_TASK_RUNNING;
             kern_mpu_apply(next);
             kern_port_switch_to(next);
         }

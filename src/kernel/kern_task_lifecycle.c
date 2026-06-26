@@ -415,8 +415,8 @@ void kern_sleep_ms(uint32_t ms)
     cur->state = KERN_TASK_SLEEPING;
     cur->wake_time = g_sched_ticks + ms;
 
-    /* yield 到调度器，调度器会检查 wake_time 决定是否重新调度此任务 */
-    kern_yield();
+    /* 直接让出 CPU；若调用 kern_yield() 会把刚刚设置的 SLEEPING 改回 READY */
+    kern_port_task_yield();
 }
 
 #endif
