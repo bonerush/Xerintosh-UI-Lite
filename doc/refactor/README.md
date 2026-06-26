@@ -11,8 +11,8 @@
 | 阶段 | 状态 | 说明 |
 |------|------|------|
 | 0 基线建立 | DONE | 隔离 worktree 已创建，构建与 native 测试通过 |
-| 1 扫描诊断 | RUNNING | 待启动 |
-| 2 分层重构 | PENDING | 待启动（顺序：kernel → HAL → UI → App → docs） |
+| 1 扫描诊断 | DONE | 诊断报告已生成 |
+| 2 分层重构 | RUNNING | 从 kernel 层开始 |
 | 3 集成验证 | PENDING | 待启动 |
 | 4 文档归档 | PENDING | 待启动 |
 
