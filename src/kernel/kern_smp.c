@@ -17,12 +17,8 @@ kern_per_cpu_t g_per_cpu[KERN_MAX_CPUS];
 
 #ifdef CONFIG_SMP_ENABLED
 
-#if defined(XEROS_NATIVE_SCHED)
-/* 原生调度器：直接读取硬件寄存器 */
-#else
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
-#endif
 
 volatile uint8_t g_cpu_ready = 0;  /* SMP 就绪标志（供外部查询） */
 
@@ -33,15 +29,8 @@ _Static_assert(KERN_MAX_CPUS >= 2, "KERN_MAX_CPUS must be at least 2 for ESP32 S
 
 uint8_t kern_cpu_id(void)
 {
-#if defined(XEROS_NATIVE_SCHED)
-    /* 原生调度器：直接读取 Xtensa PRID 寄存器 */
-    uint32_t prid;
-    __asm__ __volatile__("rsr %0, PRID" : "=r"(prid));
-    uint8_t id = (uint8_t)(prid & 0xFF);
-#else
-    /* FreeRTOS 后端 */
+    /* FreeRTOS / XEROS_NATIVE_SCHED fallback 后端 */
     uint8_t id = (uint8_t)xPortGetCoreID();
-#endif
     if (id >= KERN_MAX_CPUS) {
         kern_log(KERN_LOG_ERROR, "SMP: invalid core id %u >= KERN_MAX_CPUS", (unsigned)id);
         return 0;
@@ -71,11 +60,6 @@ void kern_smp_start_core(uint8_t cpu_id, void (*entry)(void *arg))
 {
     if (cpu_id >= KERN_MAX_CPUS) return;
 
-#if defined(XEROS_NATIVE_SCHED)
-    /* 原生调度器：SMP 核心启动暂未实现（单核模式） */
-    kern_log(KERN_LOG_WARN, "SMP: native core %d start not yet implemented", cpu_id);
-    (void)entry;
-#else
     BaseType_t ret = xTaskCreatePinnedToCore(
         (TaskFunction_t)entry,
         "xeros_smp",
@@ -91,7 +75,6 @@ void kern_smp_start_core(uint8_t cpu_id, void (*entry)(void *arg))
     } else {
         kern_log(KERN_LOG_INFO, "SMP: core %d scheduler started", cpu_id);
     }
-#endif
 }
 
 /* ═══ CPU 分配策略 ═══ */

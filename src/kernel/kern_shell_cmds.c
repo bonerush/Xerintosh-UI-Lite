@@ -171,7 +171,7 @@ static void cmd_ps(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd_
 
         /* 栈: 虚任务无独立栈，实任务显示 已用/总量（字节） */
         {
-#if defined(NATIVE_TEST) || defined(XEROS_NATIVE_SCHED)
+#if defined(NATIVE_TEST)
             /* Native: 栈由 Xeros 管理（字节），无 port_thread 字段 */
             size_t used = kern_task_stack_usage(task);
             size_t total = task->stack_size;

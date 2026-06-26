@@ -32,181 +32,7 @@
 
 #ifndef NATIVE_TEST
 
-#if defined(XEROS_NATIVE_SCHED)
-
-/* ═══ XEROS_NATIVE_SCHED 原生调度器后端 ═══ */
-
-#include "esp32/ctx_switch.h"
-#include "esp32/tick_timer.h"
-
-/*
- * 调度器上下文（保存 kern_sched_tick 的执行点）
- *
- * 当 switch_to() 首次切换到任务时，调度器的上下文保存在此。
- * 当任务调用 yield/exit 时，恢复此上下文使调度器从 switch_to() 返回。
- */
-extern kern_ctx_native_t g_sched_ctx;
-
-/* ═══ 生命周期 ═══ */
-
-static void kern_port_native_sched_init(void)
-{
-    /* tick_timer 在 timer_set_periodic 中按需初始化 */
-}
-
-/* ═══ 线程管理 ═══ */
-
-/**
- * @brief 创建原生执行上下文
- *
- * 任务上下文和栈在 kern_spawn() 中已通过 xeros_ctx_init() 初始化。
- * 此函数仅返回一个非空句柄表示成功。
- */
-static kern_port_thread_t kern_port_native_sched_thread_spawn(
-    void (*entry)(void *arg), void *arg, const char *name,
-    size_t stack_size, kern_task_t *task)
-{
-    (void)entry; (void)arg; (void)name; (void)stack_size;
-    if (task == NULL || task->native_ctx == NULL) return KERN_PORT_THREAD_NULL;
-    /* 返回非空句柄：上下文已在 kern_spawn 中初始化 */
-    return (kern_port_thread_t)task;
-}
-
-static void kern_port_native_sched_thread_exit(void)
-{
-    /* 不应直接调用 — 任务通过 task_exit() 退出 */
-    while (1) {
-        __asm__ volatile("waiti 0");
-    }
-}
-
-static void kern_port_native_sched_thread_kill(kern_port_thread_t thread)
-{
-    /* 原生后端：任务被 kill 后由 reap_zombies 回收资源 */
-    (void)thread;
-}
-
-static size_t kern_port_native_sched_thread_stack_usage(kern_port_thread_t thread)
-{
-    if (thread == KERN_PORT_THREAD_NULL) return 0;
-    kern_task_t *task = (kern_task_t *)thread;
-    /* 返回栈大小（字节），高水位由 kern_task 层追踪 */
-    return task->stack_size;
-}
-
-/* ═══ 上下文切换 ═══ */
-
-/**
- * @brief 从调度器切换到目标任务
- *
- * 协议（setjmp 语义）：
- *   1. xeros_ctx_save(&g_sched_ctx) → 返回 0：保存调度器上下文
- *   2. xeros_ctx_restore(task->native_ctx) → 切换到任务
- *   3. 当任务 yield/exit 时，恢复 g_sched_ctx → 返回 1
- */
-static void kern_port_native_sched_switch_to(kern_task_t *task)
-{
-    if (task == NULL || task->native_ctx == NULL) return;
-
-    if (xeros_ctx_save(&g_sched_ctx) == 0) {
-        /* 保存路径：切换到任务 */
-        xeros_ctx_restore(task->native_ctx);
-        /* 不会到达 */
-    }
-    /* 恢复路径：任务 yield/exit 后回到这里 */
-}
-
-/**
- * @brief 当前任务主动让出 CPU
- *
- * 协议：
- *   1. xeros_ctx_save(task->native_ctx) → 返回 0：保存任务上下文
- *   2. xeros_ctx_restore(&g_sched_ctx) → 切换回调度器
- *   3. 当调度器再次 switch_to 时，恢复任务上下文 → 返回 1
- */
-static void kern_port_native_sched_task_yield(void)
-{
-    kern_task_t *task = kern_task_current();
-    if (task == NULL || task->native_ctx == NULL) return;
-
-    if (xeros_ctx_save(task->native_ctx) == 0) {
-        /* 保存路径：切换回调度器 */
-        xeros_ctx_restore(&g_sched_ctx);
-        /* 不会到达 */
-    }
-    /* 恢复路径：调度器再次 switch_to 后回到这里 */
-}
-
-/**
- * @brief 当前任务退出
- *
- * 与 yield 类似，但先标记任务为 ZOMBIE。
- */
-static void kern_port_native_sched_task_exit(void)
-{
-    kern_task_t *task = kern_task_current();
-    if (task != NULL) {
-        task->state = KERN_TASK_ZOMBIE;
-    }
-
-    kern_task_t *current = kern_task_current();
-    if (current == NULL || current->native_ctx == NULL) {
-        while (1) { __asm__ volatile("waiti 0"); }
-    }
-
-    if (xeros_ctx_save(current->native_ctx) == 0) {
-        xeros_ctx_restore(&g_sched_ctx);
-    }
-}
-
-/* ═══ 空闲处理 ═══ */
-
-/**
- * @brief 空闲处理 — 使用 Xtensa waiti 指令进入低功耗模式
- *
- * waiti 0 将 CPU 置于等待中断状态，直到中断到达。
- * 这比忙等待节省大量功耗，同时保持中断响应能力。
- */
-static void kern_port_native_sched_idle(void)
-{
-    __asm__ volatile("waiti 0");
-}
-
-/* ═══ 定时器基础设施 ═══ */
-
-static int kern_port_native_sched_timer_set(uint32_t period_us)
-{
-    int ret = tick_timer_init(period_us);
-    if (ret != 0) return ret;
-    return tick_timer_start();
-}
-
-static void kern_port_native_sched_timer_stop(void)
-{
-    tick_timer_stop();
-}
-
-static bool kern_port_native_sched_preempt_consume(void)
-{
-    return tick_timer_consume();
-}
-
-const kern_port_ops_t g_kern_port_ops = {
-    .init                = kern_port_native_sched_init,
-    .thread_spawn        = kern_port_native_sched_thread_spawn,
-    .thread_exit         = kern_port_native_sched_thread_exit,
-    .thread_kill         = kern_port_native_sched_thread_kill,
-    .thread_stack_usage  = kern_port_native_sched_thread_stack_usage,
-    .switch_to           = kern_port_native_sched_switch_to,
-    .task_yield          = kern_port_native_sched_task_yield,
-    .task_exit           = kern_port_native_sched_task_exit,
-    .idle                = kern_port_native_sched_idle,
-    .timer_set_periodic  = kern_port_native_sched_timer_set,
-    .timer_stop          = kern_port_native_sched_timer_stop,
-    .preempt_consume     = kern_port_native_sched_preempt_consume,
-};
-
-#else /* FreeRTOS 后端（默认）*/
+/* ═══ FreeRTOS / XEROS_NATIVE_SCHED fallback 后端 ═══ */
 
 /* FreeRTOS 头文件（仅此文件直接依赖） */
 #include <freertos/FreeRTOS.h>
@@ -419,17 +245,29 @@ static kern_port_thread_t kern_port_freertos_thread_spawn(
     if (cpu >= KERN_MAX_CPUS) cpu = 0;
 
     /*
-     * 优先级选择：使用 tskIDLE_PRIORITY（与 FreeRTOS idle 同级）。
-     * 若使用 tskIDLE_PRIORITY+1，xidle 等任务会抢占 FreeRTOS idle 任务，
-     * 导致中断看门狗（INT_WDT，300ms 超时）无法被喂食而触发系统重启。
-     * 同级优先级下 FreeRTOS RR 时间片轮转保证两者都能获得 CPU 时间。
+     * 优先级分层：
+     *   - idle 任务 (xidleN): tskIDLE_PRIORITY，只在所有 Xeros 任务阻塞时运行，
+     *     确保 FreeRTOS idle 任务能喂中断看门狗 (INT_WDT)。
+     *   - 普通 Xeros 任务: tskIDLE_PRIORITY + 1，避免被 FreeRTOS RR 切走。
+     *   - UI 任务: tskIDLE_PRIORITY + 2，保证一帧渲染能连续运行到 yield。
+     *
+     * 调度器任务 (app_main / kern_smp_sched_loop) 设为 tskIDLE_PRIORITY + 1，
+     * 与 Xeros 普通任务同级；它大部分时间阻塞在 done_sem 或 vTaskDelay 上，
+     * 不会长时间占用 CPU。UI 优先级更高，因此 1ms tick 不会抢占 UI。
      */
+    UBaseType_t freertos_prio = tskIDLE_PRIORITY + 1;
+    if (name != NULL && strncmp(name, "xidle", 5) == 0) {
+        freertos_prio = tskIDLE_PRIORITY;
+    } else if (name != NULL && strcmp(name, "ui") == 0) {
+        freertos_prio = tskIDLE_PRIORITY + 2;
+    }
+
     BaseType_t ret = xTaskCreatePinnedToCore(
         task_wrapper,           /* 包装函数 */
         name ? name : "xtask",  /* FreeRTOS 任务名 */
         (uint32_t)stack_words,  /* 栈大小（字） */
         task,                   /* 参数 = kern_task_t* */
-        tskIDLE_PRIORITY,       /* 与 FreeRTOS idle 同级，避免饿死看门狗 */
+        freertos_prio,          /* FreeRTOS 优先级 */
         &handle,
         cpu                     /* 引脚到任务分配的 CPU */
     );
@@ -551,8 +389,6 @@ const kern_port_ops_t g_kern_port_ops = {
     .timer_stop          = kern_port_freertos_timer_stop,
     .preempt_consume     = kern_port_freertos_preempt_consume,
 };
-
-#endif /* defined(XEROS_NATIVE_SCHED) */
 
 #else /* NATIVE_TEST — 空桩：原生模式不使用此文件 */
 

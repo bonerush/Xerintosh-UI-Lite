@@ -194,7 +194,7 @@ static void main_loop_task(void *arg)
         }
 
         /* Yield / sleep to let other Xeros tasks run */
-        kern_sleep_ms(1);
+        kern_sleep_ms(10);
     }
 }
 
@@ -204,6 +204,10 @@ static void main_loop_task(void *arg)
  */
 extern "C" void app_main(void)
 {
+    /* 提升主任务优先级到调度器层级，确保它能在 Xeros 任务 yield 后立即接管分发令牌，
+     * 同时低于 UI 任务，避免 1ms tick 抢占正在渲染的 UI。 */
+    vTaskPrioritySet(NULL, tskIDLE_PRIORITY + 1);
+
     /* 最早进行 UART 初始化，确保后续 printf/日志能立即输出 */
     hal_uart0_init();
     hal_delay_ms(100);
@@ -395,9 +399,6 @@ static void deferred_kernel_init(void)
     /* 主循环任务：串口轮询、串口监视器、WiFi 请求处理 */
     kern_spawn("main-loop", main_loop_task, NULL, 4096);
     debug_printf("[  OK  ] Main loop task spawned as kernel task (stack=4096)\n");
-
-    /* 让出 CPU 给 FreeRTOS，使刚创建的任务有机会启动并阻塞在调度信号量上 */
-    hal_delay_ms(10);
 
     kern_log(KERN_LOG_INFO, "Xeros kernel boot complete, entering scheduler");
     debug_printf("[  OK  ] Kernel boot complete, entering scheduler loop\n");

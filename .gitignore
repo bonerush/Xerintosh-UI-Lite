@@ -6,3 +6,6 @@
 .DS_Store
 .claude/
 .codegraph/
+screenlog.*
+tools/__pycache__/
+doc/debug-native-sched-prompt.md

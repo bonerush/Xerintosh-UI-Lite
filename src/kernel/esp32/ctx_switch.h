@@ -30,8 +30,9 @@ extern "C" {
  *
  * 对于新任务：
  *   a0 指向清理处理器（entry 返回后调用 kern_exit）
- *   a2/a6 存放 arg，a5 存放 entry，pc 指向蹦床函数。
- *   蹦床通过 `mov a2, a6; callx8 a5` 调用 entry(arg)（CALLINC=2，正确设置调用帧）。
+ *   a8-a11 存放清理 handler、栈顶、entry、arg，pc 指向蹦床函数。
+ *   蹦床通过 call8 调用 xeros_task_wrapper（默认 call8 ABI），
+ *   wrapper 再通过 call8 调用 entry(arg)，保持整个链路的 CALLINC=2。
  *
  * @note ctx_save 使用 call8 ABI 保存寄存器，然后清除 CALLINC 后通过
  *       call0 子函数返回（避免 retw 旋转窗口）。
@@ -79,16 +80,17 @@ typedef struct {
 
     /* ---- 窗口寄存器 ---- */
 
-    uint32_t windowbase; /**< 窗口基址寄存器 (Window Base, SR 72) */
+    uint32_t windowbase;  /**< 窗口基址寄存器 (Window Base, SR 72) */
+    uint32_t windowstart; /**< 窗口起始寄存器 (Window Start, SR 73) */
 } kern_ctx_native_t;
 
 /**
  * @brief 原生上下文结构体的大小（字节数）
  *
- * 等于 24 个 uint32_t 字段 = 96 字节。汇编代码中使用此常量
+ * 等于 26 个 uint32_t 字段 = 104 字节。汇编代码中使用此常量
  * 计算各寄存器在结构体内的偏移量。
  */
-#define KERN_CTX_NATIVE_SIZE   (25 * sizeof(uint32_t))
+#define KERN_CTX_NATIVE_SIZE   (26 * sizeof(uint32_t))
 
 /* ========================================================================== */
 /*  函数声明                                                                   */

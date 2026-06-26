@@ -18,6 +18,10 @@
 #include "kern_shell_cmds_internal.h"
 #include "kern_shell_complete.h"
 
+#ifndef NATIVE_TEST
+#include "debug_serial.h"
+#endif
+
 #include <string.h>
 #include <stdio.h>
 

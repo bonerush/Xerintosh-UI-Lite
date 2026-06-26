@@ -31,6 +31,7 @@ Xerintosh 项目
   - [调试与诊断](architecture/debug-diagnostics.md) — 任务检查器、调度追踪、内存分析
 - **[实施计划](implementation-plan.md)** — 8 个阶段、29 个文件、详细任务分解
 - **[FreeRTOS 剩余引用清单](freertos-remaining-references.md)** — 改造路线图与依赖审计
+- **[参考资料](reference/index.md)** — FreeRTOS Xtensa port 源码与 Xtensa ABI 文档
 
 ## 快速链接
 

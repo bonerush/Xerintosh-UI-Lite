@@ -43,6 +43,10 @@ class XerosDebugger:
                 rtscts=False,
                 dsrdtr=False
             )
+            # 释放 DTR/RTS，避免 ESP32 在打开串口时被 RTS 拉低 GPIO0 而停在 bootloader
+            self.ser.dtr = False
+            self.ser.rts = False
+            time.sleep(0.05)
             print(f"[OK] 已连接 {self.port} ({self.baud} baud)")
             return True
         except serial.SerialException as e:

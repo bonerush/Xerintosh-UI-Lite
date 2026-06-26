@@ -22,9 +22,6 @@
 
 #ifdef NATIVE_TEST
 #include <ucontext.h>
-#elif defined(XEROS_NATIVE_SCHED)
-#include "esp32/ctx_switch.h"
-#include "debug_serial.h"
 #endif
 
 #include "kern_sched_fifo.h"
@@ -112,8 +109,6 @@ ucontext_t     g_sched_ctx;
 kern_task_t   *g_switch_to_task = NULL;
 static uint8_t s_sched_stack[8192];  /* 调度器上下文专用栈 */
 static volatile bool s_switch_done = false;
-#elif defined(XEROS_NATIVE_SCHED)
-kern_ctx_native_t g_sched_ctx;
 #endif
 
 /* ═══ 初始化 ═══ */
@@ -177,58 +172,7 @@ void kern_sched_init(void)
     kern_log(KERN_LOG_DEBUG, "scheduler initialized (native)");
 }
 
-#elif defined(XEROS_NATIVE_SCHED)
-
-void kern_sched_init(void) /* XEROS_NATIVE_SCHED */
-{
-    if (g_sched_initialized) return;
-    g_sched_initialized = true;
-    kern_smp_init();
-
-    kern_sched_class_register(&sched_class_rr);
-
-    g_idle_task = (kern_task_t *)calloc(1, sizeof(kern_task_t));
-    if (g_idle_task == NULL) {
-        kern_panic("failed to allocate idle task");
-        return;
-    }
-
-    g_idle_task->pid = g_next_pid++;
-    g_idle_task->state = KERN_TASK_READY;
-    g_idle_task->priority = 0;
-    g_idle_task->timeslice_remaining = SCHED_RR_DEFAULT_TIMESLICE;
-    strncpy(g_idle_task->name, "idle", KERN_TASK_NAME_LEN);
-    g_idle_task->entry = idle_entry;
-    g_idle_task->arg = NULL;
-
-    /* 分配原生上下文和栈 */
-    g_idle_task->native_ctx = (kern_ctx_native_t *)calloc(1, sizeof(kern_ctx_native_t));
-    g_idle_task->native_stack = (uint8_t *)malloc(IDLE_STACK_MIN);
-    if (g_idle_task->native_ctx == NULL || g_idle_task->native_stack == NULL) {
-        kern_panic("failed to allocate idle task context/stack");
-        return;
-    }
-    g_idle_task->stack_base = g_idle_task->native_stack;
-    g_idle_task->stack_size = IDLE_STACK_MIN;
-    memset(g_idle_task->stack_base, 0xAA, IDLE_STACK_MIN);
-
-    xeros_ctx_init(g_idle_task->native_ctx, g_idle_task->native_stack,
-                   IDLE_STACK_MIN, idle_entry, NULL);
-    task_write_canary(g_idle_task);
-
-    g_task_list = g_idle_task;
-    sched_class_rr.task_list = g_task_list;
-    sched_class_rr.task_list_tail = g_idle_task;
-    g_idle_task->scheduler_class_id = KERN_SCHED_CLASS_RR_ID;
-    g_task_count = 1;
-    g_task_list_tail = g_idle_task;
-    g_current_task = g_idle_task;
-    g_last_picked = g_idle_task;
-
-    kern_log(KERN_LOG_DEBUG, "scheduler initialized (esp32-native-sched)");
-}
-
-#else /* ═══════════════ ESP32 (FreeRTOS) ═══════════════ */
+#else /* ═══════════════ ESP32 (FreeRTOS / XEROS_NATIVE_SCHED fallback) ═══════════════ */
 
 #ifdef CONFIG_SMP_ENABLED
 void kern_smp_sched_loop(void *arg);
@@ -362,42 +306,9 @@ void kern_sched_tick(void)
     }
 }
 
-#elif defined(XEROS_NATIVE_SCHED)
+#else /* ESP32: FreeRTOS / XEROS_NATIVE_SCHED fallback */
 
-void kern_sched_tick(void)
-{
-    if (!g_sched_initialized) return;
-    g_sched_ticks++;
-    reap_zombies();
-
-    for (int i = 0; i < g_sched_class_count; i++) {
-        if (g_sched_classes[i] && g_sched_classes[i]->tick) {
-            g_sched_classes[i]->tick(g_current_task);
-        }
-    }
-
-    sched_check_stack_pressure(g_current_task);
-    sched_notify_memory_pressure();
-
-    if (g_need_resched || (g_current_task && g_current_task->state != KERN_TASK_RUNNING)) {
-        g_need_resched = false;
-        kern_task_t *next = pick_next_ready();
-        if (next && next != g_current_task) {
-            g_current_task = next;
-            kern_mpu_apply(next);
-            if (next->state != KERN_TASK_SLEEPING) next->state = KERN_TASK_RUNNING;
-            int save_ret = xeros_ctx_save(&g_sched_ctx);
-            if (save_ret == 0) {
-                xeros_ctx_restore(next->native_ctx);
-            }
-        }
-        return;
-    }
-}
-
-#else /* ESP32: FreeRTOS */
-
-void kern_sched_tick(void) /* ESP32: FreeRTOS */
+void kern_sched_tick(void) /* ESP32: FreeRTOS / XEROS_NATIVE_SCHED fallback */
 {
     if (!g_sched_initialized) return;
     g_sched_ticks++;
@@ -433,7 +344,8 @@ void idle_entry(void *arg)
 {
     (void)arg;
     while (1) {
-        kern_yield();
+        /* idle 优先级最低，睡眠 1ms 即可，避免无限 kern_yield 造成无意义切换。 */
+        kern_sleep_ms(1);
     }
 }
 
