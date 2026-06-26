@@ -22,6 +22,10 @@
 #include <ucontext.h>
 #endif
 
+#if defined(XEROS_NATIVE_SCHED)
+#include "esp32/ctx_switch.h"
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -56,6 +60,10 @@ typedef struct kern_task {
     /* 上下文保存 */
 #if defined(NATIVE_TEST)
     kern_ctx_t          ctx;            /* ucontext */
+#elif defined(XEROS_NATIVE_SCHED)
+    kern_ctx_native_t  *native_ctx;     /* 原生上下文快照 */
+    uint8_t            *native_stack;   /* 任务私有栈 */
+    bool                native_ctx_valid; /* 上下文是否已通过 setjmp 建立 */
 #else
     kern_port_thread_t  port_thread;    /* 底层执行上下文句柄 */
 #endif

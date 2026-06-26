@@ -26,7 +26,7 @@ extern void task_entry_trampoline(void);
 
 /* ═══ 栈初始化 ═══ */
 
-#if defined(NATIVE_TEST)
+#if defined(NATIVE_TEST) || defined(XEROS_NATIVE_SCHED)
 
 void task_stack_init(kern_task_t *task, size_t stack_size)
 {
@@ -35,6 +35,9 @@ void task_stack_init(kern_task_t *task, size_t stack_size)
 
     task->stack_size = stack_size;
     task->stack_base = (uint8_t *)kern_kmalloc_for_task(task, stack_size);
+#ifdef XEROS_NATIVE_SCHED
+    task->native_stack = task->stack_base;
+#endif
     if (task->stack_base == NULL) {
         kern_log(KERN_LOG_WARN, "stack alloc failed for task %s, size=%zu",
                  task->name, stack_size);
@@ -53,7 +56,7 @@ void task_write_canary(kern_task_t *task)
     }
 }
 
-#else /* ═══════════════ ESP32 (FreeRTOS / XEROS_NATIVE_SCHED fallback) ═══════════════ */
+#else /* ═══════════════ ESP32 FreeRTOS backend ═══════════════ */
 
 void task_stack_init(kern_task_t *task, size_t stack_size)
 {
@@ -72,7 +75,7 @@ void task_write_canary(kern_task_t *task)
 
 /* ═══ 栈使用量查询 ═══ */
 
-#ifdef NATIVE_TEST
+#if defined(NATIVE_TEST) || defined(XEROS_NATIVE_SCHED)
 
 size_t kern_task_stack_usage(kern_task_t *task)
 {
@@ -105,7 +108,7 @@ size_t kern_task_stack_usage(kern_task_t *task)
     return used;
 }
 
-#else /* ESP32: FreeRTOS / XEROS_NATIVE_SCHED fallback 管理栈，通过 uxTaskGetStackHighWaterMark 查询 */
+#else /* ESP32 FreeRTOS backend: 通过 uxTaskGetStackHighWaterMark 查询 */
 
 #include <freertos/FreeRTOS.h>
 
@@ -137,8 +140,8 @@ size_t kern_task_stack_usage(kern_task_t *task)
 size_t kern_task_stack_highwater(kern_task_t *task)
 {
     if (task == NULL) return 0;
-#ifndef NATIVE_TEST
-    /* FreeRTOS / XEROS_NATIVE_SCHED fallback 路径：通过 port 层查询并同步更新 TCB 字段 */
+#if !defined(NATIVE_TEST) && !defined(XEROS_NATIVE_SCHED)
+    /* FreeRTOS 路径：通过 port 层查询并同步更新 TCB 字段 */
     if (task->port_thread == KERN_PORT_THREAD_NULL) return 0;
     size_t free_words = kern_port_thread_stack_usage(task->port_thread);
     size_t free_bytes = free_words * sizeof(StackType_t);
@@ -215,7 +218,54 @@ bool kern_task_stack_grow(kern_task_t *task, size_t new_size)
     return true;
 }
 
-#else /* FreeRTOS / XEROS_NATIVE_SCHED fallback */
+#elif defined(XEROS_NATIVE_SCHED)
+
+bool kern_task_stack_grow(kern_task_t *task, size_t new_size)
+{
+    if (task == NULL || new_size <= task->stack_size) return false;
+    if (new_size > KERN_STACK_MAX) new_size = KERN_STACK_MAX;
+    if (task == g_current_task) {
+        kern_log(KERN_LOG_WARN,
+                 "stack_grow: cannot grow running task %s", task->name);
+        return false;
+    }
+
+    uint8_t *old_base = task->stack_base;
+    size_t old_size = task->stack_size;
+
+    uint8_t *new_base = (uint8_t *)kern_kmalloc_for_task(task, new_size);
+    if (new_base == NULL) {
+        kern_log(KERN_LOG_WARN,
+                 "stack_grow: alloc failed for task %s size=%zu",
+                 task->name, new_size);
+        return false;
+    }
+
+    /* 新栈填充 canary 模式，并复制旧栈全部内容到新基址 */
+    memset(new_base, 0xAA, new_size);
+    if (old_base != NULL && old_size > 0) {
+        memcpy(new_base, old_base, old_size);
+    }
+
+    task->stack_base = new_base;
+    task->native_stack = new_base;
+    task->stack_size = new_size;
+    task->stack_highwater = 0;   /* 增长后重新累计 */
+    task->native_ctx_valid = false;
+
+    /* xeros_ctx_init 已移除；调度器下次切换到该任务时会通过
+     * xeros_task_start 重新从入口启动（任务必须处于非运行态）。 */
+
+    /* xeros_ctx_init 可能触及栈底，最后重写 canary */
+    task_write_canary(task);
+
+    if (old_base != NULL) {
+        kern_kfree(old_base);
+    }
+    return true;
+}
+
+#else /* ESP32 FreeRTOS backend */
 
 bool kern_task_stack_grow(kern_task_t *task, size_t new_size)
 {

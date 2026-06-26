@@ -119,7 +119,103 @@ kern_pid_t kern_spawn(const char *name, void (*entry)(void *arg),
     return task->pid;
 }
 
-#else /* ═══════════════ ESP32 (FreeRTOS / XEROS_NATIVE_SCHED fallback) ═══════════════ */
+#elif defined(XEROS_NATIVE_SCHED)
+
+kern_pid_t kern_spawn(const char *name, void (*entry)(void *arg),
+                       void *arg, size_t stack_min)
+{
+    if (entry == NULL) return KERN_EINVAL;
+    if (g_task_count >= MAX_TASKS) return KERN_ENOSPC;
+
+    kern_sched_init();
+
+    kern_task_t *task = (kern_task_t *)calloc(1, sizeof(kern_task_t));
+    if (task == NULL) return KERN_ENOMEM;
+
+    task->pid = g_next_pid++;
+    task->state = KERN_TASK_READY;
+    task->priority = 128;
+    task->timeslice_remaining = SCHED_RR_DEFAULT_TIMESLICE;
+    task->scheduler_class_id = -1;
+    task->cpu_id = KERN_CPU_ANY;
+#ifdef CONFIG_SMP_ENABLED
+    task->cpu_id = kern_smp_migrate_assign();
+#endif
+    task->entry = entry;
+    task->arg = arg;
+
+    if (name != NULL) {
+        strncpy(task->name, name, KERN_TASK_NAME_LEN);
+        task->name[KERN_TASK_NAME_LEN] = '\0';
+    } else {
+        snprintf(task->name, KERN_TASK_NAME_LEN, "task_%d", task->pid);
+    }
+
+    /* 初始化每任务文件描述符表 */
+    memset(task->fd_table, 0, sizeof(task->fd_table));
+
+    /* 默认加入 RR 调度类 */
+    task->scheduler_class_id = KERN_SCHED_CLASS_RR_ID;
+
+    /* 初始化任务私有栈与原生上下文 */
+    size_t stack_sz = (stack_min > 0) ? stack_min : (size_t)KERN_STACK_MIN;
+    task_stack_init(task, stack_sz);
+    task->native_ctx = (kern_ctx_native_t *)kern_kmalloc_for_task(
+        task, sizeof(kern_ctx_native_t));
+    if (task->native_ctx == NULL || task->stack_base == NULL) {
+        kern_log(KERN_LOG_WARN, "native: failed to alloc ctx/stack for %s", task->name);
+        kern_resource_release_all(task);
+        free(task);
+        return KERN_ENOMEM;
+    }
+    memset(task->native_ctx, 0, sizeof(kern_ctx_native_t));
+    task->native_ctx_valid = false;
+    task_write_canary(task);
+
+    kern_mpu_setup_stack_guard(task, task->stack_base, task->stack_size);
+
+    /* 挂载到任务链表尾部（O(1) 尾追加） */
+#ifdef CONFIG_SMP_ENABLED
+    while (__sync_lock_test_and_set(&g_task_list_lock, true)) {
+        asm volatile ("nop");
+    }
+#endif
+    if (g_task_list == NULL) {
+        g_task_list = task;
+        g_task_list_tail = task;
+    } else {
+        if (g_task_list_tail != NULL) {
+            g_task_list_tail->next = task;
+        } else {
+            /* 尾指针未初始化：回退 O(n) 遍历 */
+            kern_task_t *t = g_task_list;
+            while (t->next != NULL) t = t->next;
+            t->next = task;
+        }
+        g_task_list_tail = task;
+    }
+    g_task_count++;
+#ifdef CONFIG_SMP_ENABLED
+    __sync_lock_release(&g_task_list_lock);
+#endif
+
+    /* 加入对应调度类的任务链表，使 pick_next_ready 能选到新任务 */
+    if (task->scheduler_class_id >= 0 && task->scheduler_class_id < KERN_SCHED_MAX_CLASSES) {
+        kern_sched_class_t *cls = g_sched_classes[task->scheduler_class_id];
+        if (cls != NULL && cls->enqueue != NULL) {
+            cls->enqueue(task);
+        }
+    }
+
+    /* 若新任务绑定在另一核心，发送 IPI 使其尽快调度。
+     * 注：IPI 函数在后续提交中实现，当前临时注释以便分阶段提交。 */
+    /* kern_smp_ipi_reschedule(task->cpu_id); */
+
+    kern_log(KERN_LOG_DEBUG, "spawned task %d: %s", task->pid, task->name);
+    return task->pid;
+}
+
+#else /* ═══════════════ ESP32 FreeRTOS backend ═══════════════ */
 
 kern_pid_t kern_spawn(const char *name, void (*entry)(void *arg),
                        void *arg, size_t stack_min)
@@ -374,10 +470,10 @@ kern_err_t kern_task_kill(kern_pid_t pid)
     task->state = KERN_TASK_ZOMBIE;
     kern_log(KERN_LOG_DEBUG, "task %d (%s) killed", task->pid, task->name);
 
-#if defined(NATIVE_TEST)
-    /* Native: TCB 在下次 sched_tick 时由 reap_zombies 回收 */
+#if defined(NATIVE_TEST) || defined(XEROS_NATIVE_SCHED)
+    /* Native: TCB 在下次 sched_tick 时由 reap_zombies 回收；栈与上下文作为资源已追踪 */
 #else
-    /* FreeRTOS / XEROS_NATIVE_SCHED fallback: 销毁底层线程 */
+    /* FreeRTOS: 销毁底层线程 */
     if (task->port_thread != KERN_PORT_THREAD_NULL) {
         kern_port_thread_kill(task->port_thread);
         task->port_thread = KERN_PORT_THREAD_NULL;
