@@ -1,15 +1,16 @@
-/* Only compile for Xtensa targets (ESP32), skip on native test builds
- * and XEROS_NATIVE_SCHED fallback builds (which use FreeRTOS tasks). */
-#if !defined(NATIVE_TEST) && !defined(XEROS_NATIVE_SCHED)
+/* Only compile for Xtensa targets (ESP32) with native scheduler enabled.
+ * Skip on native test builds (ucontext) and FreeRTOS backend builds. */
+#if !defined(NATIVE_TEST) && defined(XEROS_NATIVE_SCHED)
 
 /**
  * @file ctx_init.c
- * @brief Xeros 上下文初始化辅助函数 — C 语言实现
+ * @brief Xeros 原生上下文初始化辅助函数 — 复用 newlib setjmp/longjmp
  *
- * 本文件提供上下文初始化的 C 语言封装，与 ctx_switch.S 中的汇编实现
- * 功能等价。此外还提供处理器状态寄存器 (PS) 的读写辅助函数。
- *
- * 这些函数使得内核中不需要直接操作汇编即可完成新任务的上下文初始化。
+ * 本文件提供：
+ *   - xeros_ctx_save / xeros_ctx_restore：jmp_buf 包装。
+ *   - xeros_task_wrapper：用户任务入口包装。
+ *   - xeros_task_start：新任务首次运行的 C 包装，负责计算栈顶并调用
+ *     汇编启动桩 xeros_task_start_asm。
  */
 
 #include "ctx_switch.h"
@@ -17,75 +18,49 @@
 #include "../kern_task.h"
 #include "../debug_serial.h"
 
-#include <string.h>   /* memset */
+#include <setjmp.h>
+#include <stddef.h>
+#include <stdint.h>
 
-/* ========================================================================== */
-/*  外部符号声明                                                                */
-/* ========================================================================== */
+int xeros_ctx_save(kern_ctx_native_t *ctx)
+{
+    return setjmp(*ctx);
+}
 
-/**
- * @brief 任务蹦床符号（定义在 ctx_switch.S 中）
- *
- * ctx_restore_impl 通过 pc == xeros_task_trampoline 判断是否为新任务。
- * 蹦床通过 call8 调用 xeros_task_wrapper，使用 CALLINC=2 窗口旋转。
- * 蹦床符号仅用于新/旧任务判断。
- */
-extern void xeros_task_trampoline(void);
-extern void xeros_task_cleanup_handler(void);
+__attribute__((noreturn)) void xeros_ctx_restore(kern_ctx_native_t *ctx)
+{
+    longjmp(*ctx, 1);
+}
 
 /**
- * @brief 任务入口包装函数
+ * @brief 任务入口包装函数（windowed ABI）
  *
- * 由蹦床通过 call8 调用。使用默认 call8 ABI 编译，与蹦床和任务入口函数
- * 保持一致，避免混合 call4/call8 导致的窗口状态损坏。
- *
- * @param pxCode        任务入口函数指针
- * @param pvParameters  传递给任务入口函数的参数
+ * 由启动桩调用。函数参数遵循 call8 ABI：a2 = pxCode，a3 = pvParameters。
+ * 包装函数负责调用用户任务入口，并在任务自然返回时调用 kern_exit()。
  */
 void xeros_task_wrapper(void (*pxCode)(void *), void *pvParameters)
 {
-    debug_printf("[WRAPPER] entering pxCode=%p pv=%p\n", (void *)pxCode, pvParameters);
+    debug_printf("[native] task_wrapper: pxCode=%p\n", (void *)pxCode);
     pxCode(pvParameters);
-    debug_printf("[WRAPPER] pxCode returned, calling kern_exit\n");
     kern_exit();
 }
 
-/* DEBUG: ultra-minimal test function called directly from trampoline.
- * Bypasses the wrapper to test if trampoline → function → cleanup works. */
-extern volatile uint32_t g_trampoline_reached;
-void xeros_test_minimal(void)
+/* 汇编启动桩：切换到指定栈顶并调用 xeros_task_wrapper(entry, arg) */
+extern void xeros_task_start_asm(void *stack_top,
+                                 void (*entry)(void *),
+                                 void *arg);
+
+/**
+ * @brief 首次启动一个新任务（不返回）
+ *
+ * 计算任务栈顶，然后交给汇编桩完成栈切换并进入 xeros_task_wrapper。
+ */
+__attribute__((noinline, noreturn)) void xeros_task_start(kern_task_t *task)
 {
-    g_trampoline_reached = 42;
-    /* Jump directly to cleanup handler (restores scheduler context) */
-    extern void xeros_task_cleanup_handler(void);
-    xeros_task_cleanup_handler();
+    uintptr_t sp = (uintptr_t)(task->stack_base + task->stack_size);
+    sp &= ~((uintptr_t)0xF);
+    xeros_task_start_asm((void *)sp, task->entry, task->arg);
+    __builtin_unreachable();
 }
 
-/* ========================================================================== */
-/*  处理器状态寄存器 (PS) 读写辅助                                               */
-/* ========================================================================== */
-
-uint32_t xeros_get_ps(void)
-{
-    uint32_t ps;
-    __asm__ __volatile__(
-        "rsr %0, PS"
-        : "=r"(ps)
-        :
-        : "memory"
-    );
-    return ps;
-}
-
-void xeros_set_ps(uint32_t ps)
-{
-    __asm__ __volatile__(
-        "wsr %0, PS\n\t"
-        "rsync"
-        :
-        : "r"(ps)
-        : "memory"
-    );
-}
-
-#endif /* !NATIVE_TEST && !XEROS_NATIVE_SCHED */
+#endif /* !NATIVE_TEST && XEROS_NATIVE_SCHED */
