@@ -119,7 +119,7 @@ void xerintosh_push_pop_up(const char *_content, const uint16_t _span)
 
   /* ── 自动换行：当文字超出可用宽度时拆为多行 ── */
   {
-    int16_t max_w = SCREEN_WIDTH - 12;   /* 弹窗宽度上限（为边框留 12px） */
+    int16_t max_w = HAL_SCREEN_WIDTH - 12;   /* 弹窗宽度上限（为边框留 12px） */
     int16_t avail = max_w - POP_UP_OFFSET;  /* 文字可用宽度 */
 
     if (avail < 20) avail = 20;
@@ -226,11 +226,11 @@ calc_height:
         && strcmp(g_xerintosh_pop_up.content, _content) == 0) {
       g_xerintosh_pop_up.time_start = hal_get_ticks();
       g_xerintosh_pop_up.span = _span;
-      g_xerintosh_pop_up.y_pop_up_trg = (SCREEN_HEIGHT - pop_h) / 2;
+      g_xerintosh_pop_up.y_pop_up_trg = (HAL_SCREEN_HEIGHT - pop_h) / 2;
       return;
     }
 
-    g_xerintosh_pop_up.y_pop_up_trg = (SCREEN_HEIGHT - pop_h) / 2;
+    g_xerintosh_pop_up.y_pop_up_trg = (HAL_SCREEN_HEIGHT - pop_h) / 2;
     /* cache already valid from above */
   }
 
@@ -245,7 +245,7 @@ calc_height:
   g_xerintosh_pop_up.is_running = true;
 
   /* 防御性钳位：无论换行成功与否，弹窗宽度不得超出最大可用宽度 */
-  int16_t max_w = SCREEN_WIDTH - 12;
+  int16_t max_w = HAL_SCREEN_WIDTH - 12;
   if ((int16_t)g_xerintosh_pop_up.w_pop_up_trg > max_w)
     g_xerintosh_pop_up.w_pop_up_trg = max_w;
   /* cached_pop_h and cached_content_h remain valid */

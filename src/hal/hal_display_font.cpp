@@ -153,15 +153,15 @@ int16_t  g_font_fb_h = 0;
 static void font_fb_init_once(void)
 {
     if (g_font_fb == NULL) {
-        g_font_fb_w = SCREEN_WIDTH;
-        g_font_fb_h = SCREEN_HEIGHT;
+        g_font_fb_w = HAL_SCREEN_WIDTH;
+        g_font_fb_h = HAL_SCREEN_HEIGHT;
         g_font_fb = (uint16_t*)calloc(g_font_fb_w * g_font_fb_h, sizeof(uint16_t));
     }
 }
 
 static void font_draw_char(int16_t x, int16_t y, char c, uint16_t color)
 {
-    if (x + FONT_W < 0 || x >= SCREEN_WIDTH || y + FONT_H < 0 || y >= SCREEN_HEIGHT) return;
+    if (x + FONT_W < 0 || x >= HAL_SCREEN_WIDTH || y + FONT_H < 0 || y >= HAL_SCREEN_HEIGHT) return;
     if (c < 0 || c > 127) return;
     font_fb_init_once();
     const uint8_t *bm = g_font_6x8[(uint8_t)c];
@@ -171,8 +171,8 @@ static void font_draw_char(int16_t x, int16_t y, char c, uint16_t color)
             if (bits & (1 << (7 - col))) {
                 int16_t px = x + col;
                 int16_t py = y + row;
-                if (px >= 0 && px < SCREEN_WIDTH && py >= 0 && py < SCREEN_HEIGHT) {
-                    g_font_fb[py * SCREEN_WIDTH + px] = color;
+                if (px >= 0 && px < HAL_SCREEN_WIDTH && py >= 0 && py < HAL_SCREEN_HEIGHT) {
+                    g_font_fb[py * HAL_SCREEN_WIDTH + px] = color;
                 }
             }
         }

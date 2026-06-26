@@ -13,6 +13,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include "hal/hal_screen.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -58,7 +59,7 @@ typedef struct {
  * @param visible_count  可见行数
  * @param row_height     行高（含间距）
  * @param list_top       列表顶部 Y 坐标
- * @note  所有行初始 Y 设为 SCREEN_HEIGHT 以实现入场动画效果
+ * @note  所有行初始 Y 设为 HAL_SCREEN_HEIGHT 以实现入场动画效果
  */
 void xerintosh_anim_row_list_init(xerintosh_anim_row_list_t *list,
                                    int visible_count, int16_t row_height,

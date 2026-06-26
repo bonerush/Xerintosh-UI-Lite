@@ -97,9 +97,9 @@ static kern_err_t dev_fb0_ioctl(kern_device_t *dev, unsigned int cmd, unsigned l
 
     switch (cmd) {
     case DEV_FB_IOCTL_GET_WIDTH:
-        return (kern_err_t)SCREEN_WIDTH;
+        return (kern_err_t)HAL_SCREEN_WIDTH;
     case DEV_FB_IOCTL_GET_HEIGHT:
-        return (kern_err_t)SCREEN_HEIGHT;
+        return (kern_err_t)HAL_SCREEN_HEIGHT;
     case DEV_FB_IOCTL_SET_ROTATION:
         if (arg > 3) return KERN_EINVAL;
         hal_display_set_rotation((int)arg);

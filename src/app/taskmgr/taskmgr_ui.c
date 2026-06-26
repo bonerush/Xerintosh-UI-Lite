@@ -139,7 +139,7 @@ static void draw_header(void)
     hal_draw_string(title_x, title_y, "Task Manager", COLOR_FG);
 
     int16_t sep_y = HAL_HEADER_BOTTOM();
-    hal_draw_line(0, sep_y, SCREEN_WIDTH, sep_y, COLOR_FG);
+    hal_draw_line(0, sep_y, HAL_SCREEN_WIDTH, sep_y, COLOR_FG);
 }
 
 /* ═══ 任务列表 ═══ */
@@ -202,7 +202,7 @@ static void draw_list(void)
             char right_buf[20];
             format_right_text(t, right_buf, sizeof(right_buf));
             w_right = hal_get_string_width(right_buf);
-            x_right = (int16_t)(SCREEN_WIDTH - TM_RIGHT_MARGIN - w_right);
+            x_right = (int16_t)(HAL_SCREEN_WIDTH - TM_RIGHT_MARGIN - w_right);
 
             /* 裁剪：防止右对齐文本溢出屏幕左/右边缘 */
             hal_set_clip_rect(x_right, row_y, w_right, (int16_t)(fh + 4));
@@ -261,7 +261,7 @@ static void draw_confirm_overlay(void)
     int16_t fh = hal_get_font_height();
     hal_set_font(hal_get_cn_font());
 
-    int16_t bw = (int16_t)(SCREEN_WIDTH * 7 / 8);
+    int16_t bw = (int16_t)(HAL_SCREEN_WIDTH * 7 / 8);
     int16_t bh = (int16_t)(fh * 2 + HAL_MARGIN_LG);
     int16_t bx = HAL_CENTER_X(bw);
     int16_t by = HAL_CENTER_Y(bh);
@@ -304,7 +304,7 @@ static void update_footer_info(kern_task_t *t, bool is_prot)
     }
 
     s_footer_text_width = hal_get_string_width(s_footer_info);
-    s_footer_avail_width = SCREEN_WIDTH - TASKMGR_LEFT_MARGIN - HAL_MARGIN_MD;
+    s_footer_avail_width = HAL_SCREEN_WIDTH - TASKMGR_LEFT_MARGIN - HAL_MARGIN_MD;
 
     bool need_scroll = (s_footer_text_width > s_footer_avail_width);
     if (need_scroll && !s_footer_is_scrolling) {
@@ -324,7 +324,7 @@ static void draw_footer(void)
     if (t == NULL) return;
 
     int16_t sep_y = HAL_FOOTER_TOP();
-    hal_draw_line(0, sep_y, SCREEN_WIDTH, sep_y, COLOR_FG);
+    hal_draw_line(0, sep_y, HAL_SCREEN_WIDTH, sep_y, COLOR_FG);
 
     bool is_prot = taskmgr_is_task_protected(selected);
     update_footer_info(t, is_prot);
@@ -340,7 +340,7 @@ static void draw_footer(void)
     }
 
     int16_t clip_y = HAL_FOOTER_TOP();
-    hal_set_clip_rect(0, clip_y, SCREEN_WIDTH, HAL_ROW_H());
+    hal_set_clip_rect(0, clip_y, HAL_SCREEN_WIDTH, HAL_ROW_H());
 
     int16_t draw_x = TASKMGR_LEFT_MARGIN - (int16_t)scroll_x;
     int16_t cycle_dist = s_footer_text_width + s_footer_avail_width;

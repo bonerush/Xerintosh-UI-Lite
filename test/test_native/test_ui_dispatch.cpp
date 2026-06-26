@@ -166,10 +166,10 @@ TEST_F(UiDispatchTest, MeasureReturnsFullWidthForSwitchAndSlider)
     ASSERT_NE(sl, nullptr);
     ASSERT_NE(list, nullptr);
 
-    EXPECT_EQ(xerintosh_dispatch_measure(sw), SCREEN_WIDTH - 18);
-    EXPECT_EQ(xerintosh_dispatch_measure(sl), SCREEN_WIDTH - 18);
+    EXPECT_EQ(xerintosh_dispatch_measure(sw), HAL_SCREEN_WIDTH - 18);
+    EXPECT_EQ(xerintosh_dispatch_measure(sl), HAL_SCREEN_WIDTH - 18);
     EXPECT_GT(xerintosh_dispatch_measure(list), 0);
-    EXPECT_LT(xerintosh_dispatch_measure(list), SCREEN_WIDTH - 18);
+    EXPECT_LT(xerintosh_dispatch_measure(list), HAL_SCREEN_WIDTH - 18);
 
     free((void *)sw->content); free(sw);
     free((void *)sl->content); free(sl);

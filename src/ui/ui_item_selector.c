@@ -46,8 +46,8 @@ bool xerintosh_bind_item_to_selector(xerintosh_list_item_t *_item)
   /* 坐标在 refresh 内部更新 */
   if (g_xerintosh_selector.selected_item == NULL)
   {
-    g_xerintosh_selector.y_selector = 2 * SCREEN_HEIGHT;  /* 给个初始坐标做动画 */
-    g_xerintosh_selector.h_selector = SCREEN_HEIGHT;
+    g_xerintosh_selector.y_selector = 2 * HAL_SCREEN_HEIGHT;  /* 给个初始坐标做动画 */
+    g_xerintosh_selector.h_selector = HAL_SCREEN_HEIGHT;
   }
   g_xerintosh_selector.selected_index = find_item_index(_item->parent, _item);
   g_xerintosh_selector.selected_item = _item;

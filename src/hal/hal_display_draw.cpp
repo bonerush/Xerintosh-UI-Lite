@@ -18,8 +18,8 @@ extern uint16_t g_framebuffer[];  /* RGB565 帧缓冲区，定义在 hal_display
  * @brief 绘制像素点（带边界检查）
  */
 void hal_draw_pixel(int16_t x, int16_t y, uint16_t color) {
-    if (x < 0 || x >= SCREEN_WIDTH || y < 0 || y >= SCREEN_HEIGHT) return;
-    g_framebuffer[y * SCREEN_WIDTH + x] = color;
+    if (x < 0 || x >= HAL_SCREEN_WIDTH || y < 0 || y >= HAL_SCREEN_HEIGHT) return;
+    g_framebuffer[y * HAL_SCREEN_WIDTH + x] = color;
 }
 
 /**

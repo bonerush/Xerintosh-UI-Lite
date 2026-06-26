@@ -19,8 +19,8 @@ extern uint16_t g_framebuffer[];
 
 static uint16_t* fb_pixel_ptr(int16_t x, int16_t y)
 {
-    if (x < 0 || x >= SCREEN_WIDTH || y < 0 || y >= SCREEN_HEIGHT) return NULL;
-    return &g_framebuffer[y * SCREEN_WIDTH + x];
+    if (x < 0 || x >= HAL_SCREEN_WIDTH || y < 0 || y >= HAL_SCREEN_HEIGHT) return NULL;
+    return &g_framebuffer[y * HAL_SCREEN_WIDTH + x];
 }
 
 /* ─── 高级绘制（native 实现）─── */
@@ -34,8 +34,8 @@ void hal_draw_xor_rect(int16_t x, int16_t y, int16_t w, int16_t h) {
         for (int16_t col = 0; col < w; col++) {
             int16_t px = x + col;
             int16_t py = y + row;
-            if (px >= 0 && px < SCREEN_WIDTH && py >= 0 && py < SCREEN_HEIGHT) {
-                g_framebuffer[py * SCREEN_WIDTH + px] ^= 0xFFFF;
+            if (px >= 0 && px < HAL_SCREEN_WIDTH && py >= 0 && py < HAL_SCREEN_HEIGHT) {
+                g_framebuffer[py * HAL_SCREEN_WIDTH + px] ^= 0xFFFF;
             }
         }
     }
@@ -76,10 +76,10 @@ void hal_clear_clip_rect(void) {
  */
 uint16_t hal_test_fb_read(int16_t x, int16_t y)
 {
-    if (x < 0 || x >= SCREEN_WIDTH || y < 0 || y >= SCREEN_HEIGHT) return 0;
-    uint16_t v = g_framebuffer[y * SCREEN_WIDTH + x];
+    if (x < 0 || x >= HAL_SCREEN_WIDTH || y < 0 || y >= HAL_SCREEN_HEIGHT) return 0;
+    uint16_t v = g_framebuffer[y * HAL_SCREEN_WIDTH + x];
     if (g_font_fb != NULL) {
-        uint16_t fv = g_font_fb[y * SCREEN_WIDTH + x];
+        uint16_t fv = g_font_fb[y * HAL_SCREEN_WIDTH + x];
         if (fv != 0) v = fv;
     }
     return v;

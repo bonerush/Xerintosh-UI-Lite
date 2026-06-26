@@ -201,7 +201,7 @@ static int16_t dispatch_measure_text(xerintosh_list_item_t *item)
 static int16_t dispatch_measure_full_width(xerintosh_list_item_t *item)
 {
     (void)item;
-    return SCREEN_WIDTH - 18;
+    return HAL_SCREEN_WIDTH - 18;
 }
 
 /* ═══ draw ═══ */
@@ -225,18 +225,18 @@ static void dispatch_draw_switch(xerintosh_list_item_t *item, int16_t x, int16_t
 
     /* 绘制开关外框 */
     g_xerintosh_draw_color = COLOR_FG;
-    hal_draw_rect(SCREEN_WIDTH - LIST_ITEM_RIGHT_MARGIN - 7, y - 2, 11, 7, g_xerintosh_draw_color);
+    hal_draw_rect(HAL_SCREEN_WIDTH - LIST_ITEM_RIGHT_MARGIN - 7, y - 2, 11, 7, g_xerintosh_draw_color);
     if (*sw->value)
     {
         /* 开启态：方块靠右 */
-        hal_draw_fill_rect(SCREEN_WIDTH - LIST_ITEM_RIGHT_MARGIN - 1, y, 3, 3, g_xerintosh_draw_color);
-        hal_draw_pixel(SCREEN_WIDTH - LIST_ITEM_RIGHT_MARGIN - 4, y + 1, g_xerintosh_draw_color);
+        hal_draw_fill_rect(HAL_SCREEN_WIDTH - LIST_ITEM_RIGHT_MARGIN - 1, y, 3, 3, g_xerintosh_draw_color);
+        hal_draw_pixel(HAL_SCREEN_WIDTH - LIST_ITEM_RIGHT_MARGIN - 4, y + 1, g_xerintosh_draw_color);
     }
     else
     {
         /* 关闭态：方块靠左 */
-        hal_draw_fill_rect(SCREEN_WIDTH - LIST_ITEM_RIGHT_MARGIN - 5, y, 3, 3, g_xerintosh_draw_color);
-        hal_draw_pixel(SCREEN_WIDTH - LIST_ITEM_RIGHT_MARGIN, y + 1, g_xerintosh_draw_color);
+        hal_draw_fill_rect(HAL_SCREEN_WIDTH - LIST_ITEM_RIGHT_MARGIN - 5, y, 3, 3, g_xerintosh_draw_color);
+        hal_draw_pixel(HAL_SCREEN_WIDTH - LIST_ITEM_RIGHT_MARGIN, y + 1, g_xerintosh_draw_color);
     }
 }
 
@@ -257,7 +257,7 @@ static void dispatch_draw_slider(xerintosh_list_item_t *item, int16_t x, int16_t
         char value_str[10] = {};
         dispatch_itoa(*sl->value, value_str);
         int16_t value_width = hal_get_string_width(value_str);
-        int16_t x_value = SCREEN_WIDTH - LIST_ITEM_RIGHT_MARGIN - value_width + 2;
+        int16_t x_value = HAL_SCREEN_WIDTH - LIST_ITEM_RIGHT_MARGIN - value_width + 2;
         g_xerintosh_draw_color = COLOR_FG;
         hal_draw_string(x_value + 2, y + hal_get_font_height() / 2, value_str, g_xerintosh_draw_color);
     }
@@ -274,7 +274,7 @@ static void dispatch_draw_overlay_slider(xerintosh_list_item_t *item)
     char value_str[10] = {};
     dispatch_itoa(*sl->value, value_str);
     int16_t value_width = hal_get_string_width(value_str);
-    int16_t x_value = SCREEN_WIDTH - LIST_ITEM_RIGHT_MARGIN - value_width + 2;
+    int16_t x_value = HAL_SCREEN_WIDTH - LIST_ITEM_RIGHT_MARGIN - value_width + 2;
 
     /* 反色背景框 */
     g_xerintosh_draw_color = COLOR_BG;

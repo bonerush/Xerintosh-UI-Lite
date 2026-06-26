@@ -18,10 +18,10 @@ TEST(AnimRowInitTest, SetsInitialPositionsToScreenHeight)
     xerintosh_anim_row_list_t list;
     xerintosh_anim_row_list_init(&list, 3, 16, 20);
 
-    /* 所有行应从 SCREEN_HEIGHT（入场起点）开始 */
+    /* 所有行应从 HAL_SCREEN_HEIGHT（入场起点）开始 */
     for (int i = 0; i < 3; i++) {
-        EXPECT_FLOAT_EQ(list.rows[i].y, (float)SCREEN_HEIGHT)
-            << "Row " << i << " should start at SCREEN_HEIGHT";
+        EXPECT_FLOAT_EQ(list.rows[i].y, (float)HAL_SCREEN_HEIGHT)
+            << "Row " << i << " should start at HAL_SCREEN_HEIGHT";
     }
 
     /* 目标位置应为 list_top + i * row_height */
@@ -29,8 +29,8 @@ TEST(AnimRowInitTest, SetsInitialPositionsToScreenHeight)
     EXPECT_FLOAT_EQ(list.rows[1].y_trg, 36.0f);
     EXPECT_FLOAT_EQ(list.rows[2].y_trg, 52.0f);
 
-    /* 高亮框也应从 SCREEN_HEIGHT 开始 */
-    EXPECT_FLOAT_EQ(list.highlight.y, (float)SCREEN_HEIGHT);
+    /* 高亮框也应从 HAL_SCREEN_HEIGHT 开始 */
+    EXPECT_FLOAT_EQ(list.highlight.y, (float)HAL_SCREEN_HEIGHT);
     EXPECT_FLOAT_EQ(list.highlight.y_trg, 20.0f);
 
     /* 可见行数和行高应正确存储 */
@@ -55,17 +55,17 @@ TEST(AnimRowUpdateTest, AnimatesTowardTarget)
     xerintosh_anim_row_list_t list;
     xerintosh_anim_row_list_init(&list, 2, 20, 0);
 
-    /* 设置行从 SCREEN_HEIGHT 向 0 移动 */
-    list.rows[0].y = (float)SCREEN_HEIGHT;
+    /* 设置行从 HAL_SCREEN_HEIGHT 向 0 移动 */
+    list.rows[0].y = (float)HAL_SCREEN_HEIGHT;
     list.rows[0].y_trg = 0.0f;
-    list.rows[1].y = (float)SCREEN_HEIGHT;
+    list.rows[1].y = (float)HAL_SCREEN_HEIGHT;
     list.rows[1].y_trg = 20.0f;
 
     /* 更新一帧（speed=90 快速移动） */
     xerintosh_anim_row_list_update(&list, 90.0f);
 
     /* 行应该向目标移动 */
-    EXPECT_LT(list.rows[0].y, (float)SCREEN_HEIGHT)
+    EXPECT_LT(list.rows[0].y, (float)HAL_SCREEN_HEIGHT)
         << "Row 0 should have moved toward target";
     EXPECT_GT(list.rows[0].y, 0.0f)
         << "Row 0 should not overshoot to negative";

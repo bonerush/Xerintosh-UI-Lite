@@ -23,7 +23,7 @@
  */
 bool xerintosh_is_item_visible(int16_t _y_item)
 {
-  return (_y_item + 2 > LIST_INFO_BAR_HEIGHT && _y_item - 2 < SCREEN_HEIGHT);
+  return (_y_item + 2 > LIST_INFO_BAR_HEIGHT && _y_item - 2 < HAL_SCREEN_HEIGHT);
 }
 
 /**
@@ -75,42 +75,42 @@ static void xerintosh_draw_list_appearance(int16_t selected_index, int16_t child
       hal_draw_pixel(i, draw_cfg[j]._y, g_xerintosh_draw_color);
 
   /* 右侧边框竖线 */
-  hal_draw_v_line(SCREEN_WIDTH - 5, 0, SCREEN_HEIGHT, g_xerintosh_draw_color);
-  hal_draw_v_line(SCREEN_WIDTH - 1, 0, SCREEN_HEIGHT, g_xerintosh_draw_color);
+  hal_draw_v_line(HAL_SCREEN_WIDTH - 5, 0, HAL_SCREEN_HEIGHT, g_xerintosh_draw_color);
+  hal_draw_v_line(HAL_SCREEN_WIDTH - 1, 0, HAL_SCREEN_HEIGHT, g_xerintosh_draw_color);
 
   /* 滚动条 */
   static uint8_t _cached_child_num = 0;
   static int16_t _cached_screen_h = -1;
   static float _cached_length = 0;
-  if (_cached_child_num != child_num || _cached_screen_h != SCREEN_HEIGHT) {
+  if (_cached_child_num != child_num || _cached_screen_h != HAL_SCREEN_HEIGHT) {
     _cached_child_num = child_num;
-    _cached_screen_h = SCREEN_HEIGHT;
-    _cached_length = ceilf((SCREEN_HEIGHT - 10.0f) / (float)_cached_child_num);
+    _cached_screen_h = HAL_SCREEN_HEIGHT;
+    _cached_length = ceilf((HAL_SCREEN_HEIGHT - 10.0f) / (float)_cached_child_num);
   }
   float _length_each_part = _cached_length;
-  hal_draw_fill_rect(SCREEN_WIDTH - 4, 5 + selected_index * _length_each_part, 3, _length_each_part, g_xerintosh_draw_color);
+  hal_draw_fill_rect(HAL_SCREEN_WIDTH - 4, 5 + selected_index * _length_each_part, 3, _length_each_part, g_xerintosh_draw_color);
 
   /* 滚动条内部高光线 */
   g_xerintosh_draw_color = COLOR_BG;
-  hal_draw_h_line(SCREEN_WIDTH - 4, _length_each_part + (float)selected_index * _length_each_part, 3, g_xerintosh_draw_color);
+  hal_draw_h_line(HAL_SCREEN_WIDTH - 4, _length_each_part + (float)selected_index * _length_each_part, 3, g_xerintosh_draw_color);
 
   if (_length_each_part >= 9)
   {
-    hal_draw_h_line(SCREEN_WIDTH - 4,
+    hal_draw_h_line(HAL_SCREEN_WIDTH - 4,
                      floorf(_length_each_part - 2.0f + (float)selected_index * _length_each_part), 3, g_xerintosh_draw_color);
-    hal_draw_h_line(SCREEN_WIDTH - 4,
+    hal_draw_h_line(HAL_SCREEN_WIDTH - 4,
                      floorf(_length_each_part + 2.0f + (float)selected_index * _length_each_part), 3, g_xerintosh_draw_color);
   }
 
   /* 滚动条上下端点 */
   g_xerintosh_draw_color = COLOR_FG;
-  hal_draw_fill_rect(SCREEN_WIDTH - 4, 0, 3, 4, g_xerintosh_draw_color);
-  hal_draw_fill_rect(SCREEN_WIDTH - 4, SCREEN_HEIGHT - 4, 3, 4, g_xerintosh_draw_color);
+  hal_draw_fill_rect(HAL_SCREEN_WIDTH - 4, 0, 3, 4, g_xerintosh_draw_color);
+  hal_draw_fill_rect(HAL_SCREEN_WIDTH - 4, HAL_SCREEN_HEIGHT - 4, 3, 4, g_xerintosh_draw_color);
   g_xerintosh_draw_color = COLOR_BG;
-  hal_draw_h_line(SCREEN_WIDTH - 4, 2, 3, g_xerintosh_draw_color);
-  hal_draw_pixel(SCREEN_WIDTH - 3, 1, g_xerintosh_draw_color);
-  hal_draw_h_line(SCREEN_WIDTH - 4, SCREEN_HEIGHT - 3, 3, g_xerintosh_draw_color);
-  hal_draw_pixel(SCREEN_WIDTH - 3, SCREEN_HEIGHT - 2, g_xerintosh_draw_color);
+  hal_draw_h_line(HAL_SCREEN_WIDTH - 4, 2, 3, g_xerintosh_draw_color);
+  hal_draw_pixel(HAL_SCREEN_WIDTH - 3, 1, g_xerintosh_draw_color);
+  hal_draw_h_line(HAL_SCREEN_WIDTH - 4, HAL_SCREEN_HEIGHT - 3, 3, g_xerintosh_draw_color);
+  hal_draw_pixel(HAL_SCREEN_WIDTH - 3, HAL_SCREEN_HEIGHT - 2, g_xerintosh_draw_color);
 }
 
 /* ═══ 列表项与文字绘制 ═══ */
@@ -141,12 +141,12 @@ static void xerintosh_draw_list_item()
 
     /* ═══ 文字绘制与滚动效果 ═══ */
     if (_y_list_item + _font_h_2 > LIST_INFO_BAR_HEIGHT &&
-        _y_list_item + _font_h_2 < SCREEN_HEIGHT)
+        _y_list_item + _font_h_2 < HAL_SCREEN_HEIGHT)
     {
       int16_t _text_width = hal_get_string_width(_item->content);
       bool _has_right_control = xerintosh_dispatch_has_right_control(_item);
       int16_t _right_margin = _has_right_control ? LIST_ITEM_RIGHT_MARGIN : 4;
-      int16_t _avail_width = SCREEN_WIDTH - LIST_ITEM_LEFT_MARGIN - 10 - _right_margin;
+      int16_t _avail_width = HAL_SCREEN_WIDTH - LIST_ITEM_LEFT_MARGIN - 10 - _right_margin;
 
       /* switch/slider 额外占用右侧控件空间 */
       if (_has_right_control)
@@ -242,8 +242,8 @@ void xerintosh_draw_long_press_hint(uint32_t duration_ms, uint32_t threshold_ms)
     float progress = (float)duration_ms / (float)threshold_ms;
     uint16_t bar_width = 40;
     uint16_t bar_height = 4;
-    uint16_t x = SCREEN_WIDTH - bar_width - 6;
-    uint16_t y = SCREEN_HEIGHT - 6;
+    uint16_t x = HAL_SCREEN_WIDTH - bar_width - 6;
+    uint16_t y = HAL_SCREEN_HEIGHT - 6;
 
     g_xerintosh_draw_color = COLOR_FG;
     hal_draw_rect(x, y, bar_width, bar_height, g_xerintosh_draw_color);

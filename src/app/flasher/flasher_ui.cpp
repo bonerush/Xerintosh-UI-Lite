@@ -94,9 +94,9 @@ void flasher_ui_draw(const flasher_ui_state_t *st)
     if (!st) return;
 
     /* 计算进度条宽度 */
-    int16_t bar_w = (int16_t)((SCREEN_WIDTH * st->progress) / 100);
+    int16_t bar_w = (int16_t)((HAL_SCREEN_WIDTH * st->progress) / 100);
     int16_t bar_y = 4;
-    int16_t bar_h = SCREEN_HEIGHT - 8;
+    int16_t bar_h = HAL_SCREEN_HEIGHT - 8;
 
     /* 绘制左侧填充进度条 */
     if (bar_w > 0) {
@@ -104,8 +104,8 @@ void flasher_ui_draw(const flasher_ui_state_t *st)
     }
 
     /* 如果进度未满，绘制右侧空心矩形边框 */
-    if (bar_w < SCREEN_WIDTH) {
-        hal_draw_rect(bar_w, bar_y, (int16_t)(SCREEN_WIDTH - bar_w), bar_h, COLOR_FG);
+    if (bar_w < HAL_SCREEN_WIDTH) {
+        hal_draw_rect(bar_w, bar_y, (int16_t)(HAL_SCREEN_WIDTH - bar_w), bar_h, COLOR_FG);
     }
 
     /* 确定显示文字 */
@@ -125,8 +125,8 @@ void flasher_ui_draw(const flasher_ui_state_t *st)
     /* 计算文字居中位置 */
     int16_t tw = hal_get_string_width(text);
     int16_t fh = hal_get_font_height();
-    int16_t tx = (SCREEN_WIDTH - tw) / 2;
-    int16_t ty = (SCREEN_HEIGHT - fh) / 2;
+    int16_t tx = (HAL_SCREEN_WIDTH - tw) / 2;
+    int16_t ty = (HAL_SCREEN_HEIGHT - fh) / 2;
 
     /* 反色逻辑：文字中心点是否在进度条内部 */
     int16_t text_center = tx + tw / 2;

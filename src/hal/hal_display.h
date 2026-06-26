@@ -17,15 +17,7 @@
 extern "C" {
 #endif
 
-/* ═══ 常量（保持向后兼容）═══ */
-
-#ifdef NATIVE_TEST
-#define SCREEN_WIDTH  80   /* native 测试环境屏幕宽度 */
-#define SCREEN_HEIGHT 160  /* native 测试环境屏幕高度 */
-#else
-#define SCREEN_WIDTH  g_screen_width
-#define SCREEN_HEIGHT g_screen_height
-#endif
+/* ═══ 颜色常量 ═══ */
 
 #define COLOR_BG      0x0000  /* 背景色：黑色 */
 #define COLOR_FG      0xFFFF  /* 前景色：白色 */

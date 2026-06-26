@@ -103,3 +103,15 @@ TEST(HalDisplayXbm, MsbFirstBitOrder)
     EXPECT_EQ(hal_test_fb_read(1, 0), 0u);   /* (1,0) 应熄灭 */
     EXPECT_EQ(hal_test_fb_read(7, 0), 0u);   /* (7,0) 应熄灭 */
 }
+
+TEST(HalLayoutTest, ScreenConstantsAreUnified)
+{
+    /* SCREEN_WIDTH/HEIGHT 宏已移除；编译期统一使用 HAL_SCREEN_* */
+    EXPECT_EQ(HAL_SCREEN_WIDTH, 80);
+    EXPECT_EQ(HAL_SCREEN_HEIGHT, 160);
+
+    int16_t w = 0, h = 0;
+    hal_screen_get_size(&w, &h);
+    EXPECT_EQ(w, HAL_SCREEN_WIDTH);
+    EXPECT_EQ(h, HAL_SCREEN_HEIGHT);
+}

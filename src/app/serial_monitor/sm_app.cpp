@@ -59,7 +59,7 @@ void serial_monitor_init(void *ud)
     sm_buffer_init(&sm_buffer);
 
     /* 初始化动画状态 */
-    sm_entry_offset = (float)SCREEN_HEIGHT;
+    sm_entry_offset = (float)HAL_SCREEN_HEIGHT;
     sm_entry_vel    = 0.0f;
     sm_btn_alpha_0  = 100.0f;
     sm_btn_alpha_1  = 0.0f;

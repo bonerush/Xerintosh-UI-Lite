@@ -185,8 +185,8 @@ void xerintosh_refresh_camera_position()
   if (g_xerintosh_camera.selector->selected_item == NULL) return;
 
   /* 15 为选择器高度 */
-  if (g_xerintosh_camera.selector->y_selector_trg + 15 + g_xerintosh_camera.y_camera_trg > SCREEN_HEIGHT)  /* 向下超出屏幕，需要向下移动 */
-    g_xerintosh_camera.y_camera_trg = SCREEN_HEIGHT - g_xerintosh_camera.selector->y_selector_trg - 15;
+  if (g_xerintosh_camera.selector->y_selector_trg + 15 + g_xerintosh_camera.y_camera_trg > HAL_SCREEN_HEIGHT)  /* 向下超出屏幕，需要向下移动 */
+    g_xerintosh_camera.y_camera_trg = HAL_SCREEN_HEIGHT - g_xerintosh_camera.selector->y_selector_trg - 15;
 
   if (g_xerintosh_camera.selector->y_selector_trg + g_xerintosh_camera.y_camera_trg < 0)  /* 向上超出屏幕，需要向上移动 */
     g_xerintosh_camera.y_camera_trg = 0 - g_xerintosh_camera.selector->y_selector_trg + LIST_FONT_TOP_MARGIN;
@@ -206,8 +206,8 @@ static void xerintosh_init_list()
     xerintosh_get_root_list()->child_list_item[i]->y_list_item = 0;
   g_xerintosh_selector.selected_index = 0;
   g_xerintosh_selector.selected_item = xerintosh_get_root_list()->child_list_item[0];
-  g_xerintosh_selector.y_selector = SCREEN_HEIGHT;
-  g_xerintosh_selector.h_selector = SCREEN_HEIGHT;
+  g_xerintosh_selector.y_selector = HAL_SCREEN_HEIGHT;
+  g_xerintosh_selector.h_selector = HAL_SCREEN_HEIGHT;
 }
 
 /**

@@ -10,8 +10,8 @@
 #include <stddef.h>
 
 #ifndef NATIVE_TEST
-int16_t g_screen_width = 160;
-int16_t g_screen_height = 80;
+int16_t g_screen_width = 80;
+int16_t g_screen_height = 160;
 #endif
 
 void hal_screen_get_size(int16_t *w, int16_t *h)

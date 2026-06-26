@@ -34,7 +34,7 @@ void xerintosh_draw_info_bar()
       g_xerintosh_info_bar.is_running = false;
   }
 
-  int16_t _x_info_bar = SCREEN_WIDTH/2 - g_xerintosh_info_bar.w_info_bar/2;
+  int16_t _x_info_bar = HAL_SCREEN_WIDTH/2 - g_xerintosh_info_bar.w_info_bar/2;
   int16_t _y_info_bar_1 = g_xerintosh_info_bar.y_info_bar - 4;
   int16_t _y_info_bar_2 = g_xerintosh_info_bar.y_info_bar + INFO_BAR_HEIGHT;
 
@@ -47,7 +47,7 @@ void xerintosh_draw_info_bar()
 
   /* 第二层：外框 */
   g_xerintosh_draw_color = COLOR_BG;
-  hal_draw_fill_round_rect((int16_t)(SCREEN_WIDTH/2 - (g_xerintosh_info_bar.w_info_bar + 4)/2), _y_info_bar_1,
+  hal_draw_fill_round_rect((int16_t)(HAL_SCREEN_WIDTH/2 - (g_xerintosh_info_bar.w_info_bar + 4)/2), _y_info_bar_1,
                   (int16_t)(g_xerintosh_info_bar.w_info_bar + 4), INFO_BAR_HEIGHT + 6, 4, g_xerintosh_draw_color);
 
   /* 第三层：内框 */
@@ -100,14 +100,14 @@ void xerintosh_draw_pop_up()
     content_h = (int16_t)(n * fh + (n - 1) * 2);
   }
 
-  int16_t _x_pop_up = SCREEN_WIDTH/2 - g_xerintosh_pop_up.w_pop_up/2;
+  int16_t _x_pop_up = HAL_SCREEN_WIDTH/2 - g_xerintosh_pop_up.w_pop_up/2;
   int16_t _y_pop_up = g_xerintosh_pop_up.y_pop_up + pop_h;
 
   xerintosh_set_font(hal_get_cn_font());
 
   /* 外框 */
   g_xerintosh_draw_color = COLOR_BG;
-  hal_draw_fill_round_rect((int16_t)(SCREEN_WIDTH/2 - (g_xerintosh_pop_up.w_pop_up + 4)/2 - 2), (int16_t)(g_xerintosh_pop_up.y_pop_up - 2),
+  hal_draw_fill_round_rect((int16_t)(HAL_SCREEN_WIDTH/2 - (g_xerintosh_pop_up.w_pop_up + 4)/2 - 2), (int16_t)(g_xerintosh_pop_up.y_pop_up - 2),
                   (int16_t)(g_xerintosh_pop_up.w_pop_up + 8), pop_h + 4, 5, g_xerintosh_draw_color);
 
   /* 内框 */
@@ -119,7 +119,7 @@ void xerintosh_draw_pop_up()
   g_xerintosh_draw_color = COLOR_BG;
   hal_draw_h_line(_x_pop_up, _y_pop_up - 2, (int16_t)g_xerintosh_pop_up.w_pop_up, g_xerintosh_draw_color);
   hal_draw_pixel(_x_pop_up - 1, _y_pop_up - 3, g_xerintosh_draw_color);
-  hal_draw_pixel((int16_t)(SCREEN_WIDTH/2 + g_xerintosh_pop_up.w_pop_up/2), _y_pop_up - 3, g_xerintosh_draw_color);
+  hal_draw_pixel((int16_t)(HAL_SCREEN_WIDTH/2 + g_xerintosh_pop_up.w_pop_up/2), _y_pop_up - 3, g_xerintosh_draw_color);
 
   /* 多行文字渲染 */
   {

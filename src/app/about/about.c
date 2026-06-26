@@ -64,7 +64,7 @@ static void about_draw(void)
 
     /* 分隔线（纵贯屏幕） */
     hal_draw_v_line(ABOUT_LEFT_MARGIN + content_w + ABOUT_SEP_GAP,
-                    y0, SCREEN_HEIGHT - 2 * y0, COLOR_FG);
+                    y0, HAL_SCREEN_HEIGHT - 2 * y0, COLOR_FG);
 
     /* 信息区 */
     hal_set_font(hal_get_cn_font());
