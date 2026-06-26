@@ -31,6 +31,9 @@ Xerintosh 项目
   - [调试与诊断](architecture/debug-diagnostics.md) — 任务检查器、调度追踪、内存分析
 - **[实施计划](implementation-plan.md)** — 8 个阶段、29 个文件、详细任务分解
 - **[FreeRTOS 剩余引用清单](freertos-remaining-references.md)** — 改造路线图与依赖审计
+- **[原生内核调试日志](debug-xeros-native.md)** — Phase 1/2 实机调试记录与踩坑总结
+- **[内核子系统](kernel/)**
+  - [VFS Dentry-Tree 并发保护](kernel/vfs-concurrency.md) — 全局自旋锁保护 dentry 树与 inode 引用计数
 - **[参考资料](reference/index.md)** — FreeRTOS Xtensa port 源码与 Xtensa ABI 文档
 
 ## 快速链接
@@ -46,18 +49,23 @@ Xerintosh 项目
 
 ## 当前项目状态
 
-- **FreeRTOS 隔离**: 兼容层已移除；显式 FreeRTOS 调用仅剩调度器宿主喂狗与启动阶段延时 fallback
-- **可插拔后端**: 通过 `kern_port_ops_t` 操作表实现后端多态
+- **FreeRTOS 隔离**: 兼容层已移除；原生调度器路径下已无显式 FreeRTOS 调度 API 调用（仅 ESP-IDF 驱动内部仍使用 FreeRTOS）
+- **可插拔后端**: 通过 `kern_port_ops_t` 操作表实现后端多态；`kern_port_esp32_native.c` 已替代 FreeRTOS 后端成为 `m5stick-c-native` 实际后端
 - **已有 IPC**: `xeros_spinlock_t`、递归 mutex（基于 `xeros_spinlock_t`）
-- **已有 SMP**: per-CPU 数据结构、核心亲和性、负载均衡
-- **目标**: 进一步移除显式 FreeRTOS API，最终实现完全自主的原生后端
+- **已有 SMP**: per-CPU 数据结构、核心亲和性、负载均衡；已在 `m5stick-c-native` 原生调度器下启用双核调度
+- **tickless idle**: GPTimer 动态重编程已实现，空闲时按下一个唤醒事件睡眠而非固定 1ms tick
+- **WiFi**: 在原生调度器下已启用 `wifi-mgr` 任务，ESP-IDF WiFi 驱动内部 FreeRTOS 任务与 Xeros 原生任务共存
+- **IPC/SMP 安全**: 已给所有 IPC 原语加 SMP 自旋锁，修复 tickless idle 遍历任务链表的原子性、修复 CPU 分配的原子性；**IPI 已实现**，IPC 唤醒与任务创建时会通知远程核心重新调度
+- **VFS 并发**: 已添加全局 `g_vfs_lock` 自旋锁保护 dentry 树与 inode 引用计数，`kern_open`/`kern_close` 等路径已加锁
+- **目标**: 继续验证 UI/WiFi 实际屏幕操作，处理剩余遗留风险
 
 ## 相关源文件
 
 | 源文件 | 描述 |
 |--------|------|
 | `src/kernel/kern_port.h` | 可移植层操作表定义 |
-| `src/kernel/kern_port_freertos.c` | FreeRTOS 后端（当前唯一生产后端） |
+| `src/kernel/kern_port_freertos.c` | FreeRTOS 后端（默认 `m5stick-c` 环境使用） |
+| `src/kernel/kern_port_esp32_native.c` | ESP32 原生调度器后端（`m5stick-c-native` 环境使用） |
 | `src/kernel/kern_task.h` | 任务控制块（TCB）定义 |
 | `src/kernel/kern_sched.h` | 调度器内部接口 |
 | `src/kernel/kern_smp.h` | SMP 多核支持 |
