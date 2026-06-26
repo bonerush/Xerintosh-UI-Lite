@@ -132,7 +132,6 @@ static kern_task_t *sched_rr_pick_next(void)
     }
 
     t = start;
-    kern_task_t *first_candidate = NULL;
     int steps = 0;
     do {
         if (t->state == KERN_TASK_READY) {
@@ -140,11 +139,9 @@ static kern_task_t *sched_rr_pick_next(void)
             /* CPU 亲和性检查：KERN_CPU_ANY 或匹配本核心 */
             if (tid == KERN_CPU_ANY || tid == cpu) {
                 g_last_picked = t;
+                t->state = KERN_TASK_RUNNING;
                 task_list_unlock();
                 return t;
-            }
-            if (first_candidate == NULL) {
-                first_candidate = t;  /* 记录第一个就绪但亲和性不匹配的任务 */
             }
         }
         t = t->next;
@@ -156,8 +153,12 @@ static kern_task_t *sched_rr_pick_next(void)
 
     task_list_unlock();
 
-    /* 无亲和性匹配任务时，返回 KERN_CPU_ANY 任务作为兜底 */
-    return first_candidate;
+    /* 无亲和性匹配任务：返回本核心 idle 任务（idle 始终 READY 且绑定本核心） */
+    kern_task_t *idle = g_per_cpu[cpu].idle_task;
+    if (idle != NULL && idle->state == KERN_TASK_READY) {
+        idle->state = KERN_TASK_RUNNING;
+    }
+    return idle;
 }
 
 /* ═══ tick：时间片递减 + 抢占标记 ═══ */

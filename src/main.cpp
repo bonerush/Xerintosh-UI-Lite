@@ -204,10 +204,6 @@ static void main_loop_task(void *arg)
  */
 extern "C" void app_main(void)
 {
-    /* 提升主任务优先级到调度器层级，确保它能在 Xeros 任务 yield 后立即接管分发令牌，
-     * 同时低于 UI 任务，避免 1ms tick 抢占正在渲染的 UI。 */
-    vTaskPrioritySet(NULL, tskIDLE_PRIORITY + 1);
-
     /* 最早进行 UART 初始化，确保后续 printf/日志能立即输出 */
     hal_uart0_init();
     hal_delay_ms(100);
@@ -271,6 +267,13 @@ extern "C" void app_main(void)
     for (;;) {
         deferred_kernel_init();
 
+#ifdef CONFIG_SMP_ENABLED
+        /* SMP 模式下当前 Core 0 直接成为 Xeros 调度器，不再返回此处。
+         * Core 1 已在 kern_sched_init() 中通过 FreeRTOS 启动桩启动。 */
+        kern_smp_sched_loop(NULL);
+        /* 不应到达 */
+        kern_log(KERN_LOG_ERROR, "app_main: kern_smp_sched_loop returned");
+#else
         /* 消费硬件定时器 ISR 设置的抢占 tick 请求，并在当前 CPU 触发重调度。
          * 必须在 kern_sched_tick() 之前消费，确保 scheduler 在挑选下一个任务
          * 前能看到最新的抢占状态，减少高优先级任务就绪后的调度延迟。 */
@@ -280,13 +283,10 @@ extern "C" void app_main(void)
 
         kern_sched_tick();
 
-        /*
-         * 显式让出 CPU 给 FreeRTOS idle 任务，确保中断看门狗（INT_WDT, 300ms）
-         * 能被喂食。Without this, the Xeros scheduler task (priority 1) would
-         * starve the FreeRTOS idle task (priority 0) on Core 0, causing INT_WDT
-         * to fire and reset the system.
-         */
-        vTaskDelay(pdMS_TO_TICKS(1));
+        /* 让出 CPU 给原生 idle 任务，由 native_idle() 决定是否进入 tickless。
+         * 不再显式调用 FreeRTOS vTaskDelay；INT_WDT/TASK_WDT 已在 sdkconfig 中禁用。 */
+        kern_port_idle();
+#endif
     }
 }
 
@@ -384,21 +384,22 @@ static void deferred_kernel_init(void)
     /* -- 启动 Shell -- */
     kern_shell_init();
 
-    /* -- 启动 UI/WiFi/BT 任务 --
-     * 使用历史栈高水位画像推荐栈大小，首次启动无画像时回退到经验值。 */
-    size_t ui_stack   = kern_task_stack_recommend_by_name("ui",       UI_TASK_STACK_SIZE);
-    size_t wifi_stack = kern_task_stack_recommend_by_name("wifi-mgr", WIFI_MGR_STACK_SIZE);
+    /* -- 启动任务 --
+     * 原生调度器下同样启用 Shell/UI/Main-loop/WiFi 管理器。
+     * WiFi 驱动内部仍使用 FreeRTOS，但 Xeros 的 wifi-mgr 任务本身
+     * 只调用 ESP-IDF WiFi API，不直接调用 FreeRTOS 调度 API。 */
+    size_t ui_stack = kern_task_stack_recommend_by_name("ui", UI_TASK_STACK_SIZE);
 
     kern_pid_t ui_pid = kern_spawn("ui", ui_task_main, NULL, ui_stack);
     debug_printf("[  OK  ] UI task spawned (pid=%d, stack=%u)\n", ui_pid, (unsigned)ui_stack);
 
-    /* WiFi 管理器作为独立内核任务运行，与 UI 任务解耦 */
-    kern_spawn("wifi-mgr", wifi_mgr_task_main, NULL, wifi_stack);
-    debug_printf("[  OK  ] WiFi manager spawned as kernel task (stack=%u)\n", (unsigned)wifi_stack);
-
     /* 主循环任务：串口轮询、串口监视器、WiFi 请求处理 */
     kern_spawn("main-loop", main_loop_task, NULL, 4096);
     debug_printf("[  OK  ] Main loop task spawned as kernel task (stack=4096)\n");
+
+    size_t wifi_stack = kern_task_stack_recommend_by_name("wifi-mgr", WIFI_MGR_STACK_SIZE);
+    kern_spawn("wifi-mgr", wifi_mgr_task_main, NULL, wifi_stack);
+    debug_printf("[  OK  ] WiFi manager spawned as kernel task (stack=%u)\n", (unsigned)wifi_stack);
 
     kern_log(KERN_LOG_INFO, "Xeros kernel boot complete, entering scheduler");
     debug_printf("[  OK  ] Kernel boot complete, entering scheduler loop\n");

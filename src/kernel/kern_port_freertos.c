@@ -30,9 +30,9 @@
 #include <string.h>
 #include <stdlib.h>
 
-#ifndef NATIVE_TEST
+#if !defined(NATIVE_TEST) && !defined(XEROS_NATIVE_SCHED)
 
-/* ═══ FreeRTOS / XEROS_NATIVE_SCHED fallback 后端 ═══ */
+/* ═══ FreeRTOS 后端 ═══ */
 
 /* FreeRTOS 头文件（仅此文件直接依赖） */
 #include <freertos/FreeRTOS.h>
@@ -390,7 +390,7 @@ const kern_port_ops_t g_kern_port_ops = {
     .preempt_consume     = kern_port_freertos_preempt_consume,
 };
 
-#else /* NATIVE_TEST — 空桩：原生模式不使用此文件 */
+#elif defined(NATIVE_TEST) /* 空桩：原生桌面测试不使用 FreeRTOS */
 
 static void kern_port_native_test_init(void) {}
 

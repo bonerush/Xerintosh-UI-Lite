@@ -106,6 +106,8 @@ static void sched_fifo_dequeue(kern_task_t *task)
 
 static kern_task_t *sched_fifo_pick_next(void)
 {
+    uint8_t cpu = KERN_THIS_CPU;
+
     task_list_lock();
 
     kern_task_t *t = sched_class_fifo.task_list;
@@ -115,8 +117,13 @@ static kern_task_t *sched_fifo_pick_next(void)
             t->state = KERN_TASK_READY;
         }
         if (t->state == KERN_TASK_READY) {
-            task_list_unlock();
-            return t;  /* 链表按优先级排序，第一个就绪即最高优先级 */
+            uint8_t tid = t->cpu_id;
+            /* CPU 亲和性检查：KERN_CPU_ANY 或匹配本核心 */
+            if (tid == KERN_CPU_ANY || tid == cpu) {
+                t->state = KERN_TASK_RUNNING;
+                task_list_unlock();
+                return t;  /* 链表按优先级排序，第一个就绪且亲和性匹配即最高优先级 */
+            }
         }
         t = t->next;
     }

@@ -109,6 +109,8 @@ ucontext_t     g_sched_ctx;
 kern_task_t   *g_switch_to_task = NULL;
 static uint8_t s_sched_stack[8192];  /* 调度器上下文专用栈 */
 static volatile bool s_switch_done = false;
+#elif defined(XEROS_NATIVE_SCHED)
+kern_ctx_native_t g_sched_ctx[KERN_MAX_CPUS];
 #endif
 
 /* ═══ 初始化 ═══ */
@@ -172,7 +174,94 @@ void kern_sched_init(void)
     kern_log(KERN_LOG_DEBUG, "scheduler initialized (native)");
 }
 
-#else /* ═══════════════ ESP32 (FreeRTOS / XEROS_NATIVE_SCHED fallback) ═══════════════ */
+#elif defined(XEROS_NATIVE_SCHED)
+
+#ifdef CONFIG_SMP_ENABLED
+void kern_smp_sched_loop(void *arg);
+#endif
+
+void kern_sched_init(void)
+{
+    g_task_list_tail = NULL;
+    if (g_sched_initialized) return;
+    g_sched_initialized = true;
+    g_task_list_tail = NULL;
+    kern_smp_init();
+
+    kern_port_init();
+
+    /* 注册调度类：RR 为默认，FIFO 为抢占优化 */
+    kern_sched_class_register(&sched_class_rr);
+    kern_sched_class_register(&sched_class_fifo);
+
+    /* ── 创建 per-CPU idle 任务 ── */
+    for (uint8_t cpu = 0; cpu < KERN_MAX_CPUS; cpu++) {
+        char name[16];
+        snprintf(name, sizeof(name), "xidle%d", cpu);
+
+        kern_task_t *idle = (kern_task_t *)calloc(1, sizeof(kern_task_t));
+        if (idle == NULL) {
+            kern_panic("failed to allocate idle task");
+            return;
+        }
+
+        idle->pid = g_next_pid++;
+        idle->state = KERN_TASK_READY;
+        idle->priority = 0;
+        idle->timeslice_remaining = SCHED_RR_DEFAULT_TIMESLICE;
+        idle->cpu_id = cpu;
+        strncpy(idle->name, name, KERN_TASK_NAME_LEN);
+        idle->entry = idle_entry;
+        idle->arg = NULL;
+
+        task_stack_init(idle, IDLE_STACK_MIN);
+        idle->native_ctx = (kern_ctx_native_t *)kern_kmalloc_for_task(
+            idle, sizeof(kern_ctx_native_t));
+        if (idle->native_ctx == NULL || idle->stack_base == NULL) {
+            kern_panic("failed to allocate idle task context/stack");
+            free(idle);
+            return;
+        }
+        memset(idle->native_ctx, 0, sizeof(kern_ctx_native_t));
+        idle->native_ctx_valid = false;
+        task_write_canary(idle);
+
+        /* 链接到全局任务链表 */
+        idle->next = g_task_list;
+        g_task_list = idle;
+        idle->scheduler_class_id = KERN_SCHED_CLASS_RR_ID;
+        g_task_count++;
+
+        g_per_cpu[cpu].idle_task = idle;
+        g_per_cpu[cpu].last_picked = idle;
+    }
+
+    sched_class_rr.task_list = g_task_list;
+    /* 链表通过头插法构建，tail 应指向最后一个元素（xidle0），否则后续追加会断开链表 */
+    {
+        kern_task_t *tail = g_task_list;
+        while (tail != NULL && tail->next != NULL) {
+            tail = tail->next;
+        }
+        sched_class_rr.task_list_tail = tail;
+        g_task_list_tail = tail;
+    }
+
+    /* ── per-CPU 初始状态 ── */
+    g_per_cpu[0].current_task = g_per_cpu[0].idle_task;
+    g_per_cpu[0].task_count = 1;
+    g_per_cpu[1].current_task = g_per_cpu[1].idle_task;
+    g_per_cpu[1].task_count = 1;
+
+    /* ── 启动 Core 1 调度器核心（Core 0 由 app_main 直接进入 kern_smp_sched_loop） ──*/
+#ifdef CONFIG_SMP_ENABLED
+    kern_smp_start_core(1, kern_smp_sched_loop);
+#endif
+
+    kern_log(KERN_LOG_DEBUG, "scheduler initialized (esp32-native, 2 cores)");
+}
+
+#else /* ═══════════════ ESP32 FreeRTOS backend ═══════════════ */
 
 #ifdef CONFIG_SMP_ENABLED
 void kern_smp_sched_loop(void *arg);
@@ -326,10 +415,13 @@ void kern_sched_tick(void) /* ESP32: FreeRTOS / XEROS_NATIVE_SCHED fallback */
     if (g_need_resched || (g_current_task && g_current_task->state != KERN_TASK_RUNNING)) {
         g_need_resched = false;
         kern_task_t *next = pick_next_ready();
-        if (next) {
+        if (next && next != g_current_task) {
+            kern_task_t *prev = g_current_task;
+            if (prev != NULL && prev->state == KERN_TASK_RUNNING) {
+                prev->state = KERN_TASK_READY;
+            }
             g_current_task = next;
             kern_mpu_apply(next);
-            if (next->state != KERN_TASK_SLEEPING) next->state = KERN_TASK_RUNNING;
             kern_port_switch_to(next);
         }
         return;
@@ -360,19 +452,28 @@ void kern_smp_sched_loop(void *arg)
 {
     (void)arg;
 
-    /* 设置 per-CPU 状态（运行在 Core 0，KERN_THIS_CPU = xPortGetCoreID() = 0） */
-    g_per_cpu[0].current_task = g_per_cpu[0].idle_task;
-    g_per_cpu[0].task_count = 1;  /* idle 计入 */
-    g_per_cpu[0].last_picked = g_per_cpu[0].idle_task;
+    uint8_t cpu = kern_cpu_id();
+    if (cpu >= KERN_MAX_CPUS) {
+        kern_log(KERN_LOG_ERROR, "SMP: sched_loop on invalid core %u", (unsigned)cpu);
+        return;
+    }
 
-    kern_log(KERN_LOG_INFO, "SMP: core 0 scheduler entering loop");
+    /* 设置 per-CPU 状态 */
+    g_per_cpu[cpu].current_task = g_per_cpu[cpu].idle_task;
+    g_per_cpu[cpu].task_count = 1;  /* idle 计入 */
+    g_per_cpu[cpu].last_picked = g_per_cpu[cpu].idle_task;
 
-    /* Core 0 自有调度循环 */
+    /* 通知其他核心本核心已就绪 */
+    __sync_or_and_fetch(&g_cpu_ready, (uint8_t)(1u << cpu));
+
+    kern_log(KERN_LOG_INFO, "SMP: core %u scheduler entering loop", (unsigned)cpu);
+
+    /* per-CPU 调度循环 */
     while (1) {
+        if (kern_port_preempt_consume()) {
+            g_need_resched = true;
+        }
         kern_sched_tick();
-        /* 短暂让出 CPU 给 FreeRTOS idle 任务喂看门狗。
-         * 信号量乒乓协议中 kern_smp_sched_loop (prio+2) 和 xidle0 (prio+1)
-         * 交替抢占，优先级 0 的 FreeRTOS idle 任务被完全饿死。 */
         kern_port_idle();
     }
 }
