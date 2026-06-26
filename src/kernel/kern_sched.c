@@ -126,6 +126,46 @@ static volatile bool s_switch_done = false;
 kern_ctx_native_t g_sched_ctx[KERN_MAX_CPUS];
 #endif
 
+/* ═══ 初始化公共辅助函数 ═══ */
+
+static void sched_reset_common(void)
+{
+    g_task_list        = NULL;
+    g_task_list_tail   = NULL;
+    g_sched_ticks      = 0;
+    g_task_count       = 0;
+    g_need_resched     = false;
+    g_next_pid         = 0;
+}
+
+static void sched_register_default_classes(void)
+{
+    kern_sched_class_register(&sched_class_rr);
+    kern_sched_class_register(&sched_class_fifo);
+}
+
+static kern_task_t *sched_idle_create(uint8_t cpu, const char *name)
+{
+    kern_task_t *idle = (kern_task_t *)calloc(1, sizeof(kern_task_t));
+    if (idle == NULL) {
+        return NULL;
+    }
+
+    idle->pid = g_next_pid++;
+    idle->state = KERN_TASK_READY;
+    idle->priority = 0;
+    idle->timeslice_remaining = SCHED_RR_DEFAULT_TIMESLICE;
+    idle->cpu_id = cpu;
+    if (name != NULL) {
+        strncpy(idle->name, name, KERN_TASK_NAME_LEN);
+        idle->name[KERN_TASK_NAME_LEN] = '\0';
+    }
+    idle->entry = idle_entry;
+    idle->arg   = NULL;
+
+    return idle;
+}
+
 /* ═══ 初始化 ═══ */
 
 #ifdef NATIVE_TEST
@@ -134,26 +174,17 @@ void kern_sched_init(void)
 {
     g_task_list_tail = NULL;  /* 每次 init 都重置尾指针，支持测试环境多次调用 */
     if (g_sched_initialized) return;
-    g_sched_initialized = true;
-    g_task_list_tail = NULL;
+
+    sched_reset_common();
     kern_smp_init();
+    sched_register_default_classes();
 
-    /* 注册默认调度类 */
-    kern_sched_class_register(&sched_class_rr);
-
-    g_idle_task = (kern_task_t *)calloc(1, sizeof(kern_task_t));
+    g_idle_task = sched_idle_create(0, "idle");
     if (g_idle_task == NULL) {
         kern_panic("failed to allocate idle task");
         return;
     }
 
-    g_idle_task->pid = g_next_pid++;
-    g_idle_task->state = KERN_TASK_READY;
-    g_idle_task->priority = 0;
-    g_idle_task->timeslice_remaining = SCHED_RR_DEFAULT_TIMESLICE;
-    strncpy(g_idle_task->name, "idle", KERN_TASK_NAME_LEN);
-    g_idle_task->entry = idle_entry;
-    g_idle_task->arg = NULL;
     task_stack_init(g_idle_task, IDLE_STACK_MIN);
 
     if (getcontext(&g_idle_task->ctx) < 0) {
@@ -169,14 +200,18 @@ void kern_sched_init(void)
     makecontext(&g_idle_task->ctx, task_entry_trampoline, 0);
     task_write_canary(g_idle_task);
 
+    g_idle_task->scheduler_class_id = KERN_SCHED_CLASS_RR_ID;
     g_task_list = g_idle_task;
     sched_class_rr.task_list = g_task_list;
     sched_class_rr.task_list_tail = g_idle_task;
-    g_idle_task->scheduler_class_id = KERN_SCHED_CLASS_RR_ID;
     g_task_count = 1;
     g_task_list_tail = g_idle_task;
     g_current_task = g_idle_task;
     g_last_picked = g_idle_task;
+    g_per_cpu[0].idle_task = g_idle_task;
+    g_per_cpu[0].current_task = g_idle_task;
+    g_per_cpu[0].last_picked = g_idle_task;
+    g_per_cpu[0].task_count = 1;
 
     /* 初始化调度器返回上下文：macOS setcontext 要求 uc_stack 有效 */
     getcontext(&g_sched_ctx);
@@ -184,6 +219,7 @@ void kern_sched_init(void)
     g_sched_ctx.uc_stack.ss_size = sizeof(s_sched_stack);
     g_sched_ctx.uc_stack.ss_flags = 0;
 
+    g_sched_initialized = true;
     kern_log(KERN_LOG_DEBUG, "scheduler initialized (native)");
 }
 
@@ -193,45 +229,24 @@ void kern_sched_init(void)
 void kern_smp_sched_loop(void *arg);
 #endif
 
-void kern_sched_init(void)
+static void esp32_native_init(void)
 {
-    g_task_list_tail = NULL;
-    if (g_sched_initialized) return;
-    g_sched_initialized = true;
-    g_task_list_tail = NULL;
-    kern_smp_init();
-
     kern_port_init();
 
     /* 启动原生调度器的硬件 tick（1ms）。FreeRTOS 后端依赖 FreeRTOS 调度器自带
      * 时间片，因此只在 XEROS_NATIVE_SCHED 下显式启动 GPTimer。 */
-#ifdef XEROS_NATIVE_SCHED
     kern_port_timer_set_periodic(1000);
-#endif
-
-    /* 注册调度类：RR 为默认，FIFO 为抢占优化 */
-    kern_sched_class_register(&sched_class_rr);
-    kern_sched_class_register(&sched_class_fifo);
 
     /* ── 创建 per-CPU idle 任务 ── */
     for (uint8_t cpu = 0; cpu < KERN_MAX_CPUS; cpu++) {
         char name[16];
         snprintf(name, sizeof(name), "xidle%d", cpu);
 
-        kern_task_t *idle = (kern_task_t *)calloc(1, sizeof(kern_task_t));
+        kern_task_t *idle = sched_idle_create(cpu, name);
         if (idle == NULL) {
             kern_panic("failed to allocate idle task");
             return;
         }
-
-        idle->pid = g_next_pid++;
-        idle->state = KERN_TASK_READY;
-        idle->priority = 0;
-        idle->timeslice_remaining = SCHED_RR_DEFAULT_TIMESLICE;
-        idle->cpu_id = cpu;
-        strncpy(idle->name, name, KERN_TASK_NAME_LEN);
-        idle->entry = idle_entry;
-        idle->arg = NULL;
 
         task_stack_init(idle, IDLE_STACK_MIN);
         idle->native_ctx = (kern_ctx_native_t *)kern_kmalloc_for_task(
@@ -280,45 +295,41 @@ void kern_sched_init(void)
     kern_log(KERN_LOG_DEBUG, "scheduler initialized (esp32-native, 2 cores)");
 }
 
+void kern_sched_init(void)
+{
+    g_task_list_tail = NULL;
+    if (g_sched_initialized) return;
+
+    sched_reset_common();
+    kern_smp_init();
+    sched_register_default_classes();
+
+    esp32_native_init();
+
+    g_sched_initialized = true;
+}
+
 #else /* ═══════════════ ESP32 FreeRTOS backend ═══════════════ */
 
 #ifdef CONFIG_SMP_ENABLED
 void kern_smp_sched_loop(void *arg);
 #endif
 
-void kern_sched_init(void)
+static void freertos_init(void)
 {
-    g_task_list_tail = NULL;  /* 每次 init 都重置尾指针，支持测试环境多次调用 */
-    if (g_sched_initialized) return;
-    g_sched_initialized = true;
-    g_task_list_tail = NULL;
-    kern_smp_init();
-
     kern_port_init();
-
-    /* 注册调度类：RR 为默认，FIFO 为抢占优化 */
-    kern_sched_class_register(&sched_class_rr);
-    kern_sched_class_register(&sched_class_fifo);
 
     /* ── 创建 per-CPU idle 任务 ── */
     for (uint8_t cpu = 0; cpu < KERN_MAX_CPUS; cpu++) {
         char name[16];
         snprintf(name, sizeof(name), "xidle%d", cpu);
 
-        kern_task_t *idle = (kern_task_t *)calloc(1, sizeof(kern_task_t));
+        kern_task_t *idle = sched_idle_create(cpu, name);
         if (idle == NULL) {
             kern_panic("failed to allocate idle task");
             return;
         }
 
-        idle->pid = g_next_pid++;
-        idle->state = KERN_TASK_READY;
-        idle->priority = 0;
-        idle->timeslice_remaining = SCHED_RR_DEFAULT_TIMESLICE;
-        idle->cpu_id = cpu;
-        strncpy(idle->name, name, KERN_TASK_NAME_LEN);
-        idle->entry = idle_entry;
-        idle->arg = NULL;
         idle->stack_size = IDLE_STACK_MIN;
 
         idle->port_thread = kern_port_thread_spawn(
@@ -340,7 +351,7 @@ void kern_sched_init(void)
     }
 
     sched_class_rr.task_list = g_task_list;
-		sched_class_rr.task_list_tail = g_task_list;  /* SMP: idle 在队尾 */
+    sched_class_rr.task_list_tail = g_task_list;  /* SMP: idle 在队尾 */
     g_task_list_tail = g_task_list;
 
     /* ── per-CPU 初始状态 ── */
@@ -355,6 +366,20 @@ void kern_sched_init(void)
 #endif
 
     kern_log(KERN_LOG_DEBUG, "scheduler initialized (esp32-freertos, 2 cores)");
+}
+
+void kern_sched_init(void)
+{
+    g_task_list_tail = NULL;  /* 每次 init 都重置尾指针，支持测试环境多次调用 */
+    if (g_sched_initialized) return;
+
+    sched_reset_common();
+    kern_smp_init();
+    sched_register_default_classes();
+
+    freertos_init();
+
+    g_sched_initialized = true;
 }
 
 #endif

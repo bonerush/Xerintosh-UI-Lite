@@ -72,6 +72,17 @@ TEST(KernelSchedTest, InitSetsIdleReady)
     EXPECT_EQ(g_idle_task->state, KERN_TASK_READY);
 }
 
+TEST(KernelSchedTest, InitIsIdempotent)
+{
+    kern_sched_init();
+    uint32_t ticks_before = g_sched_ticks;
+    kern_task_t *idle_before = g_idle_task;
+    kern_sched_init();
+    EXPECT_EQ(g_sched_ticks, ticks_before);
+    EXPECT_EQ(g_idle_task, idle_before);
+    EXPECT_NE(g_idle_task, nullptr);
+}
+
 /* ═══ pick_next_ready 测试 ═══ */
 
 TEST(KernelSchedTest, PickNextReadyReturnsIdleWhenAlone)
