@@ -133,6 +133,7 @@ static kern_task_t *sched_rr_pick_next(void)
 
     t = start;
     kern_task_t *first_candidate = NULL;
+    int steps = 0;
     do {
         if (t->state == KERN_TASK_READY) {
             uint8_t tid = t->cpu_id;
@@ -150,7 +151,8 @@ static kern_task_t *sched_rr_pick_next(void)
         if (t == NULL) {
             t = sched_class_rr.task_list;
         }
-    } while (t != start);
+        steps++;
+    } while (t != start && steps < 20);
 
     task_list_unlock();
 

@@ -21,8 +21,8 @@ void wifi_mgr_task_main(void *arg);
 
 #ifndef NATIVE_TEST
 
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 #include "esp_timer.h"
 #include "esp_heap_caps.h"
 #include "nvs_flash.h"
@@ -173,12 +173,41 @@ extern "C" void on_screen_rotation_change_cb(void *ud)
 
 static void deferred_kernel_init(void);
 
+static void main_loop_task(void *arg)
+{
+    (void)arg;
+    for (;;) {
+        dev_ttyS0_poll();
+        serial_monitor_update();
+        wifi_mgr_process_requests();
+
+        /* Periodic stack high-water profiling (once per second) */
+        static uint32_t s_profile_last_ms = 0;
+        uint32_t profile_now = hal_get_ticks();
+        if (profile_now - s_profile_last_ms >= 1000) {
+            s_profile_last_ms = profile_now;
+            kern_task_t *cur = kern_task_current();
+            if (cur != NULL) {
+                kern_task_stack_profile_record(cur->name,
+                                               kern_task_stack_highwater(cur));
+            }
+        }
+
+        /* Yield / sleep to let other Xeros tasks run */
+        kern_sleep_ms(10);
+    }
+}
+
 /**
  * @brief ESP-IDF app_main()：系统初始化
  * @note  初始化顺序：UART -> 存储 -> 设置 -> 显示 -> UI -> 管理器
  */
 extern "C" void app_main(void)
 {
+    /* 提升主任务优先级到调度器层级，确保它能在 Xeros 任务 yield 后立即接管分发令牌，
+     * 同时低于 UI 任务，避免 1ms tick 抢占正在渲染的 UI。 */
+    vTaskPrioritySet(NULL, tskIDLE_PRIORITY + 1);
+
     /* 最早进行 UART 初始化，确保后续 printf/日志能立即输出 */
     hal_uart0_init();
     hal_delay_ms(100);
@@ -242,13 +271,6 @@ extern "C" void app_main(void)
     for (;;) {
         deferred_kernel_init();
 
-        dev_ttyS0_poll();
-        serial_monitor_update();
-
-        /* 处理 WiFi 启用/禁用异步请求。必须在 loop() 上下文中执行，
-         * 避免 UI 任务 / Xeros 任务直接调用 WiFi 驱动导致死锁或 TWDT 复位。 */
-        wifi_mgr_process_requests();
-
         /* 消费硬件定时器 ISR 设置的抢占 tick 请求，并在当前 CPU 触发重调度。
          * 必须在 kern_sched_tick() 之前消费，确保 scheduler 在挑选下一个任务
          * 前能看到最新的抢占状态，减少高优先级任务就绪后的调度延迟。 */
@@ -258,19 +280,12 @@ extern "C" void app_main(void)
 
         kern_sched_tick();
 
-        /* 周期性记录当前任务的栈高水位，用于下次启动时自动推荐栈大小。
-         * 在调度 tick 之后执行，避免在任务上下文内部增加栈压力。 */
-        static uint32_t s_profile_last_ms = 0;
-        uint32_t profile_now = hal_get_ticks();
-        if (profile_now - s_profile_last_ms >= 1000) {
-            s_profile_last_ms = profile_now;
-            kern_task_t *cur = kern_task_current();
-            if (cur != NULL) {
-                kern_task_stack_profile_record(cur->name,
-                                               kern_task_stack_highwater(cur));
-            }
-        }
-        /* 让出 CPU，避免看门狗复位并允许低优先级任务运行 */
+        /*
+         * 显式让出 CPU 给 FreeRTOS idle 任务，确保中断看门狗（INT_WDT, 300ms）
+         * 能被喂食。Without this, the Xeros scheduler task (priority 1) would
+         * starve the FreeRTOS idle task (priority 0) on Core 0, causing INT_WDT
+         * to fire and reset the system.
+         */
         vTaskDelay(pdMS_TO_TICKS(1));
     }
 }
@@ -368,7 +383,6 @@ static void deferred_kernel_init(void)
 
     /* -- 启动 Shell -- */
     kern_shell_init();
-    debug_printf("[  OK  ] Shell spawned on /dev/ttyS0\n");
 
     /* -- 启动 UI/WiFi/BT 任务 --
      * 使用历史栈高水位画像推荐栈大小，首次启动无画像时回退到经验值。 */
@@ -382,8 +396,9 @@ static void deferred_kernel_init(void)
     kern_spawn("wifi-mgr", wifi_mgr_task_main, NULL, wifi_stack);
     debug_printf("[  OK  ] WiFi manager spawned as kernel task (stack=%u)\n", (unsigned)wifi_stack);
 
-    /* 让出 CPU 给 FreeRTOS，使刚创建的任务有机会启动并阻塞在调度信号量上 */
-    hal_delay_ms(10);
+    /* 主循环任务：串口轮询、串口监视器、WiFi 请求处理 */
+    kern_spawn("main-loop", main_loop_task, NULL, 4096);
+    debug_printf("[  OK  ] Main loop task spawned as kernel task (stack=4096)\n");
 
     kern_log(KERN_LOG_INFO, "Xeros kernel boot complete, entering scheduler");
     debug_printf("[  OK  ] Kernel boot complete, entering scheduler loop\n");

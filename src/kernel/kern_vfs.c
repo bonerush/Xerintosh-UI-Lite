@@ -31,33 +31,33 @@ static bool g_vfs_initialized = false;
 
 static kern_file_t g_fd_pool[FD_POOL_SIZE];
 static uint16_t g_fd_pool_bitmap;  /* 位图：bit i = 1 表示已分配 */
-static spinlock_t g_fd_pool_lock;  /* 保护 FD 池位图 */
+static xeros_spinlock_t g_fd_pool_lock;  /* 保护 FD 池位图 */
 
 /* 从池中分配一个 kern_file_t（O(n) 线性扫描，n=FD_POOL_SIZE=16） */
 static kern_file_t *fd_pool_alloc(void) {
-    spinlock_lock(&g_fd_pool_lock);
+    xeros_spinlock_lock(&g_fd_pool_lock);
     for (int i = 0; i < FD_POOL_SIZE; i++) {
         if (!(g_fd_pool_bitmap & (1 << i))) {
             g_fd_pool_bitmap |= (1 << i);
             memset(&g_fd_pool[i], 0, sizeof(kern_file_t));
             g_fd_pool[i].in_use = true;
-            spinlock_unlock(&g_fd_pool_lock);
+            xeros_spinlock_unlock(&g_fd_pool_lock);
             return &g_fd_pool[i];
         }
     }
-    spinlock_unlock(&g_fd_pool_lock);
+    xeros_spinlock_unlock(&g_fd_pool_lock);
     return NULL;  /* 池耗尽 */
 }
 
 /* 释放池中的一个 kern_file_t */
 static void fd_pool_free(kern_file_t *f) {
     if (f == NULL) return;
-    spinlock_lock(&g_fd_pool_lock);
+    xeros_spinlock_lock(&g_fd_pool_lock);
     int idx = (int)(f - g_fd_pool);
     if (idx >= 0 && idx < FD_POOL_SIZE) {
         g_fd_pool_bitmap &= ~(1 << idx);
     }
-    spinlock_unlock(&g_fd_pool_lock);
+    xeros_spinlock_unlock(&g_fd_pool_lock);
 }
 
 /* ═══ 文件描述符表 ═══ */
@@ -207,7 +207,7 @@ void kern_vfs_init(void)
     g_vfs_initialized = true;
 
     /* 初始化 FD 池锁 */
-    spinlock_init(&g_fd_pool_lock);
+    xeros_spinlock_init(&g_fd_pool_lock);
 
     /* 初始化根 dentry */
     memset(&g_root_dentry, 0, sizeof(g_root_dentry));

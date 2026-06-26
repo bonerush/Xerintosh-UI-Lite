@@ -17,9 +17,6 @@
 
 #if defined(NATIVE_TEST)
 #include <ucontext.h>
-#elif defined(XEROS_NATIVE_SCHED)
-#include "kern_ctx_esp32.h"
-#include <setjmp.h>
 #endif
 
 /* Native 后端使用的外部蹦床函数 */
@@ -29,7 +26,7 @@ extern void task_entry_trampoline(void);
 
 /* ═══ 栈初始化 ═══ */
 
-#if defined(NATIVE_TEST) || defined(XEROS_NATIVE_SCHED)
+#if defined(NATIVE_TEST)
 
 void task_stack_init(kern_task_t *task, size_t stack_size)
 {
@@ -56,7 +53,7 @@ void task_write_canary(kern_task_t *task)
     }
 }
 
-#else /* ═══════════════ ESP32 (FreeRTOS 任务容器) ═══════════════ */
+#else /* ═══════════════ ESP32 (FreeRTOS / XEROS_NATIVE_SCHED fallback) ═══════════════ */
 
 void task_stack_init(kern_task_t *task, size_t stack_size)
 {
@@ -108,42 +105,7 @@ size_t kern_task_stack_usage(kern_task_t *task)
     return used;
 }
 
-#elif defined(XEROS_NATIVE_SCHED)
-
-/* XEROS_NATIVE_SCHED: 手动栈 + 0xAA canary，与 NATIVE_TEST 相同 */
-
-size_t kern_task_stack_usage(kern_task_t *task)
-{
-    if (task == NULL || task->stack_base == NULL) return 0;
-
-    #define CANARY_SKIP 8
-    size_t scan_start = (task->stack_size > CANARY_SKIP) ?
-                        (size_t)CANARY_SKIP : task->stack_size;
-    size_t used = 0;
-    for (size_t i = scan_start; i < task->stack_size; i++) {
-        if (task->stack_base[i] != 0xAA) {
-            used = task->stack_size - i;
-            break;
-        }
-    }
-
-    if (task->stack_size >= sizeof(uint32_t)) {
-        uint32_t canary;
-        memcpy(&canary, task->stack_base, sizeof(uint32_t));
-        if (canary != KERN_STACK_CANARY) {
-            kern_log(KERN_LOG_WARN, "stack canary corrupted for task %s (pid=%d)",
-                     task->name, task->pid);
-        }
-    }
-
-    if (used == 0) used = 1;
-    if (used > task->stack_highwater) {
-        task->stack_highwater = used;
-    }
-    return used;
-}
-
-#else /* ESP32: FreeRTOS 管理栈，通过 uxTaskGetStackHighWaterMark 查询 */
+#else /* ESP32: FreeRTOS / XEROS_NATIVE_SCHED fallback 管理栈，通过 uxTaskGetStackHighWaterMark 查询 */
 
 #include <freertos/FreeRTOS.h>
 
@@ -175,8 +137,8 @@ size_t kern_task_stack_usage(kern_task_t *task)
 size_t kern_task_stack_highwater(kern_task_t *task)
 {
     if (task == NULL) return 0;
-#if !defined(NATIVE_TEST) && !defined(XEROS_NATIVE_SCHED)
-    /* FreeRTOS 路径：通过 port 层查询并同步更新 TCB 字段 */
+#ifndef NATIVE_TEST
+    /* FreeRTOS / XEROS_NATIVE_SCHED fallback 路径：通过 port 层查询并同步更新 TCB 字段 */
     if (task->port_thread == KERN_PORT_THREAD_NULL) return 0;
     size_t free_words = kern_port_thread_stack_usage(task->port_thread);
     size_t free_bytes = free_words * sizeof(StackType_t);
@@ -206,7 +168,7 @@ size_t kern_task_stack_recommend(kern_task_t *task, size_t current_size)
 
 /* ═══ 栈自动增长（仅 Native 后端）═══ */
 
-#if defined(NATIVE_TEST) || defined(XEROS_NATIVE_SCHED)
+#if defined(NATIVE_TEST)
 
 bool kern_task_stack_grow(kern_task_t *task, size_t new_size)
 {
@@ -239,17 +201,12 @@ bool kern_task_stack_grow(kern_task_t *task, size_t new_size)
     task->stack_size = new_size;
     task->stack_highwater = 0;   /* 增长后重新累计 */
 
-#if defined(NATIVE_TEST)
     task->ctx.uc_stack.ss_sp = new_base;
     task->ctx.uc_stack.ss_size = new_size;
     g_switch_to_task = task;
     makecontext(&task->ctx, task_entry_trampoline, 0);
-#elif defined(XEROS_NATIVE_SCHED)
-    uint8_t *stack_top = new_base + new_size;
-    kern_ctx_init(&task->ctx, new_base, stack_top, task->entry, task->arg);
-#endif
 
-    /* makecontext/kern_ctx_init 可能触及栈底，最后重写 canary */
+    /* makecontext 可能触及栈底，最后重写 canary */
     task_write_canary(task);
 
     if (old_base != NULL) {
@@ -258,7 +215,7 @@ bool kern_task_stack_grow(kern_task_t *task, size_t new_size)
     return true;
 }
 
-#else /* FreeRTOS */
+#else /* FreeRTOS / XEROS_NATIVE_SCHED fallback */
 
 bool kern_task_stack_grow(kern_task_t *task, size_t new_size)
 {

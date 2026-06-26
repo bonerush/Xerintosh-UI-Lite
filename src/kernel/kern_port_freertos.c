@@ -32,62 +32,7 @@
 
 #ifndef NATIVE_TEST
 
-#if defined(XEROS_NATIVE_SCHED)
-
-/* ═══ XEROS_NATIVE_SCHED 桩：调度逻辑在 kern_task.c 中实现 ═══ */
-
-static void kern_port_native_sched_init(void) {}
-
-static kern_port_thread_t kern_port_native_sched_thread_spawn(
-    void (*entry)(void *arg), void *arg, const char *name,
-    size_t stack_size, kern_task_t *task)
-{ (void)entry; (void)arg; (void)name; (void)stack_size; (void)task;
-  return KERN_PORT_THREAD_NULL; }
-
-static void kern_port_native_sched_thread_exit(void) { while (1) {} }
-
-static void kern_port_native_sched_thread_kill(kern_port_thread_t thread) { (void)thread; }
-
-static size_t kern_port_native_sched_thread_stack_usage(kern_port_thread_t thread)
-{ (void)thread; return 0; }
-
-static void kern_port_native_sched_switch_to(kern_task_t *task) { (void)task; }
-
-static void kern_port_native_sched_task_yield(void) {}
-
-static void kern_port_native_sched_task_exit(void) { while (1) {} }
-
-static void kern_port_native_sched_idle(void)
-{
-    /* 无就绪任务时短暂忙等待让出 CPU */
-    for (volatile int i = 0; i < 10000; i++) {
-        __asm__ volatile("nop");
-    }
-}
-
-static int kern_port_native_sched_timer_set(uint32_t period_us)
-{ (void)period_us; return 0; }
-
-static void kern_port_native_sched_timer_stop(void) {}
-
-static bool kern_port_native_sched_preempt_consume(void) { return false; }
-
-const kern_port_ops_t g_kern_port_ops = {
-    .init                = kern_port_native_sched_init,
-    .thread_spawn        = kern_port_native_sched_thread_spawn,
-    .thread_exit         = kern_port_native_sched_thread_exit,
-    .thread_kill         = kern_port_native_sched_thread_kill,
-    .thread_stack_usage  = kern_port_native_sched_thread_stack_usage,
-    .switch_to           = kern_port_native_sched_switch_to,
-    .task_yield          = kern_port_native_sched_task_yield,
-    .task_exit           = kern_port_native_sched_task_exit,
-    .idle                = kern_port_native_sched_idle,
-    .timer_set_periodic  = kern_port_native_sched_timer_set,
-    .timer_stop          = kern_port_native_sched_timer_stop,
-    .preempt_consume     = kern_port_native_sched_preempt_consume,
-};
-
-#else /* FreeRTOS 后端（默认）*/
+/* ═══ FreeRTOS / XEROS_NATIVE_SCHED fallback 后端 ═══ */
 
 /* FreeRTOS 头文件（仅此文件直接依赖） */
 #include <freertos/FreeRTOS.h>
@@ -299,12 +244,30 @@ static kern_port_thread_t kern_port_freertos_thread_spawn(
     uint8_t cpu = task->cpu_id;
     if (cpu >= KERN_MAX_CPUS) cpu = 0;
 
+    /*
+     * 优先级分层：
+     *   - idle 任务 (xidleN): tskIDLE_PRIORITY，只在所有 Xeros 任务阻塞时运行，
+     *     确保 FreeRTOS idle 任务能喂中断看门狗 (INT_WDT)。
+     *   - 普通 Xeros 任务: tskIDLE_PRIORITY + 1，避免被 FreeRTOS RR 切走。
+     *   - UI 任务: tskIDLE_PRIORITY + 2，保证一帧渲染能连续运行到 yield。
+     *
+     * 调度器任务 (app_main / kern_smp_sched_loop) 设为 tskIDLE_PRIORITY + 1，
+     * 与 Xeros 普通任务同级；它大部分时间阻塞在 done_sem 或 vTaskDelay 上，
+     * 不会长时间占用 CPU。UI 优先级更高，因此 1ms tick 不会抢占 UI。
+     */
+    UBaseType_t freertos_prio = tskIDLE_PRIORITY + 1;
+    if (name != NULL && strncmp(name, "xidle", 5) == 0) {
+        freertos_prio = tskIDLE_PRIORITY;
+    } else if (name != NULL && strcmp(name, "ui") == 0) {
+        freertos_prio = tskIDLE_PRIORITY + 2;
+    }
+
     BaseType_t ret = xTaskCreatePinnedToCore(
         task_wrapper,           /* 包装函数 */
         name ? name : "xtask",  /* FreeRTOS 任务名 */
         (uint32_t)stack_words,  /* 栈大小（字） */
         task,                   /* 参数 = kern_task_t* */
-        tskIDLE_PRIORITY + 1,   /* 优先级略高于 idle */
+        freertos_prio,          /* FreeRTOS 优先级 */
         &handle,
         cpu                     /* 引脚到任务分配的 CPU */
     );
@@ -426,8 +389,6 @@ const kern_port_ops_t g_kern_port_ops = {
     .timer_stop          = kern_port_freertos_timer_stop,
     .preempt_consume     = kern_port_freertos_preempt_consume,
 };
-
-#endif /* defined(XEROS_NATIVE_SCHED) */
 
 #else /* NATIVE_TEST — 空桩：原生模式不使用此文件 */
 

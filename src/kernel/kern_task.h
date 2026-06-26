@@ -30,8 +30,6 @@ extern "C" {
 
 #ifdef NATIVE_TEST
 typedef ucontext_t    kern_ctx_t;
-#elif defined(XEROS_NATIVE_SCHED)
-#include "kern_ctx_esp32.h"
 #endif
 
 /* ═══ 前向声明（避免 kern_task.h 与 kern_vfs.h 循环包含） ═══ */
@@ -58,8 +56,6 @@ typedef struct kern_task {
     /* 上下文保存 */
 #if defined(NATIVE_TEST)
     kern_ctx_t          ctx;            /* ucontext */
-#elif defined(XEROS_NATIVE_SCHED)
-    kern_ctx_t          ctx;            /* setjmp/longjmp */
 #else
     kern_port_thread_t  port_thread;    /* 底层执行上下文句柄 */
 #endif

@@ -38,8 +38,6 @@ extern volatile bool  g_task_list_lock;    /* 共享任务列表自旋锁 */
 #ifdef NATIVE_TEST
 extern ucontext_t     g_sched_ctx;        /* 调度器上下文 */
 extern kern_task_t   *g_switch_to_task;   /* makecontext 参数传递 */
-#elif defined(XEROS_NATIVE_SCHED)
-extern kern_ctx_t     g_sched_ctx;        /* 调度器上下文 */
 #endif
 
 /* ═══ 调度器核心 ═══ */

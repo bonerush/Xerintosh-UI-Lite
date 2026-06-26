@@ -20,9 +20,6 @@
 
 #ifdef NATIVE_TEST
 #include <ucontext.h>
-#elif defined(XEROS_NATIVE_SCHED)
-#include "kern_ctx_esp32.h"
-#include <setjmp.h>
 #endif
 
 /* ═══ 任务创建 ═══ */
@@ -122,78 +119,7 @@ kern_pid_t kern_spawn(const char *name, void (*entry)(void *arg),
     return task->pid;
 }
 
-#elif defined(XEROS_NATIVE_SCHED)
-
-kern_pid_t kern_spawn(const char *name, void (*entry)(void *arg),
-                       void *arg, size_t stack_min)
-{
-    if (entry == NULL) return KERN_EINVAL;
-    if (g_task_count >= MAX_TASKS) return KERN_ENOSPC;
-
-    kern_sched_init();
-
-    kern_task_t *task = (kern_task_t *)calloc(1, sizeof(kern_task_t));
-    if (task == NULL) return KERN_ENOMEM;
-
-    task->pid = g_next_pid++;
-    task->state = KERN_TASK_READY;
-    task->priority = 128;
-    task->timeslice_remaining = SCHED_RR_DEFAULT_TIMESLICE;
-    task->scheduler_class_id = -1;
-    task->cpu_id = KERN_CPU_ANY;
-#ifdef CONFIG_SMP_ENABLED
-    task->cpu_id = kern_smp_migrate_assign();
-#endif
-    task->entry = entry;
-    task->arg = arg;
-
-    if (name != NULL) {
-        strncpy(task->name, name, KERN_TASK_NAME_LEN);
-        task->name[KERN_TASK_NAME_LEN] = '\0';
-    } else {
-        snprintf(task->name, KERN_TASK_NAME_LEN, "task_%d", task->pid);
-    }
-
-    /* 初始化每任务文件描述符表 */
-    memset(task->fd_table, 0, sizeof(task->fd_table));
-
-    /* 默认加入 RR 调度类 */
-    task->scheduler_class_id = KERN_SCHED_CLASS_RR_ID;
-
-    /* 手动分配栈 + setjmp/longjmp 上下文 */
-    task_stack_init(task, (stack_min > 0) ? stack_min : KERN_STACK_MIN);
-
-    uint8_t *stack_top = task->stack_base + task->stack_size;
-    kern_ctx_init(&task->ctx, task->stack_base, stack_top, entry, arg);
-    task_write_canary(task);
-
-    kern_mpu_setup_stack_guard(task, task->stack_base, task->stack_size);
-
-    /* 插入任务链表（头部插入，保证 idle 保持在最前面） */
-    if (g_task_list == NULL) {
-        g_task_list = task;
-    } else {
-        kern_task_t *t = g_task_list;
-        /* 跳过 idle（pid 0），其余从 idle 之后插入 */
-        while (t->next != NULL && t->next->pid == 0) t = t->next;
-        task->next = t->next;
-        t->next = task;
-    }
-    g_task_count++;
-
-    /* 加入对应调度类的任务链表 */
-    if (task->scheduler_class_id >= 0 && task->scheduler_class_id < KERN_SCHED_MAX_CLASSES) {
-        kern_sched_class_t *cls = g_sched_classes[task->scheduler_class_id];
-        if (cls != NULL && cls->enqueue != NULL) {
-            cls->enqueue(task);
-        }
-    }
-
-    kern_log(KERN_LOG_DEBUG, "spawned task %d: %s", task->pid, task->name);
-    return task->pid;
-}
-
-#else /* ═══════════════ ESP32 (FreeRTOS 任务容器) ═══════════════ */
+#else /* ═══════════════ ESP32 (FreeRTOS / XEROS_NATIVE_SCHED fallback) ═══════════════ */
 
 kern_pid_t kern_spawn(const char *name, void (*entry)(void *arg),
                        void *arg, size_t stack_min)
@@ -307,24 +233,7 @@ void kern_yield(void)
     swapcontext(&cur->ctx, &g_sched_ctx);
 }
 
-#elif defined(XEROS_NATIVE_SCHED)
-
-void kern_yield(void)
-{
-    kern_task_t *cur = g_current_task;
-    if (cur == NULL) return;
-
-    cur->state = KERN_TASK_READY;
-    g_current_task = g_idle_task;
-
-    /* setjmp 保存当前任务上下文，longjmp 回到调度器 */
-    if (setjmp(cur->ctx.jmp) == 0) {
-        longjmp(g_sched_ctx.jmp, 1);
-    }
-    /* setjmp 返回 1：调度器重新给了我们 CPU */
-}
-
-#else /* ESP32: yield = 通过可移植层释放 CPU */
+#else /* ESP32: FreeRTOS / XEROS_NATIVE_SCHED fallback */
 
 void kern_yield(void)
 {
@@ -364,25 +273,6 @@ void kern_exit(void)
     /* 不应到达此处 */
 }
 
-#elif defined(XEROS_NATIVE_SCHED)
-
-void kern_exit(void)
-{
-    kern_task_t *cur = g_current_task;
-    if (cur == NULL) return;
-
-    kern_resource_release_all(cur);
-    cur->stack_base = NULL;
-
-    cur->state = KERN_TASK_ZOMBIE;
-    kern_log(KERN_LOG_DEBUG, "task %d (%s) exited", cur->pid, cur->name);
-
-    g_current_task = g_idle_task;
-
-    /* 不保存上下文，直接跳转回调度器（任务已死亡） */
-    longjmp(g_sched_ctx.jmp, 1);
-}
-
 #else /* ESP32: exit = 标记 ZOMBIE，通过可移植层销毁自身 */
 
 void kern_exit(void)
@@ -418,23 +308,6 @@ void kern_sleep_ms(uint32_t ms)
     g_current_task = g_idle_task;
 
     swapcontext(&cur->ctx, &g_sched_ctx);
-}
-
-#elif defined(XEROS_NATIVE_SCHED)
-
-void kern_sleep_ms(uint32_t ms)
-{
-    kern_task_t *cur = g_current_task;
-    if (cur == NULL) return;
-
-    cur->state = KERN_TASK_SLEEPING;
-    cur->wake_time = g_sched_ticks + ms;
-    g_current_task = g_idle_task;
-
-    /* 与 kern_yield 相同：保存上下文，跳回调度器 */
-    if (setjmp(cur->ctx.jmp) == 0) {
-        longjmp(g_sched_ctx.jmp, 1);
-    }
 }
 
 #else /* ESP32: sleep = yield + 记录唤醒时间 */
@@ -503,10 +376,8 @@ kern_err_t kern_task_kill(kern_pid_t pid)
 
 #if defined(NATIVE_TEST)
     /* Native: TCB 在下次 sched_tick 时由 reap_zombies 回收 */
-#elif defined(XEROS_NATIVE_SCHED)
-    /* 原生调度器：栈已纳入资源追踪，由 kern_resource_release_all 统一释放 */
 #else
-    /* FreeRTOS: 销毁底层线程 */
+    /* FreeRTOS / XEROS_NATIVE_SCHED fallback: 销毁底层线程 */
     if (task->port_thread != KERN_PORT_THREAD_NULL) {
         kern_port_thread_kill(task->port_thread);
         task->port_thread = KERN_PORT_THREAD_NULL;

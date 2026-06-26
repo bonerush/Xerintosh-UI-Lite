@@ -1,7 +1,7 @@
 /**
  * @file   kern_sync.h
  * @brief  Xeros 内核同步原语头文件
- * @details 定义 spinlock_t 和 mutex_t 数据结构及操作接口。
+ * @details 定义 xeros_spinlock_t 和 mutex_t 数据结构及操作接口。
  *          当 CONFIG_SMP_ENABLED 未定义时，spinlock 退化为空操作，
  *          mutex 退化为简单的所有者检查（单核无竞争）。
  *
@@ -28,19 +28,19 @@ extern "C" {
  */
 typedef struct {
     volatile bool locked;
-} spinlock_t;
+} xeros_spinlock_t;
 
 #ifdef CONFIG_SMP_ENABLED
 
-void spinlock_init(spinlock_t *lock);
-void spinlock_lock(spinlock_t *lock);
-void spinlock_unlock(spinlock_t *lock);
+void xeros_spinlock_init(xeros_spinlock_t *lock);
+void xeros_spinlock_lock(xeros_spinlock_t *lock);
+void xeros_spinlock_unlock(xeros_spinlock_t *lock);
 
 #else
 
-#define spinlock_init(l)     do { (l)->locked = false; } while (0)
-#define spinlock_lock(l)     do {} while (0)
-#define spinlock_unlock(l)   do {} while (0)
+#define xeros_spinlock_init(l)     do { (l)->locked = false; } while (0)
+#define xeros_spinlock_lock(l)     do {} while (0)
+#define xeros_spinlock_unlock(l)   do {} while (0)
 
 #endif
 
@@ -52,7 +52,7 @@ void spinlock_unlock(spinlock_t *lock);
  *        单核模式：简单的所有者标记
  */
 typedef struct {
-    spinlock_t    lock;            /* 内部自旋锁 */
+    xeros_spinlock_t    lock;            /* 内部自旋锁 */
     kern_task_t  *owner;           /* 当前持有者 */
     uint8_t       recursive_count; /* 递归加锁计数 */
     kern_task_t  *wait_queue;      /* 等待队列头 */
@@ -68,7 +68,7 @@ kern_err_t mutex_unlock(mutex_t *m);
 
 static inline kern_err_t mutex_init(mutex_t *m)
 {
-    spinlock_init(&m->lock);
+    xeros_spinlock_init(&m->lock);
     m->owner           = NULL;
     m->recursive_count = 0;
     m->wait_queue      = NULL;

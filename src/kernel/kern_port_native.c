@@ -34,7 +34,6 @@
 #include "kern_port.h"
 #include "kern_task.h"
 #include "kern_init.h"
-#include "kern_ctx_esp32.h"
 
 #include <string.h>
 #include <stdlib.h>
@@ -173,7 +172,7 @@ void kern_port_task_yield(void)
      * 保存任务上下文并跳转回调度器：
      *   从 kern_port_switch_to 的 setjmp 处返回（返回值为 1）
      */
-    /* 上下文已由 kern_ctx_esp32.h 的 kern_ctx_init 中的 setjmp 保存。
+    /* 上下文已由任务创建时的 xeros_ctx_init 设置，
      * 直接 longjmp 回调度器即可。 */
     longjmp(g_sched_ctx.jmp, 1);
 }

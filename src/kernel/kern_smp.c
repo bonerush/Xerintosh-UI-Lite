@@ -29,9 +29,9 @@ _Static_assert(KERN_MAX_CPUS >= 2, "KERN_MAX_CPUS must be at least 2 for ESP32 S
 
 uint8_t kern_cpu_id(void)
 {
+    /* FreeRTOS / XEROS_NATIVE_SCHED fallback 后端 */
     uint8_t id = (uint8_t)xPortGetCoreID();
     if (id >= KERN_MAX_CPUS) {
-        /* 不应该发生；若出现则记录并钳位，避免 g_per_cpu 越界 */
         kern_log(KERN_LOG_ERROR, "SMP: invalid core id %u >= KERN_MAX_CPUS", (unsigned)id);
         return 0;
     }
