@@ -54,6 +54,11 @@ extern void hal_display_clear_color(uint16_t color);
  */
 extern void hal_display_flush(void);
 
+/* 内部访问器：其他 HAL 文件通过它们访问画布/帧缓冲 */
+struct _hal_canvas_opaque;
+struct _hal_canvas_opaque* hal_display_canvas(void);
+uint16_t* hal_display_framebuffer(void);
+
 /* ═══ 绘制原语 ═══ */
 
 /**

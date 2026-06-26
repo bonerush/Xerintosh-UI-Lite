@@ -239,28 +239,30 @@ const void* hal_get_cn_font(void) {
 
 #include <LovyanGFX.hpp>
 
-extern lgfx::LGFX_Sprite* g_canvas;
+static lgfx::LGFX_Sprite* canvas(void) {
+    return reinterpret_cast<lgfx::LGFX_Sprite*>(hal_display_canvas());
+}
 
 void hal_set_font(const void* font) {
-    if (!g_canvas) return;
+    if (!canvas()) return;
     if (font)
-        g_canvas->setFont((const lgfx::v1::IFont*)font);
+        canvas()->setFont((const lgfx::v1::IFont*)font);
     else
-        g_canvas->setFont(&fonts::Font0);
+        canvas()->setFont(&fonts::Font0);
 }
 
 /**
  * @brief 绘制 ASCII 字符串
  */
 void hal_draw_string(int16_t x, int16_t y, const char* str, uint16_t color) {
-    if (!g_canvas || !str) return;
-    g_canvas->setTextColor(color);
-    g_canvas->setTextDatum(lgfx::v1::baseline_left);
+    if (!canvas() || !str) return;
+    canvas()->setTextColor(color);
+    canvas()->setTextDatum(lgfx::v1::baseline_left);
 
     const char *p = str;
     const char *line_start = p;
     int16_t line_y = y;
-    int16_t font_h = g_canvas->fontHeight();
+    int16_t font_h = canvas()->fontHeight();
 
     while (1) {
         if (*p == '\n' || *p == '\0') {
@@ -270,7 +272,7 @@ void hal_draw_string(int16_t x, int16_t y, const char* str, uint16_t color) {
                 if (len >= sizeof(buf)) len = sizeof(buf) - 1;
                 memcpy(buf, line_start, len);
                 buf[len] = '\0';
-                g_canvas->drawString(buf, x, line_y);
+                canvas()->drawString(buf, x, line_y);
             }
             if (*p == '\0') break;
             line_y += font_h;
@@ -285,16 +287,16 @@ void hal_draw_string(int16_t x, int16_t y, const char* str, uint16_t color) {
  * @brief 获取 ASCII 字符串宽度
  */
 int16_t hal_get_string_width(const char* str) {
-    if (!g_canvas || !str) return 0;
-    return g_canvas->textWidth(str);
+    if (!canvas() || !str) return 0;
+    return canvas()->textWidth(str);
 }
 
 /**
  * @brief 获取当前字体高度
  */
 int16_t hal_get_font_height(void) {
-    if (!g_canvas) return 8;
-    return g_canvas->fontHeight();
+    if (!canvas()) return 8;
+    return canvas()->fontHeight();
 }
 
 #endif

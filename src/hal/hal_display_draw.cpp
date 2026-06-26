@@ -12,14 +12,14 @@
 
 #ifdef NATIVE_TEST
 
-extern uint16_t g_framebuffer[];  /* RGB565 帧缓冲区，定义在 hal_display_fb.cpp */
+static uint16_t* fb(void) { return hal_display_framebuffer(); }
 
 /**
  * @brief 绘制像素点（带边界检查）
  */
 void hal_draw_pixel(int16_t x, int16_t y, uint16_t color) {
     if (x < 0 || x >= HAL_SCREEN_WIDTH || y < 0 || y >= HAL_SCREEN_HEIGHT) return;
-    g_framebuffer[y * HAL_SCREEN_WIDTH + x] = color;
+    fb()[y * HAL_SCREEN_WIDTH + x] = color;
 }
 
 /**
@@ -221,66 +221,68 @@ void hal_draw_circle(int16_t x, int16_t y, int16_t r, uint16_t color) {
 
 #include <LovyanGFX.hpp>
 
-extern lgfx::LGFX_Sprite* g_canvas;
+static lgfx::LGFX_Sprite* canvas(void) {
+    return reinterpret_cast<lgfx::LGFX_Sprite*>(hal_display_canvas());
+}
 
 void hal_draw_pixel(int16_t x, int16_t y, uint16_t color) {
-    if (g_canvas) g_canvas->drawPixel(x, y, color);
+    if (canvas()) canvas()->drawPixel(x, y, color);
 }
 
 /**
  * @brief 绘制线段
  */
 void hal_draw_line(int16_t x1, int16_t y1, int16_t x2, int16_t y2, uint16_t color) {
-    if (g_canvas) g_canvas->drawLine(x1, y1, x2, y2, color);
+    if (canvas()) canvas()->drawLine(x1, y1, x2, y2, color);
 }
 
 /**
  * @brief 绘制水平线段
  */
 void hal_draw_h_line(int16_t x, int16_t y, int16_t len, uint16_t color) {
-    if (g_canvas) g_canvas->drawFastHLine(x, y, len, color);
+    if (canvas()) canvas()->drawFastHLine(x, y, len, color);
 }
 
 /**
  * @brief 绘制垂直线段
  */
 void hal_draw_v_line(int16_t x, int16_t y, int16_t len, uint16_t color) {
-    if (g_canvas) g_canvas->drawFastVLine(x, y, len, color);
+    if (canvas()) canvas()->drawFastVLine(x, y, len, color);
 }
 
 /**
  * @brief 绘制空心矩形
  */
 void hal_draw_rect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t color) {
-    if (g_canvas) g_canvas->drawRect(x, y, w, h, color);
+    if (canvas()) canvas()->drawRect(x, y, w, h, color);
 }
 
 /**
  * @brief 绘制实心矩形
  */
 void hal_draw_fill_rect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t color) {
-    if (g_canvas) g_canvas->fillRect(x, y, w, h, color);
+    if (canvas()) canvas()->fillRect(x, y, w, h, color);
 }
 
 /**
  * @brief 绘制空心圆角矩形
  */
 void hal_draw_round_rect(int16_t x, int16_t y, int16_t w, int16_t h, int16_t r, uint16_t color) {
-    if (g_canvas) g_canvas->drawRoundRect(x, y, w, h, r, color);
+    if (canvas()) canvas()->drawRoundRect(x, y, w, h, r, color);
 }
 
 /**
  * @brief 绘制实心圆角矩形
  */
 void hal_draw_fill_round_rect(int16_t x, int16_t y, int16_t w, int16_t h, int16_t r, uint16_t color) {
-    if (g_canvas) g_canvas->fillRoundRect(x, y, w, h, r, color);
+    if (canvas()) canvas()->fillRoundRect(x, y, w, h, r, color);
 }
 
 /**
  * @brief 绘制空心圆
  */
 void hal_draw_circle(int16_t x, int16_t y, int16_t r, uint16_t color) {
-    if (g_canvas) g_canvas->drawCircle(x, y, r, color);
+    if (canvas()) canvas()->drawCircle(x, y, r, color);
 }
 
 /**

@@ -115,3 +115,18 @@ TEST(HalLayoutTest, ScreenConstantsAreUnified)
     EXPECT_EQ(w, HAL_SCREEN_WIDTH);
     EXPECT_EQ(h, HAL_SCREEN_HEIGHT);
 }
+
+TEST(HalDisplayTest, CanvasAccessorReturnsNullBeforeInit)
+{
+    /* 在 hal_display_init() 之前，画布访问器应返回 nullptr */
+    EXPECT_EQ(hal_display_canvas(), nullptr);
+}
+
+TEST(HalDisplayTest, FramebufferAccessorIsNonNull)
+{
+    uint16_t *fb = hal_display_framebuffer();
+    ASSERT_NE(fb, nullptr);
+    /* 写入一个像素再读出，验证访问器指向有效内存 */
+    fb[0] = 0x1234;
+    EXPECT_EQ(fb[0], 0x1234);
+}
