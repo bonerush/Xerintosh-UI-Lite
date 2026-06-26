@@ -58,10 +58,11 @@ static void sched_fifo_enqueue(kern_task_t *task)
     task->scheduler_class_id = sched_class_fifo.class_id;
 
     /* 如果入队任务优先级高于当前运行的任务，触发抢占 */
-    if (g_current_task != NULL
+    kern_task_t *current = kern_current_task();
+    if (current != NULL
         && task->state == KERN_TASK_READY
-        && task->priority > g_current_task->priority) {
-        g_need_resched = true;
+        && task->priority > current->priority) {
+        kern_set_need_resched(true);
     }
 
     task_list_unlock();
@@ -113,7 +114,7 @@ static kern_task_t *sched_fifo_pick_next(void)
     kern_task_t *t = sched_class_fifo.task_list;
     while (t != NULL) {
         /* 唤醒到期 sleep 任务 */
-        if (t->state == KERN_TASK_SLEEPING && t->wake_time <= g_sched_ticks) {
+        if (t->state == KERN_TASK_SLEEPING && t->wake_time <= kern_sched_ticks()) {
             t->state = KERN_TASK_READY;
         }
         if (t->state == KERN_TASK_READY) {
@@ -144,7 +145,7 @@ static void sched_fifo_tick(kern_task_t *current)
     kern_task_t *t = sched_class_fifo.task_list;
     while (t != NULL) {
         if (t->state == KERN_TASK_READY && t->priority > current->priority) {
-            g_need_resched = true;
+            kern_set_need_resched(true);
             task_list_unlock();
             return;
         }

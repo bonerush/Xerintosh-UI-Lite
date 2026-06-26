@@ -40,6 +40,19 @@ kern_pid_t     g_next_pid = 0;
 uint8_t        g_task_count = 0;
 static bool    g_sched_initialized = false;
 
+/* 访问器实现 */
+kern_task_t *kern_task_list_head(void) { return g_task_list; }
+kern_task_t *kern_task_list_tail(void) { return g_task_list_tail; }
+void         kern_task_list_set_head(kern_task_t *task) { g_task_list = task; }
+void         kern_task_list_set_tail(kern_task_t *task) { g_task_list_tail = task; }
+
+kern_task_t *kern_current_task(void) { return g_current_task; }
+void         kern_set_current_task(kern_task_t *task) { g_current_task = task; }
+
+uint32_t     kern_sched_ticks(void) { return g_sched_ticks; }
+void         kern_set_need_resched(bool need) { g_need_resched = need; }
+bool         kern_need_resched(void) { return g_need_resched; }
+
 #ifdef CONFIG_SMP_ENABLED
 /* 共享任务列表自旋锁 */
 volatile bool  g_task_list_lock = false;

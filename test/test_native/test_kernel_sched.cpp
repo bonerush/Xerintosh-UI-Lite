@@ -215,6 +215,30 @@ TEST(KernelSchedTest, SchedClassRegisterReturnsEnospc)
     memcpy(g_sched_classes, saved_classes, KERN_SCHED_MAX_CLASSES * sizeof(kern_sched_class_t *));
 }
 
+/* ═══ 访问器测试 ═══ */
+
+TEST(KernelSchedTest, TaskListHeadAccessorMatchesGlobal)
+{
+    kern_sched_init();
+    EXPECT_EQ(kern_task_list_head(), g_task_list);
+    EXPECT_EQ(kern_task_list_tail(), g_task_list_tail);
+}
+
+TEST(KernelSchedTest, CurrentTaskAccessorMatchesGlobal)
+{
+    kern_sched_init();
+    EXPECT_EQ(kern_current_task(), g_current_task);
+}
+
+TEST(KernelSchedTest, NeedReschedAccessorWorks)
+{
+    kern_sched_init();
+    kern_set_need_resched(true);
+    EXPECT_TRUE(kern_need_resched());
+    kern_set_need_resched(false);
+    EXPECT_FALSE(kern_need_resched());
+}
+
 /* ═══ 辅助：构造一个未入队的 dummy 任务 ═══ */
 
 static void init_dummy_task(kern_task_t *task, const char *name)

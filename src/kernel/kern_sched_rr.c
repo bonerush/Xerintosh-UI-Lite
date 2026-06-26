@@ -61,7 +61,7 @@ static void sched_rr_enqueue(kern_task_t *task)
         sched_class_rr.task_list_tail = task;
     }
     /* RR 类为默认类，其链表与全局 g_task_list 共享，同步尾指针 */
-    g_task_list_tail = sched_class_rr.task_list_tail;
+    kern_task_list_set_tail(sched_class_rr.task_list_tail);
 
     task_list_unlock();
 }
@@ -108,7 +108,7 @@ static void sched_rr_dequeue(kern_task_t *task)
 static kern_task_t *sched_rr_pick_next(void)
 {
     uint8_t cpu = KERN_THIS_CPU;
-    uint32_t now = g_sched_ticks;
+    uint32_t now = kern_sched_ticks();
 
     task_list_lock();
 
@@ -176,7 +176,7 @@ static void sched_rr_tick(kern_task_t *current)
     if (current->timeslice_remaining == 0) {
         /* 时间片用尽，触发重调度 */
         current->timeslice_remaining = g_rr_timeslice;
-        g_need_resched = true;
+        kern_set_need_resched(true);
     }
 }
 
