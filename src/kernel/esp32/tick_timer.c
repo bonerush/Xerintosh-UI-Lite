@@ -27,6 +27,7 @@ static const char *TAG = "tick_timer";
 static volatile bool g_tick_pending = false;   /* ISR → 任务上下文通知标志 */
 static volatile bool g_timer_running = false;
 static gptimer_handle_t g_gptimer = NULL;
+static uint32_t g_period_us = 1000;             /* 初始化时保存的周期，用于 tickless 唤醒后恢复 */
 
 /* ═══ ISR ═══ */
 
@@ -59,6 +60,8 @@ int tick_timer_init(uint32_t period_us)
     }
 
     g_tick_pending = false;
+
+    g_period_us = period_us;
 
     /* 配置 GPTimer：1MHz 时钟（1 tick = 1us），向上计数 */
     gptimer_config_t config = {
@@ -142,6 +145,11 @@ void tick_timer_stop(void)
     ESP_LOGI(TAG, "timer stopped");
 }
 
+bool tick_timer_pending(void)
+{
+    return g_tick_pending;
+}
+
 bool tick_timer_consume(void)
 {
     if (!g_tick_pending) return false;
@@ -152,6 +160,42 @@ bool tick_timer_consume(void)
 bool tick_timer_is_running(void)
 {
     return g_timer_running;
+}
+
+void tick_timer_set_next_alarm(uint32_t us)
+{
+    if (!g_timer_running || g_gptimer == NULL) return;
+    if (us == 0) us = g_period_us;
+
+    uint64_t now = 0;
+    gptimer_get_raw_count(g_gptimer, &now);
+
+    gptimer_alarm_config_t alarm_config = {
+        .alarm_count = now + us,
+        .reload_count = 0,
+        .flags.auto_reload_on_alarm = false,
+    };
+
+    esp_err_t err = gptimer_set_alarm_action(g_gptimer, &alarm_config);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "set_next_alarm failed: %s", esp_err_to_name(err));
+    }
+}
+
+void tick_timer_restore_periodic(void)
+{
+    if (!g_timer_running || g_gptimer == NULL) return;
+
+    gptimer_alarm_config_t alarm_config = {
+        .alarm_count = g_period_us,
+        .reload_count = 0,
+        .flags.auto_reload_on_alarm = true,
+    };
+
+    esp_err_t err = gptimer_set_alarm_action(g_gptimer, &alarm_config);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "restore_periodic failed: %s", esp_err_to_name(err));
+    }
 }
 
 #endif /* !NATIVE_TEST */

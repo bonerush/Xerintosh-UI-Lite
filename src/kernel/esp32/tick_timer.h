@@ -41,6 +41,12 @@ int tick_timer_start(void);
 void tick_timer_stop(void);
 
 /**
+ * @brief 检查是否有 tick 待处理（不消费标志）
+ * @return true 如果有 tick 待处理
+ */
+bool tick_timer_pending(void);
+
+/**
  * @brief 检查并消费 tick 请求（任务上下文调用）
  *
  * 当 ISR 设置了 tick 标志时返回 true，同时清零标志。
@@ -55,6 +61,23 @@ bool tick_timer_consume(void);
  * @return true 如果定时器已启动
  */
 bool tick_timer_is_running(void);
+
+/**
+ * @brief 重编程定时器为单次报警（用于 tickless idle）
+ *
+ * 以当前计数为基准，在 us 微秒后触发一次 alarm，触发后不自动重装。
+ * 唤醒后需调用 tick_timer_restore_periodic() 恢复周期性 tick。
+ *
+ * @param us 距离当前时刻的微秒数
+ */
+void tick_timer_set_next_alarm(uint32_t us);
+
+/**
+ * @brief 恢复周期性 tick（用于 tickless idle 唤醒后）
+ *
+ * 将定时器恢复为初始化时配置的周期自动重装模式。
+ */
+void tick_timer_restore_periodic(void);
 
 #ifdef __cplusplus
 }
