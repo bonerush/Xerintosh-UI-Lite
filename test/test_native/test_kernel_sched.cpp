@@ -17,6 +17,7 @@ extern "C" {
 #include "kernel/kern_sched_rr.h"
 #include "kernel/kern_sched_fifo.h"
 #include "kernel/kern_init.h"
+#include "kernel/kern_port.h"
 }
 
 /* ═══ 辅助：任务间通信变量 ═══ */
@@ -498,4 +499,16 @@ TEST(KernelSchedTest, StackGrowTriggerDoesNotCrash)
 
     /* 只要没有崩溃/段错误即通过 */
     SUCCEED();
+}
+
+TEST(KernelPortTest, TimerSetPeriodicReturnsOk)
+{
+    kern_err_t rc = kern_port_timer_set_periodic(1000);
+    EXPECT_EQ(rc, KERN_OK);
+}
+
+TEST(KernelPortTest, TimerSetPeriodicRejectsZeroPeriod)
+{
+    kern_err_t rc = kern_port_timer_set_periodic(0);
+    EXPECT_EQ(rc, KERN_EINVAL);
 }
