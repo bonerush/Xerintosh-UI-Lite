@@ -229,11 +229,15 @@ uint32_t hal_input_get_press_duration(hal_button_t btn) {
 
 /**
  * @brief  重置所有按键的事件状态机
- * @note   在 user_item 的 init/exit 中调用，清除跨模式的残留状态
+ * @note   在 user_item 的 init/exit 中调用，清除跨模式的残留状态。
+ *         同时把 prev_raw 同步为当前 GPIO 电平，避免 reset 后下一次
+ *         hal_input_get_event 因旧边沿状态而误判出短按/释放事件。
  */
 void hal_input_reset_events(void) {
     hal_input_dc_init(&g_btn_a.dc);
     hal_input_dc_init(&g_btn_b.dc);
+    g_btn_a.prev_raw = btn_read_raw(HAL_BTN_A);
+    g_btn_b.prev_raw = btn_read_raw(HAL_BTN_B);
 }
 
 #endif
