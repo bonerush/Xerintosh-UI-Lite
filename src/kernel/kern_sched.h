@@ -33,11 +33,14 @@ extern uint8_t        g_task_count;       /* 任务总数 */
 
 #ifdef CONFIG_SMP_ENABLED
 extern volatile bool  g_task_list_lock;    /* 共享任务列表自旋锁 */
+void kern_smp_sched_loop(void *arg);       /* 每 CPU 调度器入口 */
 #endif
 
 #ifdef NATIVE_TEST
 extern ucontext_t     g_sched_ctx;        /* 调度器上下文 */
 extern kern_task_t   *g_switch_to_task;   /* makecontext 参数传递 */
+#elif defined(XEROS_NATIVE_SCHED)
+extern kern_ctx_native_t g_sched_ctx[KERN_MAX_CPUS];  /* 调度器原生上下文（per-CPU） */
 #endif
 
 /* ═══ 调度器核心 ═══ */
