@@ -24,6 +24,7 @@
 
 static kern_dentry_t g_root_dentry;
 static bool g_vfs_initialized = false;
+static xeros_spinlock_t g_vfs_lock;  /* 保护 dentry 树、inode 引用计数和初始化状态 */
 
 /* ═══ FD 对象池 ═══ */
 
@@ -75,7 +76,8 @@ static void kfree_inode(kern_inode_t *inode)
     free(inode);
 }
 
-static void kern_inode_ref(kern_inode_t *inode)
+/* 调用者必须持有 g_vfs_lock */
+static void kern_inode_ref_locked(kern_inode_t *inode)
 {
     if (inode == NULL) {
         return;
@@ -83,7 +85,8 @@ static void kern_inode_ref(kern_inode_t *inode)
     inode->ref_count++;
 }
 
-static void kern_inode_unref(kern_inode_t *inode)
+/* 调用者必须持有 g_vfs_lock */
+static void kern_inode_unref_locked(kern_inode_t *inode)
 {
     if (inode == NULL) {
         return;
@@ -113,7 +116,8 @@ uint32_t kern_vfs_inode_ref_count(const kern_inode_t *inode)
  * @param auto_create  是否自动创建中间目录（用于 kern_dentry_register）
  * @return 目标 dentry；未找到时返回 NULL
  */
-static kern_dentry_t *path_walk(kern_dentry_t *root, const char *path, bool auto_create)
+/* 路径解析核心（调用者必须持有 g_vfs_lock） */
+static kern_dentry_t *path_walk_locked(kern_dentry_t *root, const char *path, bool auto_create)
 {
     if (path == NULL || path[0] != '/') {
         return NULL;
@@ -206,7 +210,8 @@ void kern_vfs_init(void)
 
     g_vfs_initialized = true;
 
-    /* 初始化 FD 池锁 */
+    /* 初始化 VFS 全局锁与 FD 池锁 */
+    xeros_spinlock_init(&g_vfs_lock);
     xeros_spinlock_init(&g_fd_pool_lock);
 
     /* 初始化根 dentry */
@@ -231,22 +236,26 @@ kern_err_t kern_dentry_register(const char *path, kern_inode_t *inode)
     if (path == NULL) return KERN_EINVAL;
     if (inode == NULL) return KERN_EINVAL;
 
-    kern_dentry_t *dentry = path_walk(&g_root_dentry, path, true);
+    xeros_spinlock_lock(&g_vfs_lock);
+    kern_dentry_t *dentry = path_walk_locked(&g_root_dentry, path, true);
     if (dentry == NULL) {
+        xeros_spinlock_unlock(&g_vfs_lock);
         return KERN_ENOENT;
     }
 
     /* 挂载 inode（如果已有旧 inode 则替换） */
     if (dentry->inode == inode) {
         dentry->inode->fops = inode->fops;
+        xeros_spinlock_unlock(&g_vfs_lock);
         return KERN_OK;
     }
     if (dentry->inode != NULL) {
-        kern_inode_unref(dentry->inode);
+        kern_inode_unref_locked(dentry->inode);
     }
     dentry->inode = inode;
-    kern_inode_ref(inode);
+    kern_inode_ref_locked(inode);
     dentry->inode->fops = inode->fops;
+    xeros_spinlock_unlock(&g_vfs_lock);
 
     return KERN_OK;
 }
@@ -256,7 +265,10 @@ kern_dentry_t *kern_path_resolve(const char *path)
     if (!g_vfs_initialized) return NULL;
     if (path == NULL) return NULL;
 
-    return path_walk(&g_root_dentry, path, false);
+    xeros_spinlock_lock(&g_vfs_lock);
+    kern_dentry_t *result = path_walk_locked(&g_root_dentry, path, false);
+    xeros_spinlock_unlock(&g_vfs_lock);
+    return result;
 }
 
 kern_err_t kern_vfs_mkdir(const char *path)
@@ -264,17 +276,21 @@ kern_err_t kern_vfs_mkdir(const char *path)
     if (!g_vfs_initialized) return KERN_ERR;
     if (path == NULL) return KERN_EINVAL;
 
+    xeros_spinlock_lock(&g_vfs_lock);
     /* 若已存在则幂等返回 */
-    kern_dentry_t *existing = kern_path_resolve(path);
+    kern_dentry_t *existing = path_walk_locked(&g_root_dentry, path, false);
     if (existing != NULL) {
+        xeros_spinlock_unlock(&g_vfs_lock);
         return KERN_OK;
     }
 
-    kern_dentry_t *dentry = path_walk(&g_root_dentry, path, true);
+    kern_dentry_t *dentry = path_walk_locked(&g_root_dentry, path, true);
     if (dentry == NULL) {
+        xeros_spinlock_unlock(&g_vfs_lock);
         return KERN_ENOENT;
     }
 
+    xeros_spinlock_unlock(&g_vfs_lock);
     return KERN_OK;
 }
 
@@ -285,15 +301,28 @@ kern_err_t kern_vfs_unlink(const char *path)
     if (!g_vfs_initialized) return KERN_ERR;
     if (path == NULL || path[0] != '/') return KERN_EINVAL;
 
-    kern_dentry_t *dentry = kern_path_resolve(path);
-    if (dentry == NULL) return KERN_ENOENT;
+    xeros_spinlock_lock(&g_vfs_lock);
+    kern_dentry_t *dentry = path_walk_locked(&g_root_dentry, path, false);
+    if (dentry == NULL) {
+        xeros_spinlock_unlock(&g_vfs_lock);
+        return KERN_ENOENT;
+    }
 
     /* 不允许删除根目录 */
-    if (dentry == &g_root_dentry) return KERN_EACCES;
-    if (dentry->parent == NULL) return KERN_EACCES;
+    if (dentry == &g_root_dentry) {
+        xeros_spinlock_unlock(&g_vfs_lock);
+        return KERN_EACCES;
+    }
+    if (dentry->parent == NULL) {
+        xeros_spinlock_unlock(&g_vfs_lock);
+        return KERN_EACCES;
+    }
 
     /* 非空目录不可删除 */
-    if (dentry->child_count > 0) return KERN_ENOTEMPTY;
+    if (dentry->child_count > 0) {
+        xeros_spinlock_unlock(&g_vfs_lock);
+        return KERN_ENOTEMPTY;
+    }
 
     /* 从父节点的 children 数组中移除 */
     kern_inode_t *inode = dentry->inode;
@@ -311,7 +340,8 @@ kern_err_t kern_vfs_unlink(const char *path)
     }
 
     free(dentry);
-    kern_inode_unref(inode);
+    kern_inode_unref_locked(inode);
+    xeros_spinlock_unlock(&g_vfs_lock);
     return KERN_OK;
 }
 
@@ -351,25 +381,39 @@ kern_err_t kern_vfs_touch(const char *path)
     if (!g_vfs_initialized) return KERN_ERR;
     if (path == NULL || path[0] != '/') return KERN_EINVAL;
 
+    xeros_spinlock_lock(&g_vfs_lock);
     /* 若已存在则返回 EEXIST */
-    kern_dentry_t *existing = kern_path_resolve(path);
+    kern_dentry_t *existing = path_walk_locked(&g_root_dentry, path, false);
     if (existing != NULL && existing->inode != NULL) {
+        xeros_spinlock_unlock(&g_vfs_lock);
         return KERN_EEXIST;
     }
 
     /* 分配 inode */
     kern_inode_t *inode = (kern_inode_t *)calloc(1, sizeof(kern_inode_t));
-    if (inode == NULL) return KERN_ENOMEM;
+    if (inode == NULL) {
+        xeros_spinlock_unlock(&g_vfs_lock);
+        return KERN_ENOMEM;
+    }
 
     inode->type = KERN_FILE_REGULAR;
     inode->fops = &g_ramfile_fops;
     inode->private_data = NULL;
 
-    int ret = kern_dentry_register(path, inode);
-    if (ret != KERN_OK) {
+    kern_dentry_t *dentry = path_walk_locked(&g_root_dentry, path, true);
+    if (dentry == NULL) {
         free(inode);
-        return ret;
+        xeros_spinlock_unlock(&g_vfs_lock);
+        return KERN_ENOENT;
     }
+
+    if (dentry->inode != NULL) {
+        kern_inode_unref_locked(dentry->inode);
+    }
+    dentry->inode = inode;
+    kern_inode_ref_locked(inode);
+    dentry->inode->fops = inode->fops;
+    xeros_spinlock_unlock(&g_vfs_lock);
 
     return KERN_OK;
 }
@@ -446,7 +490,10 @@ static void fd_close_raw(kern_fd_t fd)
     kern_inode_t *inode = f->inode;
     cur->fd_table[fd] = NULL;
     fd_pool_free(f);
-    kern_inode_unref(inode);
+
+    xeros_spinlock_lock(&g_vfs_lock);
+    kern_inode_unref_locked(inode);
+    xeros_spinlock_unlock(&g_vfs_lock);
 }
 
 /* ═══ FD 资源释放回调 ═══ */
@@ -465,20 +512,23 @@ kern_fd_t kern_open(const char *path, unsigned int flags)
     if (!g_vfs_initialized) return KERN_ERR;
     if (path == NULL) return KERN_EINVAL;
 
-    kern_dentry_t *dentry = kern_path_resolve(path);
-    if (dentry == NULL) {
-        return KERN_ENOENT;
-    }
-    if (dentry->inode == NULL) {
-        return KERN_EISDIR;  /* dentry 无 inode → 可能为目录（未挂载文件） */
-    }
-
     kern_task_t *cur = kern_task_current();
 
     kern_fd_t fd;
     kern_file_t *f = fd_alloc(&fd);
     if (f == NULL) {
         return fd;  /* 返回 KERN_EMFILE / KERN_ENOMEM / KERN_EBADF */
+    }
+
+    xeros_spinlock_lock(&g_vfs_lock);
+    kern_dentry_t *dentry = path_walk_locked(&g_root_dentry, path, false);
+    if (dentry == NULL || dentry->inode == NULL) {
+        xeros_spinlock_unlock(&g_vfs_lock);
+        if (cur != NULL && fd >= 0 && fd < KERN_MAX_FD_PER_TASK) {
+            cur->fd_table[fd] = NULL;
+        }
+        fd_pool_free(f);
+        return (dentry == NULL) ? KERN_ENOENT : KERN_EISDIR;
     }
 
     f->dentry = dentry;
@@ -488,14 +538,17 @@ kern_fd_t kern_open(const char *path, unsigned int flags)
     f->f_pos = 0;
     f->private_data = NULL;
 
-    kern_inode_ref(f->inode);
+    kern_inode_ref_locked(f->inode);
+    xeros_spinlock_unlock(&g_vfs_lock);
 
     /* 调用设备的 open 回调（如果存在） */
     if (f->fops != NULL && f->fops->open != NULL) {
         int open_rc = f->fops->open(f, flags);
         if (open_rc != KERN_OK) {
             /* open 失败：释放 inode 引用，回收 file 结构与 FD 槽位 */
-            kern_inode_unref(f->inode);
+            xeros_spinlock_lock(&g_vfs_lock);
+            kern_inode_unref_locked(f->inode);
+            xeros_spinlock_unlock(&g_vfs_lock);
             if (cur != NULL && fd >= 0 && fd < KERN_MAX_FD_PER_TASK) {
                 cur->fd_table[fd] = NULL;
             }
