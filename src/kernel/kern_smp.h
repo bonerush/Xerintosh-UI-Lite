@@ -40,9 +40,12 @@ typedef struct kern_per_cpu {
 /** 全局 per-CPU 数组（总是存在，SMP 禁用时仅使用 [0]） */
 extern kern_per_cpu_t g_per_cpu[KERN_MAX_CPUS];
 
-/* ═══ CPU 标识 ═══ */
-
 #ifdef CONFIG_SMP_ENABLED
+
+/** SMP 核心就绪标志位图（bit i 表示 core i 已进入调度循环） */
+extern volatile uint8_t g_cpu_ready;
+
+/* ═══ CPU 标识 ═══ */
 
 #define KERN_THIS_CPU  ((uint8_t)(kern_cpu_id()))
 
@@ -55,8 +58,20 @@ void kern_smp_init(void);
 /** 在指定 CPU 上启动调度器循环 */
 void kern_smp_start_core(uint8_t cpu_id, void (*entry)(void *arg));
 
+/** 每 CPU 调度器主循环入口（Core 0 与 Core 1 共用） */
+void kern_smp_sched_loop(void *arg);
+
 /** 为 KERN_CPU_ANY 任务分配 CPU（负载最低的核心） */
 uint8_t kern_smp_migrate_assign(void);
+
+/**
+ * @brief 向指定 CPU 发送重新调度 IPI
+ * @details 当当前 CPU 唤醒了绑定在另一 CPU 上的任务时调用。
+ *          目标 CPU 收到 IPI 后会设置 need_resched 并退出 idle。
+ *          在 ESP32 双核上，esp_ipc_isr_call() 只能发往“另一核”，
+ *          因此 cpu_id 必须与当前核心不同。
+ */
+void kern_smp_ipi_reschedule(uint8_t cpu_id);
 
 #else /* !CONFIG_SMP_ENABLED — 单核零开销模式 */
 
@@ -66,6 +81,7 @@ static inline uint8_t kern_cpu_id(void) { return 0; }
 #define kern_smp_init()                 do {} while (0)
 #define kern_smp_start_core(c, e)       do { (void)(c); (void)(e); } while (0)
 static inline uint8_t kern_smp_migrate_assign(void) { return 0; }
+#define kern_smp_ipi_reschedule(c)      do { (void)(c); } while (0)
 
 #endif /* CONFIG_SMP_ENABLED */
 

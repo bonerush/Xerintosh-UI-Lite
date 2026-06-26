@@ -19,8 +19,13 @@ kern_per_cpu_t g_per_cpu[KERN_MAX_CPUS];
 
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
+#include <esp_cpu.h>
+#include <esp_ipc_isr.h>
 
 volatile uint8_t g_cpu_ready = 0;  /* SMP 就绪标志（供外部查询） */
+
+/* IPI 汇编处理函数（定义在 smp_ipi.S） */
+extern void xeros_ipi_reschedule_handler(void *arg);
 
 /* ESP32 为双核，确保 KERN_MAX_CPUS 至少为 2 */
 _Static_assert(KERN_MAX_CPUS >= 2, "KERN_MAX_CPUS must be at least 2 for ESP32 SMP");
@@ -29,13 +34,14 @@ _Static_assert(KERN_MAX_CPUS >= 2, "KERN_MAX_CPUS must be at least 2 for ESP32 S
 
 uint8_t kern_cpu_id(void)
 {
-    /* FreeRTOS / XEROS_NATIVE_SCHED fallback 后端 */
-    uint8_t id = (uint8_t)xPortGetCoreID();
-    if (id >= KERN_MAX_CPUS) {
-        kern_log(KERN_LOG_ERROR, "SMP: invalid core id %u >= KERN_MAX_CPUS", (unsigned)id);
+    /* 原生 CPU ID 读取：不依赖 FreeRTOS xPortGetCoreID。
+     * esp_cpu_get_core_id() 直接读 Xtensa PRID 特殊寄存器。 */
+    int id = esp_cpu_get_core_id();
+    if (id < 0 || id >= KERN_MAX_CPUS) {
+        kern_log(KERN_LOG_ERROR, "SMP: invalid core id %d >= KERN_MAX_CPUS", id);
         return 0;
     }
-    return id;
+    return (uint8_t)id;
 }
 
 /* ═══ SMP 初始化 ═══ */
@@ -79,16 +85,58 @@ void kern_smp_start_core(uint8_t cpu_id, void (*entry)(void *arg))
 
 /* ═══ CPU 分配策略 ═══ */
 
+#ifdef CONFIG_SMP_ENABLED
+/* 保护 g_per_cpu[].task_count 的负载均衡计数器 */
+static volatile bool g_smp_assign_lock = false;
+#endif
+
 uint8_t kern_smp_migrate_assign(void)
 {
+#ifdef CONFIG_SMP_ENABLED
+    while (__sync_lock_test_and_set(&g_smp_assign_lock, true)) {
+        __asm__ volatile("nop");
+    }
+#endif
+
     /* 简单策略：分配到任务数较少的 CPU */
+    uint8_t cpu;
     if (g_per_cpu[0].task_count <= g_per_cpu[1].task_count) {
         g_per_cpu[0].task_count++;
-        return 0;
+        cpu = 0;
     } else {
         g_per_cpu[1].task_count++;
-        return 1;
+        cpu = 1;
     }
+
+#ifdef CONFIG_SMP_ENABLED
+    __sync_lock_release(&g_smp_assign_lock);
+#endif
+
+    return cpu;
+}
+
+/* ═══ IPI（处理器间中断）═══ */
+
+void kern_smp_ipi_reschedule(uint8_t cpu_id)
+{
+#ifdef CONFIG_SMP_ENABLED
+    uint8_t self = kern_cpu_id();
+    if (cpu_id >= KERN_MAX_CPUS || cpu_id == self) {
+        return;
+    }
+
+    /* 目标核心尚未进入调度循环，无需/不能发送 IPI */
+    if ((g_cpu_ready & (uint8_t)(1u << cpu_id)) == 0) {
+        return;
+    }
+
+    /* ESP32 双核：esp_ipc_isr_call() 只能发往“另一核”。
+     * 若请求的核心确实是对侧核心，则触发高优先级中断使其退出 idle。 */
+    if (cpu_id == (self ^ 1)) {
+        esp_ipc_isr_call(xeros_ipi_reschedule_handler,
+                         (void *)&g_per_cpu[cpu_id].need_resched);
+    }
+#endif
 }
 
 #endif /* CONFIG_SMP_ENABLED */

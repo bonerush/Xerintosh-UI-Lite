@@ -207,9 +207,8 @@ kern_pid_t kern_spawn(const char *name, void (*entry)(void *arg),
         }
     }
 
-    /* 若新任务绑定在另一核心，发送 IPI 使其尽快调度。
-     * 注：IPI 函数在后续提交中实现，当前临时注释以便分阶段提交。 */
-    /* kern_smp_ipi_reschedule(task->cpu_id); */
+    /* 若新任务绑定在另一核心，发送 IPI 使其尽快调度 */
+    kern_smp_ipi_reschedule(task->cpu_id);
 
     kern_log(KERN_LOG_DEBUG, "spawned task %d: %s", task->pid, task->name);
     return task->pid;
