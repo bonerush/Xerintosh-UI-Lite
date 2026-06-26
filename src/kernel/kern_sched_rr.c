@@ -153,12 +153,15 @@ static kern_task_t *sched_rr_pick_next(void)
 
     task_list_unlock();
 
-    /* 无亲和性匹配任务：返回本核心 idle 任务（idle 始终 READY 且绑定本核心） */
+    /* 无亲和性匹配任务：返回本核心 idle 任务（idle 始终 READY/RUNNING 且绑定本核心） */
     kern_task_t *idle = g_per_cpu[cpu].idle_task;
-    if (idle != NULL && idle->state == KERN_TASK_READY) {
-        idle->state = KERN_TASK_RUNNING;
+    if (idle != NULL && (idle->state == KERN_TASK_READY || idle->state == KERN_TASK_RUNNING)) {
+        if (idle->state == KERN_TASK_READY) {
+            idle->state = KERN_TASK_RUNNING;
+        }
+        return idle;
     }
-    return idle;
+    return NULL;
 }
 
 /* ═══ tick：时间片递减 + 抢占标记 ═══ */

@@ -27,8 +27,14 @@ TEST(ContextSwitch, NativeCtxIsJmpBuf) {
 
 TEST(ContextSwitch, NativeCtxSizeMatchesXtensaWindowed) {
     /* Xtensa windowed ABI 的 jmp_buf 为 17 个 int：
-     * 12 个窗口寄存器 + 4 个 save-area 字 + 1 个返回地址 */
+     * 12 个窗口寄存器 + 4 个 save-area 字 + 1 个返回地址。
+     * 该断言只在 Xtensa 目标上有效；原生平台（x86_64/arm64）的 jmp_buf
+     * 由宿主 libc 决定，大小不同，跳过而非失败。 */
+#ifndef __xtensa__
+    GTEST_SKIP() << "Xtensa windowed ABI size check only valid on Xtensa target";
+#else
     EXPECT_EQ(sizeof(kern_ctx_native_t), 17 * sizeof(int));
+#endif
 }
 
 /* ═══ 基本可实例化验证 ═══ */
