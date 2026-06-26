@@ -1,12 +1,34 @@
-.pio
+# PlatformIO 构建产物
+.pio/
+
+# ESP-IDF 构建配置（.sdkconfig 为构建时自动生成）
+sdkconfig
+sdkconfig.old
+
+# VS Code（共享 settings 保留，仅忽略本地生成文件）
 .vscode/.browse.c_cpp.db*
 .vscode/c_cpp_properties.json
 .vscode/launch.json
 .vscode/ipch
+
+# macOS
 .DS_Store
+
+# Claude / AI 工作区
 .claude/
 .codegraph/
+
+# Python
+__pycache__/
+*.pyc
+
+# 参考文档 & 日志
 ref/
 screenlog.*
-tools/__pycache__/
+*.log
+
+# 调试记录
 doc/debug-native-sched-prompt.md
+
+# Git Worktree 隔离区（使用 worktree 时自动创建）
+.worktrees/
