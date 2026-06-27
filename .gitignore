@@ -24,8 +24,12 @@ ref/
 screenlog.*
 *.log
 
-# 调试记录
-doc/debug-native-sched-prompt.md
+# 调试记录 & 计划文档
+doc/debug-*.md
+doc/implementation-plan.md
+doc/kernel/debug/
+doc/architecture/debug-*.md
+doc/superpowers/
 
 # Git Worktree 隔离区（使用 worktree 时自动创建）
 .worktrees/
