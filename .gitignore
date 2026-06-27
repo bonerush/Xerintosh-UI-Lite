@@ -29,3 +29,6 @@ doc/debug-native-sched-prompt.md
 
 # Git Worktree 隔离区（使用 worktree 时自动创建）
 .worktrees/
+
+
+
