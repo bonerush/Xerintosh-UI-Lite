@@ -70,8 +70,9 @@ class SceneRenderer {
   animateDetails() {
     const el = this.details.root;
     el.classList.remove('step-enter');
-    void el.offsetWidth;
-    el.classList.add('step-enter');
+    requestAnimationFrame(() => {
+      el.classList.add('step-enter');
+    });
   }
 
   renderRegisters(changes) {

@@ -2,20 +2,23 @@
   fill: var(--bg-panel);
   stroke: var(--text-dim);
   stroke-width: 1.5;
-  transition: all 0.3s ease;
+  transition: stroke 0.3s ease, fill 0.3s ease, opacity 0.3s ease;
 }
 
 [data-node] text {
   fill: var(--text-muted);
   font-family: var(--font-ui);
-  font-size: 12px;
+  font-size: 13px;
+  font-weight: 500;
   transition: fill 0.3s ease;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 [data-node].active {
   stroke: var(--accent);
-  stroke-width: 2;
-  fill: rgba(250, 250, 249, 0.08);
+  stroke-width: 2.5;
+  fill: rgba(250, 250, 249, 0.1);
 }
 
 [data-node].active text {
@@ -24,7 +27,8 @@
 
 [data-node].done {
   stroke: var(--text-muted);
-  fill: rgba(161, 161, 170, 0.08);
+  fill: rgba(161, 161, 170, 0.06);
+  opacity: 0.7;
 }
 
 [data-node].done text {
@@ -32,7 +36,7 @@
 }
 
 [data-node].dim {
-  opacity: 0.4;
+  opacity: 0.35;
 }
 
 [data-arrow] {

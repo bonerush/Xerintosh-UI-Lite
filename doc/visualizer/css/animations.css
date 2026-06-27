@@ -1,12 +1,30 @@
 .step-enter {
-  animation: fade-in 0.25s ease;
+  animation: slide-up 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-@keyframes fade-in {
-  from { opacity: 0; transform: translateY(4px); }
-  to { opacity: 1; transform: translateY(0); }
+@keyframes slide-up {
+  from {
+    opacity: 0.6;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.stage {
+  transition: opacity 0.2s ease;
 }
 
 .progress-fill {
-  transition: width 0.25s ease;
+  transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.details-source a {
+  transition: color 0.15s ease;
+}
+
+button {
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
 }
