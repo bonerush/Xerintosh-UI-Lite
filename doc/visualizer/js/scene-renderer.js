@@ -55,7 +55,7 @@ export class SceneRenderer {
     this.details.title.textContent = step.title || this.currentScene.title;
     this.details.desc.textContent = step.detail;
     if (step.source) {
-      this.details.source.innerHTML = `<span>Source: </span><a href="../../../${step.source.split(':')[0]}" target="_blank">${step.source}</a>`;
+      this.details.source.innerHTML = `<span>Source: </span><a href="../../${step.source.split(':')[0]}" target="_blank">${step.source}</a>`;
     } else {
       this.details.source.innerHTML = '';
     }
