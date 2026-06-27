@@ -49,7 +49,7 @@ export const smpIpiScene = {
       highlight: ['cpu0', 'cpu1'],
       arrows: [],
       detail: 'CPU0 和 CPU1 各自维护自己的就绪队列和当前任务。',
-      source: 'src/kernel/kern_smp.c:xxx',
+      source: 'src/kernel/kern_smp.c:48-63',
     },
     {
       id: 'cpu0-ipi',
@@ -57,7 +57,7 @@ export const smpIpiScene = {
       highlight: ['cpu0', 'ipi'],
       arrows: ['cpu0-to-ipi'],
       detail: '当 CPU0 唤醒一个绑定在 CPU1 上的任务时，触发跨核中断通知 CPU1。',
-      source: 'src/kernel/kern_smp.c:xxx',
+      source: 'src/kernel/kern_smp.c:104-120',
     },
     {
       id: 'cpu1-receive',
@@ -65,7 +65,7 @@ export const smpIpiScene = {
       highlight: ['cpu1', 'ipi'],
       arrows: ['cpu1-to-ipi'],
       detail: 'CPU1 进入 IPI handler，检查是否有高优先级任务需要立即调度。',
-      source: 'src/kernel/esp32/kern_esp32_ipi.S:xxx',
+      source: 'src/kernel/esp32/smp_ipi.S:31-45',
     },
     {
       id: 'migrate-wake',
@@ -73,7 +73,7 @@ export const smpIpiScene = {
       highlight: ['migrate'],
       arrows: ['ipi-to-migrate'],
       detail: 'CPU1 将被唤醒的任务加入自己的就绪队列，必要时触发上下文切换。',
-      source: 'src/kernel/kern_smp.c:xxx',
+      source: 'src/kernel/kern_smp.c:104-120',
     },
   ],
 };

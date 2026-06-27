@@ -55,7 +55,7 @@ export const interruptScene = {
       highlight: ['irq'],
       arrows: [],
       detail: '外部设备或定时器触发中断，CPU 暂停当前指令流。',
-      source: 'src/kernel/esp32/kern_esp32_int.S:xxx',
+      source: 'src/kernel/kern_isr.c:15-33',
     },
     {
       id: 'save-context',
@@ -63,7 +63,7 @@ export const interruptScene = {
       highlight: ['entry'],
       arrows: ['irq-to-entry'],
       detail: '进入汇编中断入口，保存 PC、PS、A0-A15 等到中断栈。',
-      source: 'src/kernel/esp32/kern_esp32_int.S:xxx',
+      source: 'src/kernel/esp32/ctx_switch.S:454-516',
       registerChange: { SP: '0x3FFC7F00', PS: '0x0006001F' },
     },
     {
@@ -72,7 +72,7 @@ export const interruptScene = {
       highlight: ['dispatch'],
       arrows: ['entry-to-dispatch'],
       detail: '根据中断号查找中断描述符表，调用注册的 C 语言 ISR。',
-      source: 'src/kernel/kern_int.c:xxx',
+      source: 'src/kernel/kern_isr.c:15-33',
     },
     {
       id: 'sched-check',
@@ -80,7 +80,7 @@ export const interruptScene = {
       highlight: ['sched-check'],
       arrows: ['dispatch-to-sched'],
       detail: 'ISR 返回前检查是否需要重新调度（如 tick handler 减时间片）。',
-      source: 'src/kernel/kern_sched.c:xxx',
+      source: 'src/kernel/kern_sched.c:479-505',
     },
     {
       id: 'restore-return',
@@ -88,7 +88,7 @@ export const interruptScene = {
       highlight: ['return'],
       arrows: ['sched-to-return'],
       detail: '恢复寄存器，执行 rfi 或 retw 返回被中断的任务或新任务。',
-      source: 'src/kernel/esp32/kern_esp32_int.S:xxx',
+      source: 'src/kernel/esp32/ctx_switch.S:520-566',
       registerChange: { SP: '0x3FFC8000', PS: '0x0006001E' },
     },
   ],

@@ -50,7 +50,7 @@ export const syncScene = {
       highlight: ['task-a', 'lock'],
       arrows: ['a-to-lock'],
       detail: '任务 A 调用 mutex_lock / spinlock_lock，尝试进入临界区。',
-      source: 'src/kernel/kern_sync.c:xxx',
+      source: 'src/kernel/kern_sync.c:23-30',
     },
     {
       id: 'task-b-block',
@@ -58,7 +58,7 @@ export const syncScene = {
       highlight: ['task-b', 'wait-queue'],
       arrows: ['b-to-lock', 'lock-to-wait'],
       detail: '锁已被占用，任务 B 被放入等待队列并触发调度。',
-      source: 'src/kernel/kern_sync.c:xxx',
+      source: 'src/kernel/kern_sync.c:47-82',
     },
     {
       id: 'task-a-unlock',
@@ -66,7 +66,7 @@ export const syncScene = {
       highlight: ['task-a', 'lock'],
       arrows: [],
       detail: '任务 A 离开临界区，释放锁，并检查等待队列。',
-      source: 'src/kernel/kern_sync.c:xxx',
+      source: 'src/kernel/kern_sync.c:83-101',
     },
     {
       id: 'wake-b',
@@ -74,7 +74,7 @@ export const syncScene = {
       highlight: ['wait-queue', 'task-b'],
       arrows: ['wait-to-lock'],
       detail: '从等待队列取出任务 B，标记为就绪状态。若 B 优先级更高，触发优先级继承或调度。',
-      source: 'src/kernel/kern_sync.c:xxx',
+      source: 'src/kernel/kern_sync.c:83-101',
     },
   ],
 };

@@ -55,7 +55,7 @@ export const shellScene = {
       highlight: ['uart'],
       arrows: [],
       detail: 'Shell 任务从串口逐字符读取用户输入，直到收到换行。',
-      source: 'src/kernel/kern_shell.c:xxx',
+      source: 'src/kernel/kern_shell.c:471-495',
     },
     {
       id: 'line-buffer',
@@ -63,7 +63,7 @@ export const shellScene = {
       highlight: ['buffer'],
       arrows: ['uart-to-buffer'],
       detail: '将完整命令行存入缓冲区，等待解析。',
-      source: 'src/kernel/kern_shell.c:xxx',
+      source: 'src/kernel/kern_shell.c:594-619',
     },
     {
       id: 'parse-args',
@@ -71,7 +71,7 @@ export const shellScene = {
       highlight: ['parse'],
       arrows: ['buffer-to-parse'],
       detail: '按空格分割命令名和参数，处理引号与转义。',
-      source: 'src/kernel/kern_shell.c:xxx',
+      source: 'src/kernel/kern_shell_parser.c:58-130',
     },
     {
       id: 'lookup-command',
@@ -79,7 +79,7 @@ export const shellScene = {
       highlight: ['lookup'],
       arrows: ['parse-to-lookup'],
       detail: '遍历内置命令表，匹配命令名并获取回调函数指针。',
-      source: 'src/kernel/kern_shell.c:xxx',
+      source: 'src/kernel/kern_shell_cmds.c:1165-1177',
     },
     {
       id: 'execute-output',
@@ -87,7 +87,7 @@ export const shellScene = {
       highlight: ['execute'],
       arrows: ['lookup-to-execute'],
       detail: '调用命令回调，将结果写回串口缓冲区输出。',
-      source: 'src/kernel/kern_shell.c:xxx',
+      source: 'src/kernel/kern_shell_cmds.c:1179-1193',
     },
   ],
 };

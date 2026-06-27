@@ -55,7 +55,7 @@ export const vfsScene = {
       highlight: ['app'],
       arrows: [],
       detail: '应用调用 open/read/write/close 等文件操作。',
-      source: 'src/kernel/kern_vfs.c:xxx',
+      source: 'src/kernel/kern_vfs.c:510-531',
     },
     {
       id: 'vfs-dispatch',
@@ -63,7 +63,7 @@ export const vfsScene = {
       highlight: ['vfs'],
       arrows: ['app-to-vfs'],
       detail: 'VFS 层根据文件路径解析文件描述符，进入 inode 查找流程。',
-      source: 'src/kernel/kern_vfs.c:xxx',
+      source: 'src/kernel/kern_vfs.c:510-531',
     },
     {
       id: 'inode-lookup',
@@ -71,7 +71,7 @@ export const vfsScene = {
       highlight: ['inode'],
       arrows: ['vfs-to-inode'],
       detail: '根据路径逐层查找 dentry 和 inode，确定文件类型（普通/设备/特殊）。',
-      source: 'src/kernel/kern_vfs.c:xxx',
+      source: 'src/kernel/kern_vfs.c:233-272',
     },
     {
       id: 'device-file',
@@ -79,7 +79,7 @@ export const vfsScene = {
       highlight: ['dev'],
       arrows: ['inode-to-dev'],
       detail: '如果是设备文件（如 /dev/ttyS0），根据主次设备号找到对应驱动。',
-      source: 'src/kernel/kern_vfs.c:xxx',
+      source: 'src/kernel/kern_vfs.c:592-607',
     },
     {
       id: 'driver-callback',
@@ -87,7 +87,7 @@ export const vfsScene = {
       highlight: ['driver'],
       arrows: ['dev-to-driver'],
       detail: '调用驱动注册的 read/write 回调，完成实际硬件操作或数据返回。',
-      source: 'src/kernel/devices/...:xxx',
+      source: 'src/kernel/kern_vfs.c:608-623',
     },
   ],
 };

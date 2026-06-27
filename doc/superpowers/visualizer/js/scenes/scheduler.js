@@ -49,7 +49,7 @@ export const schedulerScene = {
       highlight: ['tick'],
       arrows: [],
       detail: '定时器产生周期中断，进入 tick handler。',
-      source: 'src/kernel/kern_timer.c:xxx',
+      source: 'src/kernel/kern_timer.c:61-79',
     },
     {
       id: 'update-timeslice',
@@ -57,7 +57,7 @@ export const schedulerScene = {
       highlight: ['timeslice'],
       arrows: ['tick-to-slice'],
       detail: '如果当前任务时间片耗尽，标记需要重新调度。',
-      source: 'src/kernel/kern_sched.c:xxx',
+      source: 'src/kernel/kern_sched.c:479-505',
     },
     {
       id: 'scan-buckets',
@@ -65,7 +65,7 @@ export const schedulerScene = {
       highlight: ['buckets'],
       arrows: ['slice-to-buckets'],
       detail: '从最高优先级开始遍历就绪队列桶，找到非空桶。',
-      source: 'src/kernel/kern_sched.c:xxx',
+      source: 'src/kernel/kern_sched_class.c:30-50',
     },
     {
       id: 'select-task',
@@ -73,7 +73,7 @@ export const schedulerScene = {
       highlight: ['select'],
       arrows: ['buckets-to-select'],
       detail: '从最高优先级桶中取出队首任务作为下一个运行任务。',
-      source: 'src/kernel/kern_sched.c:xxx',
+      source: 'src/kernel/kern_sched.c:506-536',
     },
   ],
 };

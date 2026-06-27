@@ -55,7 +55,7 @@ export const memoryScene = {
       highlight: ['kmalloc'],
       arrows: [],
       detail: '内核代码请求分配指定大小的内存块。',
-      source: 'src/kernel/kern_kmalloc.c:xxx',
+      source: 'src/kernel/kern_kmalloc.c:102-110',
     },
     {
       id: 'scan-free-list',
@@ -63,7 +63,7 @@ export const memoryScene = {
       highlight: ['free-list'],
       arrows: ['kmalloc-to-free'],
       detail: '从空闲链表头开始查找第一个足够大的空闲块。',
-      source: 'src/kernel/kern_kmalloc.c:xxx',
+      source: 'src/kernel/kern_kmalloc.c:68-101',
     },
     {
       id: 'split-block',
@@ -71,7 +71,7 @@ export const memoryScene = {
       highlight: ['split'],
       arrows: ['free-to-split'],
       detail: '如果空闲块远大于请求大小，将其分割为已分配块和剩余空闲块。',
-      source: 'src/kernel/kern_kmalloc.c:xxx',
+      source: 'src/kernel/kern_kmalloc.c:68-101',
     },
     {
       id: 'return-pointer',
@@ -79,7 +79,7 @@ export const memoryScene = {
       highlight: ['allocated'],
       arrows: ['split-to-alloc'],
       detail: '返回指向已分配内存的指针，并更新空闲链表。',
-      source: 'src/kernel/kern_kmalloc.c:xxx',
+      source: 'src/kernel/kern_kmalloc.c:102-110',
     },
     {
       id: 'kfree-merge',
@@ -87,7 +87,7 @@ export const memoryScene = {
       highlight: ['kfree'],
       arrows: ['alloc-to-kfree'],
       detail: '释放内存时将其插回空闲链表，并尝试与相邻空闲块合并。',
-      source: 'src/kernel/kern_kmalloc.c:xxx',
+      source: 'src/kernel/kern_kmalloc.c:133-152',
     },
   ],
 };

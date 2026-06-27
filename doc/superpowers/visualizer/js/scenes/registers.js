@@ -56,7 +56,7 @@ export const registersScene = {
       highlight: ['cp0'],
       arrows: [],
       detail: '设置 CPENABLE 位，启用 FPU 等协处理器访问权限。',
-      source: 'src/kernel/esp32/kern_esp32_start.S:xxx',
+      source: 'src/kernel/kern_init.c:36-55',
       registerChange: { CPENABLE: '0x00000001' },
     },
     {
@@ -65,7 +65,7 @@ export const registersScene = {
       highlight: ['wdt'],
       arrows: ['cp0-to-wdt'],
       detail: '初始化看门狗定时器，设置超时周期与喂狗机制。',
-      source: 'src/kernel/kern_debug.c:xxx',
+      source: 'src/kernel/kern_init.c:36-55',
     },
     {
       id: 'timer',
@@ -73,7 +73,7 @@ export const registersScene = {
       highlight: ['timer'],
       arrows: ['wdt-to-timer'],
       detail: '配置 Xtensa 定时器产生周期性 tick 中断。',
-      source: 'src/kernel/kern_timer.c:xxx',
+      source: 'src/kernel/kern_timer.c:61-79',
     },
     {
       id: 'gpio-matrix',
@@ -81,7 +81,7 @@ export const registersScene = {
       highlight: ['gpio'],
       arrows: ['timer-to-gpio'],
       detail: '将外设信号映射到物理 GPIO 引脚，如 SPI、UART。',
-      source: 'src/hal/hal_dreamCore/...:xxx',
+      source: 'src/kernel/kern_gpiofs.c:296-320',
     },
     {
       id: 'interrupt',
@@ -89,7 +89,7 @@ export const registersScene = {
       highlight: ['int'],
       arrows: ['gpio-to-int'],
       detail: '配置中断优先级与中断向量表，最终打开全局中断。',
-      source: 'src/kernel/kern_int.c:xxx',
+      source: 'src/kernel/kern_isr.c:15-33',
     },
   ],
 };
