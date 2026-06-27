@@ -12,8 +12,8 @@
 |------|------|------|
 | 0 基线建立 | DONE | 隔离 worktree 已创建，构建与 native 测试通过 |
 | 1 扫描诊断 | DONE | 诊断报告已生成 |
-| 2 分层重构 | RUNNING | kernel / HAL / UI / App 层已完成，文档体系进行中 |
-| 3 集成验证 | PENDING | 待启动 |
+| 2 分层重构 | DONE | kernel / HAL / UI / App / 文档体系均已完成 |
+| 3 集成验证 | RUNNING | 待执行全量 native 测试、硬件构建与冒烟测试 |
 | 4 文档归档 | PENDING | 待启动 |
 
 ### 分层进度
@@ -24,7 +24,7 @@
 | hal | DONE | [hal.md](02-refactor/hal.md) |
 | ui | DONE | [ui.md](02-refactor/ui.md) |
 | app | DONE | [app.md](02-refactor/app.md) |
-| docs | RUNNING | [docs.md](02-refactor/docs.md) |
+| docs | DONE | [docs.md](02-refactor/docs.md) |
 
 ## 状态说明
 
