@@ -108,10 +108,10 @@ void xerintosh_spring_animation(float *_pos, float *_vel, float _pos_trg,
   }
 
   /* F = k*(target - x) - c*v
-   * 使用 dt=1.10 使离散积分器在极低阻尼下仍能产生可见超调，
+   * 使用 SPRING_DT_SCALE 使离散积分器在极低阻尼下仍能产生可见超调，
    * 同时保持高阻尼情况下的稳定收敛。
    * 这是为了使弹簧动画在欠阻尼参数下通过单元测试的最低限度调整。 */
-  const float spring_dt = 1.10f;
+  const float spring_dt = SPRING_DT_SCALE;
   float force = _stiffness * (_pos_trg - *_pos) - _damping * (*_vel);
   *_vel += force * spring_dt;
   *_pos += *_vel * spring_dt;
@@ -184,9 +184,9 @@ void xerintosh_refresh_camera_position()
   if (g_xerintosh_camera.selector == NULL) return;
   if (g_xerintosh_camera.selector->selected_item == NULL) return;
 
-  /* 15 为选择器高度 */
-  if (g_xerintosh_camera.selector->y_selector_trg + 15 + g_xerintosh_camera.y_camera_trg > HAL_SCREEN_HEIGHT)  /* 向下超出屏幕，需要向下移动 */
-    g_xerintosh_camera.y_camera_trg = HAL_SCREEN_HEIGHT - g_xerintosh_camera.selector->y_selector_trg - 15;
+  /* SELECTOR_HEIGHT 为选择器高度 */
+  if (g_xerintosh_camera.selector->y_selector_trg + SELECTOR_HEIGHT + g_xerintosh_camera.y_camera_trg > HAL_SCREEN_HEIGHT)  /* 向下超出屏幕，需要向下移动 */
+    g_xerintosh_camera.y_camera_trg = HAL_SCREEN_HEIGHT - g_xerintosh_camera.selector->y_selector_trg - SELECTOR_HEIGHT;
 
   if (g_xerintosh_camera.selector->y_selector_trg + g_xerintosh_camera.y_camera_trg < 0)  /* 向上超出屏幕，需要向上移动 */
     g_xerintosh_camera.y_camera_trg = 0 - g_xerintosh_camera.selector->y_selector_trg + LIST_FONT_TOP_MARGIN;

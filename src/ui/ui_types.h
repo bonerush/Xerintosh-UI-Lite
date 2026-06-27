@@ -42,6 +42,31 @@ extern bool  g_spring_anim_mode;           /* true=动弹弹力, false=普通一
 
 #define SPRING_STIFFNESS_SELECTOR_DEFAULT  0.20f
 #define SPRING_DAMPING_SELECTOR_DEFAULT    0.35f
+#define SPRING_DT_SCALE                    1.10f  /* 弹簧离散积分器时间步长缩放 */
+
+/* ═══ 列表外观装饰 ═══ */
+#define LIST_DECO_H_LINE1_LEN   66
+#define LIST_DECO_H_LINE2_LEN   67
+
+/* ═══ 滚动条 ═══ */
+#define SCROLLBAR_WIDTH               3
+#define SCROLLBAR_TRACK_ENDCAP_H      4
+#define SCROLLBAR_TRACK_X_OFFSET      4
+#define SCROLLBAR_LEFT_BORDER_OFFSET  5
+#define SCROLLBAR_RIGHT_BORDER_OFFSET 1
+
+/* ═══ 选择器 ═══ */
+#define SELECTOR_HEIGHT         15
+#define SELECTOR_DASH_EXTEND    7
+
+/* ═══ 长按提示条 ═══ */
+#define LONG_PRESS_HINT_BAR_W    40
+#define LONG_PRESS_HINT_BAR_H    4
+#define LONG_PRESS_HINT_MARGIN_X 6
+#define LONG_PRESS_HINT_MARGIN_Y 6
+
+/* ═══ 文字滚动 ═══ */
+#define TEXT_SCROLL_CYCLE_MS     3000u
 
 /* ═══ 字体 ═══ */
 
