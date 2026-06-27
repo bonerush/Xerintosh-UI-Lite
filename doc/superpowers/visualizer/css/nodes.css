@@ -1,0 +1,56 @@
+[data-node] {
+  fill: var(--bg-panel);
+  stroke: var(--text-dim);
+  stroke-width: 1.5;
+  transition: all 0.3s ease;
+}
+
+[data-node] text {
+  fill: var(--text-muted);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  transition: fill 0.3s ease;
+}
+
+[data-node].active {
+  stroke: var(--accent);
+  stroke-width: 2;
+  fill: rgba(250, 250, 249, 0.08);
+}
+
+[data-node].active text {
+  fill: var(--text-primary);
+}
+
+[data-node].done {
+  stroke: var(--text-muted);
+  fill: rgba(161, 161, 170, 0.08);
+}
+
+[data-node].done text {
+  fill: var(--text-muted);
+}
+
+[data-node].dim {
+  opacity: 0.4;
+}
+
+[data-arrow] {
+  fill: none;
+  stroke: var(--text-dim);
+  stroke-width: 1.5;
+  stroke-dasharray: 8 4;
+  opacity: 0.4;
+}
+
+[data-arrow].flow {
+  stroke: var(--accent);
+  opacity: 1;
+  animation: dash-flow 1s linear infinite;
+}
+
+@keyframes dash-flow {
+  to {
+    stroke-dashoffset: -24;
+  }
+}
