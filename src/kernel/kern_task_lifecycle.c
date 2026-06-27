@@ -44,6 +44,11 @@ static kern_task_t *task_create_common(const char *name,
 #endif
     task->entry = entry;
     task->arg = arg;
+    task->notify_state = KERN_NOTIFY_NOT_WAITING;
+    task->notify_value = 0;
+    task->runtime_us = 0;
+    task->last_start_us = 0;
+    task->cpu_percent = 0;
 
     if (name != NULL) {
         strncpy(task->name, name, KERN_TASK_NAME_LEN);
