@@ -6,6 +6,7 @@ const moduleList = document.getElementById('module-list');
 const stageSvg = document.getElementById('stage-svg');
 const stageLabel = document.getElementById('stage-label');
 const details = {
+  root: document.getElementById('details'),
   step: document.getElementById('details-step'),
   title: document.getElementById('details-title'),
   desc: document.getElementById('details-desc'),

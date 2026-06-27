@@ -22,16 +22,23 @@ export class SceneRenderer {
   renderStep(step, index, total) {
     this.stageLabel.textContent = `${this.currentScene.title} · Step ${index + 1} / ${total}`;
 
+    const doneIds = new Set();
+    for (let i = 0; i < index; i++) {
+      const past = this.currentScene.steps[i];
+      if (past.highlight) {
+        past.highlight.forEach(id => doneIds.add(id));
+      }
+    }
+
     this.stageSvg.querySelectorAll('[data-node]').forEach(node => {
       const id = node.getAttribute('data-node');
+      node.classList.remove('active', 'done', 'dim');
       if (step.highlight.includes(id)) {
         node.classList.add('active');
-        node.classList.remove('dim');
+      } else if (doneIds.has(id)) {
+        node.classList.add('done');
       } else if (step.dim?.includes(id)) {
         node.classList.add('dim');
-        node.classList.remove('active');
-      } else {
-        node.classList.remove('active', 'dim');
       }
     });
 
@@ -53,7 +60,15 @@ export class SceneRenderer {
       this.details.source.innerHTML = '';
     }
 
+    this.animateDetails();
     this.renderRegisters(step.registerChange || {});
+  }
+
+  animateDetails() {
+    const el = this.details.root;
+    el.classList.remove('step-enter');
+    void el.offsetWidth;
+    el.classList.add('step-enter');
   }
 
   renderRegisters(changes) {

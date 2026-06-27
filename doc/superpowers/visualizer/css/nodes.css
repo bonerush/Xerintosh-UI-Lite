@@ -22,6 +22,15 @@
   fill: var(--text-primary);
 }
 
+[data-node].done {
+  stroke: var(--text-muted);
+  fill: rgba(161, 161, 170, 0.08);
+}
+
+[data-node].done text {
+  fill: var(--text-muted);
+}
+
 [data-node].dim {
   opacity: 0.4;
 }
