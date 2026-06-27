@@ -17,7 +17,7 @@ extern "C" {
 
 /* ═══ 版本信息 ═══ */
 
-#define XEROS_VERSION_STRING "2.4.0"
+#define XEROS_VERSION_STRING "3.0.0"
 
 /* ═══ 开发者与项目信息 ═══ */
 

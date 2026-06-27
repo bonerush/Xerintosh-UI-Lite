@@ -7,7 +7,7 @@
 
 ```
 Xerintosh 项目
-├── Xeros 内核 (v2.5.0)
+├── Xeros 内核 (v3.0.0)
 │   ├── [原生内核架构](architecture/xeros-native-kernel.md) ← 核心设计文档
 │   │   ├── [上下文切换](architecture/context-switch.md)
 │   │   ├── [调度器与 Tick 定时器](architecture/scheduler.md)
@@ -24,7 +24,7 @@ Xerintosh 项目
     └── [UI 核心框架](ui/index.md)
 ```
 
-## Xeros 内核特性矩阵（v2.5.0）
+## Xeros 内核特性矩阵（v3.0.0）
 
 | 功能 | 状态 | 文档 |
 |------|------|------|
