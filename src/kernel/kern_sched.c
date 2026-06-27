@@ -156,6 +156,7 @@ static kern_task_t *sched_idle_create(uint8_t cpu, const char *name)
     idle->pid = g_next_pid++;
     idle->state = KERN_TASK_READY;
     idle->priority = 0;
+    idle->base_priority = 0;
     idle->timeslice_remaining = SCHED_RR_DEFAULT_TIMESLICE;
     idle->cpu_id = cpu;
     if (name != NULL) {

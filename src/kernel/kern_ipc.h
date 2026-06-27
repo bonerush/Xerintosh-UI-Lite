@@ -95,7 +95,7 @@ typedef struct {
     xeros_spinlock_t  lock;             /* SMP 保护 */
     kern_task_t      *owner;            /* 持有者 TCB */
     uint8_t           recursive_count;  /* 递归加锁计数 */
-    uint8_t           orig_priority;    /* 持有者原始优先级（PI 提升前） */
+    uint8_t           orig_priority;    /* 持有者基线优先级（PI 恢复目标，已过时，保留兼容） */
     kern_wait_node_t *wait_queue;       /* 等待队列（按优先级排序） */
 } kern_pi_mutex_t;
 

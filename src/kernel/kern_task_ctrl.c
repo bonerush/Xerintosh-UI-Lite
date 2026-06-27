@@ -40,6 +40,7 @@ kern_err_t kern_task_priority_set(kern_task_t *task, uint8_t new_prio)
 
     uint8_t old = task->priority;
     task->priority = new_prio;
+    task->base_priority = new_prio;
 
     for (int i = 0; i < g_sched_class_count; i++) {
         kern_sched_class_t *cls = g_sched_classes[i];

@@ -36,6 +36,7 @@ static kern_task_t *task_create_common(const char *name,
     task->pid = g_next_pid++;
     task->state = KERN_TASK_READY;
     task->priority = 128;
+    task->base_priority = 128;
     task->timeslice_remaining = SCHED_RR_DEFAULT_TIMESLICE;
     task->scheduler_class_id = KERN_SCHED_CLASS_RR_ID;
     task->cpu_id = KERN_CPU_ANY;
