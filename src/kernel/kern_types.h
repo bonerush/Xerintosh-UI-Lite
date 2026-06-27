@@ -24,6 +24,7 @@ extern "C" {
 #define KERN_OK         0       /* 成功 */
 #define KERN_ERR        (-1)    /* 通用错误 */
 #define KERN_ENOENT     (-2)    /* 无此文件或目录 */
+#define KERN_EAGAIN     (-11)   /* 资源暂时不可用 */
 #define KERN_ENOMEM     (-12)   /* 内存不足 */
 #define KERN_EACCES     (-13)   /* 权限不足 */
 #define KERN_EEXIST     (-17)   /* 文件已存在 */
@@ -59,6 +60,7 @@ typedef enum {
     KERN_TASK_SLEEPING = 2,  /* 睡眠中 */
     KERN_TASK_BLOCKED  = 3,  /* 阻塞中（等待 I/O 等） */
     KERN_TASK_ZOMBIE   = 4,  /* 僵尸（已退出，待回收） */
+    KERN_TASK_SUSPENDED = 5, /* 被显式挂起 */
 } kern_task_state_t;
 
 /* ═══ 日志级别 ═══ */

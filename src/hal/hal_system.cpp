@@ -45,14 +45,9 @@ void hal_delay_ms(uint32_t ms) {
 
 /* ═══ 硬件环境：ESP-IDF 实现 ═══ */
 
-#include <freertos/FreeRTOS.h>
-#include <freertos/task.h>
 #include "esp_timer.h"
 #include "kernel/kern_smp.h"
 #include "kernel/kern_task.h"
-
-/* 原生调度器下不再调用 vTaskDelay；早期（g_current_task == NULL）使用
- * ROM 忙等延时，Xeros 启动后走 kern_sleep_ms。 */
 #include "esp32/rom/ets_sys.h"
 
 /**
@@ -70,19 +65,16 @@ uint32_t hal_get_ticks_ms(void) {
 
 /**
  * @brief 延时指定的毫秒数
+ *
+ * Xeros 启动后（g_current_task != NULL）使用 kern_sleep_ms 让出 CPU；
+ * 启动早期（g_current_task == NULL）使用 ROM 忙等延时，不依赖 FreeRTOS。
  */
 void hal_delay_ms(uint32_t ms) {
     if (g_current_task != NULL) {
         kern_sleep_ms(ms);
-#ifdef XEROS_NATIVE_SCHED
     } else {
         ets_delay_us(ms * 1000);
     }
-#else
-    } else {
-        vTaskDelay(pdMS_TO_TICKS(ms));
-    }
-#endif
 }
 
 #endif

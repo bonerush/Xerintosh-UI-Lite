@@ -156,6 +156,22 @@ size_t kern_task_stack_highwater(kern_task_t *task)
     return task->stack_highwater;
 }
 
+bool kern_task_stack_overflow_check(kern_task_t *task)
+{
+    if (task == NULL || task->stack_base == NULL) return false;
+    if (task->stack_size < sizeof(uint32_t)) return false;
+
+    uint32_t canary;
+    memcpy(&canary, task->stack_base, sizeof(canary));
+    if (canary != KERN_STACK_CANARY) {
+        kern_log(KERN_LOG_PANIC,
+                 "stack overflow detected in task %s (pid=%d)",
+                 task->name, task->pid);
+        return true;
+    }
+    return false;
+}
+
 size_t kern_task_stack_recommend(kern_task_t *task, size_t current_size)
 {
     if (task != NULL && current_size == 0) current_size = task->stack_size;

@@ -36,6 +36,7 @@ static kern_task_t *task_create_common(const char *name,
     task->pid = g_next_pid++;
     task->state = KERN_TASK_READY;
     task->priority = 128;
+    task->base_priority = 128;
     task->timeslice_remaining = SCHED_RR_DEFAULT_TIMESLICE;
     task->scheduler_class_id = KERN_SCHED_CLASS_RR_ID;
     task->cpu_id = KERN_CPU_ANY;
@@ -44,6 +45,11 @@ static kern_task_t *task_create_common(const char *name,
 #endif
     task->entry = entry;
     task->arg = arg;
+    task->notify_state = KERN_NOTIFY_NOT_WAITING;
+    task->notify_value = 0;
+    task->runtime_us = 0;
+    task->last_start_us = 0;
+    task->cpu_percent = 0;
 
     if (name != NULL) {
         strncpy(task->name, name, KERN_TASK_NAME_LEN);
@@ -113,7 +119,7 @@ kern_pid_t kern_spawn(const char *name, void (*entry)(void *arg),
     if (entry == NULL) return KERN_EINVAL;
     if (g_task_count >= MAX_TASKS) return KERN_ENOSPC;
 
-    kern_sched_init();
+    kern_sched_ensure_initialized();
 
     kern_task_t *task = task_create_common(name, entry, arg);
     if (task == NULL) return KERN_ENOMEM;
@@ -153,7 +159,7 @@ kern_pid_t kern_spawn(const char *name, void (*entry)(void *arg),
     if (entry == NULL) return KERN_EINVAL;
     if (g_task_count >= MAX_TASKS) return KERN_ENOSPC;
 
-    kern_sched_init();
+    kern_sched_ensure_initialized();
 
     kern_task_t *task = task_create_common(name, entry, arg);
     if (task == NULL) return KERN_ENOMEM;
@@ -193,7 +199,7 @@ kern_pid_t kern_spawn(const char *name, void (*entry)(void *arg),
     if (entry == NULL) return KERN_EINVAL;
     if (g_task_count >= MAX_TASKS) return KERN_ENOSPC;
 
-    kern_sched_init();
+    kern_sched_ensure_initialized();
 
     kern_task_t *task = task_create_common(name, entry, arg);
     if (task == NULL) return KERN_ENOMEM;
@@ -238,7 +244,9 @@ void kern_yield(void)
     kern_task_t *cur = g_current_task;
     if (cur == NULL) return;
 
-    cur->state = KERN_TASK_READY;
+    if (cur->state == KERN_TASK_RUNNING) {
+        cur->state = KERN_TASK_READY;
+    }
     g_current_task = g_idle_task;
 
     swapcontext(&cur->ctx, &g_sched_ctx);
@@ -251,7 +259,9 @@ void kern_yield(void)
     kern_task_t *cur = g_current_task;
     if (cur == NULL) return;
 
-    cur->state = KERN_TASK_READY;
+    if (cur->state == KERN_TASK_RUNNING) {
+        cur->state = KERN_TASK_READY;
+    }
 
     /* 通过可移植层归还令牌并等待下次调度 */
     kern_port_task_yield();

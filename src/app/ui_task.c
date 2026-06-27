@@ -75,10 +75,9 @@ void ui_task_main(void *arg)
         }
 
 #ifndef NATIVE_TEST
-        /* 释放时间给 Xeros 内核调度器，确保 TG1 系统看门狗能被及时喂狗。
-         * 使用 kern_sleep_ms 替代 vTaskDelay，在保持流畅帧率的同时
-         * 让出 CPU 给其他任务。 */
-        kern_sleep_ms(5);
+        /* 极短睡眠释放 CPU，避免 UI 任务独占当前核心，
+         * 同时最大限度提升帧率。 */
+        kern_sleep_ms(1);
 #endif
 
         /* 让出 CPU */

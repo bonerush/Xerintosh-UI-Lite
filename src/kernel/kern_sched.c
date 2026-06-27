@@ -15,6 +15,8 @@
 #include "kern_init.h"
 #include "kern_port.h"
 #include "kern_kmalloc.h"
+#include "kern_stats.h"
+#include "kern_timer.h"
 
 #include <string.h>
 #include <stdlib.h>
@@ -154,6 +156,7 @@ static kern_task_t *sched_idle_create(uint8_t cpu, const char *name)
     idle->pid = g_next_pid++;
     idle->state = KERN_TASK_READY;
     idle->priority = 0;
+    idle->base_priority = 0;
     idle->timeslice_remaining = SCHED_RR_DEFAULT_TIMESLICE;
     idle->cpu_id = cpu;
     if (name != NULL) {
@@ -166,14 +169,86 @@ static kern_task_t *sched_idle_create(uint8_t cpu, const char *name)
     return idle;
 }
 
+void kern_sched_ensure_initialized(void)
+{
+    if (!g_sched_initialized) {
+        kern_sched_init();
+    }
+}
+
 /* ═══ 初始化 ═══ */
 
 #ifdef NATIVE_TEST
 
+static void sched_native_soft_reset(void)
+{
+    /* Native 测试环境：多次调用 kern_sched_init 时期望清理残留任务，
+     * 但保留 idle 和系统守护任务以避免破坏依赖它们的测试。
+     * 这里只做链表清理：把非 idle/timerd 任务从全局链表中摘除并置为 ZOMBIE，
+     * 不释放内存，避免破坏可能仍被引用的 TCB。
+     * 注意：保留 g_sched_ticks 单调递增，避免睡眠任务 wake_time 因计数器回绕而失效。 */
+    uint32_t saved_ticks = g_sched_ticks;
+    kern_task_t *t = g_task_list;
+    kern_task_t *head = NULL;
+    kern_task_t *tail = NULL;
+    g_task_count = 0;
+
+    while (t != NULL) {
+        kern_task_t *next = t->next;
+        bool is_idle = (t == g_idle_task);
+        bool is_timerd = (strcmp(t->name, "timerd") == 0);
+        bool keep = is_idle || is_timerd;
+        if (keep) {
+            t->next = NULL;
+            if (is_timerd) {
+                /* 软重置后 timerd 先挂起，避免在 idle 单独测试中被提前选中；
+                 * 有新的定时器命令入队时由 timer 模块主动唤醒。 */
+                t->state = KERN_TASK_SUSPENDED;
+            }
+            if (head == NULL) {
+                head = tail = t;
+            } else {
+                tail->next = t;
+                tail = t;
+            }
+            g_task_count++;
+        } else {
+            t->state = KERN_TASK_ZOMBIE;
+            t->next = NULL;
+        }
+        t = next;
+    }
+
+    g_task_list = head;
+    g_task_list_tail = tail;
+    if (g_idle_task != NULL) {
+        g_idle_task->state = KERN_TASK_READY;
+        g_idle_task->scheduler_class_id = KERN_SCHED_CLASS_RR_ID;
+    }
+    sched_class_rr.task_list = g_task_list;
+    sched_class_rr.task_list_tail = tail;
+    sched_class_fifo.task_list = NULL;
+    sched_class_fifo.task_list_tail = NULL;
+    kern_timer_reset_all();
+    g_current_task = g_idle_task;
+    g_last_picked = g_idle_task;
+    g_need_resched = false;
+    g_sched_ticks = saved_ticks;
+    if (g_idle_task != NULL) {
+        g_per_cpu[0].idle_task = g_idle_task;
+        g_per_cpu[0].current_task = g_idle_task;
+        g_per_cpu[0].last_picked = g_idle_task;
+        g_per_cpu[0].task_count = g_task_count;
+    }
+}
+
 void kern_sched_init(void)
 {
     g_task_list_tail = NULL;  /* 每次 init 都重置尾指针，支持测试环境多次调用 */
-    if (g_sched_initialized) return;
+    if (g_sched_initialized) {
+        sched_native_soft_reset();
+        return;
+    }
 
     sched_reset_common();
     kern_smp_init();
@@ -417,23 +492,41 @@ void kern_sched_tick(void)
     sched_check_stack_pressure(g_current_task);
     sched_notify_memory_pressure();
 
+    kern_stats_update();
+    if ((g_sched_ticks % 100) == 0) {
+        kern_task_stack_overflow_check(g_current_task);
+    }
+    if ((g_sched_ticks % 1000) == 0) {
+        kern_watchdog_check();
+    }
+
     /* 检查是否需要重新调度（时间片到期 或 任务状态变更） */
     if (g_need_resched || (g_current_task && g_current_task->state != KERN_TASK_RUNNING)) {
         g_need_resched = false;
         kern_task_t *next = pick_next_ready();
-        if (next && next != g_current_task) {
+        if (next && (next != g_current_task ||
+                     (g_current_task && g_current_task->state != KERN_TASK_RUNNING))) {
             kern_task_t *prev = g_current_task;
             g_current_task = next;
             kern_mpu_apply(next);
             g_switch_to_task = next;
             if (next->state != KERN_TASK_SLEEPING) next->state = KERN_TASK_RUNNING;
+            if (prev != NULL) kern_stats_task_stop(prev);
+            if (next != NULL) kern_stats_task_start(next);
             /* getcontext 会被恢复两次：一次直接返回，一次从任务 yield/exit 返回。
-             * 用静态标志确保 swapcontext 只执行一次，避免无限循环。 */
+             * 用静态标志确保 swapcontext/setcontext 只执行一次，避免无限循环。 */
             s_switch_done = false;
             getcontext(&g_sched_ctx);
             if (!s_switch_done) {
                 s_switch_done = true;
-                swapcontext(&prev->ctx, &next->ctx);
+                if (next != prev) {
+                    swapcontext(&prev->ctx, &next->ctx);
+                } else {
+                    /* 选中任务与逻辑当前任务相同，但尚未真正运行（典型场景：
+                     * 任务 yield 后 g_current_task 被设为 idle）。此时 prev/next
+                     * 指向同一上下文，swapcontext 行为未定义，改用 setcontext。 */
+                    setcontext(&next->ctx);
+                }
             }
         }
     }
@@ -464,8 +557,10 @@ void kern_sched_tick(void) /* ESP32: FreeRTOS / XEROS_NATIVE_SCHED fallback */
             if (prev != NULL && prev->state == KERN_TASK_RUNNING) {
                 prev->state = KERN_TASK_READY;
             }
+            if (prev != NULL) kern_stats_task_stop(prev);
             g_current_task = next;
             next->state = KERN_TASK_RUNNING;
+            if (next != NULL) kern_stats_task_start(next);
             kern_mpu_apply(next);
             kern_port_switch_to(next);
         }

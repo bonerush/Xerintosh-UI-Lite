@@ -40,6 +40,12 @@ typedef ucontext_t    kern_ctx_t;
 
 typedef struct kern_file kern_file_t;
 
+/* ═══ 任务通知状态 ═══ */
+
+#define KERN_NOTIFY_NOT_WAITING 0
+#define KERN_NOTIFY_WAITING     1
+#define KERN_NOTIFY_RECEIVED    2
+
 /* ═══ 任务控制块（TCB） ═══ */
 
 /**
@@ -70,7 +76,8 @@ typedef struct kern_task {
 
     /* 调度信息 */
     uint32_t            wake_time;           /* 唤醒时间戳（毫秒，sleep 用） */
-    uint8_t             priority;            /* 优先级（0 最低，255 最高） */
+    uint8_t             priority;            /* 当前优先级（0 最低，255 最高） */
+    uint8_t             base_priority;       /* 基线优先级，PI 提升后恢复的目标 */
     uint8_t             timeslice_remaining; /* 当前时间片剩余 tick 数（RR class 用） */
     int8_t              scheduler_class_id;  /* 所属调度器 class 索引，-1 表示未分配 */
 
@@ -93,6 +100,15 @@ typedef struct kern_task {
 
     /* 文件描述符表：每任务独立的 FD 命名空间 */
     kern_file_t *fd_table[KERN_MAX_FD_PER_TASK]; /* 打开的文件实例指针 */
+
+    /* 任务通知 */
+    volatile uint8_t    notify_state;   /* KERN_NOTIFY_* */
+    volatile uint32_t   notify_value;   /* 当前通知值 */
+
+    /* 运行时统计 */
+    uint64_t            runtime_us;     /* 累计运行时间（微秒） */
+    uint64_t            last_start_us;  /* 本次开始运行的时间戳 */
+    uint8_t             cpu_percent;    /* 最近统计周期 CPU 占用百分比 */
 
     /* MPU 内存保护 */
     kern_mpu_config_t    *mpu_config;    /* 每任务 MPU 配置（可为 NULL） */
@@ -189,6 +205,7 @@ extern size_t kern_task_stack_usage(kern_task_t *task);
  *        FreeRTOS: 根据 uxTaskGetStackHighWaterMark 计算峰值
  */
 extern size_t kern_task_stack_highwater(kern_task_t *task);
+extern bool   kern_task_stack_overflow_check(kern_task_t *task);
 
 /**
  * @brief  根据历史高水位推荐新栈大小

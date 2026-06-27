@@ -95,7 +95,7 @@ typedef struct {
     xeros_spinlock_t  lock;             /* SMP 保护 */
     kern_task_t      *owner;            /* 持有者 TCB */
     uint8_t           recursive_count;  /* 递归加锁计数 */
-    uint8_t           orig_priority;    /* 持有者原始优先级（PI 提升前） */
+    uint8_t           orig_priority;    /* 持有者基线优先级（PI 恢复目标，已过时，保留兼容） */
     kern_wait_node_t *wait_queue;       /* 等待队列（按优先级排序） */
 } kern_pi_mutex_t;
 
@@ -148,6 +148,9 @@ typedef struct {
 #define KERN_EVENT_WAIT_ALL  0x01   /* AND 等待：所有位满足才唤醒 */
 #define KERN_EVENT_CLEAR     0x02   /* 唤醒后自动清除匹配位 */
 
+/** 事件组有效位掩码：高 8 位保留给内核内部使用 */
+#define KERN_EVENT_VALID_BITS 0x00FFFFFFu
+
 extern kern_err_t kern_event_init(kern_event_t *ev);
 extern kern_err_t kern_event_set(kern_event_t *ev, uint32_t bits);
 extern kern_err_t kern_event_clear(kern_event_t *ev, uint32_t bits);
@@ -176,6 +179,21 @@ extern kern_task_t *ipc_wait_dequeue(kern_wait_node_t **queue);
  * @param queue  等待队列头指针
  */
 extern void ipc_wait_check_timeouts(kern_wait_node_t **queue);
+
+/**
+ * @brief 阻塞当前任务并将其加入等待队列
+ * @param queue      等待队列头指针
+ * @param lock       保护等待队列的锁
+ * @param timeout_ms 超时时间（毫秒），0 表示永不超时
+ */
+extern void ipc_block_task(kern_wait_node_t **queue, xeros_spinlock_t *lock,
+                           uint32_t timeout_ms);
+
+/**
+ * @brief 从等待队列唤醒第一个任务
+ * @param queue  等待队列头指针
+ */
+extern void ipc_wake_one(kern_wait_node_t **queue);
 
 #ifdef __cplusplus
 }

@@ -106,7 +106,7 @@ public:
             auto cfg = _bus_instance.config();
             cfg.spi_host = SPI2_HOST;
             cfg.spi_mode = 0;
-            cfg.freq_write = 27000000;
+            cfg.freq_write = 40000000;
             cfg.freq_read  = 14000000;
             cfg.pin_sclk = GPIO_NUM_13;
             cfg.pin_mosi = GPIO_NUM_15;

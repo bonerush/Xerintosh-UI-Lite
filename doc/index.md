@@ -7,7 +7,7 @@
 
 ```
 Xerintosh 项目
-├── Xeros 内核 (v2.4.0)
+├── Xeros 内核 (v3.0.0)
 │   ├── [原生内核架构](architecture/xeros-native-kernel.md) ← 核心设计文档
 │   │   ├── [上下文切换](architecture/context-switch.md)
 │   │   ├── [调度器与 Tick 定时器](architecture/scheduler.md)
@@ -24,6 +24,19 @@ Xerintosh 项目
     └── [UI 核心框架](ui/index.md)
 ```
 
+## Xeros 内核特性矩阵（v3.0.0）
+
+| 功能 | 状态 | 文档 |
+|------|------|------|
+| 任务通知 | 已完成 | [task-notify.md](kernel/task-notify.md) |
+| 软件定时器 | 已完成 | [timer.md](kernel/timer.md) |
+| ISR 安全 IPC | 已完成 | [isr-safe.md](kernel/isr-safe.md) |
+| 流缓冲区 | 已完成 | [stream-buffer.md](kernel/stream-buffer.md) |
+| 任务挂起/恢复/优先级 | 已完成 | [task-ctrl.md](kernel/task-ctrl.md) |
+| 运行时统计/看门狗/栈溢出检测 | 已完成 | [stats.md](kernel/stats.md) |
+| 临界区/中断抽象 | 已完成 | [critical.md](kernel/critical.md) |
+| FreeRTOS 调度依赖 | 已移除 | [freertos-removal.md](kernel/freertos-removal.md) |
+
 ## 文档树
 
 - **[原生内核架构](architecture/xeros-native-kernel.md)**
@@ -36,7 +49,17 @@ Xerintosh 项目
 - **[FreeRTOS 剩余引用清单](freertos-remaining-references.md)** — 改造路线图与依赖审计
 - **[原生内核调试日志](debug-xeros-native.md)** — Phase 1/2 实机调试记录与踩坑总结
 - **[内核子系统](kernel/)**
-  - [VFS Dentry-Tree 并发保护](kernel/vfs-concurrency.md) — 全局自旋锁保护 dentry 树与 inode 引用计数
+  - [任务通知](kernel/task-notify.md)
+  - [软件定时器](kernel/timer.md)
+  - [ISR 安全 IPC](kernel/isr-safe.md)
+  - [流缓冲区与消息缓冲区](kernel/stream-buffer.md)
+  - [任务控制](kernel/task-ctrl.md)
+  - [运行时统计与看门狗](kernel/stats.md)
+  - [临界区与中断抽象](kernel/critical.md)
+  - [FreeRTOS 调度依赖移除记录](kernel/freertos-removal.md)
+  - [全功能适配 Debug 记录](kernel/debug/full-adaptation-debug.md)
+  - [可移植层](kernel/port.md)
+  - [VFS Dentry-Tree 并发保护](kernel/vfs-concurrency.md)
 - **[UI 核心框架](ui/index.md)** — 菜单树、输入分派、动画与渲染
 - **[App 层](app/index.md)** — 菜单构建、user_item 契约、设置转换
 - **[API 模板教程](tutorials/api-templates.md)** — 常用 API 模板与常见陷阱
@@ -68,6 +91,8 @@ Xerintosh 项目
 - **UI 核心重构完成**: 空指针/空列表保护、布局常量提取、`xerintosh_draw_list_item` 拆分、选择器速度复位集中化、退场动画魔法数字常量化、弹窗换行 `sizeof` 保护、脏矩形升级到区域追踪
 - **App 层重构完成**: `app_menu.c` 拆分为 `app_menu_core.c` + `app_menu_entries.c`；`user_item_contract.h` 显式化生命周期契约；`settings_level_to_hw` / `settings_hw_to_level` 集中设置项转换；`power_key_popup` 补齐 native 测试
 - **文档体系重构完成**: `doc/` 已新增 `ui/`、`app/`、`tutorials/` 索引，修复 `ui_item_core.h` 中断链引用
+- **Xeros 内核底层全功能适配完成**: 任务通知、软件定时器、ISR 安全 IPC、流缓冲区、任务控制、运行时统计/看门狗/栈溢出检测、临界区抽象已实现；PI 互斥锁恢复基线优先级、事件组高 8 位保留、FIFO 调度器优先级桶优化、核心启动桩隔离、`vTaskDelay` 移除均已完成并通过 native/硬件构建验证
+- **UI 刷新率优化**: 已将 `src/app/ui_task.c` 的每帧睡眠从 `kern_sleep_ms(5)` 降至 `kern_sleep_ms(1)`，并将 `src/hal/hal_display_fb.cpp` 的 SPI 写频率从 27 MHz 提升至 40 MHz；已通过 `m5stick-c-native` 构建/烧录验证，无新增警告
 - **目标**: 继续验证 UI/WiFi 实际屏幕操作（调度器层面已稳定，需用户现场确认显示渲染与 WiFi 菜单交互）
 
 ## 重构记录
@@ -75,6 +100,7 @@ Xerintosh 项目
 | 日期 | 范围 | 状态 | 报告 |
 |---|---|---|---|
 | 2026-06-27 | Xeros 内核 / HAL / UI / App / 文档 | 阶段 2 完成 | [refactor/README.md](refactor/README.md) |
+| 2026-06-27 | Xeros 内核底层全功能适配 | 完成 | [kernel/debug/full-adaptation-debug.md](kernel/debug/full-adaptation-debug.md) |
 
 ## 相关源文件
 

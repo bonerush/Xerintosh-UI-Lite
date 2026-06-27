@@ -88,8 +88,8 @@ void ipc_wait_check_timeouts(kern_wait_node_t **queue)
 
 /* ═══ 内部：阻塞当前任务 ═══ */
 
-static void ipc_block_task(kern_wait_node_t **queue, xeros_spinlock_t *lock,
-                           uint32_t timeout_ms)
+void ipc_block_task(kern_wait_node_t **queue, xeros_spinlock_t *lock,
+                    uint32_t timeout_ms)
 {
     kern_task_t *current = kern_task_current();
     if (current == NULL) return;
@@ -122,7 +122,7 @@ static void ipc_block_task(kern_wait_node_t **queue, xeros_spinlock_t *lock,
     xeros_spinlock_unlock(lock);
 }
 
-static void ipc_wake_one(kern_wait_node_t **queue)
+void ipc_wake_one(kern_wait_node_t **queue)
 {
     kern_task_t *task = ipc_wait_dequeue(queue);
     if (task != NULL) {
@@ -266,28 +266,18 @@ static void pi_boost_owner(kern_pi_mutex_t *m)
     if (current == NULL || m->owner == NULL) return;
 
     if (current->priority > m->owner->priority) {
-        if (m->owner->priority != m->orig_priority) {
-            /* 已经被提升过，只取最高值 */
-            if (current->priority > m->owner->priority) {
-                m->owner->priority = current->priority;
-            }
-        } else {
-            /* 首次提升：记录原始优先级 */
-            m->orig_priority = m->owner->priority;
-            m->owner->priority = current->priority;
-        }
+        m->owner->priority = current->priority;
     }
 }
 
 /**
- * @brief 优先级继承：恢复持有者原始优先级
+ * @brief 优先级继承：恢复持有者基线优先级
  * @note 调用者必须持有 m->lock
  */
 static void pi_restore_owner(kern_pi_mutex_t *m)
 {
-    if (m->owner != NULL && m->orig_priority != 0) {
-        m->owner->priority = m->orig_priority;
-        m->orig_priority = 0;
+    if (m->owner != NULL) {
+        m->owner->priority = m->owner->base_priority;
     }
 }
 
@@ -312,7 +302,7 @@ kern_err_t kern_pi_mutex_lock(kern_pi_mutex_t *m, uint32_t timeout_ms)
         m->locked = true;
         m->owner = current;
         m->recursive_count = 1;
-        m->orig_priority = current->priority;
+        m->orig_priority = current->base_priority;
         xeros_spinlock_unlock(&m->lock);
         return KERN_OK;
     }
@@ -370,7 +360,7 @@ kern_err_t kern_pi_mutex_unlock(kern_pi_mutex_t *m)
             m->locked = true;
             m->owner = next;
             m->recursive_count = 1;
-            m->orig_priority = next->priority;
+            m->orig_priority = next->base_priority;
             next->state = KERN_TASK_READY;
             kern_smp_ipi_reschedule(next->cpu_id);
         }
@@ -485,6 +475,8 @@ kern_err_t kern_event_set(kern_event_t *ev, uint32_t bits)
 {
     if (ev == NULL) return KERN_EINVAL;
 
+    bits &= KERN_EVENT_VALID_BITS;
+
     xeros_spinlock_lock(&ev->lock);
     ev->bits |= bits;
 
@@ -509,6 +501,9 @@ kern_err_t kern_event_set(kern_event_t *ev, uint32_t bits)
 kern_err_t kern_event_clear(kern_event_t *ev, uint32_t bits)
 {
     if (ev == NULL) return KERN_EINVAL;
+
+    bits &= KERN_EVENT_VALID_BITS;
+
     xeros_spinlock_lock(&ev->lock);
     ev->bits &= ~bits;
     xeros_spinlock_unlock(&ev->lock);
@@ -528,6 +523,8 @@ kern_err_t kern_event_wait(kern_event_t *ev, uint32_t bits,
                             uint32_t flags, uint32_t timeout_ms)
 {
     if (ev == NULL) return KERN_EINVAL;
+
+    bits &= KERN_EVENT_VALID_BITS;
 
     bool wait_all = (flags & KERN_EVENT_WAIT_ALL) != 0;
     bool auto_clear = (flags & KERN_EVENT_CLEAR) != 0;

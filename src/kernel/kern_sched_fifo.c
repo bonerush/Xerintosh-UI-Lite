@@ -31,7 +31,12 @@ static inline void task_list_unlock(void) {
 #define task_list_unlock()  do {} while (0)
 #endif
 
-/* ═══ FIFO enqueue：按优先级有序插入 ═══ */
+/* ═══ 优先级桶数组（0 最低，255 最高）═══ */
+
+static kern_task_t *g_fifo_buckets[256];
+static kern_task_t *g_fifo_bucket_tails[256];
+
+/* ═══ FIFO enqueue：按优先级桶 O(1) 追加 ═══ */
 
 static void sched_fifo_enqueue(kern_task_t *task)
 {
@@ -39,23 +44,16 @@ static void sched_fifo_enqueue(kern_task_t *task)
 
     task_list_lock();
 
-    kern_task_t **head = &sched_class_fifo.task_list;
+    uint8_t p = task->priority;
     task->next = NULL;
-
-    /* 空链表或插入到头部（最高优先级在最前） */
-    if (*head == NULL || (*head)->priority <= task->priority) {
-        task->next = *head;
-        *head = task;
-    } else {
-        kern_task_t *t = *head;
-        while (t->next != NULL && t->next->priority > task->priority) {
-            t = t->next;
-        }
-        task->next = t->next;
-        t->next = task;
-    }
-
     task->scheduler_class_id = sched_class_fifo.class_id;
+
+    if (g_fifo_buckets[p] == NULL) {
+        g_fifo_buckets[p] = task;
+    } else {
+        g_fifo_bucket_tails[p]->next = task;
+    }
+    g_fifo_bucket_tails[p] = task;
 
     /* 如果入队任务优先级高于当前运行的任务，触发抢占 */
     kern_task_t *current = kern_current_task();
@@ -76,30 +74,25 @@ static void sched_fifo_dequeue(kern_task_t *task)
 
     task_list_lock();
 
-    kern_task_t **head = &sched_class_fifo.task_list;
-    kern_task_t *prev = NULL;
-    kern_task_t *t = *head;
-    while (t != NULL) {
-        if (t == task) {
-            if (prev != NULL) {
-                prev->next = t->next;
-                if (task == sched_class_fifo.task_list_tail) {
-                    sched_class_fifo.task_list_tail = prev;
+    for (int p = 255; p >= 0; p--) {
+        kern_task_t **pp = &g_fifo_buckets[p];
+        kern_task_t *prev = NULL;
+        while (*pp != NULL) {
+            if (*pp == task) {
+                *pp = task->next;
+                if (g_fifo_bucket_tails[p] == task) {
+                    g_fifo_bucket_tails[p] = prev;
                 }
-            } else {
-                *head = t->next;
-                if (task == sched_class_fifo.task_list_tail) {
-                    sched_class_fifo.task_list_tail = NULL;
-                }
+                task->scheduler_class_id = -1;
+                task_list_unlock();
+                return;
             }
-            task->scheduler_class_id = -1;
-            task_list_unlock();
-            return;
+            prev = *pp;
+            pp = &(*pp)->next;
         }
-        prev = t;
-        t = t->next;
     }
 
+    task->scheduler_class_id = -1;
     task_list_unlock();
 }
 
@@ -108,25 +101,32 @@ static void sched_fifo_dequeue(kern_task_t *task)
 static kern_task_t *sched_fifo_pick_next(void)
 {
     uint8_t cpu = KERN_THIS_CPU;
+    uint32_t now = kern_sched_ticks();
 
     task_list_lock();
 
-    kern_task_t *t = sched_class_fifo.task_list;
-    while (t != NULL) {
-        /* 唤醒到期 sleep 任务 */
-        if (t->state == KERN_TASK_SLEEPING && t->wake_time <= kern_sched_ticks()) {
-            t->state = KERN_TASK_READY;
-        }
-        if (t->state == KERN_TASK_READY) {
-            uint8_t tid = t->cpu_id;
-            /* CPU 亲和性检查：KERN_CPU_ANY 或匹配本核心 */
-            if (tid == KERN_CPU_ANY || tid == cpu) {
-                t->state = KERN_TASK_RUNNING;
-                task_list_unlock();
-                return t;  /* 链表按优先级排序，第一个就绪且亲和性匹配即最高优先级 */
+    for (int p = 255; p >= 0; p--) {
+        kern_task_t *t = g_fifo_buckets[p];
+        while (t != NULL) {
+            /* 唤醒到期 sleep 任务 */
+            if (t->state == KERN_TASK_SLEEPING && t->wake_time <= now) {
+                t->state = KERN_TASK_READY;
             }
+            if (t->state == KERN_TASK_SUSPENDED) {
+                t = t->next;
+                continue;
+            }
+            if (t->state == KERN_TASK_READY) {
+                uint8_t tid = t->cpu_id;
+                /* CPU 亲和性检查：KERN_CPU_ANY 或匹配本核心 */
+                if (tid == KERN_CPU_ANY || tid == cpu) {
+                    t->state = KERN_TASK_RUNNING;
+                    task_list_unlock();
+                    return t;
+                }
+            }
+            t = t->next;
         }
-        t = t->next;
     }
 
     task_list_unlock();
@@ -141,19 +141,16 @@ static void sched_fifo_tick(kern_task_t *current)
 
     task_list_lock();
 
-    /* 检查 FIFO class 中是否有比当前任务优先级更高的就绪任务 */
-    kern_task_t *t = sched_class_fifo.task_list;
-    while (t != NULL) {
-        if (t->state == KERN_TASK_READY && t->priority > current->priority) {
-            kern_set_need_resched(true);
-            task_list_unlock();
-            return;
+    for (int p = 255; p > current->priority; p--) {
+        kern_task_t *t = g_fifo_buckets[p];
+        while (t != NULL) {
+            if (t->state == KERN_TASK_READY) {
+                kern_set_need_resched(true);
+                task_list_unlock();
+                return;
+            }
+            t = t->next;
         }
-        /* 链表按优先级排序，第一个不更优则后面都不会更优 */
-        if (t->priority <= current->priority) {
-            break;
-        }
-        t = t->next;
     }
 
     task_list_unlock();
@@ -164,6 +161,7 @@ static void sched_fifo_tick(kern_task_t *current)
 static void sched_fifo_prio_changed(kern_task_t *task, uint8_t old_prio)
 {
     if (task == NULL) return;
+    if (task->scheduler_class_id != sched_class_fifo.class_id) return;
     /* 移除再按新优先级重新插入 */
     sched_fifo_dequeue(task);
     sched_fifo_enqueue(task);
