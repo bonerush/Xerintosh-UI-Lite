@@ -47,9 +47,9 @@ export const bootScene = {
   title: '系统启动流程',
   initialRegisters: {
     PC: '0x40000400',
-    SP: '0x3FFC_0000',
-    PS: '0x0006_001E',
-    A0: '0x0000_0000',
+    SP: '0x3FFC0000',
+    PS: '0x0006001E',
+    A0: '0x00000000',
   },
   svg: createSvg,
   steps: [
@@ -59,7 +59,7 @@ export const bootScene = {
       highlight: ['reset'],
       arrows: [],
       detail: 'ESP32 上电后从 ROM 复位向量开始执行，初始化堆栈并跳转到入口代码。',
-      source: 'src/kernel/esp32/kern_esp32_start.S:xxx',
+      source: 'src/kernel/esp32/ctx_switch.S:195-210',
     },
     {
       id: 'hw-init',
@@ -67,7 +67,7 @@ export const bootScene = {
       highlight: ['hw-init'],
       arrows: ['reset-to-hw'],
       detail: '配置时钟、UART、中断控制器、看门狗和 GPIO，为内核运行准备硬件环境。',
-      source: 'src/hal/hal_dreamCore/...:xxx',
+      source: 'src/kernel/kern_init.c:36-55',
     },
     {
       id: 'kernel-init',
@@ -75,7 +75,7 @@ export const bootScene = {
       highlight: ['kernel-init'],
       arrows: ['hw-to-kernel'],
       detail: '依次初始化调度器、内存分配器、VFS、定时器、同步原语和 SMP。',
-      source: 'src/kernel/kern_init.c:xxx',
+      source: 'src/kernel/kern_init.c:36-55',
     },
     {
       id: 'create-init-task',
@@ -83,7 +83,7 @@ export const bootScene = {
       highlight: ['create-init'],
       arrows: ['kernel-to-create'],
       detail: '创建 init 任务，作为用户空间的第一个入口。',
-      source: 'src/kernel/kern_task.c:xxx',
+      source: 'src/kernel/kern_task_lifecycle.c:27-120',
     },
     {
       id: 'start-scheduler',
@@ -91,7 +91,7 @@ export const bootScene = {
       highlight: ['schedule'],
       arrows: ['create-to-schedule'],
       detail: '打开 tick 定时器，触发第一次上下文切换，开始多任务调度。',
-      source: 'src/kernel/kern_sched.c:xxx',
+      source: 'src/kernel/kern_sched.c:245-310',
     },
   ],
 };
