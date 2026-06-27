@@ -1,4 +1,4 @@
-function createSvg() {
+function createRegistersSvg() {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   svg.setAttribute('viewBox', '0 0 800 400');
   svg.innerHTML = `
@@ -48,7 +48,7 @@ export const registersScene = {
     PS: '0x0006001E',
     'CPENABLE': '0x00000000',
   },
-  svg: createSvg,
+  svg: createRegistersSvg,
   steps: [
     {
       id: 'cpenable',

@@ -1,4 +1,4 @@
-function createSvg() {
+function createBootSvg() {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   svg.setAttribute('viewBox', '0 0 800 400');
   svg.innerHTML = `
@@ -51,7 +51,7 @@ export const bootScene = {
     PS: '0x0006001E',
     A0: '0x00000000',
   },
-  svg: createSvg,
+  svg: createBootSvg,
   steps: [
     {
       id: 'reset-vector',

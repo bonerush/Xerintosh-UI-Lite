@@ -175,7 +175,7 @@ class StepPlayer {
 }
 
 // === Scene: boot ===
-function createSvg() {
+function createBootSvg() {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   svg.setAttribute('viewBox', '0 0 800 400');
   svg.innerHTML = `
@@ -228,7 +228,7 @@ const bootScene = {
     PS: '0x0006001E',
     A0: '0x00000000',
   },
-  svg: createSvg,
+  svg: createBootSvg,
   steps: [
     {
       id: 'reset-vector',
@@ -274,7 +274,7 @@ const bootScene = {
 };
 
 // === Scene: context-switch ===
-function createSvg() {
+function createContextSwitchSvg() {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   svg.setAttribute('viewBox', '0 0 800 400');
   svg.innerHTML = `
@@ -317,7 +317,7 @@ const contextSwitchScene = {
     SP: '0x3FFC8000',
     PS: '0x0006001E',
   },
-  svg: createSvg,
+  svg: createContextSwitchSvg,
   steps: [
     {
       id: 'current-task',
@@ -355,7 +355,7 @@ const contextSwitchScene = {
 };
 
 // === Scene: scheduler ===
-function createSvg() {
+function createSchedulerSvg() {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   svg.setAttribute('viewBox', '0 0 800 400');
   svg.innerHTML = `
@@ -398,7 +398,7 @@ const schedulerScene = {
     SP: '0x3FFC8000',
     PS: '0x0006001E',
   },
-  svg: createSvg,
+  svg: createSchedulerSvg,
   steps: [
     {
       id: 'tick-entry',
@@ -436,7 +436,7 @@ const schedulerScene = {
 };
 
 // === Scene: smp-ipi ===
-function createSvg() {
+function createSmpIpiSvg() {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   svg.setAttribute('viewBox', '0 0 800 400');
   svg.innerHTML = `
@@ -479,7 +479,7 @@ const smpIpiScene = {
     SP: '0x3FFC8000',
     PS: '0x0006001E',
   },
-  svg: createSvg,
+  svg: createSmpIpiSvg,
   steps: [
     {
       id: 'per-cpu-sched',
@@ -517,7 +517,7 @@ const smpIpiScene = {
 };
 
 // === Scene: sync ===
-function createSvg() {
+function createSyncSvg() {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   svg.setAttribute('viewBox', '0 0 800 400');
   svg.innerHTML = `
@@ -561,7 +561,7 @@ const syncScene = {
     SP: '0x3FFC8000',
     PS: '0x0006001E',
   },
-  svg: createSvg,
+  svg: createSyncSvg,
   steps: [
     {
       id: 'task-a-lock',
@@ -599,7 +599,7 @@ const syncScene = {
 };
 
 // === Scene: vfs ===
-function createSvg() {
+function createVfsSvg() {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   svg.setAttribute('viewBox', '0 0 800 400');
   svg.innerHTML = `
@@ -648,7 +648,7 @@ const vfsScene = {
     SP: '0x3FFC8000',
     PS: '0x0006001E',
   },
-  svg: createSvg,
+  svg: createVfsSvg,
   steps: [
     {
       id: 'sys-call',
@@ -694,7 +694,7 @@ const vfsScene = {
 };
 
 // === Scene: interrupt ===
-function createSvg() {
+function createInterruptSvg() {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   svg.setAttribute('viewBox', '0 0 800 400');
   svg.innerHTML = `
@@ -743,7 +743,7 @@ const interruptScene = {
     SP: '0x3FFC8000',
     PS: '0x0006001E',
   },
-  svg: createSvg,
+  svg: createInterruptSvg,
   steps: [
     {
       id: 'irq-signal',
@@ -791,7 +791,7 @@ const interruptScene = {
 };
 
 // === Scene: memory ===
-function createSvg() {
+function createMemorySvg() {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   svg.setAttribute('viewBox', '0 0 800 400');
   svg.innerHTML = `
@@ -840,7 +840,7 @@ const memoryScene = {
     SP: '0x3FFC8000',
     PS: '0x0006001E',
   },
-  svg: createSvg,
+  svg: createMemorySvg,
   steps: [
     {
       id: 'kmalloc-call',
@@ -886,7 +886,7 @@ const memoryScene = {
 };
 
 // === Scene: registers ===
-function createSvg() {
+function createRegistersSvg() {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   svg.setAttribute('viewBox', '0 0 800 400');
   svg.innerHTML = `
@@ -936,7 +936,7 @@ const registersScene = {
     PS: '0x0006001E',
     'CPENABLE': '0x00000000',
   },
-  svg: createSvg,
+  svg: createRegistersSvg,
   steps: [
     {
       id: 'cpenable',
@@ -983,7 +983,7 @@ const registersScene = {
 };
 
 // === Scene: shell ===
-function createSvg() {
+function createShellSvg() {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   svg.setAttribute('viewBox', '0 0 800 400');
   svg.innerHTML = `
@@ -1032,7 +1032,7 @@ const shellScene = {
     SP: '0x3FFC8000',
     PS: '0x0006001E',
   },
-  svg: createSvg,
+  svg: createShellSvg,
   steps: [
     {
       id: 'uart-input',

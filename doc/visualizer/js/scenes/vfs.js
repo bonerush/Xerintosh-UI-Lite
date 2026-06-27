@@ -1,4 +1,4 @@
-function createSvg() {
+function createVfsSvg() {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   svg.setAttribute('viewBox', '0 0 800 400');
   svg.innerHTML = `
@@ -47,7 +47,7 @@ export const vfsScene = {
     SP: '0x3FFC8000',
     PS: '0x0006001E',
   },
-  svg: createSvg,
+  svg: createVfsSvg,
   steps: [
     {
       id: 'sys-call',
