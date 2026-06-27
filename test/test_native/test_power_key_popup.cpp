@@ -8,24 +8,53 @@
 
 extern "C" {
 #include "app/shutdown/power_key_popup.h"
-#include "hal/hal_power_key.h"
 }
 
-/* ═══ 测试 ═══ */
+/* ═══ 测试夹具 ═══ */
 
-TEST(PowerKeyPopupTest, InitDoesNotCrash)
+class PowerKeyPopupTest : public ::testing::Test {
+protected:
+    void SetUp() override {
+        power_key_popup_init();
+    }
+};
+
+/* ═══ 初始化测试 ═══ */
+
+TEST_F(PowerKeyPopupTest, InitClearsDualActive)
+{
+    EXPECT_FALSE(power_key_popup_is_dual_active());
+    EXPECT_FALSE(power_key_popup_is_visible());
+}
+
+TEST_F(PowerKeyPopupTest, UpdateDoesNotCrashWhenNoButtonsPressed)
+{
+    power_key_popup_update();
+    SUCCEED();
+}
+
+TEST_F(PowerKeyPopupTest, DualActiveIsFalseAfterInitAndUpdate)
+{
+    power_key_popup_update();
+    EXPECT_FALSE(power_key_popup_is_dual_active());
+    EXPECT_FALSE(power_key_popup_is_visible());
+}
+
+/* ═══ 旧测试（保留兼容性） ═══ */
+
+TEST(PowerKeyPopupLegacyTest, InitDoesNotCrash)
 {
     power_key_popup_init();
     SUCCEED();
 }
 
-TEST(PowerKeyPopupTest, InitiallyNotVisible)
+TEST(PowerKeyPopupLegacyTest, InitiallyNotVisible)
 {
     power_key_popup_init();
     EXPECT_FALSE(power_key_popup_is_visible());
 }
 
-TEST(PowerKeyPopupTest, UpdateDoesNotCrash)
+TEST(PowerKeyPopupLegacyTest, UpdateDoesNotCrash)
 {
     power_key_popup_init();
     power_key_popup_update();
