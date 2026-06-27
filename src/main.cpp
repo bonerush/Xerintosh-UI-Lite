@@ -68,7 +68,8 @@ static int16_t brightness = 50;  /* 当前硬件亮度缓存 */
 extern "C" void on_brightness_change_cb(void *ud)
 {
     (void)ud;
-    brightness = settings_brightness_hw_value();
+    brightness = (int16_t)settings_level_to_hw(SETTINGS_KIND_BRIGHTNESS,
+                                               settings_get_brightness());
     hal_display_set_brightness((uint8_t)brightness);
     storage_set_brightness(settings_get_brightness());
 }
@@ -79,7 +80,8 @@ extern "C" void on_brightness_change_cb(void *ud)
 extern "C" void on_anim_speed_change_cb(void *ud)
 {
     (void)ud;
-    g_anim_speed = settings_anim_speed_value();
+    g_anim_speed = (int16_t)settings_level_to_hw(SETTINGS_KIND_ANIM_SPEED,
+                                                 settings_get_anim_speed());
     storage_set_anim_speed((uint8_t)g_anim_speed);
 }
 
