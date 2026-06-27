@@ -19,10 +19,27 @@
 #define UI_DIRTY_H
 
 #include <stdbool.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/* ═══ 脏矩形区域类型 ═══ */
+
+/**
+ * @brief 脏矩形区域描述
+ * @details active 为 true 时表示存在需要重绘的矩形区域，
+ *          (x, y, w, h) 描述该区域在屏幕上的范围。
+ */
+typedef struct xerintosh_dirty_region_t
+{
+    bool active;        /* 区域是否有效 */
+    int16_t x;          /* 左上角 x */
+    int16_t y;          /* 左上角 y */
+    int16_t w;          /* 宽度 */
+    int16_t h;          /* 高度 */
+} xerintosh_dirty_region_t;
 
 /* ═══ 公开 API ═══ */
 
@@ -43,12 +60,30 @@ extern "C" {
 void xerintosh_invalidate(void);
 
 /**
+ * @brief  标记指定屏幕区域为脏状态，请求下一帧重绘该区域
+ * @param x 区域左上角 x
+ * @param y 区域左上角 y
+ * @param w 区域宽度
+ * @param h 区域高度
+ * @note   多次调用会自动合并为包围盒。当前渲染管线仍全屏重绘，
+ *         本 API 为后续局部刷新预留数据结构。
+ */
+void xerintosh_invalidate_region(int16_t x, int16_t y, int16_t w, int16_t h);
+
+/**
  * @brief  查询当前是否处于脏状态（是否需要重绘）
  * @return true  需要重绘
  * @return false UI 干净，可跳过重绘
  * @note   框架内部用于脏矩形优化判断。App 开发者通常不需要调用。
  */
 bool xerintosh_is_dirty(void);
+
+/**
+ * @brief  获取当前脏矩形区域（只读）
+ * @return 脏矩形区域指针（永不返回 NULL）
+ * @note   返回的是内部上下文中的区域，调用方不应修改其内容。
+ */
+const xerintosh_dirty_region_t *xerintosh_get_dirty_region(void);
 
 /**
  * @brief  清除脏状态标志（重绘完成后由框架调用）

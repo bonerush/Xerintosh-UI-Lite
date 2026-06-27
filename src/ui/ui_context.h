@@ -12,6 +12,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include "ui_dirty.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -36,9 +37,9 @@ typedef struct xerintosh_context_t
   bool refresh_list_value;            /* 是否需要刷新列表项显示值 */
 
   /* 绘制状态 */
-  bool dirty;                         /* 脏矩形标志：为 true 时需重绘列表帧 */
-  uint16_t draw_color;                /* 当前前景色 */
-  int16_t anim_speed;                 /* 全局动画速度基准值 */
+  xerintosh_dirty_region_t dirty_region;  /* 脏矩形区域：active 为 true 时需重绘 */
+  uint16_t draw_color;                    /* 当前前景色 */
+  int16_t anim_speed;                     /* 全局动画速度基准值 */
 
   /* 选择器宽度缓存（避免每帧重复 hal_get_string_width） */
   const char *cached_selector_content;    /* 上次缓存时选中的内容指针 */
@@ -80,7 +81,7 @@ void xerintosh_context_init(void);
 #define g_xerintosh_exit_animation_status    (xerintosh_get_context()->exit_animation_status)
 #define g_xerintosh_exit_animation_finished  (xerintosh_get_context()->exit_animation_finished)
 #define g_xerintosh_refresh_list_value       (xerintosh_get_context()->refresh_list_value)
-#define g_xerintosh_dirty                    (xerintosh_get_context()->dirty)  /* @deprecated Use xerintosh_invalidate() / xerintosh_is_dirty() */
+#define g_xerintosh_dirty                    (xerintosh_get_context()->dirty_region.active)  /* @deprecated Use xerintosh_invalidate() / xerintosh_is_dirty() */
 #define g_xerintosh_draw_color               (xerintosh_get_context()->draw_color)
 #define g_anim_speed                         (xerintosh_get_context()->anim_speed)
 #define g_xerintosh_cached_selector_content  (xerintosh_get_context()->cached_selector_content)
