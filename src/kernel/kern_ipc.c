@@ -88,8 +88,8 @@ void ipc_wait_check_timeouts(kern_wait_node_t **queue)
 
 /* ═══ 内部：阻塞当前任务 ═══ */
 
-static void ipc_block_task(kern_wait_node_t **queue, xeros_spinlock_t *lock,
-                           uint32_t timeout_ms)
+void ipc_block_task(kern_wait_node_t **queue, xeros_spinlock_t *lock,
+                    uint32_t timeout_ms)
 {
     kern_task_t *current = kern_task_current();
     if (current == NULL) return;
@@ -122,7 +122,7 @@ static void ipc_block_task(kern_wait_node_t **queue, xeros_spinlock_t *lock,
     xeros_spinlock_unlock(lock);
 }
 
-static void ipc_wake_one(kern_wait_node_t **queue)
+void ipc_wake_one(kern_wait_node_t **queue)
 {
     kern_task_t *task = ipc_wait_dequeue(queue);
     if (task != NULL) {

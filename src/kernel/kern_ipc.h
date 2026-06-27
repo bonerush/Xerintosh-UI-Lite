@@ -177,6 +177,21 @@ extern kern_task_t *ipc_wait_dequeue(kern_wait_node_t **queue);
  */
 extern void ipc_wait_check_timeouts(kern_wait_node_t **queue);
 
+/**
+ * @brief 阻塞当前任务并将其加入等待队列
+ * @param queue      等待队列头指针
+ * @param lock       保护等待队列的锁
+ * @param timeout_ms 超时时间（毫秒），0 表示永不超时
+ */
+extern void ipc_block_task(kern_wait_node_t **queue, xeros_spinlock_t *lock,
+                           uint32_t timeout_ms);
+
+/**
+ * @brief 从等待队列唤醒第一个任务
+ * @param queue  等待队列头指针
+ */
+extern void ipc_wake_one(kern_wait_node_t **queue);
+
 #ifdef __cplusplus
 }
 #endif
