@@ -5,6 +5,7 @@ extern "C" {
 #include "ui/ui_core.h"
 #include "ui/ui_item.h"
 #include "ui/ui_drawer.h"
+#include "ui/ui_types.h"
 #include "hal/hal_system.h"
 #include "hal/hal_display.h"
 }
@@ -139,4 +140,25 @@ TEST(ExitAnimationTest, MultipleEnterExitCycles)
             << "Cycle " << cycle << ": Exit animation stuck (status="
             << (int)g_xerintosh_exit_animation_status << ")";
     }
+}
+
+/* ═══ U8: 退场动画常量存在性 ═══ */
+TEST(ExitAnimationConstants, OverdrawAndSnapAreDefined)
+{
+    EXPECT_GT(EXIT_ANIM_OVERDRAW_PX, 0);
+    EXPECT_GT(EXIT_ANIM_SNAP_PX, 0.0f);
+}
+
+TEST(ExitAnimationConstants, HourglassConstantsAreDefined)
+{
+    EXPECT_GT(EXIT_ANIM_HOURGLASS_W, 0);
+    EXPECT_GT(EXIT_ANIM_HOURGLASS_H, 0);
+    EXPECT_GT(EXIT_ANIM_HOURGLASS_OFFSET_X, 0);
+    EXPECT_GT(EXIT_ANIM_HOURGLASS_CENTER_OFFSET_Y, 0);
+}
+
+TEST(ExitAnimationConstants, ScanlineConstantsAreDefined)
+{
+    EXPECT_GT(EXIT_ANIM_SCANLINE_OVERDRAW, 0);
+    EXPECT_GT(EXIT_ANIM_SCANLINE_TRAIL_PX, 0);
 }

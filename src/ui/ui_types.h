@@ -68,6 +68,16 @@ extern bool  g_spring_anim_mode;           /* true=动弹弹力, false=普通一
 /* ═══ 文字滚动 ═══ */
 #define TEXT_SCROLL_CYCLE_MS     3000u
 
+/* ═══ 退场动画 ═══ */
+#define EXIT_ANIM_OVERDRAW_PX              8
+#define EXIT_ANIM_SNAP_PX                  1.0f
+#define EXIT_ANIM_HOURGLASS_W              13
+#define EXIT_ANIM_HOURGLASS_H              22
+#define EXIT_ANIM_HOURGLASS_OFFSET_X       8
+#define EXIT_ANIM_HOURGLASS_CENTER_OFFSET_Y 18
+#define EXIT_ANIM_SCANLINE_OVERDRAW        3
+#define EXIT_ANIM_SCANLINE_TRAIL_PX        5
+
 /* ═══ 字体 ═══ */
 
 /**
