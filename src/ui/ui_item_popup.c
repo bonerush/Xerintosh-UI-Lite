@@ -18,6 +18,20 @@ static char g_wrap_line0[48];
 static char g_wrap_line1[48];
 static char g_wrap_line2[48];
 
+/**
+ * @brief  将 src 前 len 字节安全复制到 dst，超过 dst_size 时截断
+ * @note   统一封装 sizeof 保护，避免各处手写硬编码截断。
+ */
+static void popup_copy_line(char *dst, size_t dst_size,
+                            const char *src, size_t len)
+{
+  if (len >= dst_size) {
+    len = dst_size - 1;
+  }
+  memcpy(dst, src, len);
+  dst[len] = '\0';
+}
+
 /* ═══ 字体 ═══ */
 
 static const void *g_xerintosh_font = NULL;  /* 当前字体指针 */
@@ -124,25 +138,13 @@ void xerintosh_push_pop_up(const char *_content, const uint16_t _span)
 
     if (avail < 20) avail = 20;
 
-    /* 默认单行 */
-	  {
-	    size_t l0 = strlen(_content);
-	    if (l0 >= sizeof(g_wrap_line0)) l0 = sizeof(g_wrap_line0) - 1;
-	    memcpy(g_wrap_line0, _content, l0);
-	    g_wrap_line0[l0] = '\0';
-	  }
+    /* 先测量原始内容宽度，仅在确实能单行显示时才拷贝完整内容；
+       需要换行时直接对原始指针分片，避免默认分支先把超长内容写入 48 字节缓冲区。 */
+    int16_t raw_content_w = hal_get_string_width(_content);
+
     g_xerintosh_pop_up.wrap_line_count = 1;
-	  g_xerintosh_pop_up.wrap_lines[0] = g_wrap_line0;
-	  g_xerintosh_pop_up.w_pop_up_trg = hal_get_string_width(g_wrap_line0) + POP_UP_OFFSET;
-    if ((int16_t)g_xerintosh_pop_up.w_pop_up_trg > max_w)
-      g_xerintosh_pop_up.w_pop_up_trg = max_w;
 
-    /* 用已测得的文字宽度判断是否需要换行（与上面 hal_get_string_width(g_wrap_line0)
-       复用同一结果，避免 ESP32 上 _content 原始指针与 g_wrap_line0 的 width 不一致
-       导致换行被错误跳过 → w=146 → 渲染溢出 → FreeRTOS task timeout */
-    int16_t content_w = (int16_t)g_xerintosh_pop_up.w_pop_up_trg - POP_UP_OFFSET;
-
-    if (content_w > avail && POP_UP_WRAP_LINES >= 2)
+    if (raw_content_w > avail && POP_UP_WRAP_LINES >= 2)
     {
       size_t len = strlen(_content);
       size_t best1 = find_wrap_break(_content, len, avail);
@@ -158,13 +160,9 @@ void xerintosh_push_pop_up(const char *_content, const uint16_t _span)
           if (best2_rel > 0 && best2_rel < len - best1)
           {
             size_t best2 = best1 + best2_rel;
-            size_t l0 = best1, l1 = best2_rel, l2 = len - best2;
-            if (l0 >= sizeof(g_wrap_line0)) l0 = sizeof(g_wrap_line0) - 1;
-            if (l1 >= sizeof(g_wrap_line1)) l1 = sizeof(g_wrap_line1) - 1;
-            if (l2 >= sizeof(g_wrap_line2)) l2 = sizeof(g_wrap_line2) - 1;
-            memcpy(g_wrap_line0, _content, l0);          g_wrap_line0[l0] = '\0';
-            memcpy(g_wrap_line1, _content + best1, l1);  g_wrap_line1[l1] = '\0';
-            memcpy(g_wrap_line2, _content + best2, l2);  g_wrap_line2[l2] = '\0';
+            popup_copy_line(g_wrap_line0, sizeof(g_wrap_line0), _content, best1);
+            popup_copy_line(g_wrap_line1, sizeof(g_wrap_line1), _content + best1, best2_rel);
+            popup_copy_line(g_wrap_line2, sizeof(g_wrap_line2), _content + best2, len - best2);
 
             g_xerintosh_pop_up.wrap_lines[0] = g_wrap_line0;
             g_xerintosh_pop_up.wrap_lines[1] = g_wrap_line1;
@@ -184,13 +182,8 @@ void xerintosh_push_pop_up(const char *_content, const uint16_t _span)
 
         /* 2 行 */
         {
-          size_t l0 = best1, l1 = len - best1;
-          if (l0 >= sizeof(g_wrap_line0)) l0 = sizeof(g_wrap_line0) - 1;
-          if (l1 >= sizeof(g_wrap_line1)) l1 = sizeof(g_wrap_line1) - 1;
-          memcpy(g_wrap_line0, _content, l0);
-          g_wrap_line0[l0] = '\0';
-          memcpy(g_wrap_line1, _content + best1, l1);
-          g_wrap_line1[l1] = '\0';
+          popup_copy_line(g_wrap_line0, sizeof(g_wrap_line0), _content, best1);
+          popup_copy_line(g_wrap_line1, sizeof(g_wrap_line1), _content + best1, len - best1);
 
           g_xerintosh_pop_up.wrap_lines[0] = g_wrap_line0;
           g_xerintosh_pop_up.wrap_lines[1] = g_wrap_line1;
@@ -205,6 +198,13 @@ void xerintosh_push_pop_up(const char *_content, const uint16_t _span)
         }
       }
     }
+
+    /* 默认单行（不需要换行或换行失败时的回退） */
+    popup_copy_line(g_wrap_line0, sizeof(g_wrap_line0), _content, strlen(_content));
+    g_xerintosh_pop_up.wrap_lines[0] = g_wrap_line0;
+    g_xerintosh_pop_up.w_pop_up_trg = hal_get_string_width(g_wrap_line0) + POP_UP_OFFSET;
+    if ((int16_t)g_xerintosh_pop_up.w_pop_up_trg > max_w)
+      g_xerintosh_pop_up.w_pop_up_trg = max_w;
   }
 
 calc_height:
