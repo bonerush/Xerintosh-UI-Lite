@@ -55,16 +55,26 @@ pio run -e m5stick-c-native
 
 ### 5. 硬件冒烟测试
 
-- **状态**：未执行
-- **原因**：本轮集成验证在软件层面完成；实机烧录与菜单导航、WiFi 菜单、电源键弹窗等人工验证需用户配合后续进行。
-- **建议动作**：
-  1. `pio run -e m5stick-c-native --target upload`
-  2. `python tools/xeros_debug.py --reset --wait-boot --cmd ps`
-  3. 人工验证菜单导航、设置项切换、WiFi 菜单、电源键弹窗
+- **状态**：已执行，并修复一处 UI 回归后重新烧录
+- **烧录命令**：`pio run -e m5stick-c-native --target upload`
+- **复位/日志命令**：`python tools/xeros_debug.py --reset --wait-boot --cmd ps /dev/cu.usbserial-4D52671EFA`
+- **结果**：
+  - 烧录成功（ESP32-PICO-D4，MAC `94:b9:7e:93:15:34`）
+  - 设备复位后正常启动，检测到 `[  BOOT] M5Stick-P1 kernel starting...`
+  - UART、NVS、Display、UI、Xeros kernel、SMP 双核调度、WiFi manager、shell 均正常初始化
+  - `ps` 命令输出正常：idle、shell、ui、main-loop、wifi-mgr 任务状态符合预期
+  - UI 帧循环正常：`ui frame 1/2/3/4/5 begin/flush done/yielding/resumed` 连续输出
+- **修复的 UI 回归**：
+  - 问题：选中超出初始屏幕范围的菜单项时，选择器内不显示文字、无反色高亮
+  - 根因：`src/ui/ui_draw_list.c` 拆分后 `item_text_is_visible()` 把文字基线可见性误判为文字底部可见性，导致底部 4px 内的文字被跳过
+  - 修复：恢复为判断文字基线（`y_center`）是否位于 `(LIST_INFO_BAR_HEIGHT, HAL_SCREEN_HEIGHT)`
+  - 回归测试：`test/test_native/test_ui_draw_list_item.cpp` 新增 `DrawsTextForItemNearBottomEdgeAfterCameraScroll`
+  - 修复后重新烧录：native 测试 573 succeeded、硬件构建无新增警告、`m5stick-c-native` 构建与烧录均成功
+- **未验证项**：菜单导航、设置项切换、WiFi 菜单、电源键弹窗等人工交互项仍需现场确认。
 
 ## 结论
 
-阶段 3 软件层面集成验证通过，可进入阶段 4 文档归档与分支收尾。硬件冒烟测试标记为待执行。
+阶段 3 集成验证通过，包括全量 native 测试、硬件构建、ESP32 native 调度构建、文档链接检查、实机烧录启动验证与上述 UI 回归修复。人工交互项建议后续现场补充确认。
 
 ## 相关提交
 
