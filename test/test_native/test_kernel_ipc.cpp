@@ -73,6 +73,19 @@ TEST(KernelIpcTest, EventWaitAny)
     EXPECT_EQ(kern_event_wait(&ev, 0x03, KERN_EVENT_WAIT_ANY, 0), KERN_OK);
 }
 
+TEST(KernelIpcTest, EventHighBitsAreReserved)
+{
+    kern_init();
+    kern_event_t ev;
+    kern_event_init(&ev);
+
+    kern_event_set(&ev, 0xFF000000u);
+    EXPECT_EQ(kern_event_get(&ev), 0u);
+
+    kern_event_set(&ev, 0x00FFFFFFu);
+    EXPECT_EQ(kern_event_get(&ev), 0x00FFFFFFu);
+}
+
 /* ═══ PI 互斥锁优先级记录缺陷回归测试 ═══
  *
  * 旧实现把 m->orig_priority 记录为获取锁时的当前优先级；

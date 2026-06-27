@@ -148,6 +148,9 @@ typedef struct {
 #define KERN_EVENT_WAIT_ALL  0x01   /* AND 等待：所有位满足才唤醒 */
 #define KERN_EVENT_CLEAR     0x02   /* 唤醒后自动清除匹配位 */
 
+/** 事件组有效位掩码：高 8 位保留给内核内部使用 */
+#define KERN_EVENT_VALID_BITS 0x00FFFFFFu
+
 extern kern_err_t kern_event_init(kern_event_t *ev);
 extern kern_err_t kern_event_set(kern_event_t *ev, uint32_t bits);
 extern kern_err_t kern_event_clear(kern_event_t *ev, uint32_t bits);

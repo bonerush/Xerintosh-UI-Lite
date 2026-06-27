@@ -475,6 +475,8 @@ kern_err_t kern_event_set(kern_event_t *ev, uint32_t bits)
 {
     if (ev == NULL) return KERN_EINVAL;
 
+    bits &= KERN_EVENT_VALID_BITS;
+
     xeros_spinlock_lock(&ev->lock);
     ev->bits |= bits;
 
@@ -499,6 +501,9 @@ kern_err_t kern_event_set(kern_event_t *ev, uint32_t bits)
 kern_err_t kern_event_clear(kern_event_t *ev, uint32_t bits)
 {
     if (ev == NULL) return KERN_EINVAL;
+
+    bits &= KERN_EVENT_VALID_BITS;
+
     xeros_spinlock_lock(&ev->lock);
     ev->bits &= ~bits;
     xeros_spinlock_unlock(&ev->lock);
@@ -518,6 +523,8 @@ kern_err_t kern_event_wait(kern_event_t *ev, uint32_t bits,
                             uint32_t flags, uint32_t timeout_ms)
 {
     if (ev == NULL) return KERN_EINVAL;
+
+    bits &= KERN_EVENT_VALID_BITS;
 
     bool wait_all = (flags & KERN_EVENT_WAIT_ALL) != 0;
     bool auto_clear = (flags & KERN_EVENT_CLEAR) != 0;
