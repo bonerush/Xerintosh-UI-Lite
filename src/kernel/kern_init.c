@@ -8,6 +8,7 @@
  */
 
 #include "kern_init.h"
+#include "kern_task_notify.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -39,6 +40,8 @@ void kern_init(void)
 
     g_kern_initialized = true;
     g_init_count = 1;
+
+    kern_task_notify_init();
 
     kern_log(KERN_LOG_INFO, "Xeros kernel initialized");
 }
