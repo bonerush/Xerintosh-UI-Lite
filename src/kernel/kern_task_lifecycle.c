@@ -243,7 +243,9 @@ void kern_yield(void)
     kern_task_t *cur = g_current_task;
     if (cur == NULL) return;
 
-    cur->state = KERN_TASK_READY;
+    if (cur->state == KERN_TASK_RUNNING) {
+        cur->state = KERN_TASK_READY;
+    }
     g_current_task = g_idle_task;
 
     swapcontext(&cur->ctx, &g_sched_ctx);
@@ -256,7 +258,9 @@ void kern_yield(void)
     kern_task_t *cur = g_current_task;
     if (cur == NULL) return;
 
-    cur->state = KERN_TASK_READY;
+    if (cur->state == KERN_TASK_RUNNING) {
+        cur->state = KERN_TASK_READY;
+    }
 
     /* 通过可移植层归还令牌并等待下次调度 */
     kern_port_task_yield();

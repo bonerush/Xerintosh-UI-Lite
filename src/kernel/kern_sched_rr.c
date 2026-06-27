@@ -134,6 +134,13 @@ static kern_task_t *sched_rr_pick_next(void)
     t = start;
     int steps = 0;
     do {
+        if (t->state == KERN_TASK_SUSPENDED) {
+            t = t->next;
+            if (t == NULL) {
+                t = sched_class_rr.task_list;
+            }
+            continue;
+        }
         if (t->state == KERN_TASK_READY) {
             uint8_t tid = t->cpu_id;
             /* CPU 亲和性检查：KERN_CPU_ANY 或匹配本核心 */

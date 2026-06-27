@@ -117,6 +117,10 @@ static kern_task_t *sched_fifo_pick_next(void)
         if (t->state == KERN_TASK_SLEEPING && t->wake_time <= kern_sched_ticks()) {
             t->state = KERN_TASK_READY;
         }
+        if (t->state == KERN_TASK_SUSPENDED) {
+            t = t->next;
+            continue;
+        }
         if (t->state == KERN_TASK_READY) {
             uint8_t tid = t->cpu_id;
             /* CPU 亲和性检查：KERN_CPU_ANY 或匹配本核心 */
