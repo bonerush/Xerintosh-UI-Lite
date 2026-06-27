@@ -1,3 +1,12 @@
+/**
+ * @file   kern_task_notify.h
+ * @brief  Xeros 任务通知接口头文件
+ * @details 定义任务通知的枚举、初始化及公共 API。
+ *          任务通知是一种轻量级同步机制，用于任务间发送信号或传递 32 位值。
+ *
+ * @copyright Copyright (c) 2026
+ */
+
 #ifndef KERN_TASK_NOTIFY_H
 #define KERN_TASK_NOTIFY_H
 
