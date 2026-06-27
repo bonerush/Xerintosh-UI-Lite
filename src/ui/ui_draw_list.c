@@ -120,11 +120,15 @@ static void xerintosh_draw_list_appearance(int16_t selected_index, int16_t child
  */
 static void xerintosh_draw_list_item()
 {
+  xerintosh_list_item_t *sel = g_xerintosh_selector.selected_item;
+  if (sel == NULL || sel->parent == NULL) return;
+  if (sel->parent->child_num == 0) return;
+
   xerintosh_set_font(hal_get_cn_font());
   int16_t _font_h = hal_get_font_height();
   int16_t _font_h_2 = _font_h / 2;
 
-  for (unsigned char i = 0; i < g_xerintosh_selector.selected_item->parent->child_num; i++)
+  for (unsigned char i = 0; i < sel->parent->child_num; i++)
   {
     xerintosh_list_item_t *_item = g_xerintosh_selector.selected_item->parent->child_list_item[i];
     int16_t _x_list_item = g_xerintosh_camera.x_camera + LIST_ITEM_LEFT_MARGIN;
@@ -257,8 +261,10 @@ void xerintosh_draw_long_press_hint(uint32_t duration_ms, uint32_t threshold_ms)
  */
 void xerintosh_draw_list()
 {
+  xerintosh_list_item_t *sel = g_xerintosh_selector.selected_item;
+  if (sel == NULL || sel->parent == NULL) return;
   xerintosh_draw_list_appearance(g_xerintosh_selector.selected_index,
-                                g_xerintosh_selector.selected_item->parent->child_num);
+                                 sel->parent->child_num);
   xerintosh_draw_list_item();
   xerintosh_draw_selector();
   xerintosh_draw_slider_overlays();

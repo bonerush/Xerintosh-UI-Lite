@@ -202,10 +202,19 @@ void xerintosh_refresh_camera_position()
 static void xerintosh_init_list()
 {
   /* 做动画：子项从屏幕外滑入 */
-  for (uint8_t i = 0; i < xerintosh_get_root_list()->child_num; i++)
-    xerintosh_get_root_list()->child_list_item[i]->y_list_item = 0;
-  g_xerintosh_selector.selected_index = 0;
-  g_xerintosh_selector.selected_item = xerintosh_get_root_list()->child_list_item[0];
+  xerintosh_list_item_t *root = xerintosh_get_root_list();
+  if (root != NULL && root->child_num > 0)
+  {
+    for (uint8_t i = 0; i < root->child_num; i++)
+      root->child_list_item[i]->y_list_item = 0;
+    g_xerintosh_selector.selected_index = 0;
+    g_xerintosh_selector.selected_item = root->child_list_item[0];
+  }
+  else
+  {
+    g_xerintosh_selector.selected_index = 0;
+    g_xerintosh_selector.selected_item = NULL;
+  }
   g_xerintosh_selector.y_selector = HAL_SCREEN_HEIGHT;
   g_xerintosh_selector.h_selector = HAL_SCREEN_HEIGHT;
 }
@@ -228,7 +237,7 @@ void xerintosh_init_core()
 void xerintosh_refresh_list_item_position()
 {
   xerintosh_list_item_t *sel = g_xerintosh_selector.selected_item;
-  if (sel == NULL || sel->parent == NULL) return;
+  if (sel == NULL || sel->parent == NULL || sel->parent->child_num == 0) return;
 
   for (uint8_t i = 0; i < sel->parent->child_num; i++)
     xerintosh_animation(&sel->parent->child_list_item[i]->y_list_item,
