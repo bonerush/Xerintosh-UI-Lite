@@ -115,6 +115,93 @@ static void xerintosh_draw_list_appearance(int16_t selected_index, int16_t child
 
 /* ═══ 列表项与文字绘制 ═══ */
 
+static bool item_text_is_visible(int16_t y_center)
+{
+  int16_t _font_h_2 = hal_get_font_height() / 2;
+  return (y_center + _font_h_2 > LIST_INFO_BAR_HEIGHT &&
+          y_center + _font_h_2 < HAL_SCREEN_HEIGHT);
+}
+
+static int16_t item_compute_avail_width(xerintosh_list_item_t *_item)
+{
+  bool _has_right_control = xerintosh_dispatch_has_right_control(_item);
+  int16_t _right_margin = _has_right_control ? LIST_ITEM_RIGHT_MARGIN : 4;
+  int16_t _avail_width = HAL_SCREEN_WIDTH - LIST_ITEM_LEFT_MARGIN - 10 - _right_margin;
+
+  if (_has_right_control)
+    _avail_width -= 11;
+
+  if (_avail_width < 1)
+    _avail_width = 1;
+
+  return _avail_width;
+}
+
+static float item_compute_scroll_x(xerintosh_list_item_t *_item,
+                                    int16_t text_width, int16_t avail_width)
+{
+  bool _is_selected = (_item == g_xerintosh_selector.selected_item);
+  if (!_is_selected || text_width <= avail_width) {
+    _item->is_scrolling = false;
+    return 0.0f;
+  }
+
+  if (!_item->is_scrolling) {
+    _item->is_scrolling = true;
+    _item->scroll_start_time = hal_get_ticks();
+  }
+  uint32_t _elapsed = hal_get_ticks() - _item->scroll_start_time;
+
+  /* 文字滚动期间每帧都需清屏重绘，否则旧像素残留造成残影 */
+  xerintosh_invalidate();
+
+  return xerintosh_compute_scroll_offset(text_width, avail_width, true, _elapsed);
+}
+
+static void item_draw_text_scroll(xerintosh_list_item_t *_item,
+                                   int16_t _x_list_item, int16_t _y_list_item)
+{
+  int16_t _font_h = hal_get_font_height();
+  int16_t _font_h_2 = _font_h / 2;
+
+  if (!item_text_is_visible(_y_list_item + _font_h_2)) return;
+
+  int16_t _text_width = hal_get_string_width(_item->content);
+  int16_t _avail_width = item_compute_avail_width(_item);
+  float _scroll_x = item_compute_scroll_x(_item, _text_width, _avail_width);
+
+  int16_t _clip_x = LIST_ITEM_LEFT_MARGIN + 10;
+  int16_t _clip_y = _y_list_item - _font_h_2 - 2;
+  int16_t _clip_h = _font_h + 4;
+  hal_set_clip_rect(_clip_x, _clip_y, _avail_width, _clip_h);
+
+  int16_t _cycle_dist = _text_width + _avail_width;
+  int16_t _draw_x = _clip_x - (int16_t)_scroll_x;
+
+  /* 绘制两份相同文字，形成无缝循环跑马灯 */
+  hal_draw_string(_draw_x,
+                  _y_list_item + _font_h_2,
+                  _item->content, g_xerintosh_draw_color);
+  hal_draw_string(_draw_x + _cycle_dist,
+                  _y_list_item + _font_h_2,
+                  _item->content, g_xerintosh_draw_color);
+
+  hal_clear_clip_rect();
+}
+
+static void draw_single_item(xerintosh_list_item_t *_item,
+                              int16_t _x_list_item, int16_t _y_list_item)
+{
+  g_xerintosh_draw_color = COLOR_FG;
+  xerintosh_dispatch_draw(_item, _x_list_item, _y_list_item);
+
+  if (_item->icon == custom_icon && _item->bitmap_data != NULL) {
+    xerintosh_draw_item_bitmap(_item, _x_list_item, _y_list_item);
+  }
+
+  item_draw_text_scroll(_item, _x_list_item, _y_list_item);
+}
+
 /**
  * @brief 绘制当前可见的所有列表项（含图标、文字、滚动效果）
  */
@@ -130,74 +217,11 @@ static void xerintosh_draw_list_item()
 
   for (unsigned char i = 0; i < sel->parent->child_num; i++)
   {
-    xerintosh_list_item_t *_item = g_xerintosh_selector.selected_item->parent->child_list_item[i];
+    xerintosh_list_item_t *_item = sel->parent->child_list_item[i];
     int16_t _x_list_item = g_xerintosh_camera.x_camera + LIST_ITEM_LEFT_MARGIN;
     int16_t _y_list_item = _item->y_list_item + g_xerintosh_camera.y_camera - _font_h_2;
 
-    /* 根据类型分发到对应的绘制函数 */
-    g_xerintosh_draw_color = COLOR_FG;
-    xerintosh_dispatch_draw(_item, _x_list_item, _y_list_item);
-
-    /* 自定义位图图标补充绘制 */
-    if (_item->icon == custom_icon && _item->bitmap_data != NULL) {
-      xerintosh_draw_item_bitmap(_item, _x_list_item, _y_list_item);
-    }
-
-    /* ═══ 文字绘制与滚动效果 ═══ */
-    if (_y_list_item + _font_h_2 > LIST_INFO_BAR_HEIGHT &&
-        _y_list_item + _font_h_2 < HAL_SCREEN_HEIGHT)
-    {
-      int16_t _text_width = hal_get_string_width(_item->content);
-      bool _has_right_control = xerintosh_dispatch_has_right_control(_item);
-      int16_t _right_margin = _has_right_control ? LIST_ITEM_RIGHT_MARGIN : 4;
-      int16_t _avail_width = HAL_SCREEN_WIDTH - LIST_ITEM_LEFT_MARGIN - 10 - _right_margin;
-
-      /* switch/slider 额外占用右侧控件空间 */
-      if (_has_right_control)
-        _avail_width -= 11;
-
-      /* 防御性钳位：可用宽度不得为负，避免传给 HAL 裁剪函数行为未定义 */
-      if (_avail_width < 1)
-        _avail_width = 1;
-
-      bool _is_selected = (_item == g_xerintosh_selector.selected_item);
-      float _scroll_x = 0.0f;
-
-      /* 计算文字循环滚动偏移 */
-      if (_is_selected && _text_width > _avail_width) {
-        if (!_item->is_scrolling) {
-          _item->is_scrolling = true;
-          _item->scroll_start_time = hal_get_ticks();
-        }
-        uint32_t _elapsed = hal_get_ticks() - _item->scroll_start_time;
-        _scroll_x = xerintosh_compute_scroll_offset(_text_width, _avail_width, true, _elapsed);
-
-        /* 文字滚动期间每帧都需清屏重绘，否则旧像素残留造成残影 */
-        xerintosh_invalidate();
-      } else {
-        _item->is_scrolling = false;
-      }
-
-      /* 设置裁剪区域：限制文字只在 icon 右侧到控件左侧之间显示 */
-      int16_t _clip_x = LIST_ITEM_LEFT_MARGIN + 10;
-      int16_t _clip_y = _y_list_item - _font_h_2 - 2;
-      int16_t _clip_h = _font_h + 4;
-      hal_set_clip_rect(_clip_x, _clip_y, _avail_width, _clip_h);
-
-      int16_t _cycle_dist = _text_width + _avail_width;
-      int16_t _draw_x = _clip_x - (int16_t)_scroll_x;
-
-      /* 绘制两份相同文字，形成无缝循环跑马灯 */
-      hal_draw_string(_draw_x,
-                     _y_list_item + _font_h_2,
-                     _item->content, g_xerintosh_draw_color);
-      hal_draw_string(_draw_x + _cycle_dist,
-                     _y_list_item + _font_h_2,
-                     _item->content, g_xerintosh_draw_color);
-
-      hal_clear_clip_rect();
-      /* ═══════════════════════ */
-    }
+    draw_single_item(_item, _x_list_item, _y_list_item);
   }
 
   g_xerintosh_refresh_list_value = false;
