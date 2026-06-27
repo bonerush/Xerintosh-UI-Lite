@@ -208,3 +208,24 @@ TEST_F(UiCoreFixesTest, InitCoreHandlesEmptyRoot)
     EXPECT_NO_FATAL_FAILURE(xerintosh_init_core());
     EXPECT_EQ(g_xerintosh_selector.selected_item, nullptr);
 }
+
+/* ═══ U7: 选择器绑定后速度复位 ═══ */
+TEST_F(UiCoreFixesTest, SelectorVelocitiesResetAfterBind)
+{
+    xerintosh_list_item_t *root = xerintosh_get_root_list();
+    xerintosh_list_item_t *a = xerintosh_new_list_item("A", list_icon);
+    ASSERT_NE(a, nullptr);
+    EXPECT_TRUE(xerintosh_push_item_to_list(root, a));
+
+    g_xerintosh_selector.v_y_selector = 1.0f;
+    g_xerintosh_selector.v_w_selector = 2.0f;
+    g_xerintosh_selector.v_h_selector = 3.0f;
+
+    xerintosh_bind_item_to_selector(a);
+
+    EXPECT_FLOAT_EQ(g_xerintosh_selector.v_y_selector, 0.0f);
+    EXPECT_FLOAT_EQ(g_xerintosh_selector.v_w_selector, 0.0f);
+    EXPECT_FLOAT_EQ(g_xerintosh_selector.v_h_selector, 0.0f);
+
+    xerintosh_clear_children_of_list(root);
+}

@@ -16,6 +16,17 @@
 /* ═══ 选择器 ═══ */
 
 /**
+ * @brief  复位选择器弹簧动画速度
+ * @note   在切换目标、边界跳转、菜单回退等场景调用，防止旧速度影响新目标。
+ */
+static void selector_reset_velocity(void)
+{
+    g_xerintosh_selector.v_y_selector = 0.0f;
+    g_xerintosh_selector.v_w_selector = 0.0f;
+    g_xerintosh_selector.v_h_selector = 0.0f;
+}
+
+/**
  * @brief  在父项的子项列表中查找目标项的索引
  * @param  _parent 父项指针
  * @param  _target 目标子项指针
@@ -90,9 +101,7 @@ void xerintosh_selector_go_next_item()
     g_xerintosh_selector.selected_item = children[0];
     g_xerintosh_selector.selected_index = 0;
     /* 弹簧动画：边界跳转时清零速度 */
-    g_xerintosh_selector.v_y_selector = 0.0f;
-    g_xerintosh_selector.v_w_selector = 0.0f;
-    g_xerintosh_selector.v_h_selector = 0.0f;
+    selector_reset_velocity();
     return;
   }
 
@@ -125,9 +134,7 @@ void xerintosh_selector_go_prev_item()
     g_xerintosh_selector.selected_item = children[count - 1];
     g_xerintosh_selector.selected_index = count - 1;
     /* 弹簧动画：边界跳转时清零速度 */
-    g_xerintosh_selector.v_y_selector = 0.0f;
-    g_xerintosh_selector.v_w_selector = 0.0f;
-    g_xerintosh_selector.v_h_selector = 0.0f;
+    selector_reset_velocity();
     return;
   }
 
