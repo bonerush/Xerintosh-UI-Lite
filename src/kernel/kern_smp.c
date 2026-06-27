@@ -10,6 +10,7 @@
 
 #include "kern_smp.h"
 #include "kern_init.h"
+#include "esp32/core_start.h"
 
 /* ═══ Per-CPU 数组定义（总是存在） ═══ */
 
@@ -17,8 +18,6 @@ kern_per_cpu_t g_per_cpu[KERN_MAX_CPUS];
 
 #ifdef CONFIG_SMP_ENABLED
 
-#include <freertos/FreeRTOS.h>
-#include <freertos/task.h>
 #include <esp_cpu.h>
 #include <esp_ipc_isr.h>
 
@@ -65,22 +64,7 @@ void kern_smp_init(void)
 void kern_smp_start_core(uint8_t cpu_id, void (*entry)(void *arg))
 {
     if (cpu_id >= KERN_MAX_CPUS) return;
-
-    BaseType_t ret = xTaskCreatePinnedToCore(
-        (TaskFunction_t)entry,
-        "xeros_smp",
-        4096,
-        NULL,
-        tskIDLE_PRIORITY + 2,
-        NULL,
-        cpu_id
-    );
-
-    if (ret != pdPASS) {
-        kern_log(KERN_LOG_WARN, "SMP: failed to start core %d scheduler", cpu_id);
-    } else {
-        kern_log(KERN_LOG_INFO, "SMP: core %d scheduler started", cpu_id);
-    }
+    xeros_core_start(cpu_id, entry);
 }
 
 /* ═══ CPU 分配策略 ═══ */
