@@ -1,3 +1,12 @@
+/**
+ * @file   user_item_contract.h
+ * @brief  user_item App 生命周期契约
+ * @details 显式声明 user_item 三函数生命周期类型与注册表项结构，
+ *          供菜单注册与编译期签名检查使用。
+ *
+ * @copyright Copyright (c) 2026
+ */
+
 #ifndef USER_ITEM_CONTRACT_H
 #define USER_ITEM_CONTRACT_H
 
