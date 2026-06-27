@@ -2,6 +2,7 @@
 #include "kern_sync.h"
 #include "kern_sched.h"
 #include "kern_init.h"
+#include "kern_task.h"
 
 #include <string.h>
 
@@ -21,11 +22,22 @@ typedef struct {
 static kern_timer_t    *s_timer_list = NULL;
 static xeros_spinlock_t s_timer_lock;
 static bool             s_timer_inited = false;
+static kern_pid_t       s_timerd_pid = -1;
 
 static kern_timer_cmd_t s_cmd_queue[KERN_TIMER_CMD_QUEUE_LEN];
 static volatile uint8_t s_cmd_head = 0;
 static volatile uint8_t s_cmd_tail = 0;
 static xeros_spinlock_t s_cmd_lock;
+
+static void timerd_wakeup(void)
+{
+    if (s_timerd_pid < 0) return;
+    kern_task_t *task = kern_task_get(s_timerd_pid);
+    if (task == NULL) return;
+    if (task->state != KERN_TASK_RUNNING && task->state != KERN_TASK_READY) {
+        task->state = KERN_TASK_READY;
+    }
+}
 
 static kern_err_t timer_cmd_enqueue(kern_timer_cmd_type_t type, kern_timer_t *timer)
 {
@@ -39,6 +51,8 @@ static kern_err_t timer_cmd_enqueue(kern_timer_cmd_type_t type, kern_timer_t *ti
     s_cmd_queue[s_cmd_tail].timer = timer;
     s_cmd_tail = next;
     xeros_spinlock_unlock(&s_cmd_lock);
+
+    timerd_wakeup();
     return KERN_OK;
 }
 
@@ -55,6 +69,8 @@ kern_err_t kern_timer_init(void)
     kern_pid_t pid = kern_spawn("timerd", timer_daemon_entry, NULL, 2048);
     if (pid < 0) {
         kern_log(KERN_LOG_WARN, "timer daemon spawn failed");
+    } else {
+        s_timerd_pid = pid;
     }
 
     s_timer_inited = true;
@@ -168,6 +184,18 @@ static void timer_process_expired(void)
         }
     }
     xeros_spinlock_unlock(&s_timer_lock);
+}
+
+void kern_timer_reset_all(void)
+{
+    xeros_spinlock_lock(&s_timer_lock);
+    s_timer_list = NULL;
+    xeros_spinlock_unlock(&s_timer_lock);
+
+    xeros_spinlock_lock(&s_cmd_lock);
+    s_cmd_head = 0;
+    s_cmd_tail = 0;
+    xeros_spinlock_unlock(&s_cmd_lock);
 }
 
 void kern_timer_process(void)

@@ -118,7 +118,7 @@ kern_pid_t kern_spawn(const char *name, void (*entry)(void *arg),
     if (entry == NULL) return KERN_EINVAL;
     if (g_task_count >= MAX_TASKS) return KERN_ENOSPC;
 
-    kern_sched_init();
+    kern_sched_ensure_initialized();
 
     kern_task_t *task = task_create_common(name, entry, arg);
     if (task == NULL) return KERN_ENOMEM;
@@ -158,7 +158,7 @@ kern_pid_t kern_spawn(const char *name, void (*entry)(void *arg),
     if (entry == NULL) return KERN_EINVAL;
     if (g_task_count >= MAX_TASKS) return KERN_ENOSPC;
 
-    kern_sched_init();
+    kern_sched_ensure_initialized();
 
     kern_task_t *task = task_create_common(name, entry, arg);
     if (task == NULL) return KERN_ENOMEM;
@@ -198,7 +198,7 @@ kern_pid_t kern_spawn(const char *name, void (*entry)(void *arg),
     if (entry == NULL) return KERN_EINVAL;
     if (g_task_count >= MAX_TASKS) return KERN_ENOSPC;
 
-    kern_sched_init();
+    kern_sched_ensure_initialized();
 
     kern_task_t *task = task_create_common(name, entry, arg);
     if (task == NULL) return KERN_ENOMEM;

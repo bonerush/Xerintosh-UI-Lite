@@ -168,6 +168,7 @@ static void sched_fifo_tick(kern_task_t *current)
 static void sched_fifo_prio_changed(kern_task_t *task, uint8_t old_prio)
 {
     if (task == NULL) return;
+    if (task->scheduler_class_id != sched_class_fifo.class_id) return;
     /* 移除再按新优先级重新插入 */
     sched_fifo_dequeue(task);
     sched_fifo_enqueue(task);

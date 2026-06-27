@@ -34,6 +34,7 @@ kern_err_t kern_timer_start(kern_timer_t *timer);
 kern_err_t kern_timer_stop(kern_timer_t *timer);
 kern_err_t kern_timer_reset(kern_timer_t *timer);
 void       kern_timer_process(void);
+void       kern_timer_reset_all(void);
 
 #ifdef __cplusplus
 }

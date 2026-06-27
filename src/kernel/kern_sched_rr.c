@@ -160,12 +160,11 @@ static kern_task_t *sched_rr_pick_next(void)
 
     task_list_unlock();
 
-    /* 无亲和性匹配任务：返回本核心 idle 任务（idle 始终 READY/RUNNING 且绑定本核心） */
+    /* 无亲和性匹配任务：返回本核心 idle 任务（idle 始终 READY/RUNNING 且绑定本核心）。
+     * 注意：这里不修改 idle 状态，由调度器在真正切换时统一设置，避免 yield 后
+     * g_current_task 仍指向 idle 时 pick_next 把 idle 标成 RUNNING 导致无法切回。 */
     kern_task_t *idle = g_per_cpu[cpu].idle_task;
     if (idle != NULL && (idle->state == KERN_TASK_READY || idle->state == KERN_TASK_RUNNING)) {
-        if (idle->state == KERN_TASK_READY) {
-            idle->state = KERN_TASK_RUNNING;
-        }
         return idle;
     }
     return NULL;
