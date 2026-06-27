@@ -23,7 +23,7 @@
 | kernel | DONE | [kernel.md](02-refactor/kernel.md) |
 | hal | DONE | [hal.md](02-refactor/hal.md) |
 | ui | DONE | [ui.md](02-refactor/ui.md) |
-| app | PENDING | [app.md](02-refactor/app.md) |
+| app | RUNNING | [app.md](02-refactor/app.md) |
 | docs | PENDING | [docs.md](02-refactor/docs.md) |
 
 ## 状态说明
