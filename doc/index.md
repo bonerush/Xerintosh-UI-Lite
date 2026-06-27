@@ -20,8 +20,10 @@ Xerintosh 项目
 │   └── *（文档待补充）*
 ├── 应用层 (src/app/)
 │   └── [App 层文档](app/index.md)
-└── UI 框架 (src/ui/)
-    └── [UI 核心框架](ui/index.md)
+├── UI 框架 (src/ui/)
+│   └── [UI 核心框架](ui/index.md)
+└── 可视化工具 (doc/superpowers/visualizer/)
+    └── [Xeros 内核流程可视化器](superpowers/visualizer/index.html)
 ```
 
 ## Xeros 内核特性矩阵（v3.0.0）
@@ -64,6 +66,7 @@ Xerintosh 项目
 - **[App 层](app/index.md)** — 菜单构建、user_item 契约、设置转换
 - **[API 模板教程](tutorials/api-templates.md)** — 常用 API 模板与常见陷阱
 - **[参考资料](reference/index.md)** — FreeRTOS Xtensa port 源码与 Xtensa ABI 文档
+- **[Xeros 内核流程可视化器](superpowers/visualizer/index.html)** — 交互式 SVG 动画演示：启动、上下文切换、调度、SMP/IPI、同步原语、VFS、中断、内存分配、寄存器配置、Shell 执行
 
 ## 快速链接
 
@@ -75,6 +78,7 @@ Xerintosh 项目
 | [IPC 原语](architecture/ipc-primitives.md) | 任务间通信 | 信号量、互斥锁、队列、事件组 |
 | [实施计划](implementation-plan.md) | 任务分解和时间线 | 8 阶段、风险评估、测试策略 |
 | [FreeRTOS 剩余引用清单](freertos-remaining-references.md) | 依赖审计 | 剩余引用分类与改造建议 |
+| [Xeros 内核流程可视化器](superpowers/visualizer/index.html) | 交互式流程演示 | 10 个内核模块动画、寄存器面板、源码跳转 |
 
 ## 当前项目状态
 
