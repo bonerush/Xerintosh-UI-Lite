@@ -22,26 +22,22 @@
 #include <ucontext.h>
 #endif
 
-/* ═══ 任务创建 ═══ */
+/* ═══ 任务创建公共辅助函数 ═══ */
 
-#ifdef NATIVE_TEST
-
-kern_pid_t kern_spawn(const char *name, void (*entry)(void *arg),
-                       void *arg, size_t stack_min)
+static kern_task_t *task_create_common(const char *name,
+                                       void (*entry)(void *arg),
+                                       void *arg)
 {
-    if (entry == NULL) return KERN_EINVAL;
-    if (g_task_count >= MAX_TASKS) return KERN_ENOSPC;
-
-    kern_sched_init();
-
     kern_task_t *task = (kern_task_t *)calloc(1, sizeof(kern_task_t));
-    if (task == NULL) return KERN_ENOMEM;
+    if (task == NULL) {
+        return NULL;
+    }
 
     task->pid = g_next_pid++;
     task->state = KERN_TASK_READY;
     task->priority = 128;
     task->timeslice_remaining = SCHED_RR_DEFAULT_TIMESLICE;
-    task->scheduler_class_id = -1;
+    task->scheduler_class_id = KERN_SCHED_CLASS_RR_ID;
     task->cpu_id = KERN_CPU_ANY;
 #ifdef CONFIG_SMP_ENABLED
     task->cpu_id = kern_smp_migrate_assign();
@@ -59,8 +55,68 @@ kern_pid_t kern_spawn(const char *name, void (*entry)(void *arg),
     /* 初始化每任务文件描述符表 */
     memset(task->fd_table, 0, sizeof(task->fd_table));
 
-    /* 默认加入 RR 调度类 */
-    task->scheduler_class_id = KERN_SCHED_CLASS_RR_ID;
+    return task;
+}
+
+static void task_list_append(kern_task_t *task)
+{
+    if (task == NULL) {
+        return;
+    }
+
+#ifdef CONFIG_SMP_ENABLED
+    while (__sync_lock_test_and_set(&g_task_list_lock, true)) {
+        asm volatile ("nop");
+    }
+#endif
+    if (g_task_list == NULL) {
+        g_task_list = task;
+        g_task_list_tail = task;
+    } else {
+        if (g_task_list_tail != NULL) {
+            g_task_list_tail->next = task;
+        } else {
+            /* 尾指针未初始化：回退 O(n) 遍历 */
+            kern_task_t *t = g_task_list;
+            while (t->next != NULL) t = t->next;
+            t->next = task;
+        }
+        g_task_list_tail = task;
+    }
+    g_task_count++;
+#ifdef CONFIG_SMP_ENABLED
+    __sync_lock_release(&g_task_list_lock);
+#endif
+}
+
+static void task_enqueue_to_class(kern_task_t *task)
+{
+    if (task == NULL
+        || task->scheduler_class_id < 0
+        || task->scheduler_class_id >= KERN_SCHED_MAX_CLASSES) {
+        return;
+    }
+
+    kern_sched_class_t *cls = g_sched_classes[task->scheduler_class_id];
+    if (cls != NULL && cls->enqueue != NULL) {
+        cls->enqueue(task);
+    }
+}
+
+/* ═══ 任务创建 ═══ */
+
+#ifdef NATIVE_TEST
+
+kern_pid_t kern_spawn(const char *name, void (*entry)(void *arg),
+                       void *arg, size_t stack_min)
+{
+    if (entry == NULL) return KERN_EINVAL;
+    if (g_task_count >= MAX_TASKS) return KERN_ENOSPC;
+
+    kern_sched_init();
+
+    kern_task_t *task = task_create_common(name, entry, arg);
+    if (task == NULL) return KERN_ENOMEM;
 
     size_t stack_sz = (stack_min > 0) ? stack_min : (size_t)KERN_STACK_MIN;
     task_stack_init(task, stack_sz);
@@ -82,38 +138,8 @@ kern_pid_t kern_spawn(const char *name, void (*entry)(void *arg),
 
     kern_mpu_setup_stack_guard(task, task->stack_base, task->stack_size);
 
-    /* 挂载到任务链表尾部（O(1) 尾追加） */
-#ifdef CONFIG_SMP_ENABLED
-    while (__sync_lock_test_and_set(&g_task_list_lock, true)) {
-        asm volatile ("nop");
-    }
-#endif
-    if (g_task_list == NULL) {
-        g_task_list = task;
-        g_task_list_tail = task;
-    } else {
-        if (g_task_list_tail != NULL) {
-            g_task_list_tail->next = task;
-        } else {
-            /* 尾指针未初始化：回退 O(n) 遍历 */
-            kern_task_t *t = g_task_list;
-            while (t->next != NULL) t = t->next;
-            t->next = task;
-        }
-        g_task_list_tail = task;
-    }
-    g_task_count++;
-#ifdef CONFIG_SMP_ENABLED
-    __sync_lock_release(&g_task_list_lock);
-#endif
-
-    /* 加入对应调度类的任务链表，使 pick_next_ready 能选到新任务 */
-    if (task->scheduler_class_id >= 0 && task->scheduler_class_id < KERN_SCHED_MAX_CLASSES) {
-        kern_sched_class_t *cls = g_sched_classes[task->scheduler_class_id];
-        if (cls != NULL && cls->enqueue != NULL) {
-            cls->enqueue(task);
-        }
-    }
+    task_list_append(task);
+    task_enqueue_to_class(task);
 
     kern_log(KERN_LOG_DEBUG, "spawned task %d: %s", task->pid, task->name);
     return task->pid;
@@ -129,33 +155,8 @@ kern_pid_t kern_spawn(const char *name, void (*entry)(void *arg),
 
     kern_sched_init();
 
-    kern_task_t *task = (kern_task_t *)calloc(1, sizeof(kern_task_t));
+    kern_task_t *task = task_create_common(name, entry, arg);
     if (task == NULL) return KERN_ENOMEM;
-
-    task->pid = g_next_pid++;
-    task->state = KERN_TASK_READY;
-    task->priority = 128;
-    task->timeslice_remaining = SCHED_RR_DEFAULT_TIMESLICE;
-    task->scheduler_class_id = -1;
-    task->cpu_id = KERN_CPU_ANY;
-#ifdef CONFIG_SMP_ENABLED
-    task->cpu_id = kern_smp_migrate_assign();
-#endif
-    task->entry = entry;
-    task->arg = arg;
-
-    if (name != NULL) {
-        strncpy(task->name, name, KERN_TASK_NAME_LEN);
-        task->name[KERN_TASK_NAME_LEN] = '\0';
-    } else {
-        snprintf(task->name, KERN_TASK_NAME_LEN, "task_%d", task->pid);
-    }
-
-    /* 初始化每任务文件描述符表 */
-    memset(task->fd_table, 0, sizeof(task->fd_table));
-
-    /* 默认加入 RR 调度类 */
-    task->scheduler_class_id = KERN_SCHED_CLASS_RR_ID;
 
     /* 初始化任务私有栈与原生上下文 */
     size_t stack_sz = (stack_min > 0) ? stack_min : (size_t)KERN_STACK_MIN;
@@ -174,38 +175,8 @@ kern_pid_t kern_spawn(const char *name, void (*entry)(void *arg),
 
     kern_mpu_setup_stack_guard(task, task->stack_base, task->stack_size);
 
-    /* 挂载到任务链表尾部（O(1) 尾追加） */
-#ifdef CONFIG_SMP_ENABLED
-    while (__sync_lock_test_and_set(&g_task_list_lock, true)) {
-        asm volatile ("nop");
-    }
-#endif
-    if (g_task_list == NULL) {
-        g_task_list = task;
-        g_task_list_tail = task;
-    } else {
-        if (g_task_list_tail != NULL) {
-            g_task_list_tail->next = task;
-        } else {
-            /* 尾指针未初始化：回退 O(n) 遍历 */
-            kern_task_t *t = g_task_list;
-            while (t->next != NULL) t = t->next;
-            t->next = task;
-        }
-        g_task_list_tail = task;
-    }
-    g_task_count++;
-#ifdef CONFIG_SMP_ENABLED
-    __sync_lock_release(&g_task_list_lock);
-#endif
-
-    /* 加入对应调度类的任务链表，使 pick_next_ready 能选到新任务 */
-    if (task->scheduler_class_id >= 0 && task->scheduler_class_id < KERN_SCHED_MAX_CLASSES) {
-        kern_sched_class_t *cls = g_sched_classes[task->scheduler_class_id];
-        if (cls != NULL && cls->enqueue != NULL) {
-            cls->enqueue(task);
-        }
-    }
+    task_list_append(task);
+    task_enqueue_to_class(task);
 
     /* 若新任务绑定在另一核心，发送 IPI 使其尽快调度 */
     kern_smp_ipi_reschedule(task->cpu_id);
@@ -224,33 +195,8 @@ kern_pid_t kern_spawn(const char *name, void (*entry)(void *arg),
 
     kern_sched_init();
 
-    kern_task_t *task = (kern_task_t *)calloc(1, sizeof(kern_task_t));
+    kern_task_t *task = task_create_common(name, entry, arg);
     if (task == NULL) return KERN_ENOMEM;
-
-    task->pid = g_next_pid++;
-    task->state = KERN_TASK_READY;
-    task->priority = 128;
-    task->timeslice_remaining = SCHED_RR_DEFAULT_TIMESLICE;
-    task->scheduler_class_id = -1;
-    task->cpu_id = KERN_CPU_ANY;
-#ifdef CONFIG_SMP_ENABLED
-    task->cpu_id = kern_smp_migrate_assign();
-#endif
-    task->entry = entry;
-    task->arg = arg;
-
-    if (name != NULL) {
-        strncpy(task->name, name, KERN_TASK_NAME_LEN);
-        task->name[KERN_TASK_NAME_LEN] = '\0';
-    } else {
-        snprintf(task->name, KERN_TASK_NAME_LEN, "task_%d", task->pid);
-    }
-
-    /* 初始化每任务文件描述符表 */
-    memset(task->fd_table, 0, sizeof(task->fd_table));
-
-    /* 默认加入 RR 调度类 */
-    task->scheduler_class_id = KERN_SCHED_CLASS_RR_ID;
 
     /* 通过可移植层创建底层线程承载此 Xeros 任务 */
     size_t stack_sz = (stack_min > 0) ? stack_min : (size_t)KERN_PORT_STACK_MIN;
@@ -272,38 +218,8 @@ kern_pid_t kern_spawn(const char *name, void (*entry)(void *arg),
         return KERN_ENOMEM;
     }
 
-    /* 挂载到任务链表尾部（O(1) 尾追加） */
-#ifdef CONFIG_SMP_ENABLED
-    while (__sync_lock_test_and_set(&g_task_list_lock, true)) {
-        asm volatile ("nop");
-    }
-#endif
-    if (g_task_list == NULL) {
-        g_task_list = task;
-        g_task_list_tail = task;
-    } else {
-        if (g_task_list_tail != NULL) {
-            g_task_list_tail->next = task;
-        } else {
-            /* 尾指针未初始化：回退 O(n) 遍历 */
-            kern_task_t *t = g_task_list;
-            while (t->next != NULL) t = t->next;
-            t->next = task;
-        }
-        g_task_list_tail = task;
-    }
-    g_task_count++;
-#ifdef CONFIG_SMP_ENABLED
-    __sync_lock_release(&g_task_list_lock);
-#endif
-
-    /* 加入对应调度类的任务链表，使 pick_next_ready 能选到新任务 */
-    if (task->scheduler_class_id >= 0 && task->scheduler_class_id < KERN_SCHED_MAX_CLASSES) {
-        kern_sched_class_t *cls = g_sched_classes[task->scheduler_class_id];
-        if (cls != NULL && cls->enqueue != NULL) {
-            cls->enqueue(task);
-        }
-    }
+    task_list_append(task);
+    task_enqueue_to_class(task);
 
     kern_mpu_setup_stack_guard(task, task->stack_base, task->stack_size);
 

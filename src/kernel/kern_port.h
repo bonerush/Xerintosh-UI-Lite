@@ -82,9 +82,9 @@ typedef struct kern_port_ops {
     void  (*idle)(void);
 
     /* 定时器基础设施（抢占式调度用） */
-    int   (*timer_set_periodic)(uint32_t period_us);
-    void  (*timer_stop)(void);
-    bool  (*preempt_consume)(void);  /* 检查并消费 ISR 抢占 tick 请求 */
+    kern_err_t (*timer_set_periodic)(uint32_t period_us);
+    void      (*timer_stop)(void);
+    bool      (*preempt_consume)(void);  /* 检查并消费 ISR 抢占 tick 请求 */
 } kern_port_ops_t;
 
 /**
@@ -205,12 +205,12 @@ static inline void kern_port_idle(void)
 
 /**
  * @brief  启动周期性硬件定时器（抢占式调度 ISR 源）
- * @param  period_us 周期（微秒）
- * @return 0 成功，< 0 失败
+ * @param  period_us 周期（微秒），必须大于 0
+ * @return KERN_OK 成功，KERN_EINVAL 参数无效，KERN_ERR 其他失败
  * @note   ISR 仅设置内部抢占标志，不执行调度逻辑。
  *         实际调度由 loop() 中 kern_port_preempt_consume() 触发。
  */
-static inline int kern_port_timer_set_periodic(uint32_t period_us)
+static inline kern_err_t kern_port_timer_set_periodic(uint32_t period_us)
 {
     return g_kern_port_ops.timer_set_periodic(period_us);
 }

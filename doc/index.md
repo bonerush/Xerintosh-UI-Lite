@@ -17,8 +17,11 @@ Xerintosh 项目
 │   ├── [实施计划](implementation-plan.md) ← 8 阶段任务分解
 │   └── [迁移策略](architecture/migration-strategy.md)
 ├── HAL 层 (src/hal/)
+│   └── *（文档待补充）*
 ├── 应用层 (src/app/)
+│   └── [App 层文档](app/index.md)
 └── UI 框架 (src/ui/)
+    └── [UI 核心框架](ui/index.md)
 ```
 
 ## 文档树
@@ -34,6 +37,9 @@ Xerintosh 项目
 - **[原生内核调试日志](debug-xeros-native.md)** — Phase 1/2 实机调试记录与踩坑总结
 - **[内核子系统](kernel/)**
   - [VFS Dentry-Tree 并发保护](kernel/vfs-concurrency.md) — 全局自旋锁保护 dentry 树与 inode 引用计数
+- **[UI 核心框架](ui/index.md)** — 菜单树、输入分派、动画与渲染
+- **[App 层](app/index.md)** — 菜单构建、user_item 契约、设置转换
+- **[API 模板教程](tutorials/api-templates.md)** — 常用 API 模板与常见陷阱
 - **[参考资料](reference/index.md)** — FreeRTOS Xtensa port 源码与 Xtensa ABI 文档
 
 ## 快速链接
@@ -59,7 +65,16 @@ Xerintosh 项目
 - **VFS 并发**: 已添加全局 `g_vfs_lock` 自旋锁保护 dentry 树与 inode 引用计数，`kern_open`/`kern_close` 等路径已加锁
 - **调度器状态修复**: 已修复 `kern_sched_tick` 未设置 RUNNING 状态、`kern_sleep_ms` yield 覆盖 SLEEPING、GPTimer tick 未启动等 bug
 - **调试工具完善**: `xeros_debug.py` 启动检测、复位序列、正则匹配已修复，支持 `--reset --wait-boot --cmd ps` 端到端自动化
+- **UI 核心重构完成**: 空指针/空列表保护、布局常量提取、`xerintosh_draw_list_item` 拆分、选择器速度复位集中化、退场动画魔法数字常量化、弹窗换行 `sizeof` 保护、脏矩形升级到区域追踪
+- **App 层重构完成**: `app_menu.c` 拆分为 `app_menu_core.c` + `app_menu_entries.c`；`user_item_contract.h` 显式化生命周期契约；`settings_level_to_hw` / `settings_hw_to_level` 集中设置项转换；`power_key_popup` 补齐 native 测试
+- **文档体系重构完成**: `doc/` 已新增 `ui/`、`app/`、`tutorials/` 索引，修复 `ui_item_core.h` 中断链引用
 - **目标**: 继续验证 UI/WiFi 实际屏幕操作（调度器层面已稳定，需用户现场确认显示渲染与 WiFi 菜单交互）
+
+## 重构记录
+
+| 日期 | 范围 | 状态 | 报告 |
+|---|---|---|---|
+| 2026-06-27 | Xeros 内核 / HAL / UI / App / 文档 | 阶段 2 完成 | [refactor/README.md](refactor/README.md) |
 
 ## 相关源文件
 

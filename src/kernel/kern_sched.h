@@ -22,12 +22,25 @@ extern "C" {
 
 #define MAX_TASKS          KERN_MAX_TASKS
 
-/* ═══ 调度器全局状态 ═══ */
+/* ═══ 调度器全局状态 ═══
+ * 注意：g_task_list / g_task_list_tail 仅应由下方访问器读写；
+ * g_current_task / g_idle_task / g_sched_ticks / g_need_resched / g_last_picked
+ * 由 kern_smp.h 以宏形式提供（per-CPU 访问）。 */
 
 extern kern_task_t   *g_task_list;        /* 任务链表头 */
 extern kern_task_t   *g_task_list_tail;   /* 任务链表尾（O(1) 追加） */
-/* g_current_task, g_idle_task, g_sched_ticks, g_need_resched, g_last_picked
-   由 kern_smp.h 以宏形式提供（per-CPU 访问） */
+
+kern_task_t *kern_task_list_head(void);
+kern_task_t *kern_task_list_tail(void);
+void         kern_task_list_set_head(kern_task_t *task);
+void         kern_task_list_set_tail(kern_task_t *task);
+
+kern_task_t *kern_current_task(void);
+void         kern_set_current_task(kern_task_t *task);
+
+uint32_t     kern_sched_ticks(void);
+void         kern_set_need_resched(bool need);
+bool         kern_need_resched(void);
 extern kern_pid_t     g_next_pid;         /* 下一个分配的 PID */
 extern uint8_t        g_task_count;       /* 任务总数 */
 
@@ -49,6 +62,11 @@ kern_task_t *pick_next_ready(void);
 void kern_sched_tick(void);
 void kern_sched_init(void);
 void idle_entry(void *arg);
+
+/* 访问器实现在 kern_sched.c 中提供，避免与 kern_task.h 的 extern 声明冲突 */
+
+/* 向后兼容：保留 kern_task_current 作为 g_current_task 的访问器 */
+static inline kern_task_t *kern_task_current_compat(void) { return g_current_task; }
 
 /* ═══ 跨文件内部辅助函数 ═══ */
 

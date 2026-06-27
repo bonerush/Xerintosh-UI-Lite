@@ -220,19 +220,20 @@ static void native_idle(void)
 
 #ifdef CONFIG_PREEMPT_ENABLED
 
-static int native_timer_set(uint32_t period_us)
+static kern_err_t native_timer_set(uint32_t period_us)
 {
+    if (period_us == 0) return KERN_EINVAL;
     if (tick_timer_is_running()) {
-        return 0;
+        return KERN_OK;
     }
     if (tick_timer_init(period_us) != 0) {
-        return -1;
+        return KERN_ERR;
     }
     if (tick_timer_start() != 0) {
         tick_timer_stop();
-        return -1;
+        return KERN_ERR;
     }
-    return 0;
+    return KERN_OK;
 }
 
 static void native_timer_stop(void)
@@ -247,10 +248,10 @@ static bool native_preempt_consume(void)
 
 #else /* !CONFIG_PREEMPT_ENABLED */
 
-static int native_timer_set(uint32_t period_us)
+static kern_err_t native_timer_set(uint32_t period_us)
 {
     (void)period_us;
-    return 0;
+    return KERN_OK;
 }
 
 static void native_timer_stop(void) {}

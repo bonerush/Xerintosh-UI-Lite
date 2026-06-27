@@ -23,7 +23,7 @@
  */
 bool xerintosh_is_item_visible(int16_t _y_item)
 {
-  return (_y_item + 2 > LIST_INFO_BAR_HEIGHT && _y_item - 2 < SCREEN_HEIGHT);
+  return (_y_item + 2 > LIST_INFO_BAR_HEIGHT && _y_item - 2 < HAL_SCREEN_HEIGHT);
 }
 
 /**
@@ -51,8 +51,8 @@ static void xerintosh_draw_slider_overlays(void)
 static void xerintosh_draw_list_appearance(int16_t selected_index, int16_t child_num)
 {
   g_xerintosh_draw_color = COLOR_FG;
-  hal_draw_h_line(0, 1, 66, g_xerintosh_draw_color);
-  hal_draw_h_line(0, 0, 67, g_xerintosh_draw_color);
+  hal_draw_h_line(0, 1, LIST_DECO_H_LINE1_LEN, g_xerintosh_draw_color);
+  hal_draw_h_line(0, 0, LIST_DECO_H_LINE2_LEN, g_xerintosh_draw_color);
 
   /* 顶部右侧装饰像素 */
   const struct
@@ -75,125 +75,152 @@ static void xerintosh_draw_list_appearance(int16_t selected_index, int16_t child
       hal_draw_pixel(i, draw_cfg[j]._y, g_xerintosh_draw_color);
 
   /* 右侧边框竖线 */
-  hal_draw_v_line(SCREEN_WIDTH - 5, 0, SCREEN_HEIGHT, g_xerintosh_draw_color);
-  hal_draw_v_line(SCREEN_WIDTH - 1, 0, SCREEN_HEIGHT, g_xerintosh_draw_color);
+  hal_draw_v_line(HAL_SCREEN_WIDTH - SCROLLBAR_LEFT_BORDER_OFFSET, 0, HAL_SCREEN_HEIGHT, g_xerintosh_draw_color);
+  hal_draw_v_line(HAL_SCREEN_WIDTH - SCROLLBAR_RIGHT_BORDER_OFFSET, 0, HAL_SCREEN_HEIGHT, g_xerintosh_draw_color);
 
   /* 滚动条 */
   static uint8_t _cached_child_num = 0;
   static int16_t _cached_screen_h = -1;
   static float _cached_length = 0;
-  if (_cached_child_num != child_num || _cached_screen_h != SCREEN_HEIGHT) {
+  if (_cached_child_num != child_num || _cached_screen_h != HAL_SCREEN_HEIGHT) {
     _cached_child_num = child_num;
-    _cached_screen_h = SCREEN_HEIGHT;
-    _cached_length = ceilf((SCREEN_HEIGHT - 10.0f) / (float)_cached_child_num);
+    _cached_screen_h = HAL_SCREEN_HEIGHT;
+    _cached_length = ceilf((HAL_SCREEN_HEIGHT - 10.0f) / (float)_cached_child_num);
   }
   float _length_each_part = _cached_length;
-  hal_draw_fill_rect(SCREEN_WIDTH - 4, 5 + selected_index * _length_each_part, 3, _length_each_part, g_xerintosh_draw_color);
+  hal_draw_fill_rect(HAL_SCREEN_WIDTH - SCROLLBAR_TRACK_X_OFFSET, 5 + selected_index * _length_each_part, SCROLLBAR_WIDTH, _length_each_part, g_xerintosh_draw_color);
 
   /* 滚动条内部高光线 */
   g_xerintosh_draw_color = COLOR_BG;
-  hal_draw_h_line(SCREEN_WIDTH - 4, _length_each_part + (float)selected_index * _length_each_part, 3, g_xerintosh_draw_color);
+  hal_draw_h_line(HAL_SCREEN_WIDTH - SCROLLBAR_TRACK_X_OFFSET, _length_each_part + (float)selected_index * _length_each_part, SCROLLBAR_WIDTH, g_xerintosh_draw_color);
 
   if (_length_each_part >= 9)
   {
-    hal_draw_h_line(SCREEN_WIDTH - 4,
-                     floorf(_length_each_part - 2.0f + (float)selected_index * _length_each_part), 3, g_xerintosh_draw_color);
-    hal_draw_h_line(SCREEN_WIDTH - 4,
-                     floorf(_length_each_part + 2.0f + (float)selected_index * _length_each_part), 3, g_xerintosh_draw_color);
+    hal_draw_h_line(HAL_SCREEN_WIDTH - SCROLLBAR_TRACK_X_OFFSET,
+                     floorf(_length_each_part - 2.0f + (float)selected_index * _length_each_part), SCROLLBAR_WIDTH, g_xerintosh_draw_color);
+    hal_draw_h_line(HAL_SCREEN_WIDTH - SCROLLBAR_TRACK_X_OFFSET,
+                     floorf(_length_each_part + 2.0f + (float)selected_index * _length_each_part), SCROLLBAR_WIDTH, g_xerintosh_draw_color);
   }
 
   /* 滚动条上下端点 */
   g_xerintosh_draw_color = COLOR_FG;
-  hal_draw_fill_rect(SCREEN_WIDTH - 4, 0, 3, 4, g_xerintosh_draw_color);
-  hal_draw_fill_rect(SCREEN_WIDTH - 4, SCREEN_HEIGHT - 4, 3, 4, g_xerintosh_draw_color);
+  hal_draw_fill_rect(HAL_SCREEN_WIDTH - SCROLLBAR_TRACK_X_OFFSET, 0, SCROLLBAR_WIDTH, SCROLLBAR_TRACK_ENDCAP_H, g_xerintosh_draw_color);
+  hal_draw_fill_rect(HAL_SCREEN_WIDTH - SCROLLBAR_TRACK_X_OFFSET, HAL_SCREEN_HEIGHT - SCROLLBAR_TRACK_ENDCAP_H, SCROLLBAR_WIDTH, SCROLLBAR_TRACK_ENDCAP_H, g_xerintosh_draw_color);
   g_xerintosh_draw_color = COLOR_BG;
-  hal_draw_h_line(SCREEN_WIDTH - 4, 2, 3, g_xerintosh_draw_color);
-  hal_draw_pixel(SCREEN_WIDTH - 3, 1, g_xerintosh_draw_color);
-  hal_draw_h_line(SCREEN_WIDTH - 4, SCREEN_HEIGHT - 3, 3, g_xerintosh_draw_color);
-  hal_draw_pixel(SCREEN_WIDTH - 3, SCREEN_HEIGHT - 2, g_xerintosh_draw_color);
+  hal_draw_h_line(HAL_SCREEN_WIDTH - SCROLLBAR_TRACK_X_OFFSET, 2, SCROLLBAR_WIDTH, g_xerintosh_draw_color);
+  hal_draw_pixel(HAL_SCREEN_WIDTH - 3, 1, g_xerintosh_draw_color);
+  hal_draw_h_line(HAL_SCREEN_WIDTH - SCROLLBAR_TRACK_X_OFFSET, HAL_SCREEN_HEIGHT - 3, SCROLLBAR_WIDTH, g_xerintosh_draw_color);
+  hal_draw_pixel(HAL_SCREEN_WIDTH - 3, HAL_SCREEN_HEIGHT - 2, g_xerintosh_draw_color);
 }
 
 /* ═══ 列表项与文字绘制 ═══ */
+
+static bool item_text_is_visible(int16_t y_center)
+{
+  return (y_center > LIST_INFO_BAR_HEIGHT &&
+          y_center < HAL_SCREEN_HEIGHT);
+}
+
+static int16_t item_compute_avail_width(xerintosh_list_item_t *_item)
+{
+  bool _has_right_control = xerintosh_dispatch_has_right_control(_item);
+  int16_t _right_margin = _has_right_control ? LIST_ITEM_RIGHT_MARGIN : 4;
+  int16_t _avail_width = HAL_SCREEN_WIDTH - LIST_ITEM_LEFT_MARGIN - 10 - _right_margin;
+
+  if (_has_right_control)
+    _avail_width -= 11;
+
+  if (_avail_width < 1)
+    _avail_width = 1;
+
+  return _avail_width;
+}
+
+static float item_compute_scroll_x(xerintosh_list_item_t *_item,
+                                    int16_t text_width, int16_t avail_width)
+{
+  bool _is_selected = (_item == g_xerintosh_selector.selected_item);
+  if (!_is_selected || text_width <= avail_width) {
+    _item->is_scrolling = false;
+    return 0.0f;
+  }
+
+  if (!_item->is_scrolling) {
+    _item->is_scrolling = true;
+    _item->scroll_start_time = hal_get_ticks();
+  }
+  uint32_t _elapsed = hal_get_ticks() - _item->scroll_start_time;
+
+  /* 文字滚动期间每帧都需清屏重绘，否则旧像素残留造成残影 */
+  xerintosh_invalidate();
+
+  return xerintosh_compute_scroll_offset(text_width, avail_width, true, _elapsed);
+}
+
+static void item_draw_text_scroll(xerintosh_list_item_t *_item,
+                                   int16_t _x_list_item, int16_t _y_list_item)
+{
+  int16_t _font_h = hal_get_font_height();
+  int16_t _font_h_2 = _font_h / 2;
+
+  if (!item_text_is_visible(_y_list_item + _font_h_2)) return;
+
+  int16_t _text_width = hal_get_string_width(_item->content);
+  int16_t _avail_width = item_compute_avail_width(_item);
+  float _scroll_x = item_compute_scroll_x(_item, _text_width, _avail_width);
+
+  int16_t _clip_x = LIST_ITEM_LEFT_MARGIN + 10;
+  int16_t _clip_y = _y_list_item - _font_h_2 - 2;
+  int16_t _clip_h = _font_h + 4;
+  hal_set_clip_rect(_clip_x, _clip_y, _avail_width, _clip_h);
+
+  int16_t _cycle_dist = _text_width + _avail_width;
+  int16_t _draw_x = _clip_x - (int16_t)_scroll_x;
+
+  /* 绘制两份相同文字，形成无缝循环跑马灯 */
+  hal_draw_string(_draw_x,
+                  _y_list_item + _font_h_2,
+                  _item->content, g_xerintosh_draw_color);
+  hal_draw_string(_draw_x + _cycle_dist,
+                  _y_list_item + _font_h_2,
+                  _item->content, g_xerintosh_draw_color);
+
+  hal_clear_clip_rect();
+}
+
+static void draw_single_item(xerintosh_list_item_t *_item,
+                              int16_t _x_list_item, int16_t _y_list_item)
+{
+  g_xerintosh_draw_color = COLOR_FG;
+  xerintosh_dispatch_draw(_item, _x_list_item, _y_list_item);
+
+  if (_item->icon == custom_icon && _item->bitmap_data != NULL) {
+    xerintosh_draw_item_bitmap(_item, _x_list_item, _y_list_item);
+  }
+
+  item_draw_text_scroll(_item, _x_list_item, _y_list_item);
+}
 
 /**
  * @brief 绘制当前可见的所有列表项（含图标、文字、滚动效果）
  */
 static void xerintosh_draw_list_item()
 {
+  xerintosh_list_item_t *sel = g_xerintosh_selector.selected_item;
+  if (sel == NULL || sel->parent == NULL) return;
+  if (sel->parent->child_num == 0) return;
+
   xerintosh_set_font(hal_get_cn_font());
   int16_t _font_h = hal_get_font_height();
   int16_t _font_h_2 = _font_h / 2;
 
-  for (unsigned char i = 0; i < g_xerintosh_selector.selected_item->parent->child_num; i++)
+  for (unsigned char i = 0; i < sel->parent->child_num; i++)
   {
-    xerintosh_list_item_t *_item = g_xerintosh_selector.selected_item->parent->child_list_item[i];
+    xerintosh_list_item_t *_item = sel->parent->child_list_item[i];
     int16_t _x_list_item = g_xerintosh_camera.x_camera + LIST_ITEM_LEFT_MARGIN;
     int16_t _y_list_item = _item->y_list_item + g_xerintosh_camera.y_camera - _font_h_2;
 
-    /* 根据类型分发到对应的绘制函数 */
-    g_xerintosh_draw_color = COLOR_FG;
-    xerintosh_dispatch_draw(_item, _x_list_item, _y_list_item);
-
-    /* 自定义位图图标补充绘制 */
-    if (_item->icon == custom_icon && _item->bitmap_data != NULL) {
-      xerintosh_draw_item_bitmap(_item, _x_list_item, _y_list_item);
-    }
-
-    /* ═══ 文字绘制与滚动效果 ═══ */
-    if (_y_list_item + _font_h_2 > LIST_INFO_BAR_HEIGHT &&
-        _y_list_item + _font_h_2 < SCREEN_HEIGHT)
-    {
-      int16_t _text_width = hal_get_string_width(_item->content);
-      bool _has_right_control = xerintosh_dispatch_has_right_control(_item);
-      int16_t _right_margin = _has_right_control ? LIST_ITEM_RIGHT_MARGIN : 4;
-      int16_t _avail_width = SCREEN_WIDTH - LIST_ITEM_LEFT_MARGIN - 10 - _right_margin;
-
-      /* switch/slider 额外占用右侧控件空间 */
-      if (_has_right_control)
-        _avail_width -= 11;
-
-      /* 防御性钳位：可用宽度不得为负，避免传给 HAL 裁剪函数行为未定义 */
-      if (_avail_width < 1)
-        _avail_width = 1;
-
-      bool _is_selected = (_item == g_xerintosh_selector.selected_item);
-      float _scroll_x = 0.0f;
-
-      /* 计算文字循环滚动偏移 */
-      if (_is_selected && _text_width > _avail_width) {
-        if (!_item->is_scrolling) {
-          _item->is_scrolling = true;
-          _item->scroll_start_time = hal_get_ticks();
-        }
-        uint32_t _elapsed = hal_get_ticks() - _item->scroll_start_time;
-        _scroll_x = xerintosh_compute_scroll_offset(_text_width, _avail_width, true, _elapsed);
-
-        /* 文字滚动期间每帧都需清屏重绘，否则旧像素残留造成残影 */
-        xerintosh_invalidate();
-      } else {
-        _item->is_scrolling = false;
-      }
-
-      /* 设置裁剪区域：限制文字只在 icon 右侧到控件左侧之间显示 */
-      int16_t _clip_x = LIST_ITEM_LEFT_MARGIN + 10;
-      int16_t _clip_y = _y_list_item - _font_h_2 - 2;
-      int16_t _clip_h = _font_h + 4;
-      hal_set_clip_rect(_clip_x, _clip_y, _avail_width, _clip_h);
-
-      int16_t _cycle_dist = _text_width + _avail_width;
-      int16_t _draw_x = _clip_x - (int16_t)_scroll_x;
-
-      /* 绘制两份相同文字，形成无缝循环跑马灯 */
-      hal_draw_string(_draw_x,
-                     _y_list_item + _font_h_2,
-                     _item->content, g_xerintosh_draw_color);
-      hal_draw_string(_draw_x + _cycle_dist,
-                     _y_list_item + _font_h_2,
-                     _item->content, g_xerintosh_draw_color);
-
-      hal_clear_clip_rect();
-      /* ═══════════════════════ */
-    }
+    draw_single_item(_item, _x_list_item, _y_list_item);
   }
 
   g_xerintosh_refresh_list_value = false;
@@ -215,7 +242,7 @@ static void xerintosh_draw_selector()
   /* 右侧虚线装饰 */
   g_xerintosh_draw_color = COLOR_FG;
   for (int16_t i = g_xerintosh_selector.w_selector + _x_selector;
-       i <= g_xerintosh_selector.w_selector + _x_selector + 7; i += 2)
+       i <= g_xerintosh_selector.w_selector + _x_selector + SELECTOR_DASH_EXTEND; i += 2)
   {
     for (int16_t j = _y_selector;
          j <= _y_selector + g_xerintosh_selector.h_selector - 1; j++)
@@ -240,10 +267,10 @@ void xerintosh_draw_long_press_hint(uint32_t duration_ms, uint32_t threshold_ms)
     if (duration_ms == 0 || duration_ms >= threshold_ms) return;
 
     float progress = (float)duration_ms / (float)threshold_ms;
-    uint16_t bar_width = 40;
-    uint16_t bar_height = 4;
-    uint16_t x = SCREEN_WIDTH - bar_width - 6;
-    uint16_t y = SCREEN_HEIGHT - 6;
+    uint16_t bar_width = LONG_PRESS_HINT_BAR_W;
+    uint16_t bar_height = LONG_PRESS_HINT_BAR_H;
+    uint16_t x = HAL_SCREEN_WIDTH - bar_width - LONG_PRESS_HINT_MARGIN_X;
+    uint16_t y = HAL_SCREEN_HEIGHT - LONG_PRESS_HINT_MARGIN_Y;
 
     g_xerintosh_draw_color = COLOR_FG;
     hal_draw_rect(x, y, bar_width, bar_height, g_xerintosh_draw_color);
@@ -257,8 +284,10 @@ void xerintosh_draw_long_press_hint(uint32_t duration_ms, uint32_t threshold_ms)
  */
 void xerintosh_draw_list()
 {
+  xerintosh_list_item_t *sel = g_xerintosh_selector.selected_item;
+  if (sel == NULL || sel->parent == NULL) return;
   xerintosh_draw_list_appearance(g_xerintosh_selector.selected_index,
-                                g_xerintosh_selector.selected_item->parent->child_num);
+                                 sel->parent->child_num);
   xerintosh_draw_list_item();
   xerintosh_draw_selector();
   xerintosh_draw_slider_overlays();
@@ -284,7 +313,7 @@ float xerintosh_compute_scroll_offset(int16_t text_width, int16_t avail_width,
   if (cycle_distance <= 0)
     return 0.0f;
 
-  const uint32_t SCROLL_CYCLE_MS = 3000;
+  const uint32_t SCROLL_CYCLE_MS = TEXT_SCROLL_CYCLE_MS;
   uint32_t phase = elapsed_ms % SCROLL_CYCLE_MS;
   return ((float)phase / (float)SCROLL_CYCLE_MS) * (float)cycle_distance;
 }

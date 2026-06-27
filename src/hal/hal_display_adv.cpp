@@ -15,12 +15,13 @@
 extern uint16_t *g_font_fb;
 extern int16_t  g_font_fb_w;
 extern int16_t  g_font_fb_h;
-extern uint16_t g_framebuffer[];
+
+static uint16_t* fb(void) { return hal_display_framebuffer(); }
 
 static uint16_t* fb_pixel_ptr(int16_t x, int16_t y)
 {
-    if (x < 0 || x >= SCREEN_WIDTH || y < 0 || y >= SCREEN_HEIGHT) return NULL;
-    return &g_framebuffer[y * SCREEN_WIDTH + x];
+    if (x < 0 || x >= HAL_SCREEN_WIDTH || y < 0 || y >= HAL_SCREEN_HEIGHT) return NULL;
+    return &fb()[y * HAL_SCREEN_WIDTH + x];
 }
 
 /* ─── 高级绘制（native 实现）─── */
@@ -34,8 +35,8 @@ void hal_draw_xor_rect(int16_t x, int16_t y, int16_t w, int16_t h) {
         for (int16_t col = 0; col < w; col++) {
             int16_t px = x + col;
             int16_t py = y + row;
-            if (px >= 0 && px < SCREEN_WIDTH && py >= 0 && py < SCREEN_HEIGHT) {
-                g_framebuffer[py * SCREEN_WIDTH + px] ^= 0xFFFF;
+            if (px >= 0 && px < HAL_SCREEN_WIDTH && py >= 0 && py < HAL_SCREEN_HEIGHT) {
+                fb()[py * HAL_SCREEN_WIDTH + px] ^= 0xFFFF;
             }
         }
     }
@@ -76,10 +77,10 @@ void hal_clear_clip_rect(void) {
  */
 uint16_t hal_test_fb_read(int16_t x, int16_t y)
 {
-    if (x < 0 || x >= SCREEN_WIDTH || y < 0 || y >= SCREEN_HEIGHT) return 0;
-    uint16_t v = g_framebuffer[y * SCREEN_WIDTH + x];
+    if (x < 0 || x >= HAL_SCREEN_WIDTH || y < 0 || y >= HAL_SCREEN_HEIGHT) return 0;
+    uint16_t v = fb()[y * HAL_SCREEN_WIDTH + x];
     if (g_font_fb != NULL) {
-        uint16_t fv = g_font_fb[y * SCREEN_WIDTH + x];
+        uint16_t fv = g_font_fb[y * HAL_SCREEN_WIDTH + x];
         if (fv != 0) v = fv;
     }
     return v;
@@ -97,13 +98,15 @@ uint16_t hal_test_fb_read(int16_t x, int16_t y)
 /* 子集中文字体对象（U8G2 格式，仅包含源码使用的 844 个汉字） */
 const lgfx::U8g2font cn_font = { lgfx_cn_font_subset };
 
-extern lgfx::LGFX_Sprite* g_canvas;
+static lgfx::LGFX_Sprite* canvas(void) {
+    return reinterpret_cast<lgfx::LGFX_Sprite*>(hal_display_canvas());
+}
 
 void hal_draw_xor_rect(int16_t x, int16_t y, int16_t w, int16_t h) {
-    if (!g_canvas || w <= 0 || h <= 0) return;
+    if (!canvas() || w <= 0 || h <= 0) return;
 
-    int16_t cw = g_canvas->width();
-    int16_t ch = g_canvas->height();
+    int16_t cw = canvas()->width();
+    int16_t ch = canvas()->height();
     /* 裁剪 */
     if (x < 0) { w += x; x = 0; }
     if (y < 0) { h += y; y = 0; }
@@ -119,32 +122,32 @@ void hal_draw_xor_rect(int16_t x, int16_t y, int16_t w, int16_t h) {
     int total = w * h;
     if (total > XOR_BUF_MAX_PX) return;
 
-    g_canvas->readRect(x, y, w, h, xor_buf);
+    canvas()->readRect(x, y, w, h, xor_buf);
     for (int i = 0; i < total; i++)
         xor_buf[i] ^= 0xFFFF;
-    g_canvas->pushImage(x, y, w, h, xor_buf);
+    canvas()->pushImage(x, y, w, h, xor_buf);
 }
 
 /**
  * @brief 绘制 XBM 位图
  */
 void hal_draw_xbitmap(int16_t x, int16_t y, int16_t w, int16_t h, const uint8_t* bitmap) {
-    if (!g_canvas || !bitmap) return;
-    g_canvas->drawXBitmap(x, y, bitmap, w, h, COLOR_FG);
+    if (!canvas() || !bitmap) return;
+    canvas()->drawXBitmap(x, y, bitmap, w, h, COLOR_FG);
 }
 
 /**
  * @brief 设置裁剪矩形
  */
 void hal_set_clip_rect(int16_t x, int16_t y, int16_t w, int16_t h) {
-    if (g_canvas) g_canvas->setClipRect(x, y, w, h);
+    if (canvas()) canvas()->setClipRect(x, y, w, h);
 }
 
 /**
  * @brief 清除裁剪矩形
  */
 void hal_clear_clip_rect(void) {
-    if (g_canvas) g_canvas->clearClipRect();
+    if (canvas()) canvas()->clearClipRect();
 }
 
 /**

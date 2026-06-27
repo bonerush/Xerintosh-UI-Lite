@@ -36,7 +36,7 @@ void tu_ui_draw(const tu_data_t *data, int selected) {
     y += line_h + HAL_MARGIN_SM;
 
     /* ── 分隔线 ── */
-    hal_draw_h_line(x, y, SCREEN_WIDTH - 2 * x, COLOR_FG);
+    hal_draw_h_line(x, y, HAL_SCREEN_WIDTH - 2 * x, COLOR_FG);
     y += HAL_MARGIN_LG;
 
     /* ── Deepseek 部分 ── */

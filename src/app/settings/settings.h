@@ -69,6 +69,36 @@ extern void    settings_set_spring_damping(int16_t level);
  */
 void settings_load_from_storage(void);
 
+/* ═══ 统一转换入口 ═══ */
+
+/**
+ * @brief 设置项类型标识
+ */
+typedef enum {
+    SETTINGS_KIND_BRIGHTNESS,        /**< 亮度 1-10 → 0-255 */
+    SETTINGS_KIND_ANIM_SPEED,        /**< 动画速度 1-10 → 40-95 */
+    SETTINGS_KIND_SPRING_STIFFNESS,  /**< 弹簧硬度 1-10 → 0.04-0.40 */
+    SETTINGS_KIND_SPRING_DAMPING,    /**< 弹簧阻尼 1-10 → 0.04-0.40 */
+    SETTINGS_KIND_BAUD_RATE,         /**< 波特率 1-6 → 9600-230400 */
+} settings_kind_t;
+
+/**
+ * @brief  将设置等级转换为硬件/内部值
+ * @param  kind  设置项类型
+ * @param  level 等级值
+ * @return 硬件值（亮度/PWM 用低 16 位；浮点参数放大 10000 倍存储）
+ * @note   弹簧参数返回 level * 10000 * 0.04 的整数值，调用方可除以 10000.0f 得浮点
+ */
+int32_t settings_level_to_hw(settings_kind_t kind, int16_t level);
+
+/**
+ * @brief  将硬件/内部值反向映射为设置等级
+ * @param  kind 设置项类型
+ * @param  hw   硬件值
+ * @return 等级值
+ */
+int16_t settings_hw_to_level(settings_kind_t kind, int32_t hw);
+
 /* ═══ 值转换 ═══ */
 
 /**

@@ -17,6 +17,7 @@ extern "C" {
 #include "kernel/kern_sched_rr.h"
 #include "kernel/kern_sched_fifo.h"
 #include "kernel/kern_init.h"
+#include "kernel/kern_port.h"
 }
 
 /* ═══ 辅助：任务间通信变量 ═══ */
@@ -70,6 +71,17 @@ TEST(KernelSchedTest, InitSetsIdleReady)
     kern_sched_init();
     ASSERT_NE(g_idle_task, nullptr);
     EXPECT_EQ(g_idle_task->state, KERN_TASK_READY);
+}
+
+TEST(KernelSchedTest, InitIsIdempotent)
+{
+    kern_sched_init();
+    uint32_t ticks_before = g_sched_ticks;
+    kern_task_t *idle_before = g_idle_task;
+    kern_sched_init();
+    EXPECT_EQ(g_sched_ticks, ticks_before);
+    EXPECT_EQ(g_idle_task, idle_before);
+    EXPECT_NE(g_idle_task, nullptr);
 }
 
 /* ═══ pick_next_ready 测试 ═══ */
@@ -213,6 +225,30 @@ TEST(KernelSchedTest, SchedClassRegisterReturnsEnospc)
     /* 恢复 class 注册表 */
     g_sched_class_count = saved_count;
     memcpy(g_sched_classes, saved_classes, KERN_SCHED_MAX_CLASSES * sizeof(kern_sched_class_t *));
+}
+
+/* ═══ 访问器测试 ═══ */
+
+TEST(KernelSchedTest, TaskListHeadAccessorMatchesGlobal)
+{
+    kern_sched_init();
+    EXPECT_EQ(kern_task_list_head(), g_task_list);
+    EXPECT_EQ(kern_task_list_tail(), g_task_list_tail);
+}
+
+TEST(KernelSchedTest, CurrentTaskAccessorMatchesGlobal)
+{
+    kern_sched_init();
+    EXPECT_EQ(kern_current_task(), g_current_task);
+}
+
+TEST(KernelSchedTest, NeedReschedAccessorWorks)
+{
+    kern_sched_init();
+    kern_set_need_resched(true);
+    EXPECT_TRUE(kern_need_resched());
+    kern_set_need_resched(false);
+    EXPECT_FALSE(kern_need_resched());
 }
 
 /* ═══ 辅助：构造一个未入队的 dummy 任务 ═══ */
@@ -463,4 +499,16 @@ TEST(KernelSchedTest, StackGrowTriggerDoesNotCrash)
 
     /* 只要没有崩溃/段错误即通过 */
     SUCCEED();
+}
+
+TEST(KernelPortTest, TimerSetPeriodicReturnsOk)
+{
+    kern_err_t rc = kern_port_timer_set_periodic(1000);
+    EXPECT_EQ(rc, KERN_OK);
+}
+
+TEST(KernelPortTest, TimerSetPeriodicRejectsZeroPeriod)
+{
+    kern_err_t rc = kern_port_timer_set_periodic(0);
+    EXPECT_EQ(rc, KERN_EINVAL);
 }

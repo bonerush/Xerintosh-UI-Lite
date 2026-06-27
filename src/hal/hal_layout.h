@@ -7,7 +7,7 @@
  *          3. 区域边界与对齐（HAL_CENTER_X, HAL_HEADER_BOTTOM 等）
  *
  *          全部使用 #define 宏，C 兼容，零运行时开销。
- *          基于 SCREEN_WIDTH / SCREEN_HEIGHT / hal_get_font_height() 计算。
+ *          基于 HAL_SCREEN_WIDTH / HAL_SCREEN_HEIGHT / hal_get_font_height() 计算。
  *
  * @copyright Copyright (c) 2026
  */
@@ -50,24 +50,24 @@ extern "C" {
 /**
  * @brief Footer 区域顶部 y 坐标（= 屏幕高度 - 标准行高）
  */
-#define HAL_FOOTER_TOP()    ((int16_t)(SCREEN_HEIGHT - HAL_ROW_H()))
+#define HAL_FOOTER_TOP()    ((int16_t)(HAL_SCREEN_HEIGHT - HAL_ROW_H()))
 
 /**
  * @brief Footer 区域底部 y 坐标（= 屏幕高度）
  */
-#define HAL_FOOTER_BOTTOM() ((int16_t)SCREEN_HEIGHT)
+#define HAL_FOOTER_BOTTOM() ((int16_t)HAL_SCREEN_HEIGHT)
 
 /* ═══ 层3: 对齐 ═══ */
 
 /**
  * @brief 水平居中：返回使宽度为 w 的元素居中的 x 坐标
  */
-#define HAL_CENTER_X(w)     ((int16_t)((SCREEN_WIDTH - (w)) / 2))
+#define HAL_CENTER_X(w)     ((int16_t)((HAL_SCREEN_WIDTH - (w)) / 2))
 
 /**
  * @brief 垂直居中：返回使高度为 h 的元素居中的 y 坐标（顶部）
  */
-#define HAL_CENTER_Y(h)     ((int16_t)((SCREEN_HEIGHT - (h)) / 2))
+#define HAL_CENTER_Y(h)     ((int16_t)((HAL_SCREEN_HEIGHT - (h)) / 2))
 
 /**
  * @brief 左对齐（标准缩进 = HAL_MARGIN_MD）

@@ -87,7 +87,7 @@ void flasher_init(void *ud)
     s_pt_phase_until_ms = 0;
     s_pt_first_data = false;
     s_usb_deferred_len = 0;
-    s_entry_offset = (float)SCREEN_HEIGHT;
+    s_entry_offset = (float)HAL_SCREEN_HEIGHT;
     s_entry_vel    = 0.0f;
 
     flasher_ui_init(&s_ui);

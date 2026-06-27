@@ -29,8 +29,3 @@ kern_task_t *kern_task_get(kern_pid_t pid)
     }
     return NULL;
 }
-
-kern_task_t *kern_task_list_head(void)
-{
-    return g_task_list;
-}

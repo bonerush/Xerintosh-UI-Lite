@@ -117,6 +117,17 @@ TEST(KernelTaskTest, SpawnNullNameUsesDefault)
     EXPECT_GE(pid, 0);
 }
 
+TEST(KernelTaskTest, SpawnedTaskHasValidStackAndContext)
+{
+    kern_sched_init();
+    kern_pid_t pid = kern_spawn("lifecycle", simple_task, NULL, 0);
+    ASSERT_GE(pid, 0);
+    kern_task_t *task = kern_task_get(pid);
+    ASSERT_NE(task, nullptr);
+    EXPECT_NE(task->stack_base, nullptr);
+    EXPECT_GT(task->stack_size, 0u);
+}
+
 TEST(KernelTaskTest, SpawnNullEntryReturnsError)
 {
     kern_sched_init();

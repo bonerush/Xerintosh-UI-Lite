@@ -153,15 +153,15 @@ int16_t  g_font_fb_h = 0;
 static void font_fb_init_once(void)
 {
     if (g_font_fb == NULL) {
-        g_font_fb_w = SCREEN_WIDTH;
-        g_font_fb_h = SCREEN_HEIGHT;
+        g_font_fb_w = HAL_SCREEN_WIDTH;
+        g_font_fb_h = HAL_SCREEN_HEIGHT;
         g_font_fb = (uint16_t*)calloc(g_font_fb_w * g_font_fb_h, sizeof(uint16_t));
     }
 }
 
 static void font_draw_char(int16_t x, int16_t y, char c, uint16_t color)
 {
-    if (x + FONT_W < 0 || x >= SCREEN_WIDTH || y + FONT_H < 0 || y >= SCREEN_HEIGHT) return;
+    if (x + FONT_W < 0 || x >= HAL_SCREEN_WIDTH || y + FONT_H < 0 || y >= HAL_SCREEN_HEIGHT) return;
     if (c < 0 || c > 127) return;
     font_fb_init_once();
     const uint8_t *bm = g_font_6x8[(uint8_t)c];
@@ -171,8 +171,8 @@ static void font_draw_char(int16_t x, int16_t y, char c, uint16_t color)
             if (bits & (1 << (7 - col))) {
                 int16_t px = x + col;
                 int16_t py = y + row;
-                if (px >= 0 && px < SCREEN_WIDTH && py >= 0 && py < SCREEN_HEIGHT) {
-                    g_font_fb[py * SCREEN_WIDTH + px] = color;
+                if (px >= 0 && px < HAL_SCREEN_WIDTH && py >= 0 && py < HAL_SCREEN_HEIGHT) {
+                    g_font_fb[py * HAL_SCREEN_WIDTH + px] = color;
                 }
             }
         }
@@ -239,28 +239,30 @@ const void* hal_get_cn_font(void) {
 
 #include <LovyanGFX.hpp>
 
-extern lgfx::LGFX_Sprite* g_canvas;
+static lgfx::LGFX_Sprite* canvas(void) {
+    return reinterpret_cast<lgfx::LGFX_Sprite*>(hal_display_canvas());
+}
 
 void hal_set_font(const void* font) {
-    if (!g_canvas) return;
+    if (!canvas()) return;
     if (font)
-        g_canvas->setFont((const lgfx::v1::IFont*)font);
+        canvas()->setFont((const lgfx::v1::IFont*)font);
     else
-        g_canvas->setFont(&fonts::Font0);
+        canvas()->setFont(&fonts::Font0);
 }
 
 /**
  * @brief 绘制 ASCII 字符串
  */
 void hal_draw_string(int16_t x, int16_t y, const char* str, uint16_t color) {
-    if (!g_canvas || !str) return;
-    g_canvas->setTextColor(color);
-    g_canvas->setTextDatum(lgfx::v1::baseline_left);
+    if (!canvas() || !str) return;
+    canvas()->setTextColor(color);
+    canvas()->setTextDatum(lgfx::v1::baseline_left);
 
     const char *p = str;
     const char *line_start = p;
     int16_t line_y = y;
-    int16_t font_h = g_canvas->fontHeight();
+    int16_t font_h = canvas()->fontHeight();
 
     while (1) {
         if (*p == '\n' || *p == '\0') {
@@ -270,7 +272,7 @@ void hal_draw_string(int16_t x, int16_t y, const char* str, uint16_t color) {
                 if (len >= sizeof(buf)) len = sizeof(buf) - 1;
                 memcpy(buf, line_start, len);
                 buf[len] = '\0';
-                g_canvas->drawString(buf, x, line_y);
+                canvas()->drawString(buf, x, line_y);
             }
             if (*p == '\0') break;
             line_y += font_h;
@@ -285,16 +287,16 @@ void hal_draw_string(int16_t x, int16_t y, const char* str, uint16_t color) {
  * @brief 获取 ASCII 字符串宽度
  */
 int16_t hal_get_string_width(const char* str) {
-    if (!g_canvas || !str) return 0;
-    return g_canvas->textWidth(str);
+    if (!canvas() || !str) return 0;
+    return canvas()->textWidth(str);
 }
 
 /**
  * @brief 获取当前字体高度
  */
 int16_t hal_get_font_height(void) {
-    if (!g_canvas) return 8;
-    return g_canvas->fontHeight();
+    if (!canvas()) return 8;
+    return canvas()->fontHeight();
 }
 
 #endif

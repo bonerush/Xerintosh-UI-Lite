@@ -122,7 +122,7 @@ TEST_F(KernelDevicesTest, Fb0WriteClearWithColor)
     write_fb_cmd(fd, clear_cmd, sizeof(clear_cmd));
 
     EXPECT_EQ(hal_test_fb_read(0, 0), 0xF800);
-    EXPECT_EQ(hal_test_fb_read(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2), 0xF800);
+    EXPECT_EQ(hal_test_fb_read(HAL_SCREEN_WIDTH / 2, HAL_SCREEN_HEIGHT / 2), 0xF800);
 
     kern_close(fd);
 }
@@ -206,7 +206,7 @@ TEST_F(KernelDevicesTest, Fb0IoctlGetWidth)
     ASSERT_GE(fd, 0);
 
     int w = kern_ioctl(fd, DEV_FB_IOCTL_GET_WIDTH, 0);
-    EXPECT_EQ(w, SCREEN_WIDTH);
+    EXPECT_EQ(w, HAL_SCREEN_WIDTH);
 
     kern_close(fd);
 }
@@ -218,7 +218,7 @@ TEST_F(KernelDevicesTest, Fb0IoctlGetHeight)
     ASSERT_GE(fd, 0);
 
     int h = kern_ioctl(fd, DEV_FB_IOCTL_GET_HEIGHT, 0);
-    EXPECT_EQ(h, SCREEN_HEIGHT);
+    EXPECT_EQ(h, HAL_SCREEN_HEIGHT);
 
     kern_close(fd);
 }

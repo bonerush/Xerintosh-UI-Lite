@@ -11,26 +11,66 @@
 #include "hal_input.h"
 #include "hal_system.h"
 #include "hal_input_double_click.h"
+#include <string.h>
 
-/* ═══ 双击开关（全局状态）═══ */
+/* ═══ 输入状态上下文 ═══ */
 
-static bool g_double_click_enabled = false;
+struct btn_state {
+    hal_input_dc_state_t dc;  /* 双击检测状态机 */
+    bool prev_raw;            /* 上一次的原始 GPIO 电平 */
+    bool dc_enabled;          /* 该按键是否启用双击检测 */
+};
+
+struct hal_input_context {
+    struct btn_state buttons[HAL_BTN_COUNT];
+#ifdef NATIVE_TEST
+    hal_event_t test_events[HAL_BTN_COUNT];
+    bool        test_pending[HAL_BTN_COUNT];
+#else
+    uint32_t boot_time_ms;    /* hal_input_init 被调用时的毫秒时间戳 */
+#endif
+};
+
+static struct hal_input_context g_input_ctx;
+
+static struct btn_state* input_button(hal_button_t btn)
+{
+    if (btn >= HAL_BTN_COUNT) return NULL;
+    return &g_input_ctx.buttons[btn];
+}
+
+void hal_input_set_double_click_enabled_for_button(hal_button_t btn, bool enabled)
+{
+    struct btn_state *st = input_button(btn);
+    if (st) st->dc_enabled = enabled;
+}
+
+bool hal_input_get_double_click_enabled_for_button(hal_button_t btn)
+{
+    const struct btn_state *st = input_button(btn);
+    if (!st) return false;
+    return st->dc_enabled;
+}
 
 void hal_input_set_double_click_enabled(bool enabled) {
-    g_double_click_enabled = enabled;
+    for (int i = 0; i < HAL_BTN_COUNT; i++) {
+        g_input_ctx.buttons[i].dc_enabled = enabled;
+    }
 }
 
 #ifdef NATIVE_TEST
 
 /* ═══ Native 测试环境：输入桩 ═══ */
 
-static hal_event_t g_test_events[HAL_BTN_COUNT];
-static bool g_test_event_pending[HAL_BTN_COUNT];
-
 /**
  * @brief 初始化输入（空操作）
  */
-void hal_input_init(void) {}
+void hal_input_init(void) {
+    memset(&g_input_ctx, 0, sizeof(g_input_ctx));
+    for (int i = 0; i < HAL_BTN_COUNT; i++) {
+        hal_input_dc_init(&g_input_ctx.buttons[i].dc);
+    }
+}
 
 /**
  * @brief 更新输入状态（空操作）
@@ -42,9 +82,9 @@ void hal_input_update(void) {}
  */
 hal_event_t hal_input_get_event(hal_button_t btn) {
     if (btn >= HAL_BTN_COUNT) return HAL_EVENT_NONE;
-    if (g_test_event_pending[btn]) {
-        g_test_event_pending[btn] = false;
-        return g_test_events[btn];
+    if (g_input_ctx.test_pending[btn]) {
+        g_input_ctx.test_pending[btn] = false;
+        return g_input_ctx.test_events[btn];
     }
     return HAL_EVENT_NONE;
 }
@@ -55,8 +95,8 @@ hal_event_t hal_input_get_event(hal_button_t btn) {
 void hal_test_inject_event(hal_button_t btn, hal_event_t ev)
 {
     if (btn < HAL_BTN_COUNT) {
-        g_test_events[btn] = ev;
-        g_test_event_pending[btn] = true;
+        g_input_ctx.test_events[btn] = ev;
+        g_input_ctx.test_pending[btn] = true;
     }
 }
 
@@ -66,7 +106,7 @@ void hal_test_inject_event(hal_button_t btn, hal_event_t ev)
 void hal_input_reset_events(void)
 {
     for (int i = 0; i < HAL_BTN_COUNT; i++) {
-        g_test_event_pending[i] = false;
+        g_input_ctx.test_pending[i] = false;
     }
 }
 
@@ -94,8 +134,6 @@ uint32_t hal_input_get_press_duration(hal_button_t btn) {
 
 #define BOOT_INPUT_GUARD_MS  300  /* 启动后首 300ms 忽略输入，防止 GPIO 上电毛刺 */
 
-static uint32_t g_boot_time_ms = 0;  /* hal_input_init 被调用时的毫秒时间戳 */
-
 /**
  * @brief M5Stick-C 按键 GPIO 映射
  * @note  参考 M5Unified：M5StickC 的 BtnA 对应 GPIO37，BtnB 对应 GPIO39。
@@ -105,18 +143,6 @@ static const gpio_num_t g_btn_gpio[HAL_BTN_COUNT] = {
     [HAL_BTN_A] = GPIO_NUM_37,  /* 侧键（M5Unified BtnA） */
     [HAL_BTN_B] = GPIO_NUM_39,  /* 主键/返回键（M5Unified BtnB） */
 };
-
-/**
- * @brief 内部按键状态结构
- * @note  使用 hal_input_double_click.h 中的双击检测状态机
- */
-struct btn_state {
-    hal_input_dc_state_t dc;  /* 双击检测状态机 */
-    bool prev_raw;            /* 上一次的原始 GPIO 电平 */
-};
-
-static struct btn_state g_btn_a;  /* 按键 A 状态 */
-static struct btn_state g_btn_b;  /* 按键 B 状态 */
 
 /**
  * @brief 读取按键原始电平
@@ -132,10 +158,10 @@ static bool btn_read_raw(hal_button_t btn) {
  * @brief 初始化按键状态
  */
 void hal_input_init(void) {
-    hal_input_dc_init(&g_btn_a.dc);
-    hal_input_dc_init(&g_btn_b.dc);
-    g_btn_a.prev_raw = false;
-    g_btn_b.prev_raw = false;
+    memset(&g_input_ctx, 0, sizeof(g_input_ctx));
+    for (int i = 0; i < HAL_BTN_COUNT; i++) {
+        hal_input_dc_init(&g_input_ctx.buttons[i].dc);
+    }
 
     gpio_config_t io_conf = {
         .pin_bit_mask = ((1ULL << GPIO_NUM_37) | (1ULL << GPIO_NUM_39)),
@@ -146,7 +172,7 @@ void hal_input_init(void) {
     };
     gpio_config(&io_conf);
 
-    g_boot_time_ms = hal_get_ticks();
+    g_input_ctx.boot_time_ms = hal_get_ticks_ms();
 }
 
 /**
@@ -162,12 +188,12 @@ void hal_input_update(void) {
  * @param  wasPressed  本帧是否检测到按下边沿
  * @param  wasReleased 本帧是否检测到释放边沿
  * @return 事件类型
- * @note   根据 g_double_click_enabled 选择简单状态机或双击状态机
+ * @note   根据 st->dc_enabled 选择简单状态机或双击状态机
  */
 static hal_event_t check_button_event(struct btn_state *st, bool wasPressed, bool wasReleased)
 {
-    uint32_t now = hal_get_ticks();
-    if (g_double_click_enabled) {
+    uint32_t now = hal_get_ticks_ms();
+    if (st->dc_enabled) {
         return hal_input_dc_process(&st->dc, wasPressed, wasReleased, now);
     }
     return hal_input_simple_process(&st->dc, wasPressed, wasReleased, now);
@@ -179,14 +205,12 @@ static hal_event_t check_button_event(struct btn_state *st, bool wasPressed, boo
 hal_event_t hal_input_get_event(hal_button_t btn)
 {
   /* 启动保护：忽略开机后首 300ms 内的所有按键事件，防止 GPIO 上电毛刺触发 LONG_PRESS */
-  if (hal_get_ticks() - g_boot_time_ms < BOOT_INPUT_GUARD_MS) {
+  if (hal_get_ticks_ms() - g_input_ctx.boot_time_ms < BOOT_INPUT_GUARD_MS) {
       return HAL_EVENT_NONE;
   }
 
-  struct btn_state *st = NULL;
-  if (btn == HAL_BTN_A) st = &g_btn_a;
-  else if (btn == HAL_BTN_B) st = &g_btn_b;
-  else return HAL_EVENT_NONE;
+  struct btn_state *st = input_button(btn);
+  if (!st) return HAL_EVENT_NONE;
 
   bool raw = btn_read_raw(btn);
   bool wasPressed = raw && !st->prev_raw;
@@ -200,18 +224,12 @@ hal_event_t hal_input_get_event(hal_button_t btn)
  * @brief 查询指定按键是否正处于按下状态
  */
 bool hal_input_is_pressed(hal_button_t btn) {
-    struct btn_state *st = NULL;
-    if (btn == HAL_BTN_A) {
-        st = &g_btn_a;
-    } else if (btn == HAL_BTN_B) {
-        st = &g_btn_b;
-    } else {
-        return false;
-    }
+    struct btn_state *st = input_button(btn);
+    if (!st) return false;
 
     bool pressed = btn_read_raw(btn);
     if (pressed && st->dc.pressed) {
-        st->dc.press_duration_ms = hal_get_ticks() - st->dc.press_time;
+        st->dc.press_duration_ms = hal_get_ticks_ms() - st->dc.press_time;
     }
     return pressed;
 }
@@ -220,10 +238,8 @@ bool hal_input_is_pressed(hal_button_t btn) {
  * @brief 获取按键当前按下的持续时间
  */
 uint32_t hal_input_get_press_duration(hal_button_t btn) {
-    struct btn_state *st = NULL;
-    if (btn == HAL_BTN_A) st = &g_btn_a;
-    else if (btn == HAL_BTN_B) st = &g_btn_b;
-    else return 0;
+    const struct btn_state *st = input_button(btn);
+    if (!st) return 0;
     return st->dc.press_duration_ms;
 }
 
@@ -234,10 +250,10 @@ uint32_t hal_input_get_press_duration(hal_button_t btn) {
  *         hal_input_get_event 因旧边沿状态而误判出短按/释放事件。
  */
 void hal_input_reset_events(void) {
-    hal_input_dc_init(&g_btn_a.dc);
-    hal_input_dc_init(&g_btn_b.dc);
-    g_btn_a.prev_raw = btn_read_raw(HAL_BTN_A);
-    g_btn_b.prev_raw = btn_read_raw(HAL_BTN_B);
+    for (int i = 0; i < HAL_BTN_COUNT; i++) {
+        hal_input_dc_init(&g_input_ctx.buttons[i].dc);
+        g_input_ctx.buttons[i].prev_raw = btn_read_raw((hal_button_t)i);
+    }
 }
 
 #endif

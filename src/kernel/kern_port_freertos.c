@@ -72,9 +72,10 @@ static bool IRAM_ATTR sched_timer_isr(gptimer_handle_t timer, const gptimer_alar
     return false;
 }
 
-static int kern_port_freertos_timer_set(uint32_t period_us)
+static kern_err_t kern_port_freertos_timer_set(uint32_t period_us)
 {
-    if (g_timer_active) return 0;  /* 已启动 */
+    if (period_us == 0) return KERN_EINVAL;
+    if (g_timer_active) return KERN_OK;  /* 已启动 */
 
     g_preempt_tick_pending = false;
 
@@ -89,7 +90,7 @@ static int kern_port_freertos_timer_set(uint32_t period_us)
     };
 
     if (gptimer_new_timer(&timer_config, &g_sched_timer) != ESP_OK) {
-        return -1;
+        return KERN_ERR;
     }
 
     gptimer_alarm_config_t alarm_config = {
@@ -103,7 +104,7 @@ static int kern_port_freertos_timer_set(uint32_t period_us)
     if (gptimer_set_alarm_action(g_sched_timer, &alarm_config) != ESP_OK) {
         gptimer_del_timer(g_sched_timer);
         g_sched_timer = NULL;
-        return -1;
+        return KERN_ERR;
     }
 
     gptimer_event_callbacks_t cbs = {
@@ -113,24 +114,24 @@ static int kern_port_freertos_timer_set(uint32_t period_us)
     if (gptimer_register_event_callbacks(g_sched_timer, &cbs, NULL) != ESP_OK) {
         gptimer_del_timer(g_sched_timer);
         g_sched_timer = NULL;
-        return -1;
+        return KERN_ERR;
     }
 
     if (gptimer_enable(g_sched_timer) != ESP_OK) {
         gptimer_del_timer(g_sched_timer);
         g_sched_timer = NULL;
-        return -1;
+        return KERN_ERR;
     }
 
     if (gptimer_start(g_sched_timer) != ESP_OK) {
         gptimer_disable(g_sched_timer);
         gptimer_del_timer(g_sched_timer);
         g_sched_timer = NULL;
-        return -1;
+        return KERN_ERR;
     }
 
     g_timer_active = true;
-    return 0;
+    return KERN_OK;
 }
 
 static void kern_port_freertos_timer_stop(void)
@@ -155,8 +156,8 @@ static bool kern_port_freertos_preempt_consume(void)
     return true;
 }
 #else
-static int kern_port_freertos_timer_set(uint32_t period_us)
-{ (void)period_us; return 0; }
+static kern_err_t kern_port_freertos_timer_set(uint32_t period_us)
+{ (void)period_us; return KERN_OK; }
 
 static void kern_port_freertos_timer_stop(void) {}
 
@@ -415,8 +416,8 @@ static void kern_port_native_test_task_exit(void) { while(1){} }
 
 static void kern_port_native_test_idle(void) {}
 
-static int kern_port_native_test_timer_set(uint32_t period_us)
-{ (void)period_us; return 0; }
+static kern_err_t kern_port_native_test_timer_set(uint32_t period_us)
+{ return (period_us == 0) ? KERN_EINVAL : KERN_OK; }
 
 static void kern_port_native_test_timer_stop(void) {}
 

@@ -249,7 +249,70 @@ float settings_spring_damping_hw_value(int16_t level)
     return (float)level * 0.04f;
 }
 
-/* ═══ 弹簧硬度/阻尼 Getter/Setter ═══ */
+/* ═══ 统一转换入口实现 ═══ */
+
+int32_t settings_level_to_hw(settings_kind_t kind, int16_t level)
+{
+    switch (kind) {
+    case SETTINGS_KIND_BRIGHTNESS: {
+        if (level < 1) level = 1;
+        if (level > 10) level = 10;
+        int16_t brightness = level * 10;
+        return (int32_t)((brightness * 255) / 100);
+    }
+    case SETTINGS_KIND_ANIM_SPEED: {
+        if (level < 1) level = 1;
+        if (level > 10) level = 10;
+        return (int32_t)(40 + level * 5);
+    }
+    case SETTINGS_KIND_SPRING_STIFFNESS:
+        return (int32_t)(settings_spring_stiffness_hw_value(level) * 10000.0f);
+    case SETTINGS_KIND_SPRING_DAMPING:
+        return (int32_t)(settings_spring_damping_hw_value(level) * 10000.0f);
+    case SETTINGS_KIND_BAUD_RATE:
+        return settings_serial_baud_hw_value(level);
+    default:
+        return 0;
+    }
+}
+
+int16_t settings_hw_to_level(settings_kind_t kind, int32_t hw)
+{
+    switch (kind) {
+    case SETTINGS_KIND_BRIGHTNESS:
+        return settings_brightness_level_from_hw((int16_t)hw);
+    case SETTINGS_KIND_ANIM_SPEED:
+        /* 旧格式 40-95 步进 5 → 1-10 */
+        if (hw >= 40 && hw <= 95) {
+            int16_t level = (int16_t)((hw - 40) / 5);
+            if (level < 1) level = 1;
+            if (level > 10) level = 10;
+            return level;
+        }
+        if (hw < 1) return 1;
+        if (hw > 10) return 10;
+        return (int16_t)hw;
+    case SETTINGS_KIND_SPRING_STIFFNESS:
+    case SETTINGS_KIND_SPRING_DAMPING: {
+        float val = (float)hw / 10000.0f;
+        int16_t level = (int16_t)((val + 0.02f) / 0.04f);
+        if (level < 1) level = 1;
+        if (level > 10) level = 10;
+        return level;
+    }
+    case SETTINGS_KIND_BAUD_RATE: {
+        const int32_t *table = settings_serial_baud_table();
+        int count = settings_serial_baud_count();
+        for (int i = 0; i < count; i++) {
+            if (table[i] == hw) return (int16_t)(i + 1);
+        }
+        return 5; /* 默认 115200 */
+    }
+    default:
+        return 0;
+    }
+}
+
 
 int16_t settings_get_spring_stiffness(void) { return g_spring_stiffness_level; }
 void settings_set_spring_stiffness(int16_t level) {

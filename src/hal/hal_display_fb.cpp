@@ -15,7 +15,7 @@
 
 /* ═══ Native 测试环境：软件帧缓冲 ═══ */
 
-uint16_t g_framebuffer[SCREEN_WIDTH * SCREEN_HEIGHT];  /* RGB565 帧缓冲区 */
+static uint16_t g_framebuffer[HAL_SCREEN_WIDTH * HAL_SCREEN_HEIGHT];  /* RGB565 帧缓冲区 */
 extern uint16_t *g_font_fb;  /* 定义在 hal_display_font.cpp，native 字体层 */
 static int g_rotation = 0;
 static uint8_t g_brightness = 128;
@@ -26,7 +26,7 @@ static uint8_t g_brightness = 128;
 void hal_display_init(void) {
     memset(g_framebuffer, 0, sizeof(g_framebuffer));
     if (g_font_fb != NULL) {
-        memset(g_font_fb, 0, SCREEN_WIDTH * SCREEN_HEIGHT * sizeof(uint16_t));
+        memset(g_font_fb, 0, HAL_SCREEN_WIDTH * HAL_SCREEN_HEIGHT * sizeof(uint16_t));
     }
 }
 
@@ -74,6 +74,14 @@ void hal_display_clear(void) {
  * @brief 刷新到屏幕（native 环境无实际输出，空操作）
  */
 void hal_display_flush(void) {
+}
+
+struct _hal_canvas_opaque* hal_display_canvas(void) {
+    return nullptr;
+}
+
+uint16_t* hal_display_framebuffer(void) {
+    return g_framebuffer;
 }
 
 #else
@@ -129,7 +137,7 @@ public:
 };
 
 static LGFX_M5StickC g_lgfx;      /* LovyanGFX 显示实例 */
-lgfx::LGFX_Sprite* g_canvas = nullptr;  /* 离屏画布 */
+static lgfx::LGFX_Sprite* g_canvas = nullptr;  /* 离屏画布 */
 static int g_rotation = 0;          /* 当前屏幕方向 */
 static uint8_t g_brightness = 128;  /* 当前背光亮度 */
 static bool g_power_inited = false; /* AXP192 显示电源是否已初始化 */
@@ -318,6 +326,14 @@ void hal_display_flush(void) {
     if (g_canvas) {
         g_canvas->pushSprite(&g_lgfx, 0, 0);
     }
+}
+
+struct _hal_canvas_opaque* hal_display_canvas(void) {
+    return reinterpret_cast<struct _hal_canvas_opaque*>(g_canvas);
+}
+
+uint16_t* hal_display_framebuffer(void) {
+    return nullptr;
 }
 
 #endif

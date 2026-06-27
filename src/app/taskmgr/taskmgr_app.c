@@ -134,7 +134,7 @@ int taskmgr_visible_lines(void)
 {
     int16_t header_h = TASKMGR_HEADER_H;  /* 标题栏高度 */
     int16_t footer_h = TASKMGR_FOOTER_H;  /* 底部信息栏高度 */
-    int16_t avail = SCREEN_HEIGHT - header_h - footer_h;
+    int16_t avail = HAL_SCREEN_HEIGHT - header_h - footer_h;
     int16_t row_h = TASKMGR_ROW_H;        /* 行高 */
     int visible = avail / row_h;
     if (visible > TASKMGR_VISIBLE_MAX) visible = TASKMGR_VISIBLE_MAX;
@@ -260,7 +260,7 @@ void taskmgr_loop(void *ud)
             if (delta > 1 || delta < -1) {
                 /* wrap-around（列表首尾回绕）：从屏幕底部重新入场，避免溢出列表区域 */
                 for (int i = 0; i < g_tm.anim_list.visible_count && i < ANIM_ROW_MAX; i++) {
-                    g_tm.anim_list.rows[i].y = (float)SCREEN_HEIGHT;
+                    g_tm.anim_list.rows[i].y = (float)HAL_SCREEN_HEIGHT;
                 }
             } else {
                 for (int i = 0; i < g_tm.anim_list.visible_count && i < ANIM_ROW_MAX; i++) {
@@ -270,7 +270,7 @@ void taskmgr_loop(void *ud)
         }
 
         xerintosh_anim_row_list_refresh(&g_tm.anim_list,
-            g_tm.selected, g_tm.scroll, SCREEN_WIDTH, g_tm.count);
+            g_tm.selected, g_tm.scroll, HAL_SCREEN_WIDTH, g_tm.count);
         g_tm.prev_selected = g_tm.selected;
         g_tm.prev_scroll = g_tm.scroll;
     }

@@ -24,3 +24,11 @@ TEST(HalSystemDelayTest, DelayZeroDoesNotCrash)
 {
     hal_delay_ms(0);
 }
+
+TEST(HalSystemTest, TicksMsIsAvailableAndMonotonic)
+{
+    uint32_t t1 = hal_get_ticks_ms();
+    hal_delay_ms(5);
+    uint32_t t2 = hal_get_ticks_ms();
+    EXPECT_GE(t2, t1 + 5u);
+}

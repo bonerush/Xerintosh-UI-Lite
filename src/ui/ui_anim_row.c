@@ -24,18 +24,18 @@ void xerintosh_anim_row_list_init(xerintosh_anim_row_list_t *list,
     list->list_top = list_top;
 
     for (int i = 0; i < visible_count && i < ANIM_ROW_MAX; i++) {
-        list->rows[i].y = (float)SCREEN_HEIGHT;  /* 入场起点：屏幕底部 */
+        list->rows[i].y = (float)HAL_SCREEN_HEIGHT;  /* 入场起点：屏幕底部 */
         list->rows[i].y_trg = (float)(list_top + i * row_height);
-        list->rows[i].w = (float)SCREEN_WIDTH;
-        list->rows[i].w_trg = (float)SCREEN_WIDTH;
+        list->rows[i].w = (float)HAL_SCREEN_WIDTH;
+        list->rows[i].w_trg = (float)HAL_SCREEN_WIDTH;
         list->rows[i].v_y = 0.0f;
         list->rows[i].v_w = 0.0f;
     }
 
-    list->highlight.y = (float)SCREEN_HEIGHT;
+    list->highlight.y = (float)HAL_SCREEN_HEIGHT;
     list->highlight.y_trg = (float)list_top;
-    list->highlight.w = (float)SCREEN_WIDTH;
-    list->highlight.w_trg = (float)SCREEN_WIDTH;
+    list->highlight.w = (float)HAL_SCREEN_WIDTH;
+    list->highlight.w_trg = (float)HAL_SCREEN_WIDTH;
     list->highlight.v_y = 0.0f;
     list->highlight.v_w = 0.0f;
 

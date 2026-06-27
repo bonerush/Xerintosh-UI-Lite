@@ -32,7 +32,7 @@ static xerintosh_context_t g_ui_ctx = {
   .exit_animation_status = 0,
   .exit_animation_finished = true,
   .refresh_list_value = true,
-  .dirty = true,
+  .dirty_region = { true, 0, 0, 0, 0 },
   .draw_color = 0xFFFF,
   .anim_speed = 92,
   .cached_selector_content = NULL,
@@ -61,7 +61,7 @@ void xerintosh_context_init(void)
   g_ui_ctx.exit_animation_status = 0;
   g_ui_ctx.exit_animation_finished = true;
   g_ui_ctx.refresh_list_value = true;
-  g_ui_ctx.dirty = true;
+  g_ui_ctx.dirty_region = (xerintosh_dirty_region_t){ true, 0, 0, 0, 0 };
   g_ui_ctx.draw_color = 0xFFFF;
   g_ui_ctx.anim_speed = 92;
   g_ui_ctx.cached_selector_content = NULL;
@@ -77,9 +77,9 @@ void xerintosh_context_init(void)
   s_info_bar = (xerintosh_info_bar_t){0, 1, 0 - 2 * 15, 0 - 2 * 15, 0, 0, false, 0, 1};
   s_pop_up = (xerintosh_pop_up_t){0, 1, 0 - 2 * 48, 0 - 2 * 48, 0, 0, false, 0, 1, {NULL, NULL, NULL}, 0, 0, 0};
 
-  /* 运行时根据当前屏幕方向设置初始宽度（硬件路径 SCREEN_WIDTH 为变量，不能在静态初始化中使用） */
-  s_info_bar.w_info_bar = s_info_bar.w_info_bar_trg = SCREEN_WIDTH;
-  s_pop_up.w_pop_up = s_pop_up.w_pop_up_trg = SCREEN_WIDTH;
+  /* 运行时根据当前屏幕方向设置初始宽度（硬件路径 HAL_SCREEN_WIDTH 为变量，不能在静态初始化中使用） */
+  s_info_bar.w_info_bar = s_info_bar.w_info_bar_trg = HAL_SCREEN_WIDTH;
+  s_pop_up.w_pop_up = s_pop_up.w_pop_up_trg = HAL_SCREEN_WIDTH;
 
   /* 重新连接指针 */
   g_ui_ctx.selector = &s_selector;

@@ -17,15 +17,7 @@
 extern "C" {
 #endif
 
-/* ═══ 常量（保持向后兼容）═══ */
-
-#ifdef NATIVE_TEST
-#define SCREEN_WIDTH  80   /* native 测试环境屏幕宽度 */
-#define SCREEN_HEIGHT 160  /* native 测试环境屏幕高度 */
-#else
-#define SCREEN_WIDTH  g_screen_width
-#define SCREEN_HEIGHT g_screen_height
-#endif
+/* ═══ 颜色常量 ═══ */
 
 #define COLOR_BG      0x0000  /* 背景色：黑色 */
 #define COLOR_FG      0xFFFF  /* 前景色：白色 */
@@ -61,6 +53,11 @@ extern void hal_display_clear_color(uint16_t color);
  * @brief 将离屏缓冲区内容刷新到物理屏幕
  */
 extern void hal_display_flush(void);
+
+/* 内部访问器：其他 HAL 文件通过它们访问画布/帧缓冲 */
+struct _hal_canvas_opaque;
+struct _hal_canvas_opaque* hal_display_canvas(void);
+uint16_t* hal_display_framebuffer(void);
 
 /* ═══ 绘制原语 ═══ */
 

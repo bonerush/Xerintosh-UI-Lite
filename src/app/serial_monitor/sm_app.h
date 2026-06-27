@@ -26,7 +26,7 @@ extern sm_buffer_t sm_buffer;       /* 终端缓冲区 */
 
 /* ═══ 动画状态 ═══ */
 
-extern float       sm_entry_offset;   /* 入场滑入偏移（SCREEN_HEIGHT → 0） */
+extern float       sm_entry_offset;   /* 入场滑入偏移（HAL_SCREEN_HEIGHT → 0） */
 extern float       sm_btn_alpha_1;    /* 按钮 1 高亮度 (0.0~1.0) */
 
 #ifdef __cplusplus
