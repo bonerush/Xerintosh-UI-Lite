@@ -92,6 +92,7 @@ Xerintosh 项目
 - **App 层重构完成**: `app_menu.c` 拆分为 `app_menu_core.c` + `app_menu_entries.c`；`user_item_contract.h` 显式化生命周期契约；`settings_level_to_hw` / `settings_hw_to_level` 集中设置项转换；`power_key_popup` 补齐 native 测试
 - **文档体系重构完成**: `doc/` 已新增 `ui/`、`app/`、`tutorials/` 索引，修复 `ui_item_core.h` 中断链引用
 - **Xeros 内核底层全功能适配完成**: 任务通知、软件定时器、ISR 安全 IPC、流缓冲区、任务控制、运行时统计/看门狗/栈溢出检测、临界区抽象已实现；PI 互斥锁恢复基线优先级、事件组高 8 位保留、FIFO 调度器优先级桶优化、核心启动桩隔离、`vTaskDelay` 移除均已完成并通过 native/硬件构建验证
+- **UI 刷新率优化**: 已将 `src/app/ui_task.c` 的每帧睡眠从 `kern_sleep_ms(5)` 降至 `kern_sleep_ms(1)`，并将 `src/hal/hal_display_fb.cpp` 的 SPI 写频率从 27 MHz 提升至 40 MHz；已通过 `m5stick-c-native` 构建/烧录验证，无新增警告
 - **目标**: 继续验证 UI/WiFi 实际屏幕操作（调度器层面已稳定，需用户现场确认显示渲染与 WiFi 菜单交互）
 
 ## 重构记录

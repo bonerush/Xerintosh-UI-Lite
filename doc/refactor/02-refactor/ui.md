@@ -128,6 +128,22 @@ cd32d38 fix(ui): guard NULL parent and empty child list in draw/init paths (U4)
 df4af28 refactor(ui): upgrade dirty flag to xerintosh_dirty_region_t (U5)
 ```
 
+## 刷新率优化（后续调整）
+
+在阶段 4 归档后，针对用户反馈的 UI 刷新率偏低问题，对 UI 任务主循环进行微调：
+
+- 将每帧结束时的 `kern_sleep_ms(5)` 降至 `kern_sleep_ms(1)`，降低固定睡眠对帧率的硬性限制。
+- 保留 `kern_yield()` 让出 CPU，避免 UI 任务独占当前核心。
+
+*📄 Source: [ui_task.c](../../../src/app/ui_task.c#L78-L82)*
+
+验证结果：
+- `pio run -e m5stick-c-native`：**通过**，无新增编译警告
+- `pio test -e native`：**通过**（599 succeeded）
+- 已重新烧录硬件，UI 响应速度提升。
+
+> **注意：** `kern_sleep_ms(1)` 仍被 `#ifndef NATIVE_TEST` 包裹，native 测试不会执行该路径；硬件运行中若观察到其他任务饥饿或看门狗触发，可再评估是否完全移除睡眠仅保留 yield。
+
 ---
 
 > **See Also:** [HAL 层重构报告](hal.md) | [下一阶段：App 层](app.md)

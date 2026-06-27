@@ -85,6 +85,21 @@ refactor(hal): encapsulate canvas and framebuffer accessors
 refactor(hal): unify input state into context and add per-button double-click flag
 ```
 
+## 刷新率优化（后续调整）
+
+在阶段 4 归档后，针对 UI 刷新率偏低的问题进一步调整显示总线 SPI 频率：
+
+- 将 `cfg.freq_write` 从 27 MHz 提升至 40 MHz，以缩短每帧 `pushSprite` 全屏传输耗时。
+- 保持 `cfg.freq_read = 14000000` 不变，避免读时序裕量不足。
+
+*📄 Source: [hal_display_fb.cpp](../../../src/hal/hal_display_fb.cpp#L109)*
+
+验证结果：
+- `pio run -e m5stick-c-native`：**通过**，无新增编译警告
+- 已重新烧录硬件，UI 帧率上限从约 200 fps 的理论上限提升至更高，实际流畅度改善。
+
+> **注意：** 40 MHz 已接近 ST7735S 在 M5Stick-C 布线条件下的典型极限；若后续出现雪花、花屏或偶发显示错误，可将频率回调至 30–35 MHz 并重新测试。
+
 ---
 
 > **See Also:** [kernel.md](kernel.md) | [ui.md](ui.md) | [app.md](app.md) | [docs.md](docs.md)
