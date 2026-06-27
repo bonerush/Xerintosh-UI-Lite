@@ -117,9 +117,8 @@ static void xerintosh_draw_list_appearance(int16_t selected_index, int16_t child
 
 static bool item_text_is_visible(int16_t y_center)
 {
-  int16_t _font_h_2 = hal_get_font_height() / 2;
-  return (y_center + _font_h_2 > LIST_INFO_BAR_HEIGHT &&
-          y_center + _font_h_2 < HAL_SCREEN_HEIGHT);
+  return (y_center > LIST_INFO_BAR_HEIGHT &&
+          y_center < HAL_SCREEN_HEIGHT);
 }
 
 static int16_t item_compute_avail_width(xerintosh_list_item_t *_item)

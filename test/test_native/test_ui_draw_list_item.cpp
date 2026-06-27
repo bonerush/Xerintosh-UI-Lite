@@ -80,3 +80,53 @@ TEST_F(UiDrawListItemTest, DrawListRendersLongScrollingText)
 
     EXPECT_NO_FATAL_FAILURE(xerintosh_draw_list());
 }
+
+/*
+ * 回归测试：当选中项被相机滚动到屏幕底部边缘时，文字仍应被绘制，
+ * 这样后续 XOR 选择器反色才能显示文字。
+ *
+ * 重构 U3 拆分 xerintosh_draw_list_item 后，item_text_is_visible() 把
+ * "文字基线是否可见" 错误地判断为 "文字底部是否可见"，导致底部 4px
+ * 内的文字被跳过，选择器内出现空白。
+ */
+TEST_F(UiDrawListItemTest, DrawsTextForItemNearBottomEdgeAfterCameraScroll)
+{
+    xerintosh_list_item_t *root = xerintosh_get_root_list();
+    xerintosh_list_item_t *item = xerintosh_new_list_item("B", list_icon);
+    ASSERT_NE(item, nullptr);
+    EXPECT_TRUE(xerintosh_push_item_to_list(root, item));
+
+    xerintosh_init_core();
+    g_in_xerintosh = true;
+    g_anim_enabled = false;
+
+    /* 绑定并 snap 动画到当前位置 */
+    xerintosh_bind_item_to_selector(item);
+    xerintosh_refresh_selector_position();
+    xerintosh_refresh_camera_position();
+    xerintosh_refresh_list_item_position();
+
+    /* 模拟相机滚动后，文字基线正好在屏幕底部边缘附近（HAL_SCREEN_HEIGHT - 4） */
+    int16_t font_h = hal_get_font_height();
+    item->y_list_item = item->y_list_item_trg = HAL_SCREEN_HEIGHT - 4;
+    g_xerintosh_camera.y_camera = 0.0f;
+    g_xerintosh_camera.y_camera_trg = 0.0f;
+
+    hal_display_clear();
+    xerintosh_draw_list();
+
+    int16_t text_x = LIST_ITEM_LEFT_MARGIN + 10;
+    int16_t text_y = HAL_SCREEN_HEIGHT - 4; /* 文字基线 */
+    bool found_fg = false;
+    for (int16_t row = text_y - font_h + 1; row <= text_y; ++row) {
+        for (int16_t col = text_x; col < text_x + 6; ++col) {
+            if (hal_test_fb_read(col, row) == COLOR_FG) {
+                found_fg = true;
+                break;
+            }
+        }
+        if (found_fg) break;
+    }
+    EXPECT_TRUE(found_fg)
+        << "Text should be drawn when its baseline is within 4px of screen bottom";
+}
