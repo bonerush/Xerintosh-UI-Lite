@@ -15,6 +15,7 @@
 #include "kern_init.h"
 #include "kern_port.h"
 #include "kern_kmalloc.h"
+#include "kern_stats.h"
 
 #include <string.h>
 #include <stdlib.h>
@@ -417,6 +418,14 @@ void kern_sched_tick(void)
     sched_check_stack_pressure(g_current_task);
     sched_notify_memory_pressure();
 
+    kern_stats_update();
+    if ((g_sched_ticks % 100) == 0) {
+        kern_task_stack_overflow_check(g_current_task);
+    }
+    if ((g_sched_ticks % 1000) == 0) {
+        kern_watchdog_check();
+    }
+
     /* 检查是否需要重新调度（时间片到期 或 任务状态变更） */
     if (g_need_resched || (g_current_task && g_current_task->state != KERN_TASK_RUNNING)) {
         g_need_resched = false;
@@ -427,6 +436,8 @@ void kern_sched_tick(void)
             kern_mpu_apply(next);
             g_switch_to_task = next;
             if (next->state != KERN_TASK_SLEEPING) next->state = KERN_TASK_RUNNING;
+            if (prev != NULL) kern_stats_task_stop(prev);
+            if (next != NULL) kern_stats_task_start(next);
             /* getcontext 会被恢复两次：一次直接返回，一次从任务 yield/exit 返回。
              * 用静态标志确保 swapcontext 只执行一次，避免无限循环。 */
             s_switch_done = false;
@@ -464,8 +475,10 @@ void kern_sched_tick(void) /* ESP32: FreeRTOS / XEROS_NATIVE_SCHED fallback */
             if (prev != NULL && prev->state == KERN_TASK_RUNNING) {
                 prev->state = KERN_TASK_READY;
             }
+            if (prev != NULL) kern_stats_task_stop(prev);
             g_current_task = next;
             next->state = KERN_TASK_RUNNING;
+            if (next != NULL) kern_stats_task_start(next);
             kern_mpu_apply(next);
             kern_port_switch_to(next);
         }

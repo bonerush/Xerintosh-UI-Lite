@@ -10,6 +10,7 @@
 #include "kern_init.h"
 #include "kern_task_notify.h"
 #include "kern_timer.h"
+#include "kern_stats.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -44,6 +45,7 @@ void kern_init(void)
 
     kern_task_notify_init();
     kern_timer_init();
+    kern_stats_init();
 
     kern_log(KERN_LOG_INFO, "Xeros kernel initialized");
 }

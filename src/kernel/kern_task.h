@@ -204,6 +204,7 @@ extern size_t kern_task_stack_usage(kern_task_t *task);
  *        FreeRTOS: 根据 uxTaskGetStackHighWaterMark 计算峰值
  */
 extern size_t kern_task_stack_highwater(kern_task_t *task);
+extern bool   kern_task_stack_overflow_check(kern_task_t *task);
 
 /**
  * @brief  根据历史高水位推荐新栈大小
