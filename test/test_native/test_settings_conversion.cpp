@@ -6,16 +6,36 @@ extern "C" {
 
 TEST(SettingsConversionTest, BrightnessLevelToHw)
 {
-    g_brightness_level = 5;
-    EXPECT_EQ(settings_level_to_hw(SETTINGS_KIND_BRIGHTNESS, 5),
-              settings_brightness_hw_value());
+    EXPECT_EQ(settings_level_to_hw(SETTINGS_KIND_BRIGHTNESS, 1), 25);   /* 1*10*255/100 = 25 */
+    EXPECT_EQ(settings_level_to_hw(SETTINGS_KIND_BRIGHTNESS, 5), 127);  /* 5*10*255/100 = 127 */
+    EXPECT_EQ(settings_level_to_hw(SETTINGS_KIND_BRIGHTNESS, 10), 255); /* 10*10*255/100 = 255 */
+
+    /* 参数与全局变量解耦：即使全局不同，结果仍由传入 level 决定 */
+    g_brightness_level = 1;
+    EXPECT_EQ(settings_level_to_hw(SETTINGS_KIND_BRIGHTNESS, 10), 255);
 }
 
 TEST(SettingsConversionTest, AnimSpeedLevelToHw)
 {
-    g_anim_speed_level = 5;
-    EXPECT_EQ(settings_level_to_hw(SETTINGS_KIND_ANIM_SPEED, 5),
-              settings_anim_speed_value());
+    EXPECT_EQ(settings_level_to_hw(SETTINGS_KIND_ANIM_SPEED, 1), 45);  /* 40 + 1*5 */
+    EXPECT_EQ(settings_level_to_hw(SETTINGS_KIND_ANIM_SPEED, 5), 65);  /* 40 + 5*5 */
+    EXPECT_EQ(settings_level_to_hw(SETTINGS_KIND_ANIM_SPEED, 10), 90); /* 40 + 10*5 */
+
+    /* 参数与全局变量解耦 */
+    g_anim_speed_level = 1;
+    EXPECT_EQ(settings_level_to_hw(SETTINGS_KIND_ANIM_SPEED, 10), 90);
+}
+
+TEST(SettingsConversionTest, BrightnessLevelToHwClampsOutOfRange)
+{
+    EXPECT_EQ(settings_level_to_hw(SETTINGS_KIND_BRIGHTNESS, 0), 25);  /* clamp to 1 */
+    EXPECT_EQ(settings_level_to_hw(SETTINGS_KIND_BRIGHTNESS, 11), 255); /* clamp to 10 */
+}
+
+TEST(SettingsConversionTest, AnimSpeedLevelToHwClampsOutOfRange)
+{
+    EXPECT_EQ(settings_level_to_hw(SETTINGS_KIND_ANIM_SPEED, 0), 45);  /* clamp to 1 */
+    EXPECT_EQ(settings_level_to_hw(SETTINGS_KIND_ANIM_SPEED, 11), 90); /* clamp to 10 */
 }
 
 TEST(SettingsConversionTest, BaudLevelToHw)

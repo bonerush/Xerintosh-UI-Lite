@@ -254,10 +254,17 @@ float settings_spring_damping_hw_value(int16_t level)
 int32_t settings_level_to_hw(settings_kind_t kind, int16_t level)
 {
     switch (kind) {
-    case SETTINGS_KIND_BRIGHTNESS:
-        return (int32_t)settings_brightness_hw_value();
-    case SETTINGS_KIND_ANIM_SPEED:
-        return (int32_t)settings_anim_speed_value();
+    case SETTINGS_KIND_BRIGHTNESS: {
+        if (level < 1) level = 1;
+        if (level > 10) level = 10;
+        int16_t brightness = level * 10;
+        return (int32_t)((brightness * 255) / 100);
+    }
+    case SETTINGS_KIND_ANIM_SPEED: {
+        if (level < 1) level = 1;
+        if (level > 10) level = 10;
+        return (int32_t)(40 + level * 5);
+    }
     case SETTINGS_KIND_SPRING_STIFFNESS:
         return (int32_t)(settings_spring_stiffness_hw_value(level) * 10000.0f);
     case SETTINGS_KIND_SPRING_DAMPING:
