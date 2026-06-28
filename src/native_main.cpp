@@ -30,6 +30,7 @@ void on_serial_baud_change_cb(void *ud) { (void)ud; }
 void on_spring_mode_change_cb(void *ud) { (void)ud; }
 void on_spring_stiffness_change_cb(void *ud) { (void)ud; }
 void on_spring_damping_change_cb(void *ud) { (void)ud; }
+void on_theme_change_cb(void *ud) { (void)ud; }
 }
 
 /* ═══ 动画测试 ═══ */

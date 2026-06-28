@@ -54,6 +54,9 @@ void storage_set_flasher_pin_role(uint8_t pin, uint8_t role) {
     (void)pin; (void)role;
 }
 
+bool storage_get_theme(void) { return true; }
+void storage_set_theme(bool val) { (void)val; }
+
 void storage_save_all(void) {}
 void storage_load_all(void) {}
 
@@ -540,6 +543,35 @@ void storage_set_serial_baud_rate(int16_t val) {
     nvs_close(handle);
 }
 
+/* ═══ 主题模式 ═══ */
+
+bool storage_get_theme(void) {
+    nvs_handle_t handle;
+    if (nvs_open(NVS_NAMESPACE, NVS_READONLY, &handle) != ESP_OK) {
+        return true;
+    }
+
+    if (!nvs_key_exists(handle, "theme_dark")) {
+        nvs_close(handle);
+        return true; /* 默认黑夜模式 */
+    }
+
+    uint8_t val = 1;
+    nvs_get_u8(handle, "theme_dark", &val);
+    nvs_close(handle);
+    return val != 0;
+}
+
+void storage_set_theme(bool val) {
+    nvs_handle_t handle;
+    if (nvs_open(NVS_NAMESPACE, NVS_READWRITE, &handle) != ESP_OK) {
+        return;
+    }
+    nvs_set_u8(handle, "theme_dark", val ? 1 : 0);
+    nvs_commit(handle);
+    nvs_close(handle);
+}
+
 /* ═══ API Key ═══ */
 
 bool storage_get_deepseek_key(char *key, size_t max_len) {
@@ -599,6 +631,7 @@ void storage_save_all(void)
     storage_set_spring_stiffness(settings_get_spring_stiffness());
     storage_set_spring_damping(settings_get_spring_damping());
     storage_set_serial_baud_rate(settings_get_baud_rate());
+    storage_set_theme(settings_get_theme());
 }
 
 void storage_load_all(void)

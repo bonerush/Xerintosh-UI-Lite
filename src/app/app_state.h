@@ -31,6 +31,7 @@ extern void on_serial_baud_change_cb(void *ud);
 extern void on_spring_mode_change_cb(void *ud);
 extern void on_spring_stiffness_change_cb(void *ud);
 extern void on_spring_damping_change_cb(void *ud);
+extern void on_theme_change_cb(void *ud);
 
 #ifdef __cplusplus
 }

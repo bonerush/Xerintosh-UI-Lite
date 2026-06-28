@@ -25,6 +25,7 @@
 #include "app/oscilloscope/oscilloscope.h"
 #include "kernel/kern_init.h"
 #include "ui/ui_item.h"
+#include "ui/theme_icon.h"
 
 /* 波特率选择回调 */
 static void on_baud_selected_cb(void *ud);
@@ -79,6 +80,14 @@ static void build_settings_items(xerintosh_list_item_t *root)
     xerintosh_list_item_t *sw_rot = xerintosh_new_switch_item(
         "横屏/竖屏", &g_is_landscape, NULL, on_screen_rotation_change_cb, default_icon);
 
+    xerintosh_list_item_t *sw_theme = xerintosh_new_switch_item(
+        "黑夜/白天", &g_theme_dark, NULL, on_theme_change_cb, custom_icon);
+    if (sw_theme) {
+        sw_theme->bitmap_data = icon_theme_bitmap;
+        sw_theme->bitmap_w = ICON_THEME_WIDTH;
+        sw_theme->bitmap_h = ICON_THEME_HEIGHT;
+    }
+
     /* 烧录器引脚映射子菜单 */
     flasher_menu_init();
     xerintosh_list_item_t *flasher_pin_menu = flasher_menu_get_root();
@@ -94,6 +103,7 @@ static void build_settings_items(xerintosh_list_item_t *root)
     app_menu_push_checked(root, sl_stiff, "弹动硬度");
     app_menu_push_checked(root, sl_damp, "反弹力度");
     app_menu_push_checked(root, sw_rot, "横屏/竖屏");
+    app_menu_push_checked(root, sw_theme, "黑夜/白天");
     app_menu_push_checked(root, flasher_pin_menu, "烧录器引脚");
     app_menu_push_checked(root, baud_menu, "波特率");
 }

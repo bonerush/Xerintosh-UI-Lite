@@ -181,6 +181,20 @@ int16_t  storage_get_serial_baud_rate(void);
  */
 void     storage_set_serial_baud_rate(int16_t val);
 
+/* ═══ 主题模式 ═══ */
+
+/**
+ * @brief  从存储读取主题模式
+ * @return true=黑夜模式；未设置时默认返回 true
+ */
+bool storage_get_theme(void);
+
+/**
+ * @brief  保存主题模式到存储
+ * @param  val true=黑夜模式, false=白天模式
+ */
+void storage_set_theme(bool val);
+
 /* ═══ API Key ═══ */
 
 #define STORAGE_API_KEY_MAX_LEN  64

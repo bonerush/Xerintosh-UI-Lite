@@ -134,6 +134,18 @@ extern "C" void on_spring_damping_change_cb(void *ud)
 }
 
 /**
+ * @brief 主题模式变更回调
+ */
+extern "C" void on_theme_change_cb(void *ud)
+{
+    (void)ud;
+    /* 主题切换立即生效，下一帧绘制自动使用新颜色 */
+    settings_set_theme(g_theme_dark);
+    storage_set_theme(g_theme_dark);
+    xerintosh_invalidate();
+}
+
+/**
  * @brief 波特率变更回调
  * @note  保存新波特率等级到 NVS，并重新初始化 UART
  */

@@ -38,6 +38,7 @@ extern bool    g_is_landscape;           /* 横屏开关：true=横屏, false=�
 extern int16_t g_serial_baud_rate;       /* 串口波特率等级 1-6 */
 extern int16_t g_spring_stiffness_level;  /* 弹簧硬度等级 1-10（默认 5） */
 extern int16_t g_spring_damping_level;    /* 弹簧阻尼等级 1-10（默认 9） */
+extern bool    g_theme_dark;              /* 主题模式：true=黑夜模式, false=白天模式 */
 
 /* ═══ Getter/Setter ═══ */
 
@@ -61,6 +62,9 @@ extern void    settings_set_spring_stiffness(int16_t level);
 
 extern int16_t settings_get_spring_damping(void);
 extern void    settings_set_spring_damping(int16_t level);
+
+extern bool    settings_get_theme(void);
+extern void    settings_set_theme(bool dark);
 
 /* ═══ 生命周期 ═══ */
 

@@ -21,6 +21,7 @@ bool    g_is_landscape           = true;                     /* 默认横屏 */
 int16_t g_serial_baud_rate       = 5;                        /* 默认波特率等级 5 = 115200 */
 int16_t g_spring_stiffness_level  = 5;                        /* 默认弹簧硬度等级 5 → 0.20 */
 int16_t g_spring_damping_level    = 9;                        /* 默认弹簧阻尼等级 9 → 0.36 */
+bool    g_theme_dark              = true;                     /* 默认黑夜模式 */
 
 /* ═══ 从存储加载 ═══ */
 
@@ -97,6 +98,9 @@ void settings_load_from_storage(void)
     /* 同步弹簧参数到 UI 全局变量 */
     g_spring_stiffness_selector = settings_spring_stiffness_hw_value(g_spring_stiffness_level);
     g_spring_damping_selector   = settings_spring_damping_hw_value(g_spring_damping_level);
+
+    /* 主题模式 */
+    g_theme_dark = storage_get_theme();
 }
 
 /* ═══ Getter/Setter ═══ */
@@ -247,6 +251,13 @@ float settings_spring_damping_hw_value(int16_t level)
     if (level < 1) level = 1;
     if (level > 10) level = 10;
     return (float)level * 0.04f;
+}
+
+/* ═══ 主题模式 ═══ */
+
+bool settings_get_theme(void) { return g_theme_dark; }
+void settings_set_theme(bool dark) {
+    g_theme_dark = dark;
 }
 
 /* ═══ 统一转换入口实现 ═══ */

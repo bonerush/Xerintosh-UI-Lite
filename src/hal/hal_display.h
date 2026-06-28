@@ -11,6 +11,7 @@
 #define HAL_DISPLAY_H
 
 #include <stdint.h>
+#include <stdbool.h>
 #include "hal_screen.h"
 
 #ifdef __cplusplus
@@ -19,10 +20,32 @@ extern "C" {
 
 /* ═══ 颜色常量 ═══ */
 
-#define COLOR_BG      0x0000  /* 背景色：黑色 */
-#define COLOR_FG      0xFFFF  /* 前景色：白色 */
-#define COLOR_ACCENT  0x07E0  /* 强调色：绿色 */
-#define COLOR_RED     0xF800  /* 红色：用于 Master 前缀 */
+/** @brief 主题模式全局标志（true=黑夜/黑底白字, false=白天/白底黑字） */
+extern bool g_theme_dark;
+
+/**
+ * @def COLOR_BG
+ * @brief 背景色（黑夜=黑 0x0000, 白天=白 0xFFFF）
+ */
+#define COLOR_BG      (g_theme_dark ? 0x0000 : 0xFFFF)
+
+/**
+ * @def COLOR_FG
+ * @brief 前景色（黑夜=白 0xFFFF, 白天=黑 0x0000）
+ */
+#define COLOR_FG      (g_theme_dark ? 0xFFFF : 0x0000)
+
+/**
+ * @def COLOR_ACCENT
+ * @brief 强调色——绿色（黑夜=亮绿 0x07E0, 白天=暗绿 0x0280）
+ */
+#define COLOR_ACCENT  (g_theme_dark ? 0x07E0 : 0x0280)
+
+/**
+ * @def COLOR_RED
+ * @brief 红色（黑夜=亮红 0xF800, 白天=暗红 0x8000）
+ */
+#define COLOR_RED     (g_theme_dark ? 0xF800 : 0x8000)
 
 /* ═══ 生命周期 ═══ */
 
