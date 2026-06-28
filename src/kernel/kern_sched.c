@@ -550,21 +550,33 @@ void kern_sched_tick(void) /* ESP32: FreeRTOS / XEROS_NATIVE_SCHED fallback */
     sched_notify_memory_pressure();
 
     if (g_need_resched || (g_current_task && g_current_task->state != KERN_TASK_RUNNING)) {
-        g_need_resched = false;
-        kern_task_t *next = pick_next_ready();
-        if (next && next != g_current_task) {
-            kern_task_t *prev = g_current_task;
-            if (prev != NULL && prev->state == KERN_TASK_RUNNING) {
-                prev->state = KERN_TASK_READY;
-            }
-            if (prev != NULL) kern_stats_task_stop(prev);
-            g_current_task = next;
-            next->state = KERN_TASK_RUNNING;
-            if (next != NULL) kern_stats_task_start(next);
-            kern_mpu_apply(next);
-            kern_port_switch_to(next);
+        kern_sched_reschedule();
+    }
+}
+
+/**
+ * @brief 执行重新调度（不递增 tick）
+ * @details 当任务主动 yield/sleep 后 g_current_task 状态不再是 RUNNING，
+ *          需要立即挑选下一个就绪任务，不等下一个定时器 tick。
+ *          与 kern_sched_tick() 的区别：不递增 g_sched_ticks。
+ */
+void kern_sched_reschedule(void)
+{
+    if (!g_sched_initialized) return;
+
+    g_need_resched = false;
+    kern_task_t *next = pick_next_ready();
+    if (next && next != g_current_task) {
+        kern_task_t *prev = g_current_task;
+        if (prev != NULL && prev->state == KERN_TASK_RUNNING) {
+            prev->state = KERN_TASK_READY;
         }
-        return;
+        if (prev != NULL) kern_stats_task_stop(prev);
+        g_current_task = next;
+        next->state = KERN_TASK_RUNNING;
+        if (next != NULL) kern_stats_task_start(next);
+        kern_mpu_apply(next);
+        kern_port_switch_to(next);
     }
 }
 
@@ -576,8 +588,11 @@ void idle_entry(void *arg)
 {
     (void)arg;
     while (1) {
-        /* idle 优先级最低，睡眠 1ms 即可，避免无限 kern_yield 造成无意义切换。 */
-        kern_sleep_ms(1);
+        /* idle 优先级最低，直接 yield 即可。
+         * 不用 kern_sleep_ms(1)：idle 不应进入 SLEEPING 状态，
+         * 否则 native_idle_next_wake_ms() 会将其视为需要唤醒的任务，
+         * 干扰 tickless 的下一唤醒时间计算。 */
+        kern_yield();
     }
 }
 
@@ -608,12 +623,38 @@ void kern_smp_sched_loop(void *arg)
 
     kern_log(KERN_LOG_INFO, "SMP: core %u scheduler entering loop", (unsigned)cpu);
 
-    /* per-CPU 调度循环 */
+    /* per-CPU 调度循环：
+     * - g_sched_ticks 仅在硬件定时器真正触发时递增（1kHz），不在每次循环迭代递增。
+     *   这修正了先前以 ~200us 周期递增导致 kern_sleep_ms(N) 实际只睡 N/5 ms 的问题。
+     * - 任务主动 yield/sleep 后，g_current_task->state != RUNNING，
+     *   调用 kern_sched_reschedule() 立即挑选下一个任务，不等待下一个定时器 tick。
+     * - kern_port_idle() 在没有就绪任务时进入低功耗等待（tickless 或 1ms 定时器同步等待）。 */
     while (1) {
-        if (kern_port_preempt_consume()) {
+        bool had_tick = kern_port_preempt_consume();
+        if (had_tick) {
+            g_sched_ticks++;
             g_need_resched = true;
         }
-        kern_sched_tick();
+
+        reap_zombies();
+
+        /* 调度类 tick 回调仅在硬件 tick 时执行（时间片递减等） */
+        if (had_tick) {
+            for (int i = 0; i < g_sched_class_count; i++) {
+                if (g_sched_classes[i] && g_sched_classes[i]->tick) {
+                    g_sched_classes[i]->tick(g_current_task);
+                }
+            }
+        }
+
+        sched_check_stack_pressure(g_current_task);
+        sched_notify_memory_pressure();
+
+        /* 检查是否需要重新调度（任务 yield/sleep 或时间片到期） */
+        if (g_need_resched || (g_current_task && g_current_task->state != KERN_TASK_RUNNING)) {
+            kern_sched_reschedule();
+        }
+
         kern_port_idle();
     }
 }

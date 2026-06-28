@@ -203,10 +203,15 @@ static void native_idle(void)
                 tick_timer_set_next_alarm(idle_us);
                 /* Phase 2 保守方案：先不执行 waiti 0（user mode 下可能触发异常），
                  * 用低功耗忙等直到下一次 tick 中断。后续再替换为真正的睡眠指令。 */
-                while (!tick_timer_pending() && !g_need_resched) {
+                while (!tick_timer_pending(kern_cpu_id()) && !g_need_resched) {
                     __asm__ volatile ("nop");
                 }
                 tick_timer_restore_periodic();
+
+                /* 消费导致退出 tickless 的 tick 标志，避免调度器循环中
+                 * kern_port_preempt_consume() 再次消费同一标志导致 g_sched_ticks
+                 * 重复递增（补偿 +elapsed_ms 后又 +1）。 */
+                tick_timer_consume(kern_cpu_id());
 
                 /* 关键修复：tickless 期间 g_sched_ticks 未推进，但真实时间已流逝。
                  * 不补偿会导致睡眠任务的 wake_time 检查失效，任务实际等待时间
@@ -220,12 +225,14 @@ static void native_idle(void)
         }
     }
 
-    /* 无法进入 tickless：回退到 ROM 短延时 (200us)。
-     * 短延时提升 UI 帧率精度——动画活跃时帧间隔仅 10ms，
-     * 1ms 的 idle 开销占比过大。
-     * 这里不再调用 vTaskDelay，以切断 Xeros 任务对 FreeRTOS 调度 API
-     * 的显式依赖；高优先级 FreeRTOS 驱动任务仍可抢占本任务。 */
-    ets_delay_us(200);
+    /* 无法进入 tickless：等待下一个定时器 tick（最多 1ms）。
+     * 使用定时器同步等待替代固定 ets_delay_us(200)，防止调度器循环以
+     * ~5kHz 频率旋转导致 g_sched_ticks 以 5 倍速度递增。
+     * g_sched_ticks 现在仅由调度器循环在 kern_port_preempt_consume()
+     * 返回 true 时递增，确保 1 tick = 1ms 的语义一致性。 */
+    while (!tick_timer_pending(kern_cpu_id()) && !g_need_resched) {
+        __asm__ volatile ("nop");
+    }
 }
 
 /* ═══ 定时器基础设施 ═══ */
@@ -255,7 +262,7 @@ static void native_timer_stop(void)
 
 static bool native_preempt_consume(void)
 {
-    return tick_timer_consume();
+    return tick_timer_consume(kern_cpu_id());
 }
 
 #else /* !CONFIG_PREEMPT_ENABLED */

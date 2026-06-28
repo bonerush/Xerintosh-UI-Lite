@@ -60,6 +60,7 @@ extern kern_ctx_native_t g_sched_ctx[KERN_MAX_CPUS];  /* 调度器原生上下�
 
 kern_task_t *pick_next_ready(void);
 void kern_sched_tick(void);
+void kern_sched_reschedule(void);
 void kern_sched_init(void);
 void kern_sched_ensure_initialized(void);
 void idle_entry(void *arg);

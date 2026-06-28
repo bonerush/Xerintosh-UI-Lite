@@ -24,7 +24,7 @@ static const char *TAG = "tick_timer";
 
 /* ═══ 内部状态 ═══ */
 
-static volatile bool g_tick_pending = false;   /* ISR → 任务上下文通知标志 */
+static volatile bool g_tick_pending[2] = {false, false};  /* ISR → 任务上下文通知标志（per-CPU） */
 static volatile bool g_timer_running = false;
 static gptimer_handle_t g_gptimer = NULL;
 static uint32_t g_period_us = 1000;             /* 初始化时保存的周期，用于 tickless 唤醒后恢复 */
@@ -46,7 +46,8 @@ static bool IRAM_ATTR tick_timer_alarm_isr(gptimer_handle_t timer,
     (void)edata;
     (void)user_data;
 
-    g_tick_pending = true;
+    g_tick_pending[0] = true;
+    g_tick_pending[1] = true;
     return false;  /* 不唤醒高优先级任务 */
 }
 
@@ -59,7 +60,8 @@ int tick_timer_init(uint32_t period_us)
         return -1;
     }
 
-    g_tick_pending = false;
+    g_tick_pending[0] = false;
+    g_tick_pending[1] = false;
 
     g_period_us = period_us;
 
@@ -122,7 +124,8 @@ int tick_timer_start(void)
     if (g_timer_running) return 0;
     if (g_gptimer == NULL) return -1;
 
-    g_tick_pending = false;
+    g_tick_pending[0] = false;
+    g_tick_pending[1] = false;
 
     esp_err_t err = gptimer_start(g_gptimer);
     if (err != ESP_OK) {
@@ -141,19 +144,22 @@ void tick_timer_stop(void)
 
     gptimer_stop(g_gptimer);
     g_timer_running = false;
-    g_tick_pending = false;
+    g_tick_pending[0] = false;
+    g_tick_pending[1] = false;
     ESP_LOGI(TAG, "timer stopped");
 }
 
-bool tick_timer_pending(void)
+bool tick_timer_pending(uint8_t cpu_id)
 {
-    return g_tick_pending;
+    if (cpu_id >= 2) return false;
+    return g_tick_pending[cpu_id];
 }
 
-bool tick_timer_consume(void)
+bool tick_timer_consume(uint8_t cpu_id)
 {
-    if (!g_tick_pending) return false;
-    g_tick_pending = false;
+    if (cpu_id >= 2) return false;
+    if (!g_tick_pending[cpu_id]) return false;
+    g_tick_pending[cpu_id] = false;
     return true;
 }
 

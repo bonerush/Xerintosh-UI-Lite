@@ -42,19 +42,22 @@ void tick_timer_stop(void);
 
 /**
  * @brief 检查是否有 tick 待处理（不消费标志）
+ * @param cpu_id  当前核心 ID（0 或 1）
  * @return true 如果有 tick 待处理
  */
-bool tick_timer_pending(void);
+bool tick_timer_pending(uint8_t cpu_id);
 
 /**
- * @brief 检查并消费 tick 请求（任务上下文调用）
+ * @brief 检查并消费 tick 请求（per-CPU 任务上下文调用）
  *
- * 当 ISR 设置了 tick 标志时返回 true，同时清零标志。
+ * 当 ISR 设置了 tick 标志时返回 true，同时清零本核心的标志。
  * 调度器在主循环中调用此函数来触发 kern_sched_tick()。
+ * 在 SMP 下，ISR 会同时设置两个核心的标志，每个核心独立消费自己的标志。
  *
+ * @param cpu_id  当前核心 ID（0 或 1）
  * @return true 如果有 tick 待处理
  */
-bool tick_timer_consume(void);
+bool tick_timer_consume(uint8_t cpu_id);
 
 /**
  * @brief 检查定时器是否正在运行
