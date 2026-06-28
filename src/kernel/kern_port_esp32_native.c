@@ -30,6 +30,7 @@
 #include <setjmp.h>
 
 #include "esp32/rom/ets_sys.h"
+#include "esp_timer.h"
 
 /* 原生调度器调试输出开关：0=关闭大量切换日志，1=打开 */
 #define NATIVE_SCHED_DEBUG 0
@@ -198,6 +199,7 @@ static void native_idle(void)
                 /* 限制最大睡眠时长，避免长时间无 tick 导致诊断失效 */
                 if (idle_us > 100000) idle_us = 100000;  /* max 100ms */
 
+                uint64_t t0 = esp_timer_get_time();
                 tick_timer_set_next_alarm(idle_us);
                 /* Phase 2 保守方案：先不执行 waiti 0（user mode 下可能触发异常），
                  * 用低功耗忙等直到下一次 tick 中断。后续再替换为真正的睡眠指令。 */
@@ -205,6 +207,14 @@ static void native_idle(void)
                     __asm__ volatile ("nop");
                 }
                 tick_timer_restore_periodic();
+
+                /* 关键修复：tickless 期间 g_sched_ticks 未推进，但真实时间已流逝。
+                 * 不补偿会导致睡眠任务的 wake_time 检查失效，任务实际等待时间
+                 * 远超预期，长时间空闲后 UI 卡死。 */
+                uint32_t elapsed_ms = (uint32_t)((esp_timer_get_time() - t0) / 1000);
+                if (elapsed_ms > 0) {
+                    g_sched_ticks += elapsed_ms;
+                }
                 return;
             }
         }
