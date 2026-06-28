@@ -1,0 +1,64 @@
+- generic [active] [ref=e1]:
+  - heading "UI Layout Designer — Test Suite" [level=1] [ref=e2]
+  - generic [ref=e3]:
+    - generic [ref=e4]: SOME TESTS FAILED — 35/40 passed
+    - generic [ref=e5]:
+      - 'heading "Test 1: Element Creation" [level=2] [ref=e6]'
+      - paragraph [ref=e7]: "[PASS] rect tool maps to rectangle subtype (got: rectangle)"
+      - paragraph [ref=e8]: "[PASS] rect has fill=false (got: false)"
+      - paragraph [ref=e9]: "[PASS] filled-rect has fill=true (got: true)"
+      - paragraph [ref=e10]: "[PASS] circle radius set correctly (got: 8)"
+      - paragraph [ref=e11]: "[PASS] text content preserved (got: \"Hello\")"
+      - paragraph [ref=e12]: "[PASS] icon name preserved (got: \"wifi\")"
+      - paragraph [ref=e13]: "[PASS] control subtype preserved (got: \"switch_item\")"
+    - generic [ref=e14]:
+      - 'heading "Test 2: Color Handling" [level=2] [ref=e15]'
+      - paragraph [ref=e16]: "[PASS] accent color #00E000 is valid 6-digit HEX"
+      - paragraph [ref=e17]: "[PASS] old color #07E0 is NOT valid 6-digit HEX (was RGB565)"
+      - paragraph [ref=e18]: "[PASS] element color set correctly (got: #FFFFFF)"
+    - generic [ref=e19]:
+      - 'heading "Test 3: Offscreen Rendering" [level=2] [ref=e20]'
+      - paragraph [ref=e22]: "[PASS] white rect rendered at (10,10) — pixel is whiteish"
+      - paragraph [ref=e23]: "[PASS] red filled-rect rendered — pixel is reddish"
+      - paragraph [ref=e24]: "[PASS] text rendered without throwing error"
+      - paragraph [ref=e25]: "[PASS] icon rendered without throwing error"
+    - generic [ref=e26]:
+      - 'heading "Test 3b: Control Rendering" [level=2] [ref=e27]'
+      - paragraph [ref=e29]: "[FAIL] list control renders visible content at (2,19)"
+      - paragraph [ref=e30]: "[FAIL] switch control renders visible content at (2,39)"
+      - paragraph [ref=e31]: "[FAIL] slider control renders visible content at (2,59)"
+      - paragraph [ref=e32]: "[FAIL] button control renders visible content at (2,79)"
+      - paragraph [ref=e33]: "[FAIL] user control renders visible content at (2,99)"
+    - generic [ref=e34]:
+      - 'heading "Test 4: Hit Testing" [level=2] [ref=e35]'
+      - paragraph [ref=e36]: "[PASS] point (15,15) hits rect"
+      - paragraph [ref=e37]: "[PASS] point (50,50) misses rect"
+      - paragraph [ref=e38]: "[PASS] point (8,8) hits circle (center)"
+      - paragraph [ref=e39]: "[PASS] point (2,2) hits text element"
+    - generic [ref=e40]:
+      - 'heading "Test 5: Export / Import Roundtrip" [level=2] [ref=e41]'
+      - paragraph [ref=e42]: "[PASS] export JSON contains device metadata"
+      - paragraph [ref=e43]: "[PASS] export JSON uses 'rectangle' type (not 'rect')"
+      - paragraph [ref=e44]: "[PASS] import restores 4 elements (got: 4)"
+      - paragraph [ref=e45]: "[PASS] imported first element subtype is 'rectangle' (got: rectangle)"
+      - paragraph [ref=e46]: "[PASS] imported metadata device is 'M5Stick' (got: M5Stick)"
+    - generic [ref=e47]:
+      - 'heading "Test 6: LLM Prompt Generation" [level=2] [ref=e48]'
+      - paragraph [ref=e49]: "[PASS] prompt contains project title"
+      - paragraph [ref=e50]: "[PASS] prompt references HAL API 'hal_draw_rect'"
+      - paragraph [ref=e51]: "[PASS] prompt includes color constants"
+    - generic [ref=e52]:
+      - 'heading "Test 7: Control Properties — Bug Repro" [level=2] [ref=e53]'
+      - paragraph [ref=e54]: "[PASS] control preserves content (label) property (got: \"MyItem\")"
+      - paragraph [ref=e55]: "[PASS] control has fontSize property (got: 12)"
+      - paragraph [ref=e56]: "[PASS] getPropFields includes 'content' for control (got: id,x,y,color,layer,w,h,content,fontSize,subtype)"
+      - paragraph [ref=e57]: "[PASS] getPropFields includes 'fontSize' for control (got: id,x,y,color,layer,w,h,content,fontSize,subtype)"
+    - generic [ref=e58]:
+      - 'heading "Test 8: Control Right Arrow — Bug Repro" [level=2] [ref=e59]'
+      - paragraph [ref=e61]: "[PASS] list_item has NO right-side arrow at x=62+ (should be clean)"
+      - paragraph [ref=e62]: "[PASS] button_item HAS right-side arrow at x=62+"
+      - paragraph [ref=e63]: "[PASS] user_item HAS right-side arrow at x=62+"
+    - generic [ref=e64]:
+      - 'heading "Test 9: Control Font Size — Bug Repro" [level=2] [ref=e65]'
+      - paragraph [ref=e67]: "[PASS] control renders text with fontSize=6 (custom fontSize)"
+      - paragraph [ref=e68]: "[PASS] control renders text with fontSize=16 (custom fontSize)"

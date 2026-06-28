@@ -1,0 +1,214 @@
+- generic [ref=e2]:
+  - banner [ref=e3]:
+    - generic [ref=e4]: Xerintosh UI Designer
+    - generic [ref=e5]:
+      - generic [ref=e6]: "Device:"
+      - combobox [ref=e7]:
+        - option "M5Stick (80×160)" [selected]
+        - option "OLED 128×64"
+        - option "OLED 128×128"
+        - option "ILI9341 (240×320)"
+        - option "Custom..."
+      - generic [ref=e8]: 80 × 160
+      - button "Portrait" [ref=e9] [cursor=pointer]
+    - generic [ref=e10]:
+      - button "-" [ref=e11] [cursor=pointer]
+      - generic [ref=e12]: 4×
+      - button "+" [ref=e13] [cursor=pointer]
+      - button "Grid" [ref=e14] [cursor=pointer]
+    - generic [ref=e15]:
+      - button "New" [ref=e16] [cursor=pointer]
+      - button "Import" [ref=e17] [cursor=pointer]
+      - button "Export JSON" [ref=e18] [cursor=pointer]
+      - button "Export LLM Prompt" [ref=e19] [cursor=pointer]
+  - generic [ref=e20]:
+    - complementary [ref=e21]:
+      - generic [ref=e22]:
+        - heading "Tools" [level=3] [ref=e23]
+        - generic [ref=e24]:
+          - button "Select / Move (V)" [ref=e25] [cursor=pointer]:
+            - img [ref=e26]
+          - button "Rectangle (R)" [ref=e28] [cursor=pointer]:
+            - img [ref=e29]
+          - button "Filled Rectangle (F)" [ref=e31] [cursor=pointer]:
+            - img [ref=e32]
+          - button "Round Rect" [ref=e34] [cursor=pointer]:
+            - img [ref=e35]
+          - button "Circle (C)" [ref=e37] [cursor=pointer]:
+            - img [ref=e38]
+          - button "Filled Circle" [ref=e40] [cursor=pointer]:
+            - img [ref=e41]
+          - button "Line (L)" [ref=e43] [cursor=pointer]:
+            - img [ref=e44]
+          - button "Text (T)" [ref=e46] [cursor=pointer]:
+            - img [ref=e47]:
+              - generic [ref=e48]: T
+          - button "Eraser (E)" [ref=e49] [cursor=pointer]:
+            - img [ref=e50]
+      - generic [ref=e52]:
+        - heading "Standard Icons" [level=3] [ref=e53]
+        - generic [ref=e54]:
+          - generic "List" [ref=e55]:
+            - img [ref=e56]
+            - generic [ref=e58]: List
+          - generic "Switch" [ref=e59]:
+            - img [ref=e60]
+            - generic [ref=e63]: Switch
+          - generic "Plus" [ref=e64]:
+            - img [ref=e65]
+            - generic [ref=e68]: Plus
+          - generic "User" [ref=e69]:
+            - img [ref=e70]
+            - generic [ref=e73]: User
+          - generic "Slider" [ref=e74]:
+            - img [ref=e75]
+            - generic [ref=e79]: Slider
+          - generic "Flag" [ref=e80]:
+            - img [ref=e81]
+            - generic [ref=e83]: Flag
+          - generic "Power" [ref=e84]:
+            - img [ref=e85]
+            - generic [ref=e87]: Power
+          - generic "Default" [ref=e88]:
+            - img [ref=e89]
+            - generic [ref=e91]: Default
+      - generic [ref=e92]:
+        - heading "Extra Icons" [level=3] [ref=e93]
+        - generic [ref=e94]:
+          - generic "WiFi" [ref=e95]:
+            - img [ref=e96]
+            - generic [ref=e98]: WiFi
+          - generic "Bluetooth" [ref=e99]:
+            - img [ref=e100]
+            - generic [ref=e102]: BT
+          - generic "Battery" [ref=e103]:
+            - img [ref=e104]
+            - generic [ref=e108]: Battery
+          - generic "Heart" [ref=e109]:
+            - img [ref=e110]
+            - generic [ref=e112]: Heart
+          - generic "Settings" [ref=e113]:
+            - img [ref=e114]
+            - generic [ref=e117]: Settings
+      - generic [ref=e118]:
+        - heading "Controls" [level=3] [ref=e119]
+        - generic [ref=e120]:
+          - generic [ref=e121]:
+            - generic [ref=e122]: List Item
+            - generic [ref=e123]: List
+          - generic [ref=e124]:
+            - generic [ref=e125]: "[ ON ]"
+            - generic [ref=e126]: Switch
+          - generic [ref=e127]:
+            - generic [ref=e128]: "[====]"
+            - generic [ref=e129]: Slider
+          - generic [ref=e130]:
+            - generic [ref=e131]: "[ Btn ]"
+            - generic [ref=e132]: Button
+          - generic [ref=e133]:
+            - generic [ref=e134]: "[ App ]"
+            - generic [ref=e135]: App
+      - generic [ref=e136]:
+        - heading "Colors" [level=3] [ref=e137]
+        - generic [ref=e138]:
+          - generic "White" [ref=e139] [cursor=pointer]
+          - generic "Black" [ref=e140] [cursor=pointer]
+          - generic "Accent (Green)" [ref=e141] [cursor=pointer]
+          - generic "Red" [ref=e142] [cursor=pointer]
+          - generic "Blue" [ref=e143] [cursor=pointer]
+          - textbox [ref=e144] [cursor=pointer]: "#ffffff"
+        - generic [ref=e145] [cursor=pointer]:
+          - checkbox "Fill Shape" [ref=e146]
+          - text: Fill Shape
+    - generic [ref=e150]:
+      - generic [ref=e151]: "x: 0, y: 0"
+      - generic [ref=e152]: 0 elements
+      - generic [ref=e153]: "Canvas: 80 × 160"
+    - complementary [ref=e154]:
+      - heading "Elements" [level=3] [ref=e156]
+      - generic [ref=e157]:
+        - heading "Properties" [level=3] [ref=e158]
+        - generic [ref=e159]:
+          - generic [ref=e160]: Type
+          - textbox [disabled] [ref=e161]
+        - generic [ref=e162]:
+          - generic [ref=e163]: ID
+          - textbox [ref=e164]
+        - generic [ref=e165]:
+          - generic [ref=e166]:
+            - generic [ref=e167]: X
+            - spinbutton [ref=e168]
+          - generic [ref=e169]:
+            - generic [ref=e170]: "Y"
+            - spinbutton [ref=e171]
+        - generic [ref=e172]:
+          - generic [ref=e173]:
+            - generic [ref=e174]: Width
+            - spinbutton [ref=e175]
+          - generic [ref=e176]:
+            - generic [ref=e177]: Height
+            - spinbutton [ref=e178]
+        - generic [ref=e179]:
+          - generic [ref=e180]: Radius
+          - spinbutton [ref=e181]
+        - generic [ref=e182]:
+          - generic [ref=e183]: Text
+          - textbox [ref=e184]
+        - generic [ref=e185]:
+          - generic [ref=e186]: Font Size
+          - combobox [ref=e187]:
+            - option "6px (tiny)"
+            - option "8px (small)"
+            - option "12px (medium)"
+            - option "16px (large)"
+        - generic [ref=e188]:
+          - generic [ref=e189]: Label
+          - textbox [ref=e190]
+        - generic [ref=e191]:
+          - generic [ref=e192]: Color
+          - textbox [ref=e194] [cursor=pointer]: "#000000"
+        - generic [ref=e195]:
+          - generic [ref=e196]: Layer
+          - generic [ref=e197]:
+            - button "Up" [ref=e198] [cursor=pointer]
+            - spinbutton [disabled] [ref=e199]
+            - button "Down" [ref=e200] [cursor=pointer]
+        - generic [ref=e201]:
+          - button "Delete" [ref=e202] [cursor=pointer]
+          - button "Duplicate" [ref=e203] [cursor=pointer]
+      - generic [ref=e204]:
+        - heading "Shortcuts" [level=3] [ref=e205]
+        - generic [ref=e206]:
+          - generic [ref=e207]:
+            - generic [ref=e208]: V
+            - text: Select
+          - generic [ref=e209]:
+            - generic [ref=e210]: R
+            - text: Rectangle
+          - generic [ref=e211]:
+            - generic [ref=e212]: F
+            - text: Filled Rect
+          - generic [ref=e213]:
+            - generic [ref=e214]: C
+            - text: Circle
+          - generic [ref=e215]:
+            - generic [ref=e216]: L
+            - text: Line
+          - generic [ref=e217]:
+            - generic [ref=e218]: T
+            - text: Text
+          - generic [ref=e219]:
+            - generic [ref=e220]: E
+            - text: Eraser
+          - generic [ref=e221]:
+            - generic [ref=e222]: Del
+            - text: Delete
+          - generic [ref=e223]:
+            - generic [ref=e224]: Arrows
+            - text: Nudge
+          - generic [ref=e225]:
+            - generic [ref=e226]: Ctrl+Z
+            - text: Undo
+          - generic [ref=e227]:
+            - generic [ref=e228]: Ctrl+Y
+            - text: Redo

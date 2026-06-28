@@ -1,0 +1,231 @@
+- generic [ref=e2]:
+  - banner [ref=e3]:
+    - generic [ref=e4]: Xerintosh UI Designer
+    - generic [ref=e5]:
+      - generic [ref=e6]: "设备:"
+      - combobox [ref=e7]:
+        - option "M5Stick (80×160)" [selected]
+        - option "OLED 128×64"
+        - option "OLED 128×128"
+        - option "ILI9341 (240×320)"
+        - option "自定义..."
+      - generic [ref=e8]: 80 × 160
+      - button "竖屏" [ref=e9] [cursor=pointer]
+    - generic [ref=e10]:
+      - button "-" [ref=e11] [cursor=pointer]
+      - generic [ref=e12]: 4×
+      - button "+" [ref=e13] [cursor=pointer]
+      - button "网格" [ref=e14] [cursor=pointer]
+    - generic [ref=e15]:
+      - button "新建" [ref=e16] [cursor=pointer]
+      - button "导入" [ref=e17] [cursor=pointer]
+      - button "导出 JSON" [ref=e18] [cursor=pointer]
+      - button "导出 LLM 提示词" [ref=e19] [cursor=pointer]
+    - button "EN" [ref=e20] [cursor=pointer]
+  - generic [ref=e21]:
+    - complementary [ref=e22]:
+      - generic [ref=e23]:
+        - heading "工具" [level=3] [ref=e24]
+        - generic [ref=e25]:
+          - button "Select / Move (V)" [ref=e26] [cursor=pointer]:
+            - img [ref=e27]
+          - button "Rectangle (R)" [ref=e29] [cursor=pointer]:
+            - img [ref=e30]
+          - button "Filled Rectangle (F)" [ref=e32] [cursor=pointer]:
+            - img [ref=e33]
+          - button "Round Rect" [ref=e35] [cursor=pointer]:
+            - img [ref=e36]
+          - button "Circle (C)" [ref=e38] [cursor=pointer]:
+            - img [ref=e39]
+          - button "Filled Circle" [ref=e41] [cursor=pointer]:
+            - img [ref=e42]
+          - button "Line (L)" [ref=e44] [cursor=pointer]:
+            - img [ref=e45]
+          - button "Text (T)" [ref=e47] [cursor=pointer]:
+            - img [ref=e48]:
+              - generic [ref=e49]: T
+          - button "Eraser (E)" [ref=e50] [cursor=pointer]:
+            - img [ref=e51]
+      - generic [ref=e53]:
+        - heading "标准图标" [level=3] [ref=e54]
+        - generic [ref=e55]:
+          - generic "List" [ref=e56]:
+            - img [ref=e57]
+            - generic [ref=e59]: List
+          - generic "Switch" [ref=e60]:
+            - img [ref=e61]
+            - generic [ref=e64]: Switch
+          - generic "Plus" [ref=e65]:
+            - img [ref=e66]
+            - generic [ref=e69]: Plus
+          - generic "User" [ref=e70]:
+            - img [ref=e71]
+            - generic [ref=e74]: User
+          - generic "Slider" [ref=e75]:
+            - img [ref=e76]
+            - generic [ref=e80]: Slider
+          - generic "Flag" [ref=e81]:
+            - img [ref=e82]
+            - generic [ref=e84]: Flag
+          - generic "Power" [ref=e85]:
+            - img [ref=e86]
+            - generic [ref=e88]: Power
+          - generic "Default" [ref=e89]:
+            - img [ref=e90]
+            - generic [ref=e92]: Default
+      - generic [ref=e93]:
+        - heading "扩展图标" [level=3] [ref=e94]
+        - generic [ref=e95]:
+          - generic "WiFi" [ref=e96]:
+            - img [ref=e97]
+            - generic [ref=e99]: WiFi
+          - generic "Bluetooth" [ref=e100]:
+            - img [ref=e101]
+            - generic [ref=e103]: BT
+          - generic "Battery" [ref=e104]:
+            - img [ref=e105]
+            - generic [ref=e109]: Battery
+          - generic "Heart" [ref=e110]:
+            - img [ref=e111]
+            - generic [ref=e113]: Heart
+          - generic "Settings" [ref=e114]:
+            - img [ref=e115]
+            - generic [ref=e118]: Settings
+      - generic [ref=e119]:
+        - heading "Containers" [level=3] [ref=e120]
+        - button "List Container" [ref=e122] [cursor=pointer]:
+          - img [ref=e123]
+      - generic [ref=e125]:
+        - heading "控件" [level=3] [ref=e126]
+        - generic [ref=e127]:
+          - generic [ref=e128]:
+            - generic [ref=e129]: List Item
+            - generic [ref=e130]: List
+          - generic [ref=e131]:
+            - generic [ref=e132]: "[ ON ]"
+            - generic [ref=e133]: Switch
+          - generic [ref=e134]:
+            - generic [ref=e135]: "[====]"
+            - generic [ref=e136]: Slider
+          - generic [ref=e137]:
+            - generic [ref=e138]: "[ Btn ]"
+            - generic [ref=e139]: Button
+          - generic [ref=e140]:
+            - generic [ref=e141]: "[ App ]"
+            - generic [ref=e142]: App
+      - generic [ref=e143]:
+        - heading "颜色" [level=3] [ref=e144]
+        - generic [ref=e145]:
+          - generic "白色" [ref=e146] [cursor=pointer]
+          - generic "黑色" [ref=e147] [cursor=pointer]
+          - generic "强调色 (绿)" [ref=e148] [cursor=pointer]
+          - generic "红色" [ref=e149] [cursor=pointer]
+          - generic "蓝色" [ref=e150] [cursor=pointer]
+          - textbox [ref=e151] [cursor=pointer]: "#ffffff"
+        - generic [ref=e152] [cursor=pointer]:
+          - checkbox "填充形状" [ref=e153]
+          - generic [ref=e154]: 填充形状
+    - generic [ref=e158]:
+      - generic [ref=e159]: "x: -38, y: 179"
+      - generic [ref=e160]: 7 个元素
+      - generic [ref=e161]: "Canvas: 80 × 160"
+    - complementary [ref=e162]:
+      - generic [ref=e163]:
+        - heading "个元素" [level=3] [ref=e164]
+        - generic [ref=e244]:
+          - generic [ref=e318] [cursor=pointer]:
+            - generic [ref=e319]: List (0)
+            - generic [ref=e320]: list
+          - generic [ref=e321] [cursor=pointer]:
+            - generic [ref=e322]: List (0)
+            - generic [ref=e323]: list
+          - generic [ref=e324] [cursor=pointer]:
+            - generic [ref=e325]: List (1)
+            - generic [ref=e326]: list
+          - generic [ref=e327] [cursor=pointer]:
+            - generic [ref=e328]: switch_icon
+            - generic [ref=e329]: icon
+          - generic [ref=e330] [cursor=pointer]:
+            - generic [ref=e331]: switch_icon
+            - generic [ref=e332]: icon
+          - generic [ref=e333] [cursor=pointer]:
+            - generic [ref=e334]: list_icon
+            - generic [ref=e335]: icon
+          - generic [ref=e336] [cursor=pointer]:
+            - generic [ref=e337]: Switch
+            - generic [ref=e338]: switch_item
+      - generic [ref=e165]:
+        - heading "属性" [level=3] [ref=e166]
+        - generic [ref=e167]:
+          - generic [ref=e168]: 类型
+          - textbox [disabled] [ref=e169]: switch_item
+        - generic [ref=e170]:
+          - generic [ref=e171]: ID
+          - textbox [ref=e172]: control_8
+        - generic [ref=e173]:
+          - generic [ref=e174]:
+            - generic [ref=e175]: X
+            - spinbutton [ref=e176]: "0"
+          - generic [ref=e177]:
+            - generic [ref=e178]: "Y"
+            - spinbutton [ref=e179]: "71"
+        - generic [ref=e193]:
+          - generic [ref=e194]: 字体大小
+          - combobox [ref=e195]:
+            - option "6px (tiny)"
+            - option "8px (small)" [selected]
+            - option "12px (medium)"
+            - option "16px (large)"
+        - generic [ref=e196]:
+          - generic [ref=e197]: 标签
+          - textbox [ref=e198]: Switch
+        - generic [ref=e206]:
+          - generic [ref=e207]: 颜色
+          - generic [ref=e208]:
+            - textbox [ref=e209] [cursor=pointer]: "#ffffff"
+            - generic [ref=e248]: "#FFFFFF"
+        - generic [ref=e210]:
+          - generic [ref=e211]: 层级
+          - generic [ref=e212]:
+            - button "Up" [ref=e213] [cursor=pointer]
+            - spinbutton [disabled] [ref=e214]: "0"
+            - button "Down" [ref=e215] [cursor=pointer]
+        - generic [ref=e216]:
+          - button "删除" [ref=e217] [cursor=pointer]
+          - button "复制" [ref=e218] [cursor=pointer]
+      - generic [ref=e219]:
+        - heading "快捷键" [level=3] [ref=e220]
+        - generic [ref=e221]:
+          - generic [ref=e222]:
+            - generic [ref=e223]: V
+            - text: Select
+          - generic [ref=e224]:
+            - generic [ref=e225]: R
+            - text: Rectangle
+          - generic [ref=e226]:
+            - generic [ref=e227]: F
+            - text: Filled Rect
+          - generic [ref=e228]:
+            - generic [ref=e229]: C
+            - text: Circle
+          - generic [ref=e230]:
+            - generic [ref=e231]: L
+            - text: Line
+          - generic [ref=e232]:
+            - generic [ref=e233]: T
+            - text: Text
+          - generic [ref=e234]:
+            - generic [ref=e235]: E
+            - text: Eraser
+          - generic [ref=e236]:
+            - generic [ref=e237]: Del
+            - text: Delete
+          - generic [ref=e238]:
+            - generic [ref=e239]: Arrows
+            - text: Nudge
+          - generic [ref=e240]:
+            - generic [ref=e241]: Ctrl+Z
+            - text: Undo
+          - generic [ref=e242]:
+            - generic [ref=e243]: Ctrl+Y
+            - text: Redo
