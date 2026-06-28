@@ -82,26 +82,12 @@ static void sched_check_stack_pressure(kern_task_t *task)
     }
 
 #if defined(NATIVE_TEST) || defined(XEROS_NATIVE_SCHED)
-    /* 仅 Native 后端：连续多次超高使用率触发自动增长 */
-    static uint8_t s_grow_counter[KERN_MAX_TASKS] = {0};
-    if (task->pid >= 0 && task->pid < KERN_MAX_TASKS) {
-        if (task->stack_size > 0
-            && usage > task->stack_size * STACK_GROW_THRESHOLD_PCT / 100) {
-            s_grow_counter[task->pid]++;
-            if (s_grow_counter[task->pid] >= STACK_GROW_CONSECUTIVE) {
-                size_t recommended = kern_task_stack_recommend(task, 0);
-                if (recommended > task->stack_size) {
-                    kern_log(KERN_LOG_INFO,
-                             "stack_grow: task %s %zu -> %zu",
-                             task->name, task->stack_size, recommended);
-                    kern_task_stack_grow(task, recommended);
-                }
-                s_grow_counter[task->pid] = 0;
-            }
-        } else {
-            s_grow_counter[task->pid] = 0;
-        }
-    }
+    /* 运行时自动栈增长已禁用：
+     *   kern_task_stack_grow() 会销毁任务已保存的上下文
+     *   (ucontext/jmp_buf)，导致阻塞/睡眠中的任务被重启。
+     *   栈大小应在 kern_spawn 时通过 stack_min 参数指定。
+     *   若运行时出现高水位告警，请增加创建时的栈大小。 */
+    (void)usage;  /* usage 仅用于上方的压力日志 */
 #endif
 }
 

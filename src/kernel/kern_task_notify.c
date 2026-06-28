@@ -11,6 +11,7 @@
 #include "kern_sched.h"
 #include "kern_smp.h"
 #include "kern_sync.h"
+#include "kern_critical.h"
 
 #include <string.h>
 
@@ -54,6 +55,7 @@ kern_err_t kern_task_notify(kern_task_t *task, uint32_t value,
     if (!s_notify_inited) return KERN_EAGAIN;
     if (task == NULL) return KERN_EINVAL;
 
+    uint32_t irq_state = kern_enter_critical();
     xeros_spinlock_lock(&s_notify_lock);
 
     switch (action) {
@@ -71,17 +73,20 @@ kern_err_t kern_task_notify(kern_task_t *task, uint32_t value,
     case KERN_NOTIFY_SET_VALUE_WITHOUT_OVERWRITE:
         if (task->notify_state != KERN_NOTIFY_WAITING) {
             xeros_spinlock_unlock(&s_notify_lock);
+            kern_exit_critical(irq_state);
             return KERN_EAGAIN;
         }
         task->notify_value = value;
         break;
     default:
         xeros_spinlock_unlock(&s_notify_lock);
+        kern_exit_critical(irq_state);
         return KERN_EINVAL;
     }
 
     notify_wake_locked(task);
     xeros_spinlock_unlock(&s_notify_lock);
+    kern_exit_critical(irq_state);
     return KERN_OK;
 }
 

@@ -22,10 +22,22 @@ kern_task_t *kern_task_current(void)
 
 kern_task_t *kern_task_get(kern_pid_t pid)
 {
+#ifdef CONFIG_SMP_ENABLED
+    while (__sync_lock_test_and_set(&g_task_list_lock, true)) { asm volatile("nop"); }
+#endif
+    kern_task_t *found = NULL;
     kern_task_t *t = g_task_list;
     while (t != NULL) {
-        if (t->pid == pid) return t;
+        if (t->pid == pid) {
+            found = t;
+            break;
+        }
         t = t->next;
     }
-    return NULL;
+#ifdef CONFIG_SMP_ENABLED
+    __sync_lock_release(&g_task_list_lock);
+#endif
+    /* 注意：返回的指针在锁释放后可能变陈旧。
+     *       调用者应尽快使用，不应长期持有引用。 */
+    return found;
 }

@@ -10,6 +10,7 @@
  */
 
 #include "kern_ipc.h"
+#include "kern_critical.h"
 #include "kern_sched.h"
 #include "kern_smp.h"
 #include "kern_kmalloc.h"
@@ -137,12 +138,14 @@ kern_err_t kern_bin_sem_give(kern_bin_sem_t *sem)
 {
     if (sem == NULL) return KERN_EINVAL;
 
+    uint32_t irq_state = kern_enter_critical();
     xeros_spinlock_lock(&sem->lock);
     if (sem->count < 1) {
         sem->count = 1;
         ipc_wake_one(&sem->wait_queue);
     }
     xeros_spinlock_unlock(&sem->lock);
+    kern_exit_critical(irq_state);
     return KERN_OK;
 }
 
@@ -194,12 +197,14 @@ kern_err_t kern_sem_give(kern_sem_t *sem)
 {
     if (sem == NULL) return KERN_EINVAL;
 
+    uint32_t irq_state = kern_enter_critical();
     xeros_spinlock_lock(&sem->lock);
     if (sem->count < sem->max_count) {
         sem->count++;
         ipc_wake_one(&sem->wait_queue);
     }
     xeros_spinlock_unlock(&sem->lock);
+    kern_exit_critical(irq_state);
     return KERN_OK;
 }
 
@@ -477,6 +482,7 @@ kern_err_t kern_event_set(kern_event_t *ev, uint32_t bits)
 
     bits &= KERN_EVENT_VALID_BITS;
 
+    uint32_t irq_state = kern_enter_critical();
     xeros_spinlock_lock(&ev->lock);
     ev->bits |= bits;
 
@@ -495,6 +501,7 @@ kern_err_t kern_event_set(kern_event_t *ev, uint32_t bits)
     }
 
     xeros_spinlock_unlock(&ev->lock);
+    kern_exit_critical(irq_state);
     return KERN_OK;
 }
 
