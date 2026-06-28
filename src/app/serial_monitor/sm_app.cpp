@@ -171,6 +171,7 @@ void serial_monitor_update(void)
     }
 
 #ifndef NATIVE_TEST
+    serial_uart_lock();
     uint8_t byte;
     while (hal_uart0_read(&byte, 1) > 0) {
         char c = (char)byte;
@@ -185,6 +186,7 @@ void serial_monitor_update(void)
             sm_rx_buf[sm_rx_len++] = c;
         }
     }
+    serial_uart_unlock();
 #endif
 }
 

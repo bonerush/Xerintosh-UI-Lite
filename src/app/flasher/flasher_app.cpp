@@ -46,7 +46,7 @@ typedef enum {
 /* DTR 后等待目标 bootloader 就绪的时间（ESP32: ~10ms, 留余量） */
 #define FLASHER_BOOT_WAIT_MS  80
 /* DTR 等待期间 USB 数据暂存区（避免 esptool 同步帧溢出丢失） */
-#define FLASHER_USB_DEFER_MAX  256
+#define FLASHER_USB_DEFER_MAX  1024
 
 /* ═══ 状态变量 ═══ */
 static flasher_ui_state_t      s_ui;
@@ -220,8 +220,14 @@ void flasher_loop(void *ud)
             } else {
                 /* DTR 等待期间暂存 USB 数据，避免 esptool 同步帧因
                  * Serial 缓冲区溢出而丢失。进入 IDLE 后一次性转发 */
+                static bool s_deferred_full_warned = false;
                 for (int i = 0; i < usb_len && s_usb_deferred_len < FLASHER_USB_DEFER_MAX; i++) {
                     s_usb_deferred[s_usb_deferred_len++] = usb_buf[i];
+                }
+                if (usb_len > 0 && s_usb_deferred_len >= FLASHER_USB_DEFER_MAX
+                    && !s_deferred_full_warned) {
+                    debug_printf("[ WARN ] flasher: USB defer buffer full, bytes dropped\n");
+                    s_deferred_full_warned = true;
                 }
             }
         }

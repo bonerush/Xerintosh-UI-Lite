@@ -504,6 +504,7 @@ void wifi_mgr_on_switch_toggle(void *ud)
 void wifi_menu_on_network_button_pressed(void *ud)
 {
     (void)ud;
+    if (!g_xerintosh_selector.selected_item) return;
     const char *content = g_xerintosh_selector.selected_item->content;
     if (!content) {
         return;
@@ -521,6 +522,7 @@ void wifi_menu_on_network_button_pressed(void *ud)
 void wifi_menu_on_saved_connect_pressed(void *ud)
 {
     (void)ud;
+    if (!g_xerintosh_selector.selected_item || !g_xerintosh_selector.selected_item->parent) return;
     const char *content = g_xerintosh_selector.selected_item->parent->content;
     if (!content) {
         return;
@@ -568,6 +570,7 @@ void wifi_menu_on_saved_connect_pressed(void *ud)
 void wifi_menu_on_saved_delete_pressed(void *ud)
 {
     (void)ud;
+    if (!g_xerintosh_selector.selected_item || !g_xerintosh_selector.selected_item->parent) return;
     const char *content = g_xerintosh_selector.selected_item->parent->content;
     if (!content) {
         return;

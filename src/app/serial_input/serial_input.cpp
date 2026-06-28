@@ -44,6 +44,9 @@ static char           g_target_name[64];                       /* 目标名称�
 static uint32_t       g_wait_start_ms  = 0;                    /* 等待开始时间 */
 static bool           g_input_consumed = false;                /* 输入是否已被消费 */
 
+/* UART0 共享自旋锁：防止 serial_input 与 serial_monitor 同时消费硬件串口 */
+volatile bool g_serial_uart_lock = false;
+
 /* ═══ 内部辅助函数 ═══ */
 
 /**
@@ -134,6 +137,7 @@ serial_state_t serial_poll(void)
     }
 
     /* ─── 逐字节读取串口（非阻塞）─── */
+    serial_uart_lock();
     while (true)
     {
         uint8_t byte;
@@ -151,6 +155,7 @@ serial_state_t serial_poll(void)
             uart_println(""); /* 回显换行 */
 
             g_serial_state = SERIAL_STATE_PASSWORD_RECEIVED;
+            serial_uart_unlock();
             return g_serial_state;
         }
 
@@ -180,6 +185,7 @@ serial_state_t serial_poll(void)
             uart_print("*"); /* 掩码显示 */
         }
     }
+    serial_uart_unlock();
 
     return g_serial_state;
 }

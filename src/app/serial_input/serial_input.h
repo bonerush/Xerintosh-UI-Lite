@@ -70,6 +70,20 @@ const char*    serial_get_target_name(void);
  */
 bool           serial_input_is_waiting(void);
 
+/**
+ * @brief  UART0 共享自旋锁（serial_input 与 serial_monitor 互斥）
+ * @note   用于防止两个任务同时消费硬件 UART 缓冲区字节。
+ *         在 serial_poll() 和 serial_monitor_update() 中使用。
+ */
+extern volatile bool g_serial_uart_lock;
+
+static inline void serial_uart_lock(void) {
+    while (__sync_lock_test_and_set(&g_serial_uart_lock, true)) { asm volatile("nop"); }
+}
+static inline void serial_uart_unlock(void) {
+    __sync_lock_release(&g_serial_uart_lock);
+}
+
 #ifdef __cplusplus
 }
 #endif

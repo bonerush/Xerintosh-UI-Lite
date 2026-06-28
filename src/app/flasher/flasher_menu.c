@@ -128,6 +128,7 @@ static void on_flasher_role_selected_cb(void *ud)
 {
     (void)ud;
     xerintosh_list_item_t *item = g_xerintosh_selector.selected_item;
+    if (!item) return;
     flasher_signal_t role = (flasher_signal_t)(intptr_t)item->user_data;
     uint8_t pin = (uint8_t)(intptr_t)item->parent->user_data;
 
