@@ -1,16 +1,16 @@
-# 归档报告
+# 重构归档报告 (2026-06-28)
 
-> **Parent:** [doc/refactor/README.md](README.md)
+> **Parent:** [重构状态总览](README.md)
 
 ## 重构概览
 
 | 项目 | 内容 |
 |---|---|
-| 分支 | `refactor/2026-06-27-fullstack` |
-| 起始 commit | `7ac97ef` |
-| 结束 commit | `c0c71ba` |
-| 范围 | Xeros 内核 / HAL / UI 核心 / App / 文档体系 |
-| 目标 | 原子级重构与优化，逐层消除技术债务，提升可测试性与可维护性 |
+| 分支 | `refactor/2026-06-28-fullstack` |
+| 起始 commit | `5d4cc00` |
+| 结束 commit | `c00d097` |
+| 提交数 | 5 |
+| 范围 | 内核 / HAL / UI / App / 文档 |
 
 ## 各阶段报告
 
@@ -23,76 +23,64 @@
 | | [02-refactor/ui.md](02-refactor/ui.md) | DONE |
 | | [02-refactor/app.md](02-refactor/app.md) | DONE |
 | | [02-refactor/docs.md](02-refactor/docs.md) | DONE |
-| 3 集成验证 | [03-integration.md](03-integration.md) | DONE（软件层面） |
+| 3 集成验证 | [03-integration.md](03-integration.md) | DONE |
 | 4 归档 | [04-archive.md](04-archive.md) | DONE |
 
 ## 关键变更摘要
 
-### Xeros 内核层
+### 内核层
 
-- 统一移植层 timer API 返回类型为 `kern_err_t`
-- 封装调度器全局状态访问器
-- 提取调度器初始化与任务创建公共逻辑
-- 补充 [Port Layer 文档](../kernel/port.md)
+- 调度器 idle 优化：`ets_delay_us(200)`，tickless 阈值降至 1ms
+- 移除 `main.cpp` 中死代码 FreeRTOS includes，标记 `kern_port_freertos.c` 为废弃
+- **修复 tickless idle 时间漂移**：`g_sched_ticks` 在 tickless 结束后按实际流逝时间补偿，解决长时间空闲后 UI 卡死
 
 ### HAL 层
 
-- 完成 HAL 层重构（详见 [hal.md](02-refactor/hal.md)）
+- 新增 `hal_display_flush_region()` 脏区域局部刷新 API（底层暂回退全屏推送，待 LovyanGFX 升级）
 
-### UI 核心层
+### UI 层
 
-- 空指针与空列表保护
-- 布局常量提取
-- `xerintosh_draw_list_item` 拆分
-- 选择器速度复位集中化
-- 退场动画魔法数字常量化
-- 弹窗换行 `sizeof` 保护
-- 脏矩形升级到区域追踪
+- VRR 可变刷新率：100Hz(10ms) 动画 / 60Hz(16ms) 静态 / 125Hz(8ms) 长按提示
+- 脏矩形条件刷新：脏区 <50% 局部推送，>=50% 全屏推送
+- `kern_sleep_ms()` 替代 `kern_sleep_ms(5) + kern_yield()`，消除冗余 yield
 
-### App 层
+### 基础设施
 
-- `app_menu.c` 拆分为 `app_menu_core.c` + `app_menu_entries.c`
-- 显式化 `user_item` 生命周期契约
-- 集中设置项 `level↔hw` 转换
-- 补齐 `power_key_popup` native 测试
+- 基线建立：验证规则写入 `CLAUDE.md` 和 `.claude/rules/verification.md`
+- 默认上传目标改为 `m5stick-c-native`（Xeros 原生调度器）
+- 平台配置 `platformio.ini` 加入 `default_envs = m5stick-c-native`
 
-### 文档体系
+## 提交记录
 
-- `doc/ui/index.md` 与 `doc/app/index.md` 使 `doc/` 镜像 `src/`
-- `doc/tutorials/api-templates.md` 修复源码中断链引用
-- `doc/index.md` 更新项目状态与重构记录
+```
+7622179 chore: establish refactor baseline, verification rules, and default upload target
+277db32 perf(ui,sched): implement VRR 60-100Hz frame control and scheduler idle optimization
+f4cbf6a refactor(kernel): remove dead FreeRTOS includes and deprecate port layer
+484c564 perf(ui,hal): add dirty-region flush API and conditional SPI push
+c00d097 fix(kernel): advance sched ticks by elapsed time after tickless idle
+```
 
 ## 验证结果
 
-- `pio test -e native`：**通过**（573 succeeded，2 skipped）
-- `pio run -e m5stick-c`：**SUCCESS**，无新增警告
-- `pio run -e m5stick-c-native`：**SUCCESS**，无新增警告
-- 文档新增链接：全部有效
-- 硬件冒烟测试：已执行，并修复底部选择器文字/反色回归后重新烧录
-
-## 内存占用
-
-| 环境 | RAM | Flash |
-|---|---|---|
-| `m5stick-c` | 19.5%（63832 / 327680 bytes） | 73.2%（1124673 / 1536000 bytes） |
-| `m5stick-c-native` | 19.5%（63984 / 327680 bytes） | 73.9%（1135017 / 1536000 bytes） |
-
-重构未引入明显内存增长，均保持在原有水平。
+| 目标 | 状态 | RAM | Flash |
+|------|------|-----|-------|
+| `native` (test) | 601 cases, 599 passed, 2 skipped | — | — |
+| `m5stick-c` | SUCCESS | 20.2% (66048 / 327680) | 73.2% (1124393 / 1536000) |
+| `m5stick-c-native` | SUCCESS | 20.2% (66200 / 327680) | 74.0% (1136333 / 1536000) |
+| 实机启动 | 通过 | — | — |
 
 ## 已知问题与后续工作
 
-- 硬件冒烟测试已覆盖启动、任务调度、UI 帧循环；菜单导航、设置项切换、WiFi 菜单、电源键弹窗等人工交互项建议在实机上补测。
-- `doc/` 中存在若干预存在断链，不属于本轮重构范围，建议后续集中修复。
-- 脏矩形区域追踪已建立数据结构，渲染管线局部刷新实现留待后续迭代。
+- 局部 SPI 推送优化需 LovyanGFX 库升级支持区域重载 API
+- `kern_port_freertos.c` 可在 m5stick-c-native 完全稳定后彻底删除
+- 长期稳定性需 >30 分钟空闲测试确认 tickless 修复无退化
 
 ## 分支收尾
 
-阶段 4 完成后，分支 `refactor/2026-06-27-fullstack` 进入收尾阶段。建议操作：
-
-1. 合并回 `main`：本地合并并通过验证后删除分支。
-2. 或发起 Pull Request：推送分支到远端并创建 PR，保留 worktree 以便迭代。
-3. 或保持分支：由用户自行决定后续处理方式。
+分支 `refactor/2026-06-28-fullstack` 已完成所有 5 个阶段。建议：
+1. 合并回 `main` 或发起 PR
+2. 确认长期稳定性后删除分支
 
 ---
 
-> **See Also:** [集成验证报告](03-integration.md) | [项目总览](README.md)
+> **历史轮次**：[2026-06-27 全栈重构](04-archive.md)（可通过 `git show 2026-06-27-refactor:doc/refactor/04-archive.md` 查看）

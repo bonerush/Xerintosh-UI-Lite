@@ -86,7 +86,8 @@ Xerintosh 项目
 - **可插拔后端**: 通过 `kern_port_ops_t` 操作表实现后端多态；`kern_port_esp32_native.c` 已替代 FreeRTOS 后端成为 `m5stick-c-native` 实际后端
 - **已有 IPC**: `xeros_spinlock_t`、递归 mutex（基于 `xeros_spinlock_t`）
 - **已有 SMP**: per-CPU 数据结构、核心亲和性、负载均衡；已在 `m5stick-c-native` 原生调度器下启用双核调度
-- **tickless idle**: GPTimer 动态重编程已实现，空闲时按下一个唤醒事件睡眠而非固定 1ms tick
+- **tickless idle**: GPTimer 动态重编程已实现，空闲时按下一个唤醒事件睡眠而非固定 1ms tick；修复 tickless 期间 `g_sched_ticks` 时间漂移 bug
+- **UI 刷新率**: VRR 可变刷新率 (100Hz 动画 / 60Hz 静态 / 125Hz 长按提示)，脏矩形条件刷新策略
 - **WiFi**: 在原生调度器下已启用 `wifi-mgr` 任务，ESP-IDF WiFi 驱动内部 FreeRTOS 任务与 Xeros 原生任务共存
 - **IPC/SMP 安全**: 已给所有 IPC 原语加 SMP 自旋锁，修复 tickless idle 遍历任务链表的原子性、修复 CPU 分配的原子性；**IPI 已实现**，IPC 唤醒与任务创建时会通知远程核心重新调度
 - **VFS 并发**: 已添加全局 `g_vfs_lock` 自旋锁保护 dentry 树与 inode 引用计数，`kern_open`/`kern_close` 等路径已加锁
@@ -96,13 +97,15 @@ Xerintosh 项目
 - **App 层重构完成**: `app_menu.c` 拆分为 `app_menu_core.c` + `app_menu_entries.c`；`user_item_contract.h` 显式化生命周期契约；`settings_level_to_hw` / `settings_hw_to_level` 集中设置项转换；`power_key_popup` 补齐 native 测试
 - **文档体系重构完成**: `doc/` 已新增 `ui/`、`app/`、`tutorials/` 索引，修复 `ui_item_core.h` 中断链引用
 - **Xeros 内核底层全功能适配完成**: 任务通知、软件定时器、ISR 安全 IPC、流缓冲区、任务控制、运行时统计/看门狗/栈溢出检测、临界区抽象已实现；PI 互斥锁恢复基线优先级、事件组高 8 位保留、FIFO 调度器优先级桶优化、核心启动桩隔离、`vTaskDelay` 移除均已完成并通过 native/硬件构建验证
-- **UI 刷新率优化**: 已将 `src/app/ui_task.c` 的每帧睡眠从 `kern_sleep_ms(5)` 降至 `kern_sleep_ms(1)`，并将 `src/hal/hal_display_fb.cpp` 的 SPI 写频率从 27 MHz 提升至 40 MHz；已通过 `m5stick-c-native` 构建/烧录验证，无新增警告
+- **已通过 `m5stick-c-native` 构建/烧录验证，无新增警告**
 - **目标**: 继续验证 UI/WiFi 实际屏幕操作（调度器层面已稳定，需用户现场确认显示渲染与 WiFi 菜单交互）
+- **tickless 稳定性**: 修复长时间空闲后 UI 卡死的根因（tickless idle 期间 `g_sched_ticks` 未推进导致时间漂移），通过在 tickless 结束后按实际流逝时间补偿 `g_sched_ticks` 解决
 
 ## 重构记录
 
 | 日期 | 范围 | 状态 | 报告 |
 |---|---|---|---|
+| 2026-06-28 | VRR UI + 调度器优化 + FreeRTOS 清理 + tickless 稳定性 | 完成 | [refactor/README.md](refactor/README.md) |
 | 2026-06-27 | Xeros 内核 / HAL / UI / App / 文档 | 阶段 2 完成 | [refactor/README.md](refactor/README.md) |
 | 2026-06-27 | Xeros 内核底层全功能适配 | 完成 | [kernel/debug/full-adaptation-debug.md](kernel/debug/full-adaptation-debug.md) |
 
