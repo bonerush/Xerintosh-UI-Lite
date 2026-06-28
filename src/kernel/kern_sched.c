@@ -308,8 +308,7 @@ static void esp32_native_init(void)
 {
     kern_port_init();
 
-    /* 启动原生调度器的硬件 tick（1ms）。FreeRTOS 后端依赖 FreeRTOS 调度器自带
-     * 时间片，因此只在 XEROS_NATIVE_SCHED 下显式启动 GPTimer。 */
+    /* 启动原生调度器的硬件 tick（1ms）*/
     kern_port_timer_set_periodic(1000);
 
     /* ── 创建 per-CPU idle 任务 ── */
@@ -384,80 +383,7 @@ void kern_sched_init(void)
     g_sched_initialized = true;
 }
 
-#else /* ═══════════════ ESP32 FreeRTOS backend ═══════════════ */
-
-#ifdef CONFIG_SMP_ENABLED
-void kern_smp_sched_loop(void *arg);
-#endif
-
-static void freertos_init(void)
-{
-    kern_port_init();
-
-    /* ── 创建 per-CPU idle 任务 ── */
-    for (uint8_t cpu = 0; cpu < KERN_MAX_CPUS; cpu++) {
-        char name[16];
-        snprintf(name, sizeof(name), "xidle%d", cpu);
-
-        kern_task_t *idle = sched_idle_create(cpu, name);
-        if (idle == NULL) {
-            kern_panic("failed to allocate idle task");
-            return;
-        }
-
-        idle->stack_size = IDLE_STACK_MIN;
-
-        idle->port_thread = kern_port_thread_spawn(
-            NULL, idle, name, IDLE_STACK_MIN, idle);
-        if (idle->port_thread == KERN_PORT_THREAD_NULL) {
-            kern_panic("failed to create idle thread");
-            free(idle);
-            return;
-        }
-
-        /* 链接到全局任务列表 */
-        idle->next = g_task_list;
-        g_task_list = idle;
-        idle->scheduler_class_id = KERN_SCHED_CLASS_RR_ID;
-        g_task_count++;
-
-        g_per_cpu[cpu].idle_task = idle;
-        g_per_cpu[cpu].last_picked = idle;
-    }
-
-    sched_class_rr.task_list = g_task_list;
-    sched_class_rr.task_list_tail = g_task_list;  /* SMP: idle 在队尾 */
-    g_task_list_tail = g_task_list;
-
-    /* ── per-CPU 初始状态 ── */
-    g_per_cpu[0].current_task = g_per_cpu[0].idle_task;
-    g_per_cpu[0].task_count = 1;  /* idle 计入 */
-    g_per_cpu[1].current_task = g_per_cpu[1].idle_task;
-    g_per_cpu[1].task_count = 1;  /* idle 计入 */
-
-    /* ── 启动 Core 0 调度器核心 ── */
-#ifdef CONFIG_SMP_ENABLED
-    kern_smp_start_core(0, kern_smp_sched_loop);
-#endif
-
-    kern_log(KERN_LOG_DEBUG, "scheduler initialized (esp32-freertos, 2 cores)");
-}
-
-void kern_sched_init(void)
-{
-    g_task_list_tail = NULL;  /* 每次 init 都重置尾指针，支持测试环境多次调用 */
-    if (g_sched_initialized) return;
-
-    sched_reset_common();
-    kern_smp_init();
-    sched_register_default_classes();
-
-    freertos_init();
-
-    g_sched_initialized = true;
-}
-
-#endif
+#endif /* XEROS_NATIVE_SCHED */
 
 /* ═══ Native 调度器入口（ucontext 专用栈）═══ */
 
@@ -532,9 +458,9 @@ void kern_sched_tick(void)
     }
 }
 
-#else /* ESP32: FreeRTOS / XEROS_NATIVE_SCHED fallback */
+#else /* XEROS_NATIVE_SCHED */
 
-void kern_sched_tick(void) /* ESP32: FreeRTOS / XEROS_NATIVE_SCHED fallback */
+void kern_sched_tick(void)
 {
     if (!g_sched_initialized) return;
     g_sched_ticks++;
@@ -599,9 +525,6 @@ void idle_entry(void *arg)
 /* ═══ Core 0 调度器循环 ═══ */
 
 #ifdef CONFIG_SMP_ENABLED
-
-#include <freertos/FreeRTOS.h>
-#include <freertos/task.h>
 
 void kern_smp_sched_loop(void *arg)
 {

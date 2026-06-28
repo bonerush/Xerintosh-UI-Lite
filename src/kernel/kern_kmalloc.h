@@ -81,7 +81,7 @@ void *kern_krealloc(void *ptr, size_t new_size);
  * @note  部分字段在 NATIVE_TEST 后端为近似值或 0（不可用）。
  */
 typedef struct {
-    size_t total_bytes;           /* 堆总字节数（FreeRTOS）/ 0（native） */
+    size_t total_bytes;           /* 堆总字节数（ESP32）/ 0（native） */
     size_t free_bytes;            /* 当前空闲字节数 */
     size_t largest_free_block;    /* 最大连续空闲块 */
     size_t min_free_bytes;        /* 历史最小空闲字节数 */
@@ -109,7 +109,7 @@ typedef enum {
 
 /**
  * @brief  获取当前内存压力等级
- * @note  FreeRTOS: 基于 total/free/fragmentation
+ * @note  ESP32: 基于 total/free/fragmentation
  *        Native: 基于 kmalloc 已分配量与保留水位
  */
 kern_kmem_pressure_level_t kern_kmem_pressure_level(void);

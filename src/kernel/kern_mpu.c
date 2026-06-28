@@ -26,7 +26,7 @@
  * ═══ ESP32 MPU 寄存器定义 ═══
  *
  * ESP32 有两组 MPU（PMS: Processor Memory Subsystem），
- * 每组 8 个区域。通过与 FreeRTOS MPU 兼容的 API 操作。
+ * 每组 8 个区域。通过 ESP-IDF MPU API 操作。
  *
  * DPORT_PRO_PMS_C0_REG  ~ DPORT_PRO_PMS_C7_REG   (PRO_CPU)
  * DPORT_APP_PMS_C0_REG  ~ DPORT_APP_PMS_C7_REG   (APP_CPU)
@@ -39,7 +39,7 @@
  *   bits 13:0  — 区域基址[27:14]（32 字节对齐）
  *
  * 由于直接访问 ESP32 DPORT 寄存器需要包含 esp32-hal 特定头文件，
- * 以下实现使用 FreeRTOS MPU API 或 ESP-IDF 等效函数（当可用时）。
+ * 以下实现使用 ESP-IDF MPU API（当可用时）。
  * 当前为框架实现，硬件寄存器操作将在设备上联调时完成。
  */
 

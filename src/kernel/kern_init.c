@@ -28,7 +28,7 @@ static bool g_has_panic = false;                 /* 是否发生过 panic */
 static uint32_t g_init_count = 0;                /* 初始化次数（幂等性） */
 
 #ifndef NATIVE_TEST
-static volatile bool g_log_locked = false;        /* 日志自旋锁（替代 FreeRTOS 互斥锁） */
+static volatile bool g_log_locked = false;        /* 日志自旋锁 */
 #endif
 
 /* ═══ 初始化 ═══ */
@@ -97,7 +97,7 @@ void kern_vlog(kern_log_level_t level, const char *fmt, va_list args)
     vfprintf(stdout, fmt, args);
     fprintf(stdout, "\n");
 #else
-    /* 硬件环境：输出到串口（自旋锁保护，避免与 FreeRTOS WiFi/BT 任务竞争） */
+    /* 硬件环境：输出到串口（自旋锁保护，避免与 ESP-IDF WiFi/BT 任务竞争） */
     while (__sync_lock_test_and_set(&g_log_locked, true)) {
         /* 自旋等待：自旋锁持有者不应长时间阻塞，短暂自旋即可 */
     }

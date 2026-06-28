@@ -56,22 +56,7 @@ void task_write_canary(kern_task_t *task)
     }
 }
 
-#else /* ═══════════════ ESP32 FreeRTOS backend ═══════════════ */
-
-void task_stack_init(kern_task_t *task, size_t stack_size)
-{
-    (void)task;
-    (void)stack_size;
-    /* FreeRTOS 分配和管理任务栈 */
-}
-
-void task_write_canary(kern_task_t *task)
-{
-    (void)task;
-    /* FreeRTOS 有自己的栈溢出检测 */
-}
-
-#endif
+#endif /* XEROS_NATIVE_SCHED */
 
 /* ═══ 栈使用量查询 ═══ */
 
@@ -108,51 +93,13 @@ size_t kern_task_stack_usage(kern_task_t *task)
     return used;
 }
 
-#else /* ESP32 FreeRTOS backend: 通过 uxTaskGetStackHighWaterMark 查询 */
-
-#include <freertos/FreeRTOS.h>
-
-size_t kern_task_stack_usage(kern_task_t *task)
-{
-    if (task == NULL) return 0;
-
-    if (task->port_thread != KERN_PORT_THREAD_NULL) {
-        /* port 层返回剩余栈字数 */
-        size_t free_words = kern_port_thread_stack_usage(task->port_thread);
-        size_t free_bytes = free_words * sizeof(StackType_t);
-
-        size_t used = 0;
-        if (free_bytes < task->stack_size) {
-            used = task->stack_size - free_bytes;
-        }
-        if (used > task->stack_highwater) {
-            task->stack_highwater = used;
-        }
-        return used;
-    }
-    return 0;
-}
-
-#endif
+#endif /* XEROS_NATIVE_SCHED */
 
 /* ═══ 栈高水位与推荐接口 ═══ */
 
 size_t kern_task_stack_highwater(kern_task_t *task)
 {
     if (task == NULL) return 0;
-#if !defined(NATIVE_TEST) && !defined(XEROS_NATIVE_SCHED)
-    /* FreeRTOS 路径：通过 port 层查询并同步更新 TCB 字段 */
-    if (task->port_thread == KERN_PORT_THREAD_NULL) return 0;
-    size_t free_words = kern_port_thread_stack_usage(task->port_thread);
-    size_t free_bytes = free_words * sizeof(StackType_t);
-    size_t used = 0;
-    if (free_bytes < task->stack_size) {
-        used = task->stack_size - free_bytes;
-    }
-    if (used > task->stack_highwater) {
-        task->stack_highwater = used;
-    }
-#endif
     return task->stack_highwater;
 }
 
@@ -281,19 +228,7 @@ bool kern_task_stack_grow(kern_task_t *task, size_t new_size)
     return true;
 }
 
-#else /* ESP32 FreeRTOS backend */
-
-bool kern_task_stack_grow(kern_task_t *task, size_t new_size)
-{
-    (void)task;
-    (void)new_size;
-    kern_log(KERN_LOG_WARN,
-             "stack_grow: not supported on FreeRTOS backend"
-             " (FreeRTOS task stack cannot be resized after creation)");
-    return false;
-}
-
-#endif
+#endif /* XEROS_NATIVE_SCHED */
 
 /* ═══ 栈使用画像（按任务名记录历史高水位）═══ */
 

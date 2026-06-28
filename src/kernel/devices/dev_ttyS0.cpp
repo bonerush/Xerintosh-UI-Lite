@@ -3,8 +3,7 @@
  * @brief  /dev/ttyS0 串口设备实现（统一设备模型）
  * @details 通过环形缓冲区将硬件串口映射为 kern_device_ops_t 回调。
  *
- *          为避免任务上下文中的 FreeRTOS 冲突，所有 Serial 访问
- *          都在 dev_ttyS0_poll() 中执行（由主 loop 调用）。
+ *          所有 Serial 访问都在 dev_ttyS0_poll() 中执行（由主 loop 调用）。
  *          任务的 read/write 仅操作内存环形缓冲区。
  *
  * @copyright Copyright (c) 2026

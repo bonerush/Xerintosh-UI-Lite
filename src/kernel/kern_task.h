@@ -5,8 +5,7 @@
  *          抢占式时间片调度及 sleep/wake 接口。
  *
  *          Native 测试：使用 ucontext（POSIX 独立栈）
- *          ESP32：使用 FreeRTOS 任务承载（每任务独立栈），
- *                 FreeRTOS 信号量令牌实现抢占式调度
+ *          ESP32：使用 Xeros 原生调度器（每任务独立栈）
  *
  * @copyright Copyright (c) 2026
  */
@@ -51,14 +50,14 @@ typedef struct kern_file kern_file_t;
 /**
  * @brief 任务控制块
  * @note  Native: 动态栈（堆分配），ucontext 上下文
- *        ESP32: FreeRTOS 任务承载，独立栈由 FreeRTOS 管理
+ *        ESP32: Xeros 原生调度器承载，独立栈由 Xeros 管理
  */
 typedef struct kern_task {
     kern_pid_t          pid;            /* 任务 ID */
     char                name[KERN_TASK_NAME_LEN + 1];  /* 任务名称 */
     kern_task_state_t   state;          /* 任务状态 */
 
-    /* 动态栈管理（Native: 堆分配+ucontext；ESP32: FreeRTOS 管理栈） */
+    /* 动态栈管理（Native: 堆分配+ucontext；ESP32: Xeros 原生管理栈） */
     uint8_t            *stack_base;     /* 栈底指针 */
     size_t              stack_size;     /* 栈大小（字节） */
     size_t              stack_highwater; /* 历史最大栈使用量（字节） */
@@ -165,7 +164,7 @@ extern void kern_exit(void);
  * @note   受保护的系统任务不可终止（返回 KERN_EACCES）。
  *         当前任务不可终止自身（返回 KERN_EACCES）。
  *         虚任务：调用 kern_task_unregister_virtual() 注销。
- *         非虚任务：标记 ZOMBIE 并销毁底层 FreeRTOS 线程。
+ *         非虚任务：标记 ZOMBIE 并销毁底层线程。
  */
 extern kern_err_t kern_task_kill(kern_pid_t pid);
 
@@ -202,7 +201,7 @@ extern size_t kern_task_stack_usage(kern_task_t *task);
 /**
  * @brief  获取任务栈历史高水位（字节）
  * @note  Native: 返回 TCB 中记录的峰值
- *        FreeRTOS: 根据 uxTaskGetStackHighWaterMark 计算峰值
+ *        根据栈 canary 模式扫描计算峰值
  */
 extern size_t kern_task_stack_highwater(kern_task_t *task);
 extern bool   kern_task_stack_overflow_check(kern_task_t *task);
@@ -251,7 +250,7 @@ extern void kern_task_stack_profile_dump(void (*cb)(const kern_task_stack_profil
 /**
  * @brief  增长任务栈
  * @note   Native/XEROS_NATIVE_SCHED 后端：分配新栈、复制旧栈、更新上下文。
- *         FreeRTOS 后端：不支持，返回 false。
+ *         栈增长仅支持 Native 和 XEROS_NATIVE_SCHED 后端。
  *         **仅对非运行态任务安全调用**。
  */
 extern bool kern_task_stack_grow(kern_task_t *task, size_t new_size);
@@ -262,7 +261,7 @@ extern bool kern_task_stack_grow(kern_task_t *task, size_t new_size);
  * @brief  注册虚任务到内核任务链表
  * @param  name 任务名称（用于 /proc/tasks 显示）
  * @return PID >= 0 成功，< 0 为错误码
- * @note   虚任务不创建 FreeRTOS 上下文，不参与调度。
+ * @note   虚任务不创建底层线程上下文，不参与调度。
  *         仅用于内核可观测性（/proc/tasks 可见、kill 可终止）。
  *         当 App 退出时必须调用 kern_task_unregister_virtual() 注销。
  */

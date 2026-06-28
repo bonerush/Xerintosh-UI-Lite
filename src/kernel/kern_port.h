@@ -2,14 +2,11 @@
  * @file   kern_port.h
  * @brief  Xeros 内核可移植层头文件
  * @details 抽象底层执行上下文（线程创建、上下文切换、栈查询），
- *          将 FreeRTOS / setjmp-longjmp 等具体实现隔离在端口层。
+ *          将 setjmp-longjmp / ESP32 原生上下文切换等具体实现隔离在端口层。
  *
  *          当前支持两种后端：
- *          - FreeRTOS 任务容器（默认，`#else` 路径）
- *          - 原生 setjmp/longjmp（`#ifdef XEROS_NATIVE_SCHED`，实验性）
- *
- *          所有与 FreeRTOS 的直接交互仅限于 kern_port_freertos.c。
- *          内核其他模块（kern_task 等）仅通过本接口调用。
+ *          - 原生 setjmp/longjmp（NATIVE_TEST）
+ *          - ESP32 原生调度器（XEROS_NATIVE_SCHED）
  *
  *          自 kernel-v2-phase1 起，公共 API 通过 kern_port_ops_t 结构体
  *          实现后端多态。kern_port_*() 函数变为 static inline 包装器，

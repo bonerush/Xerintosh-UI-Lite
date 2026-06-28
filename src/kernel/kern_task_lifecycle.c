@@ -191,49 +191,7 @@ kern_pid_t kern_spawn(const char *name, void (*entry)(void *arg),
     return task->pid;
 }
 
-#else /* ═══════════════ ESP32 FreeRTOS backend ═══════════════ */
-
-kern_pid_t kern_spawn(const char *name, void (*entry)(void *arg),
-                       void *arg, size_t stack_min)
-{
-    if (entry == NULL) return KERN_EINVAL;
-    if (g_task_count >= MAX_TASKS) return KERN_ENOSPC;
-
-    kern_sched_ensure_initialized();
-
-    kern_task_t *task = task_create_common(name, entry, arg);
-    if (task == NULL) return KERN_ENOMEM;
-
-    /* 通过可移植层创建底层线程承载此 Xeros 任务 */
-    size_t stack_sz = (stack_min > 0) ? stack_min : (size_t)KERN_PORT_STACK_MIN;
-    if (stack_sz < KERN_PORT_STACK_MIN) stack_sz = KERN_PORT_STACK_MIN;
-
-    /* 记录栈信息用于调试 */
-    task->stack_size = stack_sz;
-
-    task->port_thread = kern_port_thread_spawn(
-        NULL,                              /* entry 由 port 层 task_wrapper 内部读取 task->entry */
-        task,                              /* arg = TCB */
-        name ? name : "xtask",
-        stack_sz,
-        task
-    );
-    if (task->port_thread == KERN_PORT_THREAD_NULL) {
-        kern_log(KERN_LOG_WARN, "port: thread spawn failed for %s", task->name);
-        free(task);
-        return KERN_ENOMEM;
-    }
-
-    task_list_append(task);
-    task_enqueue_to_class(task);
-
-    kern_mpu_setup_stack_guard(task, task->stack_base, task->stack_size);
-
-    kern_log(KERN_LOG_DEBUG, "spawned task %d: %s", task->pid, task->name);
-    return task->pid;
-}
-
-#endif
+#endif /* XEROS_NATIVE_SCHED */
 
 /* ═══ Yield ═══ */
 
@@ -252,7 +210,7 @@ void kern_yield(void)
     swapcontext(&cur->ctx, &g_sched_ctx);
 }
 
-#else /* ESP32: FreeRTOS / XEROS_NATIVE_SCHED fallback */
+#else /* XEROS_NATIVE_SCHED */
 
 void kern_yield(void)
 {
@@ -331,7 +289,7 @@ void kern_sleep_ms(uint32_t ms)
     swapcontext(&cur->ctx, &g_sched_ctx);
 }
 
-#else /* ESP32: sleep = yield + 记录唤醒时间 */
+#else /* XEROS_NATIVE_SCHED: sleep = yield + 记录唤醒时间 */
 
 void kern_sleep_ms(uint32_t ms)
 {
@@ -395,15 +353,7 @@ kern_err_t kern_task_kill(kern_pid_t pid)
     task->state = KERN_TASK_ZOMBIE;
     kern_log(KERN_LOG_DEBUG, "task %d (%s) killed", task->pid, task->name);
 
-#if defined(NATIVE_TEST) || defined(XEROS_NATIVE_SCHED)
-    /* Native: TCB 在下次 sched_tick 时由 reap_zombies 回收；栈与上下文作为资源已追踪 */
-#else
-    /* FreeRTOS: 销毁底层线程 */
-    if (task->port_thread != KERN_PORT_THREAD_NULL) {
-        kern_port_thread_kill(task->port_thread);
-        task->port_thread = KERN_PORT_THREAD_NULL;
-    }
-#endif
+    /* TCB 在下次 sched_tick 时由 reap_zombies 回收；栈与上下文作为资源已追踪 */
 
     return KERN_OK;
 }

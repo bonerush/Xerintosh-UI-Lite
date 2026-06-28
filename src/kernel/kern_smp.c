@@ -33,8 +33,7 @@ _Static_assert(KERN_MAX_CPUS >= 2, "KERN_MAX_CPUS must be at least 2 for ESP32 S
 
 uint8_t kern_cpu_id(void)
 {
-    /* 原生 CPU ID 读取：不依赖 FreeRTOS xPortGetCoreID。
-     * esp_cpu_get_core_id() 直接读 Xtensa PRID 特殊寄存器。 */
+    /* 原生 CPU ID 读取：esp_cpu_get_core_id() 直接读 Xtensa PRID 特殊寄存器。 */
     int id = esp_cpu_get_core_id();
     if (id < 0 || id >= KERN_MAX_CPUS) {
         kern_log(KERN_LOG_ERROR, "SMP: invalid core id %d >= KERN_MAX_CPUS", id);

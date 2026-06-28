@@ -571,7 +571,7 @@ static void cmd_kill(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cw
         return;
     }
 
-    /* 使用统一 kill API（处理虚任务注销 + FreeRTOS 线程销毁） */
+    /* 使用统一 kill API */
     int ret = kern_task_kill((kern_pid_t)pid_l);
     char msg[64];
     if (ret == 0) {
@@ -733,7 +733,7 @@ static void cmd_top(kern_fd_t tty, int argc, char *argv[], char *cwd, size_t cwd
         char c;
         if (kern_read(tty, &c, 1) > 0) running = false;
         if (running) {
-            kern_sleep_ms(2000);  /* 使用内核 sleep API，兼容 FreeRTOS 和原生调度器 */
+            kern_sleep_ms(2000);
         }
     }
 }

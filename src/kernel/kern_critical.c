@@ -39,7 +39,7 @@ void kern_enable_interrupts(void)
     kern_exit_critical(0);
 }
 
-#else /* NATIVE_TEST 或 FreeRTOS 后端 */
+#else /* NATIVE_TEST */
 
 uint32_t kern_enter_critical(void) { return 0; }
 void     kern_exit_critical(uint32_t state) { (void)state; }

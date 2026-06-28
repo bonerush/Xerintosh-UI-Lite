@@ -1,18 +1,18 @@
 /* Only compile for Xtensa targets (ESP32) with native scheduler enabled.
- * Skip on native test builds (ucontext) and FreeRTOS backend builds. */
+ * Skip on native test builds (ucontext). */
 #if !defined(NATIVE_TEST) && defined(XEROS_NATIVE_SCHED)
 
 /**
  * @file   kern_port_esp32_native.c
  * @brief  Xeros 内核可移植层 — ESP32 原生调度器后端
- * @details 第一版最小原生调度器（复用 newlib setjmp/longjmp）：
- *          - 调度器运行在 app_main 的 FreeRTOS 任务上下文中。
+ * @details Xeros 原生调度器（复用 newlib setjmp/longjmp）：
+ *          - 调度器运行在 app_main 的 ESP-IDF 任务上下文中。
  *          - Xeros 任务使用独立的私有栈；调度器与任务通过 jmp_buf 协切换。
  *          - 新任务第一次运行时走 xeros_task_start 汇编桩切换到任务栈。
  *          - tickless：idle 中按下一个 SLEEPING 任务的唤醒时间重编程 GPTimer，
  *            用低功耗忙等替代固定 1ms tick；无法进入 tickless 时回退到 ROM 延时。
  *
- *          本文件通过 kern_port_ops_t 提供后端多态，替换 FreeRTOS 后端。
+ *          本文件通过 kern_port_ops_t 提供后端多态。
  *
  * @copyright Copyright (c) 2026
  */
@@ -53,7 +53,7 @@ static void native_init(void)
     /* 原生调度器不需要信号量；定时器按需启动 */
 }
 
-/* ═══ 线程管理（原生调度器不使用 FreeRTOS 线程承载任务）═══ */
+/* ═══ 线程管理（原生调度器自行管理任务上下文）═══ */
 
 static kern_port_thread_t native_thread_spawn(
     void (*entry)(void *arg),
