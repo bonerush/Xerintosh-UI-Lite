@@ -248,11 +248,19 @@ uint32_t hal_input_get_press_duration(hal_button_t btn) {
  * @note   在 user_item 的 init/exit 中调用，清除跨模式的残留状态。
  *         同时把 prev_raw 同步为当前 GPIO 电平，避免 reset 后下一次
  *         hal_input_get_event 因旧边沿状态而误判出短按/释放事件。
+ *
+ *         若复位时按键仍处于物理按下态（如 user_item 退出过程中用户
+ *         手指尚未松开长按），将 long_fired 置位以防止释放时误判为
+ *         SHORT_PRESS。所有调用场景均在长按事件已被消费后发生，此保护
+ *         不会影响正常按键检测。
  */
 void hal_input_reset_events(void) {
     for (int i = 0; i < HAL_BTN_COUNT; i++) {
         hal_input_dc_init(&g_input_ctx.buttons[i].dc);
         g_input_ctx.buttons[i].prev_raw = btn_read_raw((hal_button_t)i);
+        if (g_input_ctx.buttons[i].prev_raw) {
+            g_input_ctx.buttons[i].dc.long_fired = true;
+        }
     }
 }
 
