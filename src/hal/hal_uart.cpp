@@ -18,6 +18,33 @@
 
 static bool s_uart0_ready = false;
 
+/*
+ * UART 硬件自旋锁
+ *
+ * 在 XEROS_NATIVE_SCHED + CONFIG_PREEMPT_ENABLED 下，多个 Xeros 任务
+ * （main-loop、wifi-mgr）可能并发调用 hal_uart0_read/write，而 ESP-IDF
+ * 的 uart_read_bytes/uart_write_bytes 内部使用 FreeRTOS 非递归互斥锁。
+ * 由于 Xeros 任务在同一个 FreeRTOS 任务（app_main）内通过 setjmp/longjmp
+ * 切换，FreeRTOS 会将重复获取视为同一任务自递归，导致自死锁——系统冻结。
+ *
+ * 此自旋锁确保任何时候只有一个 Xeros 任务进入 ESP-IDF UART 驱动函数，
+ * 避免 FreeRTOS 互斥锁的同一任务重复获取问题。即使被抢占，自旋锁持有者
+ * 恢复后会先完成 UART 调用并释放锁，其他任务才能进入。
+ */
+static volatile bool s_hal_uart_spinlock = false;
+
+static inline void hal_uart_spin_lock(void)
+{
+    while (__sync_lock_test_and_set(&s_hal_uart_spinlock, true)) {
+        /* 忙等：抢占式调度器会自动切换回锁持有者任务 */
+    }
+}
+
+static inline void hal_uart_spin_unlock(void)
+{
+    __sync_lock_release(&s_hal_uart_spinlock);
+}
+
 void hal_uart0_init(void)
 {
     if (s_uart0_ready) return;
@@ -60,21 +87,29 @@ int hal_uart0_read(uint8_t *buf, int len)
 {
     if (!s_uart0_ready) hal_uart0_init();
     if (buf == NULL || len <= 0) return 0;
-    return (int)uart_read_bytes(HAL_UART0_NUM, buf, (size_t)len, 0);
+    hal_uart_spin_lock();
+    int ret = (int)uart_read_bytes(HAL_UART0_NUM, buf, (size_t)len, 0);
+    hal_uart_spin_unlock();
+    return ret;
 }
 
 int hal_uart0_write(const uint8_t *data, int len)
 {
     if (!s_uart0_ready) hal_uart0_init();
     if (data == NULL || len <= 0) return 0;
-    return (int)uart_write_bytes(HAL_UART0_NUM, (const char *)data, (size_t)len);
+    hal_uart_spin_lock();
+    int ret = (int)uart_write_bytes(HAL_UART0_NUM, (const char *)data, (size_t)len);
+    hal_uart_spin_unlock();
+    return ret;
 }
 
 int hal_uart0_available(void)
 {
     if (!s_uart0_ready) hal_uart0_init();
+    hal_uart_spin_lock();
     size_t len = 0;
     uart_get_buffered_data_len(HAL_UART0_NUM, &len);
+    hal_uart_spin_unlock();
     return (int)len;
 }
 

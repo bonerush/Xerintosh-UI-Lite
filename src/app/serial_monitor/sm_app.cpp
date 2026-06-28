@@ -37,7 +37,7 @@ static float       sm_btn_vel_0    = 0.0f;
 static float       sm_btn_vel_1    = 0.0f;
 
 #ifndef NATIVE_TEST
-#include "driver/uart.h"
+#include "hal/hal_uart.h"
 static char        sm_rx_buf[SM_TERM_LINE_LEN];
 static uint8_t     sm_rx_len = 0;
 #endif
@@ -172,7 +172,7 @@ void serial_monitor_update(void)
 
 #ifndef NATIVE_TEST
     uint8_t byte;
-    while (uart_read_bytes(UART_NUM_0, &byte, 1, 0) > 0) {
+    while (hal_uart0_read(&byte, 1) > 0) {
         char c = (char)byte;
 
         if (c == '\n' || c == '\r') {

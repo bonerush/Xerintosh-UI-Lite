@@ -71,7 +71,7 @@ bool g_flasher_bridge_active = false;
 #define FLASHER_DBG_ENABLED 0
 
 #ifndef NATIVE_TEST
-#include "driver/uart.h"
+#include "hal/hal_uart.h"
 #include "kernel/debug_serial.h"
 #endif
 
@@ -196,7 +196,7 @@ void flasher_loop(void *ud)
         uint8_t usb_buf[64];
         int usb_len = 0;
         uint8_t byte;
-        while (usb_len < (int)sizeof(usb_buf) && uart_read_bytes(UART_NUM_0, &byte, 1, 0) > 0) {
+        while (usb_len < (int)sizeof(usb_buf) && hal_uart0_read(&byte, 1) > 0) {
             usb_buf[usb_len++] = byte;
         }
 
@@ -233,7 +233,7 @@ void flasher_loop(void *ud)
         int uart_len = flasher_uart_read(uart_buf, sizeof(uart_buf));
         if (uart_len > 0) {
             if (hal_get_ticks() - s_pt_last_tx_ms < 2000) {
-                uart_write_bytes(UART_NUM_0, (const char *)uart_buf, uart_len);
+                hal_uart0_write(uart_buf, uart_len);
             }
             s_pt_rx_bytes += (uint32_t)uart_len;
         }

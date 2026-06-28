@@ -12,11 +12,8 @@
 # 1. Native 测试（必须全部通过）
 pio test -e native
 
-# 2. 硬件目标构建（必须无警告）
+# 2. 硬件目标构建（必须无警告，使用 Xeros 原生调度器）
 pio run -e m5stick-c
-
-# 3. Xeros 原生调度构建（内核层修改后强制要求）
-pio run -e m5stick-c-native
 ```
 
 电脑端全部通过后，再进入第二步。
@@ -24,11 +21,11 @@ pio run -e m5stick-c-native
 ### 第二步：实机验证 (Device Verification)
 
 ```bash
-# 烧录（默认使用 Xeros 原生调度器版本）
+# 烧录
 pio run --target upload
 
 # 串口监控
-pio device monitor -e m5stick-c-native
+pio device monitor -e m5stick-c
 ```
 
 **冒烟测试清单：**
@@ -46,26 +43,26 @@ pio device monitor -e m5stick-c-native
 | 电脑端验证失败 | **禁止烧录**。修复后重新验证。 |
 | 实机验证失败 | 记录崩溃信息，标记阶段为 `BLOCKED`。 |
 
-## 默认上传目标
+## 构建环境
 
-本项目默认使用 **Xeros 原生调度器** (`m5stick-c-native`) 环境。
+本项目只有一个 ESP32 构建目标 `m5stick-c`，使用 **Xeros 原生调度器**（无 FreeRTOS 后端）。
 
 ```bash
-# 上传（自动使用 m5stick-c-native）
+# 上传
 pio run --target upload
 
 # 明确指定
-pio run -e m5stick-c-native --target upload
+pio run -e m5stick-c --target upload
 ```
 
 ## 构建命令速查
 
 ```bash
 # 全量验证（电脑端）
-pio test -e native && pio run -e m5stick-c && pio run -e m5stick-c-native
+pio test -e native && pio run -e m5stick-c
 
 # 烧录 + 监控
-pio run --target upload && pio device monitor -e m5stick-c-native
+pio run --target upload && pio device monitor -e m5stick-c
 ```
 
 ## 重构规则

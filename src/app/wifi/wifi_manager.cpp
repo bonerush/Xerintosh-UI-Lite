@@ -40,7 +40,8 @@ void wifi_mgr_task_main(void *arg) { (void)arg; }
 #include <esp_timer.h>
 #include <lwip/inet.h>
 #include "hal/hal_system.h"
-#include "hal/hal_uart.h"
+
+#define TAG "wifi_mgr"
 
 #include "app/wifi/wifi_manager.h"
 #include "app/wifi/wifi_menu.h"
@@ -267,13 +268,13 @@ void wifi_mgr_init(void)
      * 在 enable/disable 中独立管理。 */
     esp_err_t rc = esp_netif_init();
     if (rc != ESP_OK) {
-        hal_uart0_write((const uint8_t *)"[WiFi] esp_netif_init failed\n", 30);
+        ESP_LOGE(TAG, "esp_netif_init failed");
         return;
     }
 
     rc = esp_event_loop_create_default();
     if (rc != ESP_OK) {
-        hal_uart0_write((const uint8_t *)"[WiFi] esp_event_loop_create_default failed\n", 45);
+        ESP_LOGE(TAG, "esp_event_loop_create_default failed");
         return;
     }
 
@@ -299,24 +300,18 @@ void wifi_mgr_enable(void)
 {
     kern_kmem_stat_t st;
     xeros_mem_get_stats(&st);
-
-    char log_buf[128];
-    snprintf(log_buf, sizeof(log_buf),
-             "[WiFi] enable start free=%lu max=%lu\n",
+    ESP_LOGI(TAG, "enable start free=%lu max=%lu",
              (uint32_t)st.free_bytes,
              (uint32_t)st.largest_free_block);
-    hal_uart0_write((const uint8_t *)log_buf, strlen(log_buf));
 
     g_wifi_enabled = true;
 
     if (!xeros_mem_can_alloc(WIFI_MIN_FREE_HEAP, WIFI_MIN_MAX_ALLOC_HEAP)) {
         xeros_mem_get_stats(&st);
-        snprintf(log_buf, sizeof(log_buf),
-                 "[WiFi] heap guard failed: free=%lu max_alloc=%lu reserved=%lu\n",
+        ESP_LOGW(TAG, "heap guard failed: free=%lu max_alloc=%lu reserved=%lu",
                  (uint32_t)st.free_bytes,
                  (uint32_t)st.largest_free_block,
                  (uint32_t)kern_kmem_reserved_bytes());
-        hal_uart0_write((const uint8_t *)log_buf, strlen(log_buf));
         wifi_popup_request("内存不足", 2000);
         g_wifi_enabled = false;
         g_wifi_on = false;
@@ -332,7 +327,7 @@ void wifi_mgr_enable(void)
         wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
         esp_err_t rc = esp_wifi_init(&cfg);
         if (rc != ESP_OK) {
-            hal_uart0_write((const uint8_t *)"[WiFi] esp_wifi_init failed\n", 29);
+            ESP_LOGE(TAG, "esp_wifi_init failed");
             g_wifi_enabled = false;
             g_wifi_on = false;
             g_state = WIFI_MGR_IDLE;
@@ -354,11 +349,11 @@ void wifi_mgr_enable(void)
 
     esp_err_t rc = esp_wifi_set_mode(WIFI_MODE_STA);
     if (rc != ESP_OK) {
-        hal_uart0_write((const uint8_t *)"[WiFi] esp_wifi_set_mode failed\n", 33);
+        ESP_LOGE(TAG, "esp_wifi_set_mode failed");
     }
     rc = esp_wifi_start();
     if (rc != ESP_OK) {
-        hal_uart0_write((const uint8_t *)"[WiFi] esp_wifi_start failed\n", 31);
+        ESP_LOGE(TAG, "esp_wifi_start failed");
     }
 
     kern_sleep_ms(10); /* 让出 CPU */
@@ -401,12 +396,9 @@ void wifi_mgr_disable(void)
     kern_kmem_stat_t st;
     xeros_mem_get_stats(&st);
 
-    char log_buf[128];
-    snprintf(log_buf, sizeof(log_buf),
-             "[WiFi] disable start free=%lu max=%lu\n",
+    ESP_LOGI(TAG, "disable start free=%lu max=%lu",
              (uint32_t)st.free_bytes,
              (uint32_t)st.largest_free_block);
-    hal_uart0_write((const uint8_t *)log_buf, strlen(log_buf));
 
     wifi_popup_dismiss();
 
@@ -429,11 +421,9 @@ void wifi_mgr_disable(void)
     g_wifi_driver_inited   = false;
 
     xeros_mem_get_stats(&st);
-    snprintf(log_buf, sizeof(log_buf),
-             "[WiFi] disable done free=%lu max=%lu\n",
+    ESP_LOGI(TAG, "disable done free=%lu max=%lu",
              (uint32_t)st.free_bytes,
              (uint32_t)st.largest_free_block);
-    hal_uart0_write((const uint8_t *)log_buf, strlen(log_buf));
 
     if (g_networks_list) {
         ui_selector_safety_move_out(g_networks_list, g_settings_list);
