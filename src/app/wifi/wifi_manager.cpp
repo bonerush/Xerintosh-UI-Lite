@@ -190,17 +190,24 @@ static void wifi_popup_dismiss(void)
  */
 extern "C" void wifi_popup_refresh(void)
 {
-    if (!g_popup_active) return;
+    /* 在锁内读取快照，防止与 wifi_popup_request() 竞争 */
+    xeros_spinlock_lock(&g_popup_spinlock);
+    bool active = g_popup_active;
+    uint32_t start = g_popup_start;
+    uint16_t span = g_popup_span;
+    xeros_spinlock_unlock(&g_popup_spinlock);
+
+    if (!active) return;
 
     /* 超时检查：span 到期后触发动画退场 */
-    if (hal_get_ticks() - g_popup_start >= g_popup_span) {
+    if (hal_get_ticks() - start >= span) {
         wifi_popup_dismiss();
         return;
     }
 
     /* 每帧 push 保持弹窗存活（重置 time_start 防止弹窗自身超时） */
     xeros_spinlock_lock(&g_popup_spinlock);
-    xerintosh_push_pop_up(g_popup_content, g_popup_span);
+    xerintosh_push_pop_up(g_popup_content, span);
     xeros_spinlock_unlock(&g_popup_spinlock);
 }
 
@@ -739,6 +746,7 @@ void wifi_mgr_update(void)
                 g_scan_ap_count = ap_count;
             } else {
                 g_scan_ap_count = 0;
+                wifi_popup_request("内存不足，无法扫描", 2000);
             }
 
             if (!g_initial_scan_shown) {

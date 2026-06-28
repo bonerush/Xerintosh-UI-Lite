@@ -89,7 +89,10 @@ void power_key_popup_update(void)
         if (g_dual_active)
         {
             g_dual_cooldown_end_ms = hal_get_ticks() + DUAL_RELEASE_COOLDOWN_MS;
-            hal_input_reset_events();
+            /* 消费双键释放后的残留事件，避免误触发短按/长按。
+             * 不使用 hal_input_reset_events() 因为会破坏其他模块的事件状态 */
+            hal_input_get_event(HAL_BTN_A);
+            hal_input_get_event(HAL_BTN_B);
             xerintosh_dismiss_pop_up();
         }
         g_dual_active = false;
