@@ -156,7 +156,7 @@ static kern_task_t *sched_rr_pick_next(void)
             t = sched_class_rr.task_list;
         }
         steps++;
-    } while (t != start && steps < 20);
+    } while (t != start && steps < MAX_TASKS * 2);
 
     task_list_unlock();
 

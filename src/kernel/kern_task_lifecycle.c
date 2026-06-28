@@ -321,6 +321,7 @@ bool kern_task_is_protected(const kern_task_t *task)
     static const char *protected_names[] = {
         "idle", "shell", "ui",
         "taskmgr", "Task Manager",  /* UI App 英文名保护 */
+        "timerd",                   /* 内核定时器守护进程 */
         NULL
     };
 

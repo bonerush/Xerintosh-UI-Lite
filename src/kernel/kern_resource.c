@@ -22,6 +22,10 @@
 
 #define RES_POOL_SIZE (KERN_MAX_TASKS * 4)  /* 16 * 4 = 64 */
 
+/* 编译期保证：位图 (uint64_t) 必须能容纳所有槽位 */
+_Static_assert(RES_POOL_SIZE <= 64,
+               "RES_POOL_SIZE exceeds 64-bit bitmap; increase bitmap type");
+
 static kern_resource_t g_res_pool[RES_POOL_SIZE];
 static uint64_t g_res_pool_bitmap;  /* 位图：bit i = 1 表示已分配 */
 
