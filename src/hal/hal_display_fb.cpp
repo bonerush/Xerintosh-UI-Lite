@@ -76,6 +76,10 @@ void hal_display_clear(void) {
 void hal_display_flush(void) {
 }
 
+void hal_display_flush_region(int16_t x, int16_t y, int16_t w, int16_t h) {
+    (void)x; (void)y; (void)w; (void)h;
+}
+
 struct _hal_canvas_opaque* hal_display_canvas(void) {
     return nullptr;
 }
@@ -326,6 +330,26 @@ void hal_display_flush(void) {
     if (g_canvas) {
         g_canvas->pushSprite(&g_lgfx, 0, 0);
     }
+}
+
+/**
+ * @brief 将画布指定矩形区域推送到物理屏幕
+ * @note  当前 LovyanGFX 版本不支持 pushSprite 区域重载，
+ *        因此回退到全屏推送。保留此接口以待库升级后启用局部推送。
+ */
+void hal_display_flush_region(int16_t x, int16_t y, int16_t w, int16_t h) {
+    if (!g_canvas) return;
+
+    /* 边界裁剪确保在屏幕范围内 */
+    if (x < 0) { w += x; x = 0; }
+    if (y < 0) { h += y; y = 0; }
+    if (x + w > g_screen_width)  w = g_screen_width - x;
+    if (y + h > g_screen_height) h = g_screen_height - y;
+    if (w <= 0 || h <= 0) return;
+
+    /* TODO: 升级 LovyanGFX 后使用 push_sprite 区域重载
+     * g_canvas->push_sprite(&g_lgfx, x, y, w, h, x, y, ~0u); */
+    g_canvas->pushSprite(&g_lgfx, 0, 0);
 }
 
 struct _hal_canvas_opaque* hal_display_canvas(void) {

@@ -130,9 +130,22 @@ void ui_task_main(void *arg)
             has_hint = true;
         }
 
-        /* 仅在有绘制内容时刷新到屏幕，减少无意义 SPI 传输 */
+        /* 脏区域局部刷新策略：
+         * - dirty 区域 < 全屏 50%：仅推送脏矩形区域（节省 SPI 带宽）
+         * - dirty 区域 >= 50% 或全屏清屏后：全屏推送
+         * - 无脏标志且无长按提示：跳过刷新 */
         if (should_clear || has_hint || xerintosh_is_dirty()) {
-            hal_display_flush();
+            const xerintosh_dirty_region_t *dr = xerintosh_get_dirty_region();
+            int32_t dr_area = (int32_t)dr->w * (int32_t)dr->h;
+            int32_t full_area = (int32_t)HAL_SCREEN_WIDTH * (int32_t)HAL_SCREEN_HEIGHT;
+
+            if (should_clear || dr_area >= full_area / 2) {
+                hal_display_flush();
+            } else if (dr->active && dr_area > 0) {
+                hal_display_flush_region(dr->x, dr->y, dr->w, dr->h);
+            } else {
+                hal_display_flush();  /* 回退：全屏推送 */
+            }
         }
 
         if (frame <= 5) {

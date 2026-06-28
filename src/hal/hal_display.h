@@ -54,6 +54,16 @@ extern void hal_display_clear_color(uint16_t color);
  */
 extern void hal_display_flush(void);
 
+/**
+ * @brief 将离屏缓冲区的指定矩形区域刷新到物理屏幕
+ * @param x     源区域左上角 x
+ * @param y     源区域左上角 y
+ * @param w     区域宽度
+ * @param h     区域高度
+ * @note  仅在脏区域较小时使用，全屏刷新请用 hal_display_flush()
+ */
+extern void hal_display_flush_region(int16_t x, int16_t y, int16_t w, int16_t h);
+
 /* 内部访问器：其他 HAL 文件通过它们访问画布/帧缓冲 */
 struct _hal_canvas_opaque;
 struct _hal_canvas_opaque* hal_display_canvas(void);
