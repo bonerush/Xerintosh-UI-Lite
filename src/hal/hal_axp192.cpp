@@ -56,6 +56,8 @@ esp_err_t hal_axp192_init(void) {
     err = i2c_master_bus_add_device(g_axp192_bus, &dev_cfg, &g_axp192_dev);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to add AXP192 device: %d", err);
+        i2c_del_master_bus(g_axp192_bus);
+        g_axp192_bus = NULL;
         return err;
     }
 

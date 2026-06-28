@@ -33,7 +33,12 @@ static kern_task_t *task_create_common(const char *name,
         return NULL;
     }
 
-    task->pid = g_next_pid++;
+    task->pid = g_next_pid;
+    if (g_next_pid < INT16_MAX) {
+        g_next_pid++;
+    } else {
+        g_next_pid = 0;  /* wraparound: PID space exhausted, reuse */
+    }
     task->state = KERN_TASK_READY;
     task->priority = 128;
     task->base_priority = 128;

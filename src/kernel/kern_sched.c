@@ -13,6 +13,7 @@
 #include "kern_task.h"
 #include "kern_mpu.h"
 #include "kern_init.h"
+#include "kern_resource.h"
 #include "kern_port.h"
 #include "kern_kmalloc.h"
 #include "kern_stats.h"
@@ -327,6 +328,7 @@ static void esp32_native_init(void)
             idle, sizeof(kern_ctx_native_t));
         if (idle->native_ctx == NULL || idle->stack_base == NULL) {
             kern_panic("failed to allocate idle task context/stack");
+            kern_resource_release_all(idle);
             free(idle);
             return;
         }

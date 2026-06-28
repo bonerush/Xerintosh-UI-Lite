@@ -131,7 +131,9 @@ uint32_t hal_input_get_press_duration(hal_button_t btn) {
 /* ═══ 硬件环境：ESP-IDF GPIO 按键处理 ═══ */
 
 #include "driver/gpio.h"
+#include "esp_log.h"
 
+static const char *TAG = "hal_input";
 #define BOOT_INPUT_GUARD_MS  300  /* 启动后首 300ms 忽略输入，防止 GPIO 上电毛刺 */
 
 /**
@@ -170,7 +172,11 @@ void hal_input_init(void) {
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
         .intr_type = GPIO_INTR_DISABLE,
     };
-    gpio_config(&io_conf);
+    esp_err_t gpio_err = gpio_config(&io_conf);
+    if (gpio_err != ESP_OK) {
+        ESP_LOGE(TAG, "GPIO config failed: %d", gpio_err);
+        return;
+    }
 
     g_input_ctx.boot_time_ms = hal_get_ticks();
 }
