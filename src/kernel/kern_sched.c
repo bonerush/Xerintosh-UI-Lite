@@ -188,6 +188,9 @@ static void sched_native_soft_reset(void)
      * 这里只做链表清理：把非 idle/timerd 任务从全局链表中摘除并置为 ZOMBIE，
      * 不释放内存，避免破坏可能仍被引用的 TCB。
      * 注意：保留 g_sched_ticks 单调递增，避免睡眠任务 wake_time 因计数器回绕而失效。 */
+#ifdef CONFIG_SMP_ENABLED
+    while (__sync_lock_test_and_set(&g_task_list_lock, true)) { asm volatile("nop"); }
+#endif
     uint32_t saved_ticks = g_sched_ticks;
     kern_task_t *t = g_task_list;
     kern_task_t *head = NULL;
@@ -241,6 +244,9 @@ static void sched_native_soft_reset(void)
         g_per_cpu[0].last_picked = g_idle_task;
         g_per_cpu[0].task_count = g_task_count;
     }
+#ifdef CONFIG_SMP_ENABLED
+    __sync_lock_release(&g_task_list_lock);
+#endif
 }
 
 void kern_sched_init(void)

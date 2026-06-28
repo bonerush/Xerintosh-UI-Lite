@@ -136,15 +136,17 @@ serial_state_t serial_poll(void)
         return g_serial_state;
     }
 
-    /* ─── 逐字节读取串口（非阻塞）─── */
+    /* ─── 逐字节读取串口（非阻塞，单次最多 256 字节）─── */
     serial_uart_lock();
-    while (true)
+    int bytes_this_poll = 0;
+    while (bytes_this_poll < 256)
     {
         uint8_t byte;
         int n = hal_uart0_read(&byte, 1);
         if (n <= 0) {
             break;
         }
+        bytes_this_poll++;
 
         char c = (char)byte;
 

@@ -228,10 +228,13 @@ static void axp192_power_on_display(void)
         return;
     }
 
-    hal_axp192_write_reg(0x30, 0x80); /* VBUS-IPSOUT Pass-Through Management */
+    esp_err_t err;
+    err = hal_axp192_write_reg(0x30, 0x80);
+    if (err != ESP_OK) debug_printf("[ FAIL ] AXP192 reg 0x30: %d\n", err);
     axp192_disable_dcdc3();
     axp192_set_ldo3(3000);            /* LCD power 3.0V */
-    hal_axp192_write_reg(0x12, 0x4D); /* DCDC1/LDO2/LDO3/EXTEN enable */
+    err = hal_axp192_write_reg(0x12, 0x4D);
+    if (err != ESP_OK) debug_printf("[ FAIL ] AXP192 reg 0x12: %d\n", err);
 
     hal_delay_ms(10);
     axp192_set_backlight(g_brightness);

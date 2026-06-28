@@ -702,18 +702,26 @@ void wifi_mgr_update(void)
 
     case WIFI_MGR_WARMUP: {
         if (hal_get_ticks() - g_warmup_start_time >= WIFI_WARMUP_DELAY_MS) {
+            static uint8_t warmup_scan_retries = 0;
             g_scan_done = false;
             g_scan_ap_count = 0;
             wifi_scan_config_t scan_cfg = {};
             scan_cfg.show_hidden = true;
             esp_err_t err = esp_wifi_scan_start(&scan_cfg, false);
             if (err != ESP_OK) {
-                if (!g_initial_scan_shown) {
-                    wifi_popup_request("扫描失败", 2000);
+                if (warmup_scan_retries < 3) {
+                    warmup_scan_retries++;
+                    g_warmup_start_time = hal_get_ticks();  /* 重试 */
+                } else {
+                    warmup_scan_retries = 0;
+                    if (!g_initial_scan_shown) {
+                        wifi_popup_request("扫描失败", 2000);
+                    }
+                    g_state = WIFI_MGR_SCAN_DONE;
+                    g_initial_scan_shown = true;
                 }
-                g_state = WIFI_MGR_SCAN_DONE;
-                g_initial_scan_shown = true;
             } else {
+                warmup_scan_retries = 0;
                 g_state = WIFI_MGR_SCANNING;
                 g_wifi_scan_start_time = hal_get_ticks();
                 if (!g_initial_scan_shown) {
