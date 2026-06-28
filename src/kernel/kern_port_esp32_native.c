@@ -143,7 +143,7 @@ static void native_task_exit(void)
 
 /* 进入 tickless 的最小空闲时长（毫秒）
  * 小于此值时保持 1ms 周期 tick，避免频繁重编程定时器。 */
-#define TICKLESS_MIN_IDLE_MS 2
+#define TICKLESS_MIN_IDLE_MS 1
 
 static uint32_t native_idle_next_wake_ms(void)
 {
@@ -210,10 +210,12 @@ static void native_idle(void)
         }
     }
 
-    /* 无法进入 tickless：回退到 ROM 延时 1ms，避免 busy-loop。
+    /* 无法进入 tickless：回退到 ROM 短延时 (200us)。
+     * 短延时提升 UI 帧率精度——动画活跃时帧间隔仅 10ms，
+     * 1ms 的 idle 开销占比过大。
      * 这里不再调用 vTaskDelay，以切断 Xeros 任务对 FreeRTOS 调度 API
      * 的显式依赖；高优先级 FreeRTOS 驱动任务仍可抢占本任务。 */
-    ets_delay_us(1000);
+    ets_delay_us(200);
 }
 
 /* ═══ 定时器基础设施 ═══ */
