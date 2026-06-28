@@ -109,7 +109,7 @@ static kern_task_t *sched_fifo_pick_next(void)
         kern_task_t *t = g_fifo_buckets[p];
         while (t != NULL) {
             /* 唤醒到期 sleep 任务 */
-            if (t->state == KERN_TASK_SLEEPING && t->wake_time <= now) {
+            if (t->state == KERN_TASK_SLEEPING && (int32_t)(now - t->wake_time) >= 0) {
                 t->state = KERN_TASK_READY;
             }
             if (t->state == KERN_TASK_SUSPENDED) {

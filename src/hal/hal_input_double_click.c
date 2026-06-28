@@ -16,6 +16,7 @@
  */
 void hal_input_dc_init(hal_input_dc_state_t *st)
 {
+    if (!st) return;
     st->pressed = false;
     st->press_time = 0;
     st->long_fired = false;
@@ -87,6 +88,8 @@ hal_event_t hal_input_dc_process(hal_input_dc_state_t *st,
                                   bool was_released,
                                   uint32_t now_ms)
 {
+    if (!st) return HAL_EVENT_NONE;
+
     /* 第一步：处理按下边沿（P1-1）
      * 必须在超时检查之前处理，否则窗口超时的同一帧出现新按下时，
      * 按下事件会被丢弃，导致用户感觉按键丢失。 */
@@ -203,6 +206,8 @@ hal_event_t hal_input_simple_process(hal_input_dc_state_t *st,
                                       bool was_released,
                                       uint32_t now_ms)
 {
+    if (!st) return HAL_EVENT_NONE;
+
     /* 第一步：按下边沿 */
     if (was_pressed) {
         st->pressed = true;

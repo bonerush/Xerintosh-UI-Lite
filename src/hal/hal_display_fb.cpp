@@ -253,6 +253,7 @@ void hal_display_init(void) {
     }
     if (!g_lgfx.init()) {
         debug_printf("[ FAIL ] LGFX init failed\n");
+        return;
     }
 
     g_screen_width = g_lgfx.width();

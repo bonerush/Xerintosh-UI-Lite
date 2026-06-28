@@ -115,7 +115,7 @@ static kern_task_t *sched_rr_pick_next(void)
     /* 第一遍：唤醒所有到期 sleep 任务 */
     kern_task_t *t = sched_class_rr.task_list;
     while (t != NULL) {
-        if (t->state == KERN_TASK_SLEEPING && t->wake_time <= now) {
+        if (t->state == KERN_TASK_SLEEPING && (int32_t)(now - t->wake_time) >= 0) {
             t->state = KERN_TASK_READY;
         }
         t = t->next;

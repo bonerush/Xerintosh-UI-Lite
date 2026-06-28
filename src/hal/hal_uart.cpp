@@ -77,7 +77,7 @@ void hal_uart0_init(void)
 void hal_uart0_set_baudrate(uint32_t baud_rate)
 {
     if (!s_uart0_ready) hal_uart0_init();
-    uart_set_baudrate(HAL_UART0_NUM, (uint32_t)baud_rate);
+    (void)uart_set_baudrate(HAL_UART0_NUM, (uint32_t)baud_rate);
 }
 
 int hal_uart0_read(uint8_t *buf, int len)
