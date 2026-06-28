@@ -33,10 +33,10 @@ extern "C" {
 struct kern_task;
 
 #ifdef NATIVE_TEST
-  /* Native: 使用 POSIX ucontext（无 FreeRTOS） */
+  /* Native: 使用 POSIX ucontext */
   #define KERN_PORT_STACK_MIN  1024
 #else
-  /* ESP32 + FreeRTOS 任务容器（默认与 XEROS_NATIVE_SCHED fallback） */
+  /* ESP32 + Xeros 原生调度器 */
   #define KERN_PORT_STACK_MIN  4096
 #endif
 
@@ -44,7 +44,6 @@ struct kern_task;
 
 /**
  * @brief 底层执行上下文句柄
- * @note  FreeRTOS 后端为 TaskHandle_t
  *        原生后端为 NULL（栈由 Xeros 管理）
  */
 typedef void* kern_port_thread_t;
@@ -55,7 +54,7 @@ typedef void* kern_port_thread_t;
 
 /**
  * @brief 可移植层操作表
- * @note  每个后端（FreeRTOS / 原生 / 测试桩）提供自己的实现，
+ * @note  每个后端（ESP32 原生 / Native 测试）提供自己的实现，
  *        编译时通过 #if 守卫选择，运行时通过此表分派。
  */
 typedef struct kern_port_ops {
@@ -108,8 +107,7 @@ static inline void kern_port_init(void)
  * @param  stack_size 栈大小（**字节**，0 表示使用默认值）
  * @param  task       关联的 Xeros TCB 指针
  * @return 线程句柄，失败返回 KERN_PORT_THREAD_NULL
- * @note   FreeRTOS 后端：stack_size 在创建时转换为 StackType_t 字数后传入
- *         xTaskCreatePinnedToCore。创建后 Xeros 无法调整该栈大小或回收。
+ *         ESP32: 栈大小在创建时固定，创建后无法调整。
  *         如需“按需分配”，请在创建前使用 kern_task_stack_recommend()。
  */
 static inline kern_port_thread_t kern_port_thread_spawn(
@@ -147,7 +145,7 @@ static inline void kern_port_thread_kill(kern_port_thread_t thread)
 /**
  * @brief  获取线程栈使用高水位
  * @param  thread 线程句柄
- * @return 剩余栈字数（FreeRTOS 后端）或已使用栈字节数（Native 后端）。
+ * @return 已使用栈字节数。
  *         调用者 kern_task_stack_usage() 负责按后端统一转换为字节。
  */
 static inline size_t kern_port_thread_stack_usage(kern_port_thread_t thread)

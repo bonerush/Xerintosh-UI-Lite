@@ -28,13 +28,13 @@ extern void hal_system_init(void);
  * @brief  获取系统启动后的单调毫秒数
  * @return 毫秒时间戳
  */
-extern uint32_t hal_get_ticks_ms(void);
+extern uint32_t hal_get_ticks(void);
 
 /**
- * @brief  hal_get_ticks_ms() 的兼容别名
- * @deprecated 新代码请使用 hal_get_ticks_ms()
+ * @brief  hal_get_ticks() 的兼容别名
+ * @deprecated 新代码请使用 hal_get_ticks()
  */
-static inline uint32_t hal_get_ticks(void) { return hal_get_ticks_ms(); }
+static inline uint32_t hal_get_ticks_ms(void) { return hal_get_ticks(); }
 
 /**
  * @brief  延时指定的毫秒数

@@ -3,7 +3,7 @@
  * @brief  HAL 系统层实现
  * @details 双实现架构：
  *          - NATIVE_TEST 时：使用 std::chrono 提供高精度时间
- *          - 硬件环境时：使用 ESP-IDF esp_timer_get_time() / vTaskDelay()
+ *          - 硬件环境时：使用 ESP-IDF esp_timer_get_time()
  *
  * @copyright Copyright (c) 2026
  */
@@ -29,7 +29,7 @@ void hal_system_init(void) {
 /**
  * @brief 获取系统启动后的毫秒数
  */
-uint32_t hal_get_ticks_ms(void) {
+uint32_t hal_get_ticks(void) {
     auto now = std::chrono::steady_clock::now();
     return std::chrono::duration_cast<std::chrono::milliseconds>(now - g_start_time).count();
 }
@@ -59,7 +59,7 @@ void hal_system_init(void) {
 /**
  * @brief 获取系统启动后的毫秒数
  */
-uint32_t hal_get_ticks_ms(void) {
+uint32_t hal_get_ticks(void) {
     return (uint32_t)(esp_timer_get_time() / 1000ULL);
 }
 
@@ -67,7 +67,7 @@ uint32_t hal_get_ticks_ms(void) {
  * @brief 延时指定的毫秒数
  *
  * Xeros 启动后（g_current_task != NULL）使用 kern_sleep_ms 让出 CPU；
- * 启动早期（g_current_task == NULL）使用 ROM 忙等延时，不依赖 FreeRTOS。
+ * 启动早期（g_current_task == NULL）使用 ROM 忙等延时。
  */
 void hal_delay_ms(uint32_t ms) {
     if (g_current_task != NULL) {

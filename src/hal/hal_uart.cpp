@@ -21,15 +21,12 @@ static bool s_uart0_ready = false;
 /*
  * UART 硬件自旋锁
  *
- * 在 XEROS_NATIVE_SCHED + CONFIG_PREEMPT_ENABLED 下，多个 Xeros 任务
- * （main-loop、wifi-mgr）可能并发调用 hal_uart0_read/write，而 ESP-IDF
- * 的 uart_read_bytes/uart_write_bytes 内部使用 FreeRTOS 非递归互斥锁。
- * 由于 Xeros 任务在同一个 FreeRTOS 任务（app_main）内通过 setjmp/longjmp
- * 切换，FreeRTOS 会将重复获取视为同一任务自递归，导致自死锁——系统冻结。
+ * 多个 Xeros 任务可能并发调用 hal_uart0_read/write，而 ESP-IDF 的
+ * uart_read_bytes/uart_write_bytes 内部使用非递归互斥锁。
+ * 由于 Xeros 任务在 app_main 内通过 setjmp/longjmp 切换，
+ * ESP-IDF 会将重复获取视为同一线程自递归，导致自死锁。
  *
- * 此自旋锁确保任何时候只有一个 Xeros 任务进入 ESP-IDF UART 驱动函数，
- * 避免 FreeRTOS 互斥锁的同一任务重复获取问题。即使被抢占，自旋锁持有者
- * 恢复后会先完成 UART 调用并释放锁，其他任务才能进入。
+ * 此自旋锁确保任何时候只有一个 Xeros 任务进入 ESP-IDF UART 驱动函数。
  */
 static volatile bool s_hal_uart_spinlock = false;
 

@@ -74,7 +74,7 @@ typedef struct xerintosh_switch_item_t
 /**
  * @brief 按钮项（单次触发回调）
  * @warning 按钮回调中不能直接调用 xerintosh_push_pop_up() 或显示层绘制函数，
- *          因其底层依赖 FreeRTOS 信号量，在调度上下文中会触发 task timeout。
+ *          在调度上下文中可能超时。
  *          正确做法：设标志位，由主循环的 app_input_process() 统一处理。
  */
 typedef struct xerintosh_button_item_t

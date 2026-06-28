@@ -254,7 +254,7 @@ hal_pwr_key_event_t hal_power_key_get_event(void)
         return ev;
     }
 
-    uint32_t now_ms = hal_get_ticks_ms();
+    uint32_t now_ms = hal_get_ticks();
 
     uint8_t pek = 0;
     if (hal_axp192_read_reg(AXP192_REG_IRQ_STATUS3, &pek) != ESP_OK) {
@@ -321,7 +321,7 @@ hal_pwr_key_event_t hal_power_key_get_event(void)
 uint32_t hal_power_key_get_hold_duration_ms(void)
 {
     if (!g_pwr.pressed) return 0;
-    return hal_get_ticks_ms() - g_pwr.press_time;
+    return hal_get_ticks() - g_pwr.press_time;
 }
 
 /**

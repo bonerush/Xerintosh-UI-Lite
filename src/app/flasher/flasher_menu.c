@@ -55,7 +55,7 @@ static uint8_t s_flasher_sub_owner_pin = 0;
 static uint32_t s_flasher_sub_press_start = 0;
 
 /* 延迟弹窗：按钮回调中不能直接调用 xerintosh_push_pop_up（显示层 textWidth
-   在中断/调度上下文中会触发 FreeRTOS task timeout），改为设置标志位，
+   在调度上下文中可能超时），改为设置标志位，
    由每帧 flasher_menu_process_input() 统一 push */
 static bool s_deferred_popup_pending = false;
 

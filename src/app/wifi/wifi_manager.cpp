@@ -465,7 +465,7 @@ void wifi_mgr_request_disable(void)
 /**
  * @brief 在主任务上下文中统一处理 WiFi 启用/禁用请求
  * @note  WiFi 驱动操作（esp_wifi_scan_start 等）必须在该上下文中执行，
- *        避免跨任务调用导致 FreeRTOS 死锁或 TWDT 复位。
+ *        避免跨任务调用导致 ESP-IDF 死锁或 TWDT 复位。
  */
 void wifi_mgr_process_requests(void)
 {
