@@ -19,6 +19,8 @@ void wifi_mgr_disable(void) {}
 bool wifi_mgr_is_waiting_input(void) { return false; }
 bool wifi_mgr_is_enabled(void) { return false; }
 bool wifi_mgr_is_driver_on(void) { return false; }
+bool wifi_mgr_is_connected(void) { return false; }
+void wifi_mgr_ensure_dns(void) {}
 uint32_t wifi_mgr_needed_heap(void) { return 45000; }
 void wifi_mgr_update(void) {}
 void wifi_mgr_request_enable(void) {}
@@ -36,6 +38,7 @@ void wifi_mgr_task_main(void *arg) { (void)arg; }
 #include <esp_event.h>
 #include <esp_netif.h>
 #include <esp_timer.h>
+#include <lwip/inet.h>
 #include "hal/hal_system.h"
 #include "hal/hal_uart.h"
 
@@ -61,28 +64,26 @@ extern "C" {
 
 static xeros_spinlock_t g_popup_spinlock;
 
-static wifi_mgr_state_t g_state           = WIFI_MGR_IDLE;    /* 状态机当前状态 */
-static bool             g_wifi_enabled    = false;            /* WiFi 是否已启用 */
-static bool             g_wifi_driver_inited = false;         /* WiFi 驱动是否已初始化 */
+static wifi_mgr_state_t g_state           = WIFI_MGR_IDLE;
+static bool             g_wifi_enabled    = false;
+static bool             g_wifi_driver_inited = false;
 
-/* ═══ 异步请求标志（线程安全）═══
- * UI 任务 / Xeros 任务通过 request_*() 设置标志，
- * 主任务调用 process_requests() 统一执行 WiFi 驱动操作。 */
+/* ═══ 异步请求标志（线程安全）═══ */
 static volatile bool g_enable_requested  = false;
 static volatile bool g_disable_requested = false;
 
 /* 连接状态 */
-static bool  g_connecting = false;                              /* 是否正在连接 */
-static char  g_connecting_ssid[STORAGE_SSID_MAX_LEN] = {0};     /* 正在连接的 SSID */
-static char  g_connecting_pass[STORAGE_PASS_MAX_LEN] = {0};     /* 正在连接的密码 */
+static bool  g_connecting = false;
+static char  g_connecting_ssid[STORAGE_SSID_MAX_LEN] = {0};
+static char  g_connecting_pass[STORAGE_PASS_MAX_LEN] = {0};
 
 /* 时序控制 */
-static uint32_t g_wifi_scan_start_time = 0;   /* 扫描开始时间 */
-static uint32_t g_warmup_start_time   = 0;    /* 预热开始时间 */
-static uint32_t g_connect_start_time  = 0;    /* 连接开始时间 */
-static bool g_initial_scan_shown = false;           /* 首次启动扫描弹窗是否已显示 */
-static bool g_auto_connect_done = false;            /* 本次 enable 周期内是否已尝试自动连接 */
-static bool g_is_auto_connect   = false;            /* 当前连接是否为自动连接（抑制弹窗） */
+static uint32_t g_wifi_scan_start_time = 0;
+static uint32_t g_warmup_start_time   = 0;
+static uint32_t g_connect_start_time  = 0;
+static bool g_initial_scan_shown = false;
+static bool g_auto_connect_done = false;
+static bool g_is_auto_connect   = false;
 
 /* ESP-IDF 异步扫描结果缓存 */
 static volatile bool g_scan_done = false;
@@ -90,18 +91,57 @@ static uint16_t g_scan_ap_count = 0;
 static wifi_ap_record_t *g_scan_ap_records = NULL;
 #define WIFI_SCAN_MAX_AP 32
 
-/* ESP-IDF 扫描完成回调（WiFi 事件驱动） */
-static void wifi_scan_done_handler(void* arg, esp_event_base_t base,
-                                   int32_t event_id, void *data)
+/* ═══ 事件驱动连接标志（由 WiFi/IP 事件处理器设置，update loop 消费）═══ */
+static volatile bool g_evt_sta_connected    = false;  /* WIFI_EVENT_STA_CONNECTED 已触发 */
+static volatile bool g_evt_sta_disconnected = false;  /* WIFI_EVENT_STA_DISCONNECTED 已触发 */
+static volatile bool g_evt_got_ip           = false;  /* IP_EVENT_STA_GOT_IP 已触发 */
+static volatile uint8_t g_evt_disconnect_reason = 0;   /* 断开原因码 */
+
+/* 自动重连控制 */
+static uint8_t g_reconnect_attempts = 0;
+#define WIFI_MAX_RECONNECT_ATTEMPTS 3
+
+/* ═══ 统一 WiFi + IP 事件处理器 ═══ */
+
+static void wifi_event_handler(void* arg, esp_event_base_t base,
+                               int32_t event_id, void *data)
 {
-    (void)arg; (void)base; (void)event_id; (void)data;
-    g_scan_done = true;
+    (void)arg; (void)base;
+    switch (event_id) {
+    case WIFI_EVENT_SCAN_DONE:
+        g_scan_done = true;
+        break;
+    case WIFI_EVENT_STA_CONNECTED:
+        g_evt_sta_connected = true;
+        g_evt_sta_disconnected = false;
+        break;
+    case WIFI_EVENT_STA_DISCONNECTED: {
+        wifi_event_sta_disconnected_t *evt =
+            (wifi_event_sta_disconnected_t *)data;
+        g_evt_disconnect_reason = evt->reason;
+        g_evt_sta_disconnected = true;
+        g_evt_sta_connected = false;
+        g_evt_got_ip = false;
+        break;
+    }
+    default:
+        break;
+    }
+}
+
+static void ip_event_handler(void* arg, esp_event_base_t base,
+                             int32_t event_id, void *data)
+{
+    (void)arg; (void)base;
+    if (event_id == IP_EVENT_STA_GOT_IP) {
+        g_evt_got_ip = true;
+    }
 }
 
 /* 超时常量 */
-#define WIFI_WARMUP_DELAY_MS    2000  /* 预热等待时间（WiFi 驱动需要充分初始化） */
-#define WIFI_SCAN_TIMEOUT_MS    30000  /* 扫描超时时间 */
-#define WIFI_CONNECT_TIMEOUT_MS 15000  /* 连接超时时间 */
+#define WIFI_WARMUP_DELAY_MS    2000
+#define WIFI_SCAN_TIMEOUT_MS    30000
+#define WIFI_CONNECT_TIMEOUT_MS 15000
 
 /* 内存守卫阈值 */
 #define WIFI_MIN_FREE_HEAP        45000
@@ -163,39 +203,83 @@ extern "C" void wifi_popup_refresh(void)
     xeros_spinlock_unlock(&g_popup_spinlock);
 }
 
-/* ═══ 前向声明（回调函数）═══ */
+/* ═══ 前向声明 ═══ */
 
 static bool try_auto_connect(void);
-static void suppress_wifi_logs(void);
-static void restore_wifi_logs(void);
 extern "C" void wifi_mgr_task_main(void *arg);
 
 /* ═══ 公共查询接口 ═══ */
 
 bool wifi_mgr_is_waiting_input(void)
 {
-    return g_state == WIFI_MGR_CONNECTING;
+    /* 仅在 CONNECTING 状态且尚未发起 esp_wifi_connect()
+       时（等待用户在串口输入密码）返回 true。
+       自动重连路径中 g_connecting 已被设为 true，不在此列。 */
+    return g_state == WIFI_MGR_CONNECTING && !g_connecting;
 }
 
 bool wifi_mgr_is_driver_on(void) { return g_wifi_enabled; }
+
+bool wifi_mgr_is_connected(void)
+{
+    /* CONNECTED 状态代表 IP_EVENT_STA_GOT_IP 已触发，
+       因此直接信任 g_state 即可（事件驱动保证） */
+    if (g_state != WIFI_MGR_CONNECTED) return false;
+
+    /* 二次确认：netif 确实持有有效 IP */
+    esp_netif_t *netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
+    if (!netif) return false;
+
+    esp_netif_ip_info_t ip_info;
+    if (esp_netif_get_ip_info(netif, &ip_info) != ESP_OK) return false;
+
+    return ip_info.ip.addr != 0;
+}
+
+void wifi_mgr_ensure_dns(void)
+{
+    esp_netif_t *netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
+    if (!netif) return;
+
+    esp_netif_dns_info_t dns_info;
+    if (esp_netif_get_dns_info(netif, ESP_NETIF_DNS_MAIN, &dns_info) != ESP_OK) return;
+
+    if (dns_info.ip.u_addr.ip4.addr != 0) return;
+
+    dns_info.ip.type = ESP_IPADDR_TYPE_V4;
+    dns_info.ip.u_addr.ip4.addr = ipaddr_addr("8.8.8.8");
+    esp_netif_set_dns_info(netif, ESP_NETIF_DNS_MAIN, &dns_info);
+}
 
 uint32_t wifi_mgr_needed_heap(void) { return WIFI_MIN_FREE_HEAP; }
 
 /* ═══ 初始化 ═══ */
 
-/**
- * @brief 初始化 WiFi 管理器
- * @note  获取设置菜单指针，用于后续动态挂载网络子菜单。
- *        注意：不在此处自动连接，避免 WiFi 断开导致驱动不稳定。
- */
 void wifi_mgr_init(void)
 {
     xeros_spinlock_init(&g_popup_spinlock);
     g_enable_requested  = false;
     g_disable_requested = false;
 
-    /* 按名称查找"设置"菜单项（Round 7 重构后，"设置"不再是
-     * root->child_list_item[0]，因为 user items 先于"设置"挂载） */
+    /* ── 一次性初始化 ESP-IDF 网络子系统 ──
+     * esp_netif、event loop、STA netif 在系统生命周期内只创建一次，
+     * 不随 WiFi 开关销毁/重建。WiFi 驱动 (esp_wifi_init/deinit)
+     * 在 enable/disable 中独立管理。 */
+    esp_err_t rc = esp_netif_init();
+    if (rc != ESP_OK) {
+        hal_uart0_write((const uint8_t *)"[WiFi] esp_netif_init failed\n", 30);
+        return;
+    }
+
+    rc = esp_event_loop_create_default();
+    if (rc != ESP_OK) {
+        hal_uart0_write((const uint8_t *)"[WiFi] esp_event_loop_create_default failed\n", 45);
+        return;
+    }
+
+    /* 创建默认 STA netif（含 DHCP 客户端） */
+    esp_netif_create_default_wifi_sta();
+
     xerintosh_list_item_t *root = xerintosh_get_root_list();
     if (root) {
         for (int i = 0; i < root->child_num; i++) {
@@ -207,18 +291,10 @@ void wifi_mgr_init(void)
             }
         }
     }
-
-    /* 注意：自动连接已移除。g_wifi_on 默认 true (WiFi 开机自启)，
-       此处不调用 WiFi 连接因为后续扫描会失败（
-       断开会使驱动处于不稳定状态）。
-       连接逻辑改为用户选择网络时触发。 */
 }
 
 /* ═══ 启用 / 禁用 ═══ */
 
-/**
- * @brief 启用 WiFi：进入 STA 模式，开始预热，并重建网络菜单
- */
 void wifi_mgr_enable(void)
 {
     kern_kmem_stat_t st;
@@ -233,9 +309,6 @@ void wifi_mgr_enable(void)
 
     g_wifi_enabled = true;
 
-    /* ── 内存预检：WiFi 驱动初始化需要 ~40KB 堆 ──
-     * 使用 xeros_mem_can_alloc() 统一检查总空闲、最大连续块与保留水位。
-     * BT 默认关闭时堆约 163KB，BT 按需加载后堆约 132KB，仍需留足余量 */
     if (!xeros_mem_can_alloc(WIFI_MIN_FREE_HEAP, WIFI_MIN_MAX_ALLOC_HEAP)) {
         xeros_mem_get_stats(&st);
         snprintf(log_buf, sizeof(log_buf),
@@ -246,32 +319,58 @@ void wifi_mgr_enable(void)
         hal_uart0_write((const uint8_t *)log_buf, strlen(log_buf));
         wifi_popup_request("内存不足", 2000);
         g_wifi_enabled = false;
-        g_wifi_on = false;   /* A9: 回写状态 */
+        g_wifi_on = false;
         g_state = WIFI_MGR_IDLE;
         wifi_menu_rebuild_list(0);
         return;
     }
 
-    /* 使用 ESP-IDF 原生 WiFi API 初始化驱动 */
+    /* ── 初始化 WiFi 驱动 ──
+     * 注意：esp_netif / event loop / STA netif 已在 wifi_mgr_init() 中一次性创建，
+     *       此处仅管理 WiFi 驱动 (esp_wifi_init/deinit) 的生命周期。 */
     if (!g_wifi_driver_inited) {
-        ESP_ERROR_CHECK(esp_netif_init());
-        ESP_ERROR_CHECK(esp_event_loop_create_default());
         wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
-        ESP_ERROR_CHECK(esp_wifi_init(&cfg));
+        esp_err_t rc = esp_wifi_init(&cfg);
+        if (rc != ESP_OK) {
+            hal_uart0_write((const uint8_t *)"[WiFi] esp_wifi_init failed\n", 29);
+            g_wifi_enabled = false;
+            g_wifi_on = false;
+            g_state = WIFI_MGR_IDLE;
+            return;
+        }
         g_wifi_driver_inited = true;
     }
+
+    kern_sleep_ms(10); /* 让出 CPU，防止看门狗 */
+
+    /* 注册 WiFi 和 IP 事件处理器（每次 enable 重新注册） */
+    esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID,
+                               wifi_event_handler, NULL);
+    esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP,
+                               ip_event_handler, NULL);
 
     esp_wifi_set_storage(WIFI_STORAGE_RAM);
     esp_wifi_set_ps(WIFI_PS_NONE);
 
-    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
-    ESP_ERROR_CHECK(esp_wifi_start());
+    esp_err_t rc = esp_wifi_set_mode(WIFI_MODE_STA);
+    if (rc != ESP_OK) {
+        hal_uart0_write((const uint8_t *)"[WiFi] esp_wifi_set_mode failed\n", 33);
+    }
+    rc = esp_wifi_start();
+    if (rc != ESP_OK) {
+        hal_uart0_write((const uint8_t *)"[WiFi] esp_wifi_start failed\n", 31);
+    }
 
-    /* 注册 ESP-IDF 扫描完成事件回调 */
+    kern_sleep_ms(10); /* 让出 CPU */
+
+    /* 重置事件标志 */
     g_scan_done = false;
     g_scan_ap_count = 0;
-    esp_event_handler_register(WIFI_EVENT, WIFI_EVENT_SCAN_DONE,
-                               wifi_scan_done_handler, NULL);
+    g_evt_sta_connected = false;
+    g_evt_sta_disconnected = false;
+    g_evt_got_ip = false;
+    g_evt_disconnect_reason = 0;
+    g_reconnect_attempts = 0;
 
     g_warmup_start_time = hal_get_ticks();
     g_state = WIFI_MGR_WARMUP;
@@ -280,33 +379,8 @@ void wifi_mgr_enable(void)
     wifi_menu_rebuild_list(0);
 }
 
-/* ─── 日志抑制辅助 ─── */
-
-/**
- * @brief 抑制 WiFi 驱动日志（连接期间减少串口输出）
- */
-static void suppress_wifi_logs(void)
-{
-    esp_log_level_set("wifi", ESP_LOG_ERROR);
-}
-
-/**
- * @brief 恢复 WiFi 驱动日志级别
- */
-static void restore_wifi_logs(void)
-{
-    esp_log_level_set("wifi", ESP_LOG_WARN);
-}
-
 /* ═══ 扫描 SSID 访问器（供 wifi_menu.c 在 C 环境调用） ═══ */
 
-/**
- * @brief  获取指定索引的扫描结果 SSID
- * @param  index 扫描结果索引（0-based）
- * @return SSID 字符串指针（静态缓冲区，每次调用覆盖）
- * @note   在 C 环境中替代 WiFi.SSID() 调用。
- *         返回指针在下一次调用本函数后失效，调用者需立即使用或复制。
- */
 extern "C" const char *wifi_mgr_get_scan_ssid(int index)
 {
     static char buf[33];
@@ -335,17 +409,24 @@ void wifi_mgr_disable(void)
     hal_uart0_write((const uint8_t *)log_buf, strlen(log_buf));
 
     wifi_popup_dismiss();
-    if (g_connecting) {
-        restore_wifi_logs();
-    }
-    /* 注销扫描完成事件回调 */
-    esp_event_handler_unregister(WIFI_EVENT, WIFI_EVENT_SCAN_DONE,
-                                 wifi_scan_done_handler);
+
+    /* 注销事件处理器 */
+    esp_event_handler_unregister(WIFI_EVENT, ESP_EVENT_ANY_ID,
+                                 wifi_event_handler);
+    esp_event_handler_unregister(IP_EVENT, IP_EVENT_STA_GOT_IP,
+                                 ip_event_handler);
+
     esp_wifi_disconnect();
+    kern_sleep_ms(50); /* 等待断开完成 */
     esp_wifi_stop();
+    kern_sleep_ms(50); /* 等待停止完成 */
     esp_wifi_deinit();
 
-    g_wifi_enabled = false;
+    /* 注意：不销毁 STA netif / event loop / esp_netif，
+     *       这些在系统生命周期内只创建一次（wifi_mgr_init）。 */
+
+    g_wifi_enabled         = false;
+    g_wifi_driver_inited   = false;
 
     xeros_mem_get_stats(&st);
     snprintf(log_buf, sizeof(log_buf),
@@ -355,9 +436,7 @@ void wifi_mgr_disable(void)
     hal_uart0_write((const uint8_t *)log_buf, strlen(log_buf));
 
     if (g_networks_list) {
-        /* 若选择器当前位于网络子树内，将其移回设置项 */
         ui_selector_safety_move_out(g_networks_list, g_settings_list);
-
         xerintosh_clear_children_of_list(g_networks_list);
         xerintosh_remove_item_from_list(g_settings_list, g_networks_list);
         g_networks_list = NULL;
@@ -370,8 +449,8 @@ void wifi_mgr_disable(void)
     g_state               = WIFI_MGR_IDLE;
     g_auto_connect_done   = false;
     g_is_auto_connect     = false;
+    g_reconnect_attempts  = 0;
 
-    /* 释放扫描结果缓存 */
     if (g_scan_ap_records) {
         free(g_scan_ap_records);
         g_scan_ap_records = NULL;
@@ -465,17 +544,21 @@ void wifi_menu_on_saved_connect_pressed(void *ud)
     if (!storage_wifi_get(idx, ssid, pass)) {
         return;
     }
-    suppress_wifi_logs();
+
     esp_wifi_disconnect();
-    {
-        uint64_t _start = esp_timer_get_time();
-        while (esp_timer_get_time() - _start < 1000ULL) {}
-    }  /* 喂狗：BT 活跃时 WiFi 操作可能阻塞 */
+    kern_sleep_ms(50);
 
     wifi_config_t wifi_cfg = {};
     strncpy((char *)wifi_cfg.sta.ssid, ssid, sizeof(wifi_cfg.sta.ssid) - 1);
     strncpy((char *)wifi_cfg.sta.password, pass, sizeof(wifi_cfg.sta.password) - 1);
     esp_wifi_set_config(WIFI_IF_STA, &wifi_cfg);
+
+    /* 重置事件标志 */
+    g_evt_sta_connected = false;
+    g_evt_sta_disconnected = false;
+    g_evt_got_ip = false;
+    g_evt_disconnect_reason = 0;
+
     esp_wifi_connect();
 
     strncpy(g_connecting_ssid, ssid, STORAGE_SSID_MAX_LEN);
@@ -518,7 +601,7 @@ void wifi_menu_on_scan_pressed(void *ud)
     (void)ud;
     if (g_connecting) {
         esp_wifi_disconnect();
-        restore_wifi_logs();
+        kern_sleep_ms(50);
         g_connecting = false;
     }
 
@@ -552,7 +635,6 @@ static bool try_auto_connect(void)
 
     if (g_scan_ap_count == 0) return false;
 
-    /* 在扫描结果中查找已保存网络，选择信号最强的 */
     int best_saved_idx = -1;
     int8_t best_rssi = -128;
 
@@ -576,22 +658,23 @@ static bool try_auto_connect(void)
 
     if (best_saved_idx < 0) return false;
 
-    /* 发起静默连接 */
     char ssid[STORAGE_SSID_MAX_LEN];
     char pass[STORAGE_PASS_MAX_LEN];
     if (!storage_wifi_get(best_saved_idx, ssid, pass)) return false;
 
-    suppress_wifi_logs();
     esp_wifi_disconnect();
-    {
-        uint64_t _start = esp_timer_get_time();
-        while (esp_timer_get_time() - _start < 1000ULL) {}
-    }
+    kern_sleep_ms(50);
 
     wifi_config_t wifi_cfg = {};
     strncpy((char *)wifi_cfg.sta.ssid, ssid, sizeof(wifi_cfg.sta.ssid) - 1);
     strncpy((char *)wifi_cfg.sta.password, pass, sizeof(wifi_cfg.sta.password) - 1);
     esp_wifi_set_config(WIFI_IF_STA, &wifi_cfg);
+
+    /* 重置事件标志 */
+    g_evt_sta_connected = false;
+    g_evt_sta_disconnected = false;
+    g_evt_got_ip = false;
+
     esp_wifi_connect();
 
     strncpy(g_connecting_ssid, ssid, STORAGE_SSID_MAX_LEN);
@@ -603,12 +686,8 @@ static bool try_auto_connect(void)
     return true;
 }
 
-/* ═══ 每帧更新（非阻塞状态机）═══ */
+/* ═══ 每帧更新（事件驱动状态机）═══ */
 
-/**
- * @brief 每帧更新 WiFi 状态机（非阻塞）
- * @note  处理预热倒计时、扫描超时/完成、连接超时/成功/失败等状态转换
- */
 bool wifi_mgr_is_enabled(void) {
     return g_wifi_enabled;
 }
@@ -622,7 +701,6 @@ void wifi_mgr_update(void)
     switch (g_state) {
 
     case WIFI_MGR_WARMUP: {
-        /* 预热完成后启动 ESP-IDF 异步扫描 */
         if (hal_get_ticks() - g_warmup_start_time >= WIFI_WARMUP_DELAY_MS) {
             g_scan_done = false;
             g_scan_ap_count = 0;
@@ -647,7 +725,6 @@ void wifi_mgr_update(void)
     }
 
     case WIFI_MGR_SCANNING: {
-        /* 扫描超时检查 */
         if (hal_get_ticks() - g_wifi_scan_start_time >= WIFI_SCAN_TIMEOUT_MS) {
             if (!g_initial_scan_shown) {
                 wifi_popup_dismiss();
@@ -659,7 +736,6 @@ void wifi_mgr_update(void)
         }
 
         if (g_scan_done) {
-            /* 读取扫描结果 */
             uint16_t ap_count = WIFI_SCAN_MAX_AP;
             if (g_scan_ap_records == NULL) {
                 g_scan_ap_records = (wifi_ap_record_t *)malloc(
@@ -682,24 +758,29 @@ void wifi_mgr_update(void)
             g_state = WIFI_MGR_SCAN_DONE;
             g_initial_scan_shown = true;
         }
-        /* else: 仍在扫描中，等待回调 */
         break;
     }
 
     case WIFI_MGR_CONNECTING: {
-        /* 轮询串口密码输入 */
+        /* ── 第一步：轮询串口密码输入 ── */
         serial_state_t ss = serial_poll();
         if (ss == SERIAL_STATE_PASSWORD_RECEIVED) {
             const char *input  = serial_get_input();
             const char *target = serial_get_target_name();
             if (input && target) {
-                suppress_wifi_logs();
                 esp_wifi_disconnect();
+                kern_sleep_ms(50);
 
                 wifi_config_t wifi_cfg = {};
                 strncpy((char *)wifi_cfg.sta.ssid, target, sizeof(wifi_cfg.sta.ssid) - 1);
                 strncpy((char *)wifi_cfg.sta.password, input, sizeof(wifi_cfg.sta.password) - 1);
                 esp_wifi_set_config(WIFI_IF_STA, &wifi_cfg);
+
+                /* 重置事件标志 */
+                g_evt_sta_connected = false;
+                g_evt_sta_disconnected = false;
+                g_evt_got_ip = false;
+
                 esp_wifi_connect();
 
                 strncpy(g_connecting_ssid, target, STORAGE_SSID_MAX_LEN);
@@ -709,46 +790,57 @@ void wifi_mgr_update(void)
                 wifi_popup_request("连接中...", 15000);
             }
         } else if (ss == SERIAL_STATE_CANCELLED) {
-            restore_wifi_logs();
             g_connecting = false;
             g_state = WIFI_MGR_SCAN_DONE;
             wifi_popup_dismiss();
+            break;
         }
 
-        /* 检查 WiFi 连接状态 */
-        if (g_connecting) {
-            /* 连接超时检查 */
-            if (hal_get_ticks() - g_connect_start_time >= WIFI_CONNECT_TIMEOUT_MS) {
-                esp_wifi_disconnect();
-                restore_wifi_logs();
-                g_connecting = false;
-                if (!g_is_auto_connect) {
-                    wifi_popup_request("连接超时", 2000);
-                }
-                g_state = WIFI_MGR_CONNECT_FAILED;
-                break;
-            }
+        /* ── 第二步：事件驱动连接状态检测 ── */
+        if (!g_connecting) break; /* 仍在等待密码输入 */
 
-            wifi_ap_record_t ap_info;
-            esp_err_t status = esp_wifi_sta_get_ap_info(&ap_info);
-            if (status == ESP_OK) {
-                restore_wifi_logs();
-                g_connecting = false;
-                storage_wifi_add(g_connecting_ssid, g_connecting_pass);
-                if (!g_is_auto_connect) {
-                    wifi_popup_request("已连接", 1500);
-                }
-                g_state = WIFI_MGR_CONNECTED;
-                wifi_menu_rebuild_list(0);
-            } else {
-                /* 仍在尝试中 */
+        /* 检查超时 */
+        if (hal_get_ticks() - g_connect_start_time >= WIFI_CONNECT_TIMEOUT_MS) {
+            esp_wifi_disconnect();
+            kern_sleep_ms(50);
+            g_connecting = false;
+            if (!g_is_auto_connect) {
+                wifi_popup_request("连接超时", 2000);
             }
+            g_state = WIFI_MGR_CONNECT_FAILED;
+            break;
+        }
+
+        /* 事件：已断开（密码错误或 AP 拒绝） */
+        if (g_evt_sta_disconnected) {
+            g_evt_sta_disconnected = false;
+            g_connecting = false;
+            if (!g_is_auto_connect) {
+                char reason_buf[48];
+                snprintf(reason_buf, sizeof(reason_buf),
+                         "连接失败 (%d)", g_evt_disconnect_reason);
+                wifi_popup_request(reason_buf, 3000);
+            }
+            g_state = WIFI_MGR_CONNECT_FAILED;
+            break;
+        }
+
+        /* 事件：L2 已连接 + DHCP 已获取 IP → 真正的 L3 连接成功 */
+        if (g_evt_sta_connected && g_evt_got_ip) {
+            g_evt_sta_connected = false;
+            g_evt_got_ip = false;
+            g_connecting = false;
+            storage_wifi_add(g_connecting_ssid, g_connecting_pass);
+            if (!g_is_auto_connect) {
+                wifi_popup_request("已连接", 1500);
+            }
+            g_state = WIFI_MGR_CONNECTED;
+            wifi_menu_rebuild_list(0);
         }
         break;
     }
 
     case WIFI_MGR_SCAN_DONE: {
-        /* 扫描完成后尝试自动连接（仅一次） */
         if (!g_auto_connect_done) {
             g_auto_connect_done = true;
             try_auto_connect();
@@ -756,9 +848,67 @@ void wifi_mgr_update(void)
         break;
     }
 
-    case WIFI_MGR_CONNECTED:
+    case WIFI_MGR_CONNECTED: {
+        /* ═══ 被动断开检测（事件驱动）═══
+         * 仅在已连接情况下检测断开事件。
+         * 断开由 WiFi 硬件事件触发（AP 掉线、信号丢失等），
+         * 无需轮询 esp_wifi_sta_get_ap_info()。 */
+        if (g_evt_sta_disconnected) {
+            g_evt_sta_disconnected = false;
+            uint8_t reason = g_evt_disconnect_reason;
+
+            /* 判断是否需要自动重连：仅对短暂性原因重连 */
+            bool should_retry = false;
+            switch (reason) {
+            case WIFI_REASON_BEACON_TIMEOUT:    /* 200: AP 信标丢失 */
+            case WIFI_REASON_NO_AP_FOUND:       /* 201: 扫描中未找到 AP */
+            case WIFI_REASON_HANDSHAKE_TIMEOUT: /* 204: WPA 握手超时 */
+            case WIFI_REASON_CONNECTION_FAIL:   /* 205: 通用连接失败 */
+                should_retry = true;
+                break;
+            case WIFI_REASON_AUTH_FAIL:         /* 202: 认证失败——密码错误 */
+            case WIFI_REASON_ASSOC_FAIL:        /* 203: 关联被拒 */
+            case WIFI_REASON_AUTH_EXPIRE:       /* 2: 认证过期 */
+            default:
+                break; /* 永久性失败，不重试 */
+            }
+
+            if (should_retry && g_reconnect_attempts < WIFI_MAX_RECONNECT_ATTEMPTS) {
+                g_reconnect_attempts++;
+
+                char retry_buf[64];
+                snprintf(retry_buf, sizeof(retry_buf),
+                         "重连中 (%d/%d)...",
+                         g_reconnect_attempts, WIFI_MAX_RECONNECT_ATTEMPTS);
+                wifi_popup_request(retry_buf, 10000);
+
+                /* 重置事件标志后重新连接 */
+                g_evt_sta_connected = false;
+                g_evt_got_ip = false;
+                g_evt_disconnect_reason = 0;
+
+                esp_wifi_disconnect();
+                kern_sleep_ms(100);
+                esp_wifi_connect();
+
+                g_connecting = true;
+                g_connect_start_time = hal_get_ticks();
+                g_state = WIFI_MGR_CONNECTING;
+            } else {
+                /* 放弃重连 */
+                if (g_reconnect_attempts > 0) {
+                    wifi_popup_request("重连失败", 2000);
+                }
+                g_reconnect_attempts = 0;
+                g_connecting = false;
+                g_state = WIFI_MGR_CONNECT_FAILED;
+            }
+        }
+        break;
+    }
+
     case WIFI_MGR_CONNECT_FAILED:
-        /* 保持当前状态直到用户采取新动作（重新扫描、选择其他网络） */
+        /* 等待用户操作（重新扫描、选择其他网络等） */
         break;
 
     default:

@@ -11,6 +11,7 @@
 #include "tu_api.h"
 #include "tu_ui.h"
 #include "app/storage/storage.h"
+#include "app/wifi/wifi_manager.h"
 #include "hal/hal_input.h"
 #include "hal/hal_system.h"
 #include "app/ui_service.h"
@@ -63,8 +64,9 @@ void token_usage_loop(void *ud)
         char ds_key[STORAGE_API_KEY_MAX_LEN];
         bool has_key = storage_get_deepseek_key(ds_key, sizeof(ds_key));
 
-        /* 刷新数据（空 key 时跳过请求） */
-        if (has_key && ds_key[0] != '\0') {
+        /* 刷新数据（空 key 或 WiFi 未连接时跳过请求） */
+        if (has_key && ds_key[0] != '\0' && wifi_mgr_is_connected()) {
+            wifi_mgr_ensure_dns();
             g_tu_data.deepseek_ok = tu_api_fetch_deepseek(ds_key, &g_tu_data.deepseek);
         } else {
             g_tu_data.deepseek_ok = false;

@@ -56,7 +56,9 @@ void wifi_mgr_disable(void);
 
 /**
  * @brief  查询是否正在等待串口输入密码
- * @return true  等待输入中（CONNECTING 状态）
+ * @return true  正在等待输入（CONNECTING 状态且尚未发起连接）
+ * @note   自动重连路径（g_connecting 已置位）不视为等待输入，
+ *         避免 app_input 错误取消自动重连流程。
  */
 bool wifi_mgr_is_waiting_input(void);
 
@@ -71,6 +73,19 @@ bool wifi_mgr_is_enabled(void);
  * @brief  查询 WiFi 驱动是否真实初始化成功
  */
 bool wifi_mgr_is_driver_on(void);
+
+/**
+ * @brief  查询 WiFi 是否已成功连接到 AP 且已获取 IP 地址
+ * @return true  WiFi 状态机处于 CONNECTED 状态且 netif 拥有有效 IP
+ */
+bool wifi_mgr_is_connected(void);
+
+/**
+ * @brief  确保 STA netif 上已配置 DNS 服务器
+ * @note   若 DHCP 未提供 DNS，则设置 8.8.8.8 作为主 DNS 回退。
+ *         应在发起网络请求前调用，无副作用（已有 DNS 则跳过）。
+ */
+void wifi_mgr_ensure_dns(void);
 
 /**
  * @brief  返回 WiFi 启用建议的最小空闲内存（字节）
