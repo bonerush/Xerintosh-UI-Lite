@@ -1,6 +1,10 @@
 /**
  * @file   kern_port_freertos.c
- * @brief  Xeros 内核可移植层 — FreeRTOS 后端实现
+ * @brief  Xeros 内核可移植层 — FreeRTOS 后端实现（已废弃）
+ * @details ⚠️ DEPRECATED: 此文件仅在 m5stick-c（非原生调度器）环境下使用。
+ *          默认构建目标已切换为 m5stick-c-native（XEROS_NATIVE_SCHED），
+ *          此文件不再参与编译。保留作为回退兼容参考。
+ *          新代码请参考 kern_port_esp32_native.c（原生调度器后端）。
  * @details 基于 FreeRTOS 任务容器 + 双信号量令牌协议实现抢占式调度。
  *
  *          协议：

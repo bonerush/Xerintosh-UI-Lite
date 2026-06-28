@@ -21,8 +21,6 @@ void wifi_mgr_task_main(void *arg);
 
 #ifndef NATIVE_TEST
 
-#include <freertos/FreeRTOS.h>
-#include <freertos/task.h>
 #include "esp_timer.h"
 #include "esp_heap_caps.h"
 #include "nvs_flash.h"
@@ -262,7 +260,7 @@ extern "C" void app_main(void)
     g_in_xerintosh = true;
 
     /* 内核初始化延迟到 loop() 第一帧，避免 setup() 累积时间
-     * 触发 TG1 系统看门狗（FreeRTOS idle 任务在 setup 返回后喂狗） */
+     * 触发 TG1 系统看门狗（系统 idle 任务在 setup 返回后喂狗） */
     debug_printf("[  OK  ] Hardware init complete, deferring kernel init\n");
 
     /* 主循环 */
@@ -271,7 +269,7 @@ extern "C" void app_main(void)
 
 #ifdef CONFIG_SMP_ENABLED
         /* SMP 模式下当前 Core 0 直接成为 Xeros 调度器，不再返回此处。
-         * Core 1 已在 kern_sched_init() 中通过 FreeRTOS 启动桩启动。 */
+         * Core 1 已在 kern_sched_init() 中通过系统启动桩启动。 */
         kern_smp_sched_loop(NULL);
         /* 不应到达 */
         kern_log(KERN_LOG_ERROR, "app_main: kern_smp_sched_loop returned");
@@ -286,7 +284,7 @@ extern "C" void app_main(void)
         kern_sched_tick();
 
         /* 让出 CPU 给原生 idle 任务，由 native_idle() 决定是否进入 tickless。
-         * 不再显式调用 FreeRTOS vTaskDelay；INT_WDT/TASK_WDT 已在 sdkconfig 中禁用。 */
+         * 不再显式调用阻塞延时；INT_WDT/TASK_WDT 已在 sdkconfig 中禁用。 */
         kern_port_idle();
 #endif
     }
@@ -388,8 +386,8 @@ static void deferred_kernel_init(void)
 
     /* -- 启动任务 --
      * 原生调度器下同样启用 Shell/UI/Main-loop/WiFi 管理器。
-     * WiFi 驱动内部仍使用 FreeRTOS，但 Xeros 的 wifi-mgr 任务本身
-     * 只调用 ESP-IDF WiFi API，不直接调用 FreeRTOS 调度 API。 */
+     * WiFi/BT 驱动内部使用 ESP-IDF 框架；Xeros 的 wifi-mgr 任务本身
+     * 只调用 ESP-IDF WiFi API，不直接调用底层调度 API。 */
     size_t ui_stack = kern_task_stack_recommend_by_name("ui", UI_TASK_STACK_SIZE);
 
     kern_pid_t ui_pid = kern_spawn("ui", ui_task_main, NULL, ui_stack);
