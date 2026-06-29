@@ -70,17 +70,18 @@ static uint8_t     sm_rx_len = 0;
 #ifndef NATIVE_TEST
 static void sm_on_bt_rx(const uint8_t *data, uint16_t len)
 {
-    /* 诊断：确认回调被调用和 len */
-#ifndef NATIVE_TEST
-    if (sm_source == SM_SOURCE_BT && sm_running) {
-        ESP_LOGI("sm_bt", "RX: len=%d", len);
-    }
-#endif
     if (sm_source != SM_SOURCE_BT) return;
     if (!sm_running) return;
 
     for (uint16_t i = 0; i < len; i++) {
         char c = (char)data[i];
+
+        /* 回显：将收到的字符发送回 BT 终端（如同 Shell 对 UART 的回显） */
+        if (c == '\n') {
+            bt_uart_send_string("\r\n");
+        } else {
+            bt_uart_send((const uint8_t *)&c, 1);
+        }
 
         if (c == '\n' || c == '\r') {
             if (sm_rx_len > 0) {
@@ -262,6 +263,13 @@ void serial_monitor_update(void)
     uint8_t byte;
     while (hal_uart0_read(&byte, 1) > 0) {
         char c = (char)byte;
+
+        /* 回显到 UART（如同 Shell 的回显） */
+        if (c == '\n') {
+            hal_uart0_write((const uint8_t *)"\r\n", 2);
+        } else {
+            hal_uart0_write(&byte, 1);
+        }
 
         if (c == '\n' || c == '\r') {
             if (sm_rx_len > 0) {
