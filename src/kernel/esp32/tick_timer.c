@@ -192,6 +192,18 @@ void tick_timer_restore_periodic(void)
 {
     if (!g_timer_running || g_gptimer == NULL) return;
 
+    /*
+     * 先停止 GPTimer 再重新配置，避免以下竞态：
+     *   tick_timer_restore_periodic() 调用 gptimer_set_alarm_action()
+     *   释放内部自旋锁后中断恢复，GPTimer ISR 立即触发，
+     *   此时 GPTimer 的 group 自旋锁处于边界状态，
+     *   ISR 中 vPortExitCritical 读取 spinlock->owner 时
+     *   可能触发 LoadStoreError（EXCVADDR=0x00000000）。
+     *
+     * 先停止计数 → 配置 → 重新启动，确保 ISR 在配置期间不会触发。
+     */
+    gptimer_stop(g_gptimer);
+
     gptimer_alarm_config_t alarm_config = {
         .alarm_count = g_period_us,
         .reload_count = 0,
@@ -202,6 +214,8 @@ void tick_timer_restore_periodic(void)
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "restore_periodic failed: %s", esp_err_to_name(err));
     }
+
+    gptimer_start(g_gptimer);
 }
 
 #endif /* !NATIVE_TEST */
