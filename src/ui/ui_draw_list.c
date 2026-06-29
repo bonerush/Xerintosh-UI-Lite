@@ -286,6 +286,9 @@ void xerintosh_draw_list()
 {
   xerintosh_list_item_t *sel = g_xerintosh_selector.selected_item;
   if (sel == NULL || sel->parent == NULL) return;
+  /* 空列表保护：父项无子项时直接返回，
+   * 防止 draw_list_appearance 中 child_num=0 导致除零崩溃 */
+  if (sel->parent->child_num == 0) return;
   xerintosh_draw_list_appearance(g_xerintosh_selector.selected_index,
                                  sel->parent->child_num);
   xerintosh_draw_list_item();

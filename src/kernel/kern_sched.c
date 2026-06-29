@@ -399,6 +399,7 @@ static void sched_entry(void)
 void kern_sched_tick(void)
 {
     if (!g_sched_initialized) return;
+    if (!g_current_task) return;
     g_sched_ticks++;
     reap_zombies();
 
@@ -457,6 +458,7 @@ void kern_sched_tick(void)
 void kern_sched_tick(void)
 {
     if (!g_sched_initialized) return;
+    if (!g_current_task) return;
     g_sched_ticks++;
     reap_zombies();
 
@@ -483,6 +485,7 @@ void kern_sched_tick(void)
 void kern_sched_reschedule(void)
 {
     if (!g_sched_initialized) return;
+    if (!g_current_task) return;
 
     g_need_resched = false;
     kern_task_t *next = pick_next_ready();

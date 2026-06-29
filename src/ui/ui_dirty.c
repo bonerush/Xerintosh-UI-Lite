@@ -52,10 +52,23 @@ void xerintosh_invalidate_region(int16_t x, int16_t y, int16_t w, int16_t h)
         if (nx2 > x2) x2 = nx2;
         if (ny2 > y2) y2 = ny2;
 
+        /* 合并后的区域接近全屏(>=90%)时直接升级为全屏脏矩形，
+         * 避免多次小区域合并后性能退化 */
+        int32_t merged_w = x2 - x1;
+        int32_t merged_h = y2 - y1;
+        if (merged_w * merged_h >= (int32_t)(HAL_SCREEN_WIDTH * HAL_SCREEN_HEIGHT) * 90 / 100) {
+            r->x = 0;
+            r->y = 0;
+            r->w = HAL_SCREEN_WIDTH;
+            r->h = HAL_SCREEN_HEIGHT;
+            r->active = true;
+            return;
+        }
+
         r->x = x1;
         r->y = y1;
-        r->w = x2 - x1;
-        r->h = y2 - y1;
+        r->w = (int16_t)merged_w;
+        r->h = (int16_t)merged_h;
     }
 
     r->active = true;
@@ -66,7 +79,11 @@ void xerintosh_invalidate_region(int16_t x, int16_t y, int16_t w, int16_t h)
  */
 bool xerintosh_is_dirty(void)
 {
-    return xerintosh_get_context()->dirty_region.active;
+    xerintosh_dirty_region_t *r = &xerintosh_get_context()->dirty_region;
+    if (!r->active) return false;
+    /* 无效的脏矩形尺寸（w <= 0 或 h <= 0）视作未脏 */
+    if (r->w <= 0 || r->h <= 0) return false;
+    return true;
 }
 
 /**

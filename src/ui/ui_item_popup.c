@@ -18,6 +18,11 @@ static char g_wrap_line0[48];
 static char g_wrap_line1[48];
 static char g_wrap_line2[48];
 
+/* InfoBar 文字换行缓冲区（与弹窗分离，避免冲突） */
+static char g_info_wrap_line0[48];
+static char g_info_wrap_line1[48];
+static char g_info_wrap_line2[48];
+
 /**
  * @brief  将 src 前 len 字节安全复制到 dst，超过 dst_size 时截断
  * @note   统一封装 sizeof 保护，避免各处手写硬编码截断。
@@ -93,10 +98,11 @@ static size_t find_wrap_break(const char *text, size_t len, int16_t avail)
 /* ═══ 信息栏 ═══ */
 
 /**
- * @brief 推送顶部信息栏
+ * @brief 推送顶部信息栏（内部实现：支持多行换行）
  * @param _content 显示文本
  * @param _span    显示持续时间（毫秒）
- * @note   如果信息栏正在显示相同内容，则重置计时器；否则重新展开
+ * @note   如果信息栏正在显示相同内容，则重置计时器；否则重新展开。
+ *         自动换行：当文字超出可用宽度时拆为多行。
  */
 void xerintosh_push_info_bar(const char *_content, const uint16_t _span)
 {
@@ -104,18 +110,118 @@ void xerintosh_push_info_bar(const char *_content, const uint16_t _span)
      如果在显示时间之内有新的消息涌入，则 y 和 y_trg 都不变，继续显示，且显示时间清零。
      只有显示时间到了的时候，才会复位。 */
 
+  xerintosh_set_font(hal_get_cn_font());
+
+  /* ── 自动换行：当文字超出可用宽度时拆为多行 ── */
+  {
+    int16_t avail = HAL_SCREEN_WIDTH - INFO_BAR_OFFSET;
+    if (avail < 20) avail = 20;
+
+    int16_t raw_content_w = hal_get_string_width(_content);
+
+    g_xerintosh_info_bar.wrap_line_count = 1;
+
+    if (raw_content_w > avail && INFO_BAR_WRAP_LINES >= 2)
+    {
+      size_t len = strlen(_content);
+      size_t best1 = find_wrap_break(_content, len, avail);
+
+      if (best1 > 0 && best1 < len)
+      {
+        /* 尝试 3 行 */
+        if (INFO_BAR_WRAP_LINES >= 3)
+        {
+          size_t best2_rel = find_wrap_break(_content + best1, len - best1, avail);
+          if (best2_rel > 0 && best2_rel < len - best1)
+          {
+            size_t best2 = best1 + best2_rel;
+            popup_copy_line(g_info_wrap_line0, sizeof(g_info_wrap_line0), _content, best1);
+            popup_copy_line(g_info_wrap_line1, sizeof(g_info_wrap_line1), _content + best1, best2_rel);
+            popup_copy_line(g_info_wrap_line2, sizeof(g_info_wrap_line2), _content + best2, len - best2);
+
+            g_xerintosh_info_bar.wrap_lines[0] = g_info_wrap_line0;
+            g_xerintosh_info_bar.wrap_lines[1] = g_info_wrap_line1;
+            g_xerintosh_info_bar.wrap_lines[2] = g_info_wrap_line2;
+            g_xerintosh_info_bar.wrap_line_count = 3;
+
+            int16_t w0 = hal_get_string_width(g_info_wrap_line0);
+            int16_t w1 = hal_get_string_width(g_info_wrap_line1);
+            int16_t w2 = hal_get_string_width(g_info_wrap_line2);
+            g_xerintosh_info_bar.w_info_bar_trg = ((w0 > w1)
+              ? ((w0 > w2) ? w0 : w2)
+              : ((w1 > w2) ? w1 : w2)) + INFO_BAR_OFFSET;
+            goto info_calc_height;
+          }
+        }
+
+        /* 2 行 */
+        {
+          popup_copy_line(g_info_wrap_line0, sizeof(g_info_wrap_line0), _content, best1);
+          popup_copy_line(g_info_wrap_line1, sizeof(g_info_wrap_line1), _content + best1, len - best1);
+
+          g_xerintosh_info_bar.wrap_lines[0] = g_info_wrap_line0;
+          g_xerintosh_info_bar.wrap_lines[1] = g_info_wrap_line1;
+          g_xerintosh_info_bar.wrap_line_count = 2;
+
+          int16_t w0 = hal_get_string_width(g_info_wrap_line0);
+          int16_t w1 = hal_get_string_width(g_info_wrap_line1);
+          g_xerintosh_info_bar.w_info_bar_trg = ((w0 > w1) ? w0 : w1) + INFO_BAR_OFFSET;
+          goto info_calc_height;
+        }
+      }
+    }
+
+    /* 默认单行（不需要换行或换行失败时的回退） */
+    g_xerintosh_info_bar.wrap_lines[0] = _content;
+    g_xerintosh_info_bar.w_info_bar_trg = raw_content_w + INFO_BAR_OFFSET;
+  }
+
+info_calc_height:
+  /* 根据内容行数计算并缓存动态高度 */
+  {
+    uint8_t n = g_xerintosh_info_bar.wrap_line_count;
+    if (n < 1) n = 1;
+    if (n > INFO_BAR_WRAP_LINES) n = INFO_BAR_WRAP_LINES;
+    int16_t fh = hal_get_font_height();
+    int16_t content_h = (int16_t)(n * fh + (n - 1) * 1);
+    int16_t bar_h = info_bar_compute_height(n);
+    g_xerintosh_info_bar.cached_bar_h = bar_h;
+    g_xerintosh_info_bar.cached_content_h = content_h;
+  }
+
   g_xerintosh_info_bar.time = hal_get_ticks();
   g_xerintosh_info_bar.content = _content;
   g_xerintosh_info_bar.span = _span;
-  g_xerintosh_info_bar.is_running = false; /* 每次进入该函数都代表有新的消息涌入，所以需要重置 is_running */
+  g_xerintosh_info_bar.is_running = false;
 
-  /* 展开弹窗；收回弹窗和同步时间戳需要在循环中进行，所以移到了 drawer 中 */
+  /* 展开信息栏 */
   g_xerintosh_info_bar.time_start = hal_get_ticks();
   g_xerintosh_info_bar.y_info_bar_trg = 0;
   g_xerintosh_info_bar.is_running = true;
+  xerintosh_invalidate();  /* 内容变更时强制重绘，不依赖动画来触发脏标记 */
+}
 
-  xerintosh_set_font(hal_get_cn_font());
-  g_xerintosh_info_bar.w_info_bar_trg = hal_get_string_width(g_xerintosh_info_bar.content) + INFO_BAR_OFFSET;
+/**
+ * @brief 立即隐藏信息栏（无动画，瞬间移出屏幕）
+ */
+void xerintosh_hide_info_bar(void)
+{
+  g_xerintosh_info_bar.is_running = false;
+  g_xerintosh_info_bar.y_info_bar_trg = 0 - 2 * INFO_BAR_HEIGHT;
+  g_xerintosh_info_bar.y_info_bar = 0 - 2 * INFO_BAR_HEIGHT;
+  xerintosh_invalidate();
+}
+
+/**
+ * @brief 动画退出信息栏（触发向上滑出动画，动画结束后自动停止）
+ * @note  与 xerintosh_dismiss_pop_up 对齐，设置移出目标后由每帧动画驱动滑出。
+ */
+void xerintosh_dismiss_info_bar(void)
+{
+  if (!g_xerintosh_info_bar.is_running) return;
+  int16_t bar_h = g_xerintosh_info_bar.cached_bar_h;
+  if (bar_h == 0) bar_h = INFO_BAR_HEIGHT;
+  g_xerintosh_info_bar.y_info_bar_trg = 0 - 2 * bar_h;
 }
 
 /* ═══ 弹窗 ═══ */
@@ -250,6 +356,7 @@ calc_height:
     g_xerintosh_pop_up.w_pop_up_trg = max_w;
   /* cached_pop_h and cached_content_h remain valid */
 
+  xerintosh_invalidate();  /* 内容变更时强制重绘，不依赖动画来触发脏标记 */
 }
 
 /**

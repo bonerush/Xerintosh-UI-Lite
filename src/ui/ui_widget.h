@@ -19,6 +19,7 @@ extern "C" {
 
 #define INFO_BAR_HEIGHT 15
 #define INFO_BAR_OFFSET 10
+#define INFO_BAR_WRAP_LINES 3
 
 /**
  * @brief 顶部信息栏结构体
@@ -32,6 +33,10 @@ typedef struct xerintosh_info_bar_t
   bool is_running;           /* 是否正在显示 */
   uint32_t time_start;       /* 开始显示的时间戳 */
   uint32_t time;             /* 最近一次更新的时间戳 */
+  const char *wrap_lines[INFO_BAR_WRAP_LINES];  /* 换行后的各行指针 */
+  uint8_t wrap_line_count;   /* 实际行数 */
+  int16_t cached_bar_h;      /* 缓存 InfoBar 高度 */
+  int16_t cached_content_h;  /* 缓存内容区高度 */
 } xerintosh_info_bar_t;
 
 /* 全局信息栏实例由 ui_context.h 的向后兼容宏 g_xerintosh_info_bar 提供 */
@@ -42,6 +47,16 @@ typedef struct xerintosh_info_bar_t
  * @param _span    显示持续时间（毫秒）
  */
 extern void xerintosh_push_info_bar(const char *_content, const uint16_t _span);
+
+/**
+ * @brief 立即隐藏信息栏（无动画，瞬间移出屏幕）
+ */
+extern void xerintosh_hide_info_bar(void);
+
+/**
+ * @brief 动画退出信息栏（触发向上滑出动画，动画结束后自动停止）
+ */
+extern void xerintosh_dismiss_info_bar(void);
 
 /* ═══ 弹窗 ═══ */
 
@@ -66,6 +81,23 @@ static inline int16_t popup_compute_height(uint8_t wrap_line_count)
   int16_t pop_h = content_h + 8;
   if (pop_h < 24) pop_h = 24;
   return pop_h;
+}
+
+/**
+ * @brief 根据换行数计算 InfoBar 高度（共享实现，避免 ui_item_popup.c / ui_draw_widgets.c 重复）
+ * @param wrap_line_count 内容行数
+ * @return InfoBar 总高度（含 padding）
+ */
+static inline int16_t info_bar_compute_height(uint8_t wrap_line_count)
+{
+  int16_t fh = hal_get_font_height();
+  uint8_t n = wrap_line_count;
+  if (n < 1) n = 1;
+  if (n > INFO_BAR_WRAP_LINES) n = INFO_BAR_WRAP_LINES;
+  int16_t content_h = (int16_t)(n * fh + (n - 1) * 1);
+  int16_t bar_h = content_h + 6;
+  if (bar_h < INFO_BAR_HEIGHT) bar_h = INFO_BAR_HEIGHT;
+  return bar_h;
 }
 
 /**

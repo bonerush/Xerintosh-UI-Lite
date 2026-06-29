@@ -399,6 +399,9 @@ kern_err_t kern_queue_send(kern_queue_t *q, const void *msg, uint32_t timeout_ms
 {
     if (q == NULL || msg == NULL) return KERN_EINVAL;
 
+    /* 计算绝对截止时间，防止超时重试导致无限期阻塞 */
+    uint32_t deadline = (timeout_ms > 0) ? (g_sched_ticks + timeout_ms) : 0;
+
     /* 队列满：等待或返回 */
     while (1) {
         xeros_spinlock_lock(&q->lock);
@@ -411,7 +414,11 @@ kern_err_t kern_queue_send(kern_queue_t *q, const void *msg, uint32_t timeout_ms
         }
         xeros_spinlock_unlock(&q->lock);
         ipc_block_task(&q->send_wait, &q->lock, timeout_ms);
-        /* 被唤醒后重试 */
+        /* 被唤醒后重新计算剩余超时，防止无限循环 */
+        if (deadline > 0) {
+            if (g_sched_ticks >= deadline) return KERN_ETIMEOUT;
+            timeout_ms = deadline - g_sched_ticks;
+        }
     }
 
     /* 写入消息 */
@@ -430,6 +437,9 @@ kern_err_t kern_queue_recv(kern_queue_t *q, void *msg, uint32_t timeout_ms)
 {
     if (q == NULL || msg == NULL) return KERN_EINVAL;
 
+    /* 计算绝对截止时间，防止超时重试导致无限期阻塞 */
+    uint32_t deadline = (timeout_ms > 0) ? (g_sched_ticks + timeout_ms) : 0;
+
     /* 队列空：等待或返回 */
     while (1) {
         xeros_spinlock_lock(&q->lock);
@@ -442,6 +452,11 @@ kern_err_t kern_queue_recv(kern_queue_t *q, void *msg, uint32_t timeout_ms)
         }
         xeros_spinlock_unlock(&q->lock);
         ipc_block_task(&q->recv_wait, &q->lock, timeout_ms);
+        /* 被唤醒后重新计算剩余超时，防止无限循环 */
+        if (deadline > 0) {
+            if (g_sched_ticks >= deadline) return KERN_ETIMEOUT;
+            timeout_ms = deadline - g_sched_ticks;
+        }
     }
 
     /* 读取消息 */

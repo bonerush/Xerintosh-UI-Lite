@@ -67,7 +67,7 @@ void power_key_popup_update(void)
         if (dur >= SHUTDOWN_HOLD_MS && !g_dual_shutdown_triggered)
         {
             g_dual_shutdown_triggered = true;
-            xerintosh_hide_pop_up();
+            xerintosh_hide_info_bar();
             /* 先显示关机画面，再硬件断电 */
             shutdown_screen_show();
             hal_power_off_hw();
@@ -79,7 +79,7 @@ void power_key_popup_update(void)
             uint32_t tenth = (remaining_ms % 1000) / 100;
             snprintf(msg, sizeof(msg), "长按AB键关机,还需%lu.%lus",
                      (unsigned long)sec, (unsigned long)tenth);
-            xerintosh_push_pop_up(msg, 60000);
+            xerintosh_push_info_bar(msg, 60000);
         }
     }
     else
@@ -93,7 +93,7 @@ void power_key_popup_update(void)
              * 不使用 hal_input_reset_events() 因为会破坏其他模块的事件状态 */
             hal_input_get_event(HAL_BTN_A);
             hal_input_get_event(HAL_BTN_B);
-            xerintosh_dismiss_pop_up();
+            xerintosh_dismiss_info_bar();
         }
         g_dual_active = false;
         g_dual_shutdown_triggered = false;

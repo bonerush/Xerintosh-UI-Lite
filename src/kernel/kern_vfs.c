@@ -11,6 +11,7 @@
 #include "kern_resource.h"
 #include "kern_task.h"
 #include "kern_sync.h"
+#include "kern_init.h"
 
 #include <string.h>
 #include <stdlib.h>
@@ -19,6 +20,7 @@
 /* ═══ 常量 ═══ */
 
 /* 根目录项最大子节点数已在 kern_vfs.h 中定义 */
+#define KERN_PATH_MAX_DEPTH  16   /* 路径解析最大深度，防止循环链接或畸形路径 */
 
 /* ═══ 根目录项 ═══ */
 
@@ -133,8 +135,18 @@ static kern_dentry_t *path_walk_locked(kern_dentry_t *root, const char *path, bo
     }
 
     kern_dentry_t *cur = root;
+    uint8_t depth = 0;  /* 路径深度计数器，防止循环链接或畸形路径 */
 
     while (*p != '\0') {
+        /* 最大路径深度保护 */
+        if (depth >= KERN_PATH_MAX_DEPTH) {
+            kern_log(KERN_LOG_WARN,
+                     "path_walk: depth exceeds %d (path=%s)",
+                     KERN_PATH_MAX_DEPTH, path);
+            return NULL;
+        }
+        depth++;
+
         /* 提取下一个分量名 */
         const char *start = p;
         while (*p != '/' && *p != '\0') p++;
@@ -514,12 +526,14 @@ kern_fd_t kern_open(const char *path, unsigned int flags)
 
     kern_task_t *cur = kern_task_current();
 
+    /* ─── Phase 1: FD 分配 ─── */
     kern_fd_t fd;
     kern_file_t *f = fd_alloc(&fd);
     if (f == NULL) {
         return fd;  /* 返回 KERN_EMFILE / KERN_ENOMEM / KERN_EBADF */
     }
 
+    /* ─── Phase 2: 路径解析 ─── */
     xeros_spinlock_lock(&g_vfs_lock);
     kern_dentry_t *dentry = path_walk_locked(&g_root_dentry, path, false);
     if (dentry == NULL || dentry->inode == NULL) {
@@ -531,6 +545,7 @@ kern_fd_t kern_open(const char *path, unsigned int flags)
         return (dentry == NULL) ? KERN_ENOENT : KERN_EISDIR;
     }
 
+    /* ─── Phase 3: inode 引用 ─── */
     f->dentry = dentry;
     f->inode = dentry->inode;
     f->fops = dentry->inode->fops;

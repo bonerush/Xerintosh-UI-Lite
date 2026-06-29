@@ -35,6 +35,7 @@ extern "C" {
 #define KERN_EPIPE      (-32)   /* 管道损坏 */
 #define KERN_EBADF      (-9)    /* 无效文件描述符 */
 #define KERN_ENOTTY     (-25)   /* 不支持的 ioctl */
+#define KERN_ENAMETOOLONG (-36) /* 文件名过长 */
 #define KERN_ENOTEMPTY  (-39)   /* 目录非空 */
 #define KERN_EPERM      (-40)   /* 操作不允许（如非 owner 解锁 mutex） */
 #define KERN_ETIMEOUT   (-110)  /* 操作超时 */

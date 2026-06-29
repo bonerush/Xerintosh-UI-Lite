@@ -68,7 +68,11 @@ bool xerintosh_animation(float *_pos, float _pos_trg, float _speed)
       return true;
     }
     *_pos += (_pos_trg - *_pos) / (100.0f - _speed);
-    xerintosh_invalidate();  /* 动画进行中，标记需要重绘 */
+    /* 仅在位置确实发生变化且距离目标仍 > 0.5px 时才标记重绘，
+     * 避免末段微调时的不必要 SPI 推送 */
+    if (fabsf(*_pos - _pos_trg) > 0.5f) {
+      xerintosh_invalidate();
+    }
     return false;
   }
   return true;
@@ -127,30 +131,23 @@ void xerintosh_spring_animation(float *_pos, float *_vel, float _pos_trg,
 }
 
 /**
- * @brief  统一动画调度：根据全局设置自动选择弹簧或缓动动画
+ * @brief  统一缓动动画调度（已移除弹簧模式分支）
  * @param  _pos     当前位置指针（会被直接更新）
- * @param  _vel     当前速度指针（弹簧模式使用，可为 NULL 强制缓动）
+ * @param  _vel     当前速度指针（保留参数但不再使用，兼容遗留接口）
  * @param  _target  目标位置
- * @param  _speed   动画速度（0~99，仅缓动模式使用）
+ * @param  _speed   动画速度（0~99）
  * @return true  已稳定在目标
  * @return false 动画进行中
+ * @note   弹簧模式调用方已改为直接调用 xerintosh_spring_animation()，
+ *         本函数仅处理缓动动画，移除 g_spring_anim_mode 分支开销。
  * @note   当 g_anim_enabled == false 时直接跳转到目标。
- * @note   当 g_spring_anim_mode == true 且 _vel != NULL 时使用弹簧动画，
- *         刚度/阻尼参数使用 g_spring_stiffness_selector / g_spring_damping_selector。
- * @note   弹簧模式下返回值恒为 false（调用方需自行判断 settled）。
  */
 bool xerintosh_animate_unified(float *_pos, float *_vel, float _target, float _speed)
 {
+    (void)_vel; /* 遗留参数，已由调用方直接选择动画类型 */
     if (!g_anim_enabled) {
         *_pos = _target;
-        if (_vel) *_vel = 0.0f;
         return true;
-    }
-    if (g_spring_anim_mode && _vel) {
-        xerintosh_spring_animation(_pos, _vel, _target,
-                                    g_spring_stiffness_selector,
-                                    g_spring_damping_selector);
-        return false; /* 弹簧不返回 settled，调用方自行判断 */
     }
     return xerintosh_animation(_pos, _target, _speed);
 }
@@ -253,9 +250,26 @@ void xerintosh_refresh_selector_position()
   if (g_xerintosh_selector.selected_item == NULL) return;
 
   xerintosh_set_font(hal_get_cn_font());
-  g_xerintosh_selector.y_selector_trg = g_xerintosh_selector.selected_item->y_list_item_trg - hal_get_font_height() + 1;
-  g_xerintosh_selector.w_selector_trg = xerintosh_dispatch_measure(g_xerintosh_selector.selected_item);
-  g_xerintosh_selector.h_selector_trg = hal_get_font_height() + 4;
+  float new_y_trg = g_xerintosh_selector.selected_item->y_list_item_trg - hal_get_font_height() + 1;
+  float new_w_trg = xerintosh_dispatch_measure(g_xerintosh_selector.selected_item);
+  float new_h_trg = hal_get_font_height() + 4;
+
+  /* 提前返回：若所有目标值未变化且选择器已稳定在目标位置，跳过动画计算 */
+  if (g_xerintosh_selector.y_selector_trg == new_y_trg &&
+      g_xerintosh_selector.w_selector_trg == new_w_trg &&
+      g_xerintosh_selector.h_selector_trg == new_h_trg)
+  {
+    if (g_xerintosh_selector.y_selector == new_y_trg &&
+        g_xerintosh_selector.w_selector == new_w_trg &&
+        g_xerintosh_selector.h_selector == new_h_trg) {
+      return;
+    }
+  }
+
+  g_xerintosh_selector.y_selector_trg = new_y_trg;
+  g_xerintosh_selector.w_selector_trg = new_w_trg;
+  g_xerintosh_selector.h_selector_trg = new_h_trg;
+
   if (g_spring_anim_mode) {
     xerintosh_spring_animation(&g_xerintosh_selector.y_selector, &g_xerintosh_selector.v_y_selector,
                                 g_xerintosh_selector.y_selector_trg,

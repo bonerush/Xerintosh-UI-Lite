@@ -14,6 +14,8 @@
 #include "kern_port.h"
 #include "kern_sched_rr.h"
 
+#include "kern_vfs.h"
+
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -244,11 +246,19 @@ void kern_exit(void)
     kern_task_t *cur = g_current_task;
     if (cur == NULL) return;
 
+    /* 关闭所有打开的文件描述符 */
+    for (kern_fd_t i = 0; i < KERN_MAX_FD_PER_TASK; i++) {
+        if (cur->fd_table[i] != NULL) {
+            kern_close(i);
+        }
+    }
+
     /* Native 后端：不能在这里释放栈内存，因为当前正在该栈上运行。
      * 资源回收推迟到 reap_zombies()，在任务已脱离调度链表、不会继续执行后再释放。 */
     cur->stack_base = NULL;
 
     cur->state = KERN_TASK_ZOMBIE;
+    __sync_synchronize(); /* barrier: 确保其他核能看到状态变更 */
     kern_log(KERN_LOG_DEBUG, "task %d (%s) exited", cur->pid, cur->name);
 
     g_current_task = g_idle_task;
@@ -265,10 +275,18 @@ void kern_exit(void)
     kern_task_t *cur = g_current_task;
     if (cur == NULL) return;
 
+    /* 关闭所有打开的文件描述符 */
+    for (kern_fd_t i = 0; i < KERN_MAX_FD_PER_TASK; i++) {
+        if (cur->fd_table[i] != NULL) {
+            kern_close(i);
+        }
+    }
+
     kern_resource_release_all(cur);
     cur->stack_base = NULL;
 
     cur->state = KERN_TASK_ZOMBIE;
+    __sync_synchronize(); /* barrier: 确保其他核能看到状态变更 */
     kern_log(KERN_LOG_DEBUG, "task %d (%s) exited", cur->pid, cur->name);
 
     g_current_task = g_idle_task;
@@ -358,6 +376,7 @@ kern_err_t kern_task_kill(kern_pid_t pid)
     /* 非虚任务：先释放追踪资源，再标记 ZOMBIE */
     kern_resource_release_all(task);
     task->state = KERN_TASK_ZOMBIE;
+    __sync_synchronize(); /* barrier: 确保其他核能看到状态变更 */
     kern_log(KERN_LOG_DEBUG, "task %d (%s) killed", task->pid, task->name);
 
     /* TCB 在下次 sched_tick 时由 reap_zombies 回收；栈与上下文作为资源已追踪 */
@@ -383,7 +402,16 @@ void reap_zombies(void)
 
         kern_task_t *prev = NULL;
         kern_task_t *t = cls->task_list;
+        /* 环形链表防护：最多迭代 g_task_count + 1 次，超过则视为有环 */
+        uint8_t max_iters = (g_task_count < UINT8_MAX) ? (uint8_t)(g_task_count + 1) : UINT8_MAX;
+        uint8_t iters = 0;
         while (t != NULL) {
+            if (iters++ >= max_iters) {
+                kern_log(KERN_LOG_ERROR,
+                         "reap_zombies: cycle detected in class %u, aborting traversal",
+                         (unsigned)c);
+                break;
+            }
             if (t->state == KERN_TASK_ZOMBIE && !(t->flags & KERN_TASK_FLAG_VIRTUAL)) {
                 kern_task_t *zombie = t;
                 t = t->next;
@@ -421,7 +449,15 @@ void reap_zombies(void)
         g_task_list_tail = NULL;
     } else {
         kern_task_t *tail = g_task_list;
-        while (tail->next != NULL) tail = tail->next;
+        uint8_t tail_iters = 0;
+        uint8_t tail_max = (g_task_count < UINT8_MAX) ? g_task_count : UINT8_MAX;
+        while (tail->next != NULL) {
+            if (tail_iters++ >= tail_max) {
+                kern_log(KERN_LOG_ERROR, "reap_zombies: cycle detected during tail rebuild");
+                break;
+            }
+            tail = tail->next;
+        }
         g_task_list_tail = tail;
     }
 }

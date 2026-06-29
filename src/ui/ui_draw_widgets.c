@@ -16,7 +16,8 @@
 
 /**
  * @brief 绘制顶部信息栏
- * @note  包含三层圆角矩形堆叠形成立体边框，内部显示文字
+ * @note  包含三层圆角矩形堆叠形成立体边框，内部显示文字。
+ *        支持多行换行显示（通过 wrap_line_count 判断）。
  */
 void xerintosh_draw_info_bar()
 {
@@ -26,34 +27,46 @@ void xerintosh_draw_info_bar()
   if (g_xerintosh_info_bar.y_info_bar == g_xerintosh_info_bar.y_info_bar_trg)
     g_xerintosh_info_bar.time = hal_get_ticks();
 
-  /* 超时后向屏幕上方移出 */
+  /* 获取换行信息 */
+  uint8_t n = g_xerintosh_info_bar.wrap_line_count;
+  if (n < 1) n = 1;
+  if (n > INFO_BAR_WRAP_LINES) n = INFO_BAR_WRAP_LINES;
+
+  /* 使用缓存高度；缓存无效时按单行默认 */
+  int16_t bar_h = g_xerintosh_info_bar.cached_bar_h;
+  int16_t fh = hal_get_font_height();
+  if (bar_h == 0) {
+    bar_h = INFO_BAR_HEIGHT;
+  }
+
+  /* 超时后向屏幕上方移出（使用缓存的动态高度） */
   if (g_xerintosh_info_bar.time - g_xerintosh_info_bar.time_start >= g_xerintosh_info_bar.span)
   {
-    g_xerintosh_info_bar.y_info_bar_trg = -2 * INFO_BAR_HEIGHT;
+    g_xerintosh_info_bar.y_info_bar_trg = (int16_t)(-2 * bar_h);
     if (g_xerintosh_info_bar.y_info_bar == g_xerintosh_info_bar.y_info_bar_trg)
       g_xerintosh_info_bar.is_running = false;
   }
 
   int16_t _x_info_bar = HAL_SCREEN_WIDTH/2 - g_xerintosh_info_bar.w_info_bar/2;
   int16_t _y_info_bar_1 = g_xerintosh_info_bar.y_info_bar - 4;
-  int16_t _y_info_bar_2 = g_xerintosh_info_bar.y_info_bar + INFO_BAR_HEIGHT;
+  int16_t _y_info_bar_2 = g_xerintosh_info_bar.y_info_bar + bar_h;
 
   xerintosh_set_font(hal_get_cn_font());
 
   /* 第一层：阴影底色 */
   g_xerintosh_draw_color = COLOR_FG;
   hal_draw_fill_round_rect(_x_info_bar + 3, _y_info_bar_1 + 3,
-                  (int16_t)g_xerintosh_info_bar.w_info_bar, INFO_BAR_HEIGHT + 4, 4, g_xerintosh_draw_color);
+                  (int16_t)g_xerintosh_info_bar.w_info_bar, bar_h + 4, 4, g_xerintosh_draw_color);
 
   /* 第二层：外框 */
   g_xerintosh_draw_color = COLOR_BG;
   hal_draw_fill_round_rect((int16_t)(HAL_SCREEN_WIDTH/2 - (g_xerintosh_info_bar.w_info_bar + 4)/2), _y_info_bar_1,
-                  (int16_t)(g_xerintosh_info_bar.w_info_bar + 4), INFO_BAR_HEIGHT + 6, 4, g_xerintosh_draw_color);
+                  (int16_t)(g_xerintosh_info_bar.w_info_bar + 4), bar_h + 6, 4, g_xerintosh_draw_color);
 
   /* 第三层：内框 */
   g_xerintosh_draw_color = COLOR_FG;
   hal_draw_fill_round_rect(_x_info_bar, _y_info_bar_1,
-                  (int16_t)g_xerintosh_info_bar.w_info_bar, INFO_BAR_HEIGHT + 4, 3, g_xerintosh_draw_color);
+                  (int16_t)g_xerintosh_info_bar.w_info_bar, bar_h + 4, 3, g_xerintosh_draw_color);
 
   /* 高光与文字 */
   g_xerintosh_draw_color = COLOR_BG;
@@ -61,9 +74,21 @@ void xerintosh_draw_info_bar()
   hal_draw_pixel(_x_info_bar + 1, _y_info_bar_2 - 3, g_xerintosh_draw_color);
   hal_draw_pixel(_x_info_bar - 2, _y_info_bar_2 - 3, g_xerintosh_draw_color);
 
-  hal_draw_string(_x_info_bar + 6,
-                 (int16_t)(g_xerintosh_info_bar.y_info_bar + hal_get_font_height() - 2),
-                 g_xerintosh_info_bar.content, g_xerintosh_draw_color);
+  /* 多行文字渲染（垂直居中） */
+  {
+    int16_t content_h = (int16_t)(n * fh + (n - 1) * 1);
+    int16_t y_text = (int16_t)(g_xerintosh_info_bar.y_info_bar + (bar_h - content_h) / 2 + fh - 2);
+
+    for (uint8_t i = 0; i < n; i++)
+    {
+      hal_draw_string(_x_info_bar + 6, y_text,
+                      (g_xerintosh_info_bar.wrap_lines[i] != NULL)
+                        ? g_xerintosh_info_bar.wrap_lines[i]
+                        : g_xerintosh_info_bar.content,
+                      g_xerintosh_draw_color);
+      y_text += fh + 1;
+    }
+  }
 }
 
 /* ═══ 弹窗 ═══ */

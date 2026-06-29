@@ -28,6 +28,65 @@
 
 见 `.claude/rules/verification.md`：**先电脑验证，随后传到实机验证。**
 
+## 当前基线
+
+> 记录时间：2026-06-30
+
+### Native 测试
+
+| 环境 | 状态 | 耗时 |
+|------|------|------|
+| `test_native` | PASSED | 3.29s |
+| `test_token_usage` | PASSED | 0.76s |
+
+- **总计**：618 个测试用例，616 个通过，2 个跳过，0 个失败
+- **详细耗时**：`test_native` 2.97s, `test_token_usage` 0.75s, 合计 3.72s
+
+### 硬件构建 (m5stick-c)
+
+| 状态 | 耗时 | RAM | Flash |
+|------|------|-----|-------|
+| SUCCESS | 4.65s | 29.5% (96528 / 327680 B) | 74.2% (1556301 / 2097152 B) |
+
+- 编译警告：无
+
+### 工作树
+
+- **分支**：`main`
+- **状态**：clean（无未提交更改）
+- **与远程同步**：是（up to date with origin/main）
+
+## 重构总结 (2026-06-30)
+
+### 阶段 2 内核优化
+- [x] 调度器 NULL 指针守卫 + 竞态修复
+- [x] kmalloc 原子统计 + canary 防护
+- [x] 任务退出资源回收完整性
+- [x] VFS 路径深度限制
+- [ ] IPC 超时机制 (如已实现)
+
+### 阶段 3 UI 动画统一
+- [x] 动画函数优化（减少分支 + 避免无效脏矩形）
+- [x] 脏矩形区域合并优化
+- [x] VRR 自适应帧率
+- [x] 空列表保护
+
+### 阶段 4 InfoBar 改造
+- [x] InfoBar 多行文字支持
+- [x] 动态高度计算
+- [x] 电源键倒计时改用 InfoBar
+- [x] WiFi 过程通知改用 InfoBar
+
+### 验证状态
+- Native 测试: PASS (618 用例，616 通过，2 跳过，0 失败)
+- 硬件构建: SUCCESS
+- 新增编译警告: 无
+
+### 构建基线
+- pio test -e native: 616 tests passed in 3.72s
+- pio run -e m5stick-c: SUCCESS (RAM: 29.5%, Flash: 74.2%)
+- 代码变更: +514 lines / -109 lines
+
 ## 历史轮次
 
 - [2026-06-28 全栈重构](./04-archive.md) — 已完成

@@ -1,15 +1,17 @@
 /**
  * @file   ui_anim_row.c
  * @brief  公共行列表动画工具实现
- * @details 封装 xerintosh_animate_unified() 循环，提供行列表动画的
- *          初始化、逐帧更新、目标刷新三个核心操作。
- *          支持弹簧模式与缓动模式自动切换（跟随 g_spring_anim_mode）。
+ * @details 提供行列表动画的初始化、逐帧更新、目标刷新三个核心操作。
+ *          逐帧更新中根据 g_spring_anim_mode 直接分派到
+ *          xerintosh_spring_animation() 或 xerintosh_animation()，
+ *          不再经过 xerintosh_animate_unified() 中间层。
  *
  * @copyright Copyright (c) 2026
  */
 
 #include "ui_anim_row.h"
 #include "ui_core.h"
+#include "ui_types.h"   /* g_spring_anim_mode, g_spring_stiffness_selector, g_spring_damping_selector */
 #include "hal/hal_display.h"
 #include <math.h>
 
@@ -49,28 +51,53 @@ void xerintosh_anim_row_list_init(xerintosh_anim_row_list_t *list,
 bool xerintosh_anim_row_list_update(xerintosh_anim_row_list_t *list, float speed)
 {
     bool all_settled = true;
+    const bool use_spring = g_spring_anim_mode;
 
     for (int i = 0; i < list->visible_count && i < ANIM_ROW_MAX; i++) {
-        xerintosh_animate_unified(&list->rows[i].y, &list->rows[i].v_y,
-                                   list->rows[i].y_trg, speed);
-        xerintosh_animate_unified(&list->rows[i].w, &list->rows[i].v_w,
-                                   list->rows[i].w_trg, speed);
+        if (use_spring) {
+            xerintosh_spring_animation(&list->rows[i].y, &list->rows[i].v_y,
+                                        list->rows[i].y_trg,
+                                        g_spring_stiffness_selector,
+                                        g_spring_damping_selector);
+            xerintosh_spring_animation(&list->rows[i].w, &list->rows[i].v_w,
+                                        list->rows[i].w_trg,
+                                        g_spring_stiffness_selector,
+                                        g_spring_damping_selector);
+        } else {
+            xerintosh_animation(&list->rows[i].y, list->rows[i].y_trg, speed);
+            xerintosh_animation(&list->rows[i].w, list->rows[i].w_trg, speed);
+        }
         /* 同时检查 y 和 w 两个维度的稳定状态 */
         if (fabsf(list->rows[i].y - list->rows[i].y_trg) > 0.5f
             || fabsf(list->rows[i].w - list->rows[i].w_trg) > 0.5f)
             all_settled = false;
     }
 
-    xerintosh_animate_unified(&list->highlight.y, &list->highlight.v_y,
-                               list->highlight.y_trg, speed);
-    xerintosh_animate_unified(&list->highlight.w, &list->highlight.v_w,
-                               list->highlight.w_trg, speed);
+    if (use_spring) {
+        xerintosh_spring_animation(&list->highlight.y, &list->highlight.v_y,
+                                    list->highlight.y_trg,
+                                    g_spring_stiffness_selector,
+                                    g_spring_damping_selector);
+        xerintosh_spring_animation(&list->highlight.w, &list->highlight.v_w,
+                                    list->highlight.w_trg,
+                                    g_spring_stiffness_selector,
+                                    g_spring_damping_selector);
+    } else {
+        xerintosh_animation(&list->highlight.y, list->highlight.y_trg, speed);
+        xerintosh_animation(&list->highlight.w, list->highlight.w_trg, speed);
+    }
     if (fabsf(list->highlight.y - list->highlight.y_trg) > 0.5f
         || fabsf(list->highlight.w - list->highlight.w_trg) > 0.5f)
         all_settled = false;
 
-    xerintosh_animate_unified(&list->scroll_offset, &list->v_scroll_offset,
-                               list->scroll_offset_trg, speed);
+    if (use_spring) {
+        xerintosh_spring_animation(&list->scroll_offset, &list->v_scroll_offset,
+                                    list->scroll_offset_trg,
+                                    g_spring_stiffness_selector,
+                                    g_spring_damping_selector);
+    } else {
+        xerintosh_animation(&list->scroll_offset, list->scroll_offset_trg, speed);
+    }
     if (fabsf(list->scroll_offset - list->scroll_offset_trg) > 0.5f)
         all_settled = false;
 

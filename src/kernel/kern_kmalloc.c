@@ -32,6 +32,7 @@
 typedef struct {
     size_t size;         /* 用户请求的分配大小（不含头） */
     kern_task_t *owner;  /* 拥有此分配的任务 */
+    uint32_t canary;     /* 金丝雀值 0xDEADBEEF，检测内存越界写 */
 } kmalloc_header_t;
 
 /**
@@ -43,9 +44,9 @@ static inline kmalloc_header_t *get_header(void *ptr)
     return (kmalloc_header_t *)((uint8_t *)ptr - sizeof(kmalloc_header_t));
 }
 
-/* ═══ 全局内存统计 ═══ */
+/* ═══ 全局内存统计（原子操作） ═══ */
 
-static volatile size_t g_kmem_allocated_bytes = 0;
+static size_t g_kmem_allocated_bytes = 0;
 
 /* 用 canary 包围保留水位，检测是否有越界写或非法修改 */
 static struct {
@@ -78,6 +79,7 @@ static void *kern_kmalloc_impl(size_t size, kern_task_t *owner, bool track)
 
     hdr->size = size;
     hdr->owner = owner;
+    hdr->canary = 0xDEADBEEF;
 
     void *user_ptr = (void *)((uint8_t *)hdr + sizeof(kmalloc_header_t));
 
@@ -92,7 +94,7 @@ static void *kern_kmalloc_impl(size_t size, kern_task_t *owner, bool track)
         }
     }
 
-    g_kmem_allocated_bytes += size;
+    __sync_fetch_and_add(&g_kmem_allocated_bytes, size);
 
     return user_ptr;
 }
@@ -137,16 +139,19 @@ void kern_kfree(void *ptr)
     kmalloc_header_t *hdr = get_header(ptr);
     if (hdr == NULL) return;
 
+    /* 验证金丝雀值，检测内存越界写 */
+    if (hdr->canary != 0xDEADBEEF) {
+        kern_log(KERN_LOG_ERROR,
+                 "kmalloc canary corrupted (ptr=%p, size=%zu, canary=0x%08lx)",
+                 ptr, hdr->size, (unsigned long)hdr->canary);
+    }
+
     /* 从资源追踪中移除 */
     if (hdr->owner != NULL) {
         kern_resource_untrack(hdr->owner, ptr);
     }
 
-    if (hdr->size <= g_kmem_allocated_bytes) {
-        g_kmem_allocated_bytes -= hdr->size;
-    } else {
-        g_kmem_allocated_bytes = 0;
-    }
+    __sync_fetch_and_sub(&g_kmem_allocated_bytes, hdr->size);
 
     free(hdr);
 }
@@ -157,6 +162,13 @@ void kern_kfree_untracked(void *ptr)
 
     kmalloc_header_t *hdr = get_header(ptr);
     if (hdr == NULL) return;
+
+    /* 验证金丝雀值，检测内存越界写 */
+    if (hdr->canary != 0xDEADBEEF) {
+        kern_log(KERN_LOG_ERROR,
+                 "kmalloc untracked canary corrupted (ptr=%p, size=%zu, canary=0x%08lx)",
+                 ptr, hdr->size, (unsigned long)hdr->canary);
+    }
 
     free(hdr);
 }
@@ -181,20 +193,16 @@ void *kern_krealloc(void *ptr, size_t new_size)
         kern_resource_untrack(old_hdr->owner, ptr);
     }
 
-    /* 先扣除旧大小；成功后再加回新大小 */
+    /* 先扣除旧大小；成功后再加回新大小（原子操作） */
     size_t old_size = old_hdr->size;
-    if (old_size <= g_kmem_allocated_bytes) {
-        g_kmem_allocated_bytes -= old_size;
-    } else {
-        g_kmem_allocated_bytes = 0;
-    }
+    __sync_fetch_and_sub(&g_kmem_allocated_bytes, old_size);
 
     /* 重新分配 */
     kmalloc_header_t *new_hdr = (kmalloc_header_t *)realloc(old_hdr,
                                             sizeof(kmalloc_header_t) + new_size);
     if (new_hdr == NULL) {
         /* realloc 失败：旧内存仍有效，恢复统计并重新追踪 */
-        g_kmem_allocated_bytes += old_size;
+        __sync_fetch_and_add(&g_kmem_allocated_bytes, old_size);
         if (old_hdr->owner != NULL) {
             kern_resource_track(old_hdr->owner, ptr,
                                 KERN_RES_MEMORY, kmem_release);
@@ -204,7 +212,8 @@ void *kern_krealloc(void *ptr, size_t new_size)
 
     new_hdr->size = new_size;
     new_hdr->owner = kern_task_current();
-    g_kmem_allocated_bytes += new_size;
+    new_hdr->canary = 0xDEADBEEF;
+    __sync_fetch_and_add(&g_kmem_allocated_bytes, new_size);
 
     void *user_ptr = (void *)((uint8_t *)new_hdr + sizeof(kmalloc_header_t));
 
@@ -226,7 +235,7 @@ bool kern_kmem_get_stats(kern_kmem_stat_t *out)
     if (out == NULL) return false;
 
     memset(out, 0, sizeof(*out));
-    out->allocated_bytes = g_kmem_allocated_bytes;
+    out->allocated_bytes = __sync_fetch_and_add(&g_kmem_allocated_bytes, 0);
 
 #ifndef NATIVE_TEST
     out->total_bytes = heap_caps_get_total_size(MALLOC_CAP_8BIT);

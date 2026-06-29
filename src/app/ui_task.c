@@ -44,26 +44,64 @@ extern void app_input_process(void);
 /* 帧计时器 */
 static uint32_t s_frame_start_ms = 0;
 
+/* 实际帧耗时历史记录（用于自适应 VRR 微调） */
+#define VRR_TIME_HISTORY_SIZE 3
+static uint32_t s_actual_frame_times[VRR_TIME_HISTORY_SIZE] = {0};
+static int s_frame_time_idx = 0;
+
+/**
+ * @brief 获取最近几帧的平均实际耗时
+ * @return 平均耗时（毫秒），暂无数据时返回 0
+ */
+static uint32_t vrr_get_avg_frame_time(void)
+{
+    uint32_t sum = 0;
+    bool has_data = false;
+    for (int i = 0; i < VRR_TIME_HISTORY_SIZE; i++) {
+        sum += s_actual_frame_times[i];
+        if (s_actual_frame_times[i] > 0) has_data = true;
+    }
+    if (!has_data) return 0;
+    return sum / VRR_TIME_HISTORY_SIZE;
+}
+
 /**
  * @brief 计算当前帧的目标间隔
  * @return 目标帧间隔（毫秒）
  */
 static uint32_t vrr_target_interval(void)
 {
+    uint32_t base;
+
     /* 长按提示最高优先级（需要丝滑的进度环） */
     uint32_t dur_a = hal_input_get_press_duration(HAL_BTN_A);
     uint32_t dur_b = hal_input_get_press_duration(HAL_BTN_B);
     if ((dur_a > 0 && dur_a < 500) || (dur_b > 0 && dur_b < 500)) {
-        return VRR_HINT_MS;
+        base = VRR_HINT_MS;
+    } else if (xerintosh_is_dirty()) {
+        base = VRR_ANIM_ACTIVE_MS;
+    } else {
+        base = VRR_IDLE_MS;
     }
 
-    /* 动画活跃时高频刷新 */
-    if (xerintosh_is_dirty()) {
-        return VRR_ANIM_ACTIVE_MS;
+    /* 自适应 VRR 微调：根据最近几帧的实际耗时微调目标间隔
+     * - 实际耗时接近目标（相差 < 2ms）：保持当前帧率
+     * - 实际耗远比目标小（< 目标 - 5ms）：增加间隔降低帧率以省电 */
+    uint32_t avg_actual = vrr_get_avg_frame_time();
+    if (avg_actual > 0) {
+        int32_t slack = (int32_t)base - (int32_t)avg_actual;
+        if (slack > 5) {
+            uint32_t adjustment = (uint32_t)(slack / 2);
+            uint32_t new_base = base + adjustment;
+            if (new_base > VRR_IDLE_MS) {
+                base = VRR_IDLE_MS;
+            } else {
+                base = new_base;
+            }
+        }
     }
 
-    /* 静态画面低频刷新 */
-    return VRR_IDLE_MS;
+    return base;
 }
 
 /**
@@ -74,6 +112,10 @@ static void vrr_wait_for_next_frame(void)
 {
     uint32_t elapsed = hal_get_ticks() - s_frame_start_ms;
     uint32_t target = vrr_target_interval();
+
+    /* 记录实际帧耗时历史（最近 N 帧的滚动平均） */
+    s_actual_frame_times[s_frame_time_idx] = elapsed;
+    s_frame_time_idx = (s_frame_time_idx + 1) % VRR_TIME_HISTORY_SIZE;
 
     if (elapsed < target) {
         uint32_t remain = target - elapsed;

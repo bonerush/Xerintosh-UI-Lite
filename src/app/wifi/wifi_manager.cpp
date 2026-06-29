@@ -158,12 +158,22 @@ static volatile uint16_t g_popup_span   = 0;        /* 显示时长（毫秒） 
 static uint32_t          g_popup_start  = 0;        /* 弹窗激活时的 tick */
 static char              g_popup_content[48] = {0};  /* 弹窗文本 */
 
+/* ═══ InfoBar 状态（与弹窗并行，用于过程性通知，暂不使用） ═══ */
+
+static volatile bool     g_infobar_active = false;  /* InfoBar 是否激活 */
+static volatile uint16_t g_infobar_span   = 0;       /* 显示时长（毫秒） */
+static uint32_t          g_infobar_start  = 0;       /* InfoBar 激活时的 tick */
+static char              g_infobar_content[48] = {0}; /* InfoBar 文本 */
+
 /**
  * @brief 请求显示弹窗（可从任意任务调用）
  * @note  设置激活标志，UI 任务每帧 push 保持弹窗存活，span 到期自动退场。
+ *        弹窗比 InfoBar 重要，请求弹窗时自动关闭 InfoBar。
  */
 static void wifi_popup_request(const char *msg, uint16_t span_ms)
 {
+    g_infobar_active = false;
+
     xeros_spinlock_lock(&g_popup_spinlock);
     strncpy(g_popup_content, msg, sizeof(g_popup_content) - 1);
     g_popup_content[sizeof(g_popup_content) - 1] = '\0';
@@ -183,32 +193,79 @@ static void wifi_popup_dismiss(void)
 }
 
 /**
- * @brief UI 任务每帧调用：保持弹窗存活并管理超时退场
+ * @brief 请求显示 InfoBar（可从任意任务调用）
+ * @note  InfoBar 不像弹窗需要用户注意，使用短 span + 每帧 push 模式。
+ */
+static void wifi_infobar_request(const char *msg, uint16_t span_ms)
+{
+    xeros_spinlock_lock(&g_popup_spinlock);
+    strncpy(g_infobar_content, msg, sizeof(g_infobar_content) - 1);
+    g_infobar_content[sizeof(g_infobar_content) - 1] = '\0';
+    g_infobar_span = span_ms;
+    xeros_spinlock_unlock(&g_popup_spinlock);
+    g_infobar_start = hal_get_ticks();
+    g_infobar_active = true;
+}
+
+/**
+ * @brief 提前关闭 InfoBar
+ */
+static void wifi_infobar_dismiss(void)
+{
+    g_infobar_active = false;
+}
+
+/**
+ * @brief UI 任务每帧调用：保持弹窗和 InfoBar 存活并管理超时退场
  * @note  由 app_input_process() 在 UI 任务中调用。
- *        激活期间每帧 push_pop_up（与 power_key_popup 同模式），
- *        span 到期后调用 dismiss_pop_up 触发向上滑出动画。
+ *        弹窗激活期间每帧 push_pop_up，InfoBar 激活期间每帧 push_info_bar。
+ *        两者并行且互不干扰：弹窗居中显示，InfoBar 为顶部信息栏。
  */
 extern "C" void wifi_popup_refresh(void)
 {
-    /* 在锁内读取快照，防止与 wifi_popup_request() 竞争 */
-    xeros_spinlock_lock(&g_popup_spinlock);
-    bool active = g_popup_active;
-    uint32_t start = g_popup_start;
-    uint16_t span = g_popup_span;
-    xeros_spinlock_unlock(&g_popup_spinlock);
+    /* ── 弹窗处理 ── */
+    {
+        /* 在锁内读取快照，防止与 wifi_popup_request() 竞争 */
+        xeros_spinlock_lock(&g_popup_spinlock);
+        bool active = g_popup_active;
+        uint32_t start = g_popup_start;
+        uint16_t span = g_popup_span;
+        xeros_spinlock_unlock(&g_popup_spinlock);
 
-    if (!active) return;
-
-    /* 超时检查：span 到期后触发动画退场 */
-    if (hal_get_ticks() - start >= span) {
-        wifi_popup_dismiss();
-        return;
+        if (active) {
+            /* 超时检查：span 到期后触发动画退场 */
+            if (hal_get_ticks() - start >= span) {
+                wifi_popup_dismiss();
+            } else {
+                /* 每帧 push 保持弹窗存活（重置 time_start 防止弹窗自身超时） */
+                xeros_spinlock_lock(&g_popup_spinlock);
+                xerintosh_push_pop_up(g_popup_content, span);
+                xeros_spinlock_unlock(&g_popup_spinlock);
+            }
+        }
     }
 
-    /* 每帧 push 保持弹窗存活（重置 time_start 防止弹窗自身超时） */
-    xeros_spinlock_lock(&g_popup_spinlock);
-    xerintosh_push_pop_up(g_popup_content, span);
-    xeros_spinlock_unlock(&g_popup_spinlock);
+    /* ── InfoBar 处理（与弹窗并行，每帧 push_info_bar） ── */
+    {
+        xeros_spinlock_lock(&g_popup_spinlock);
+        bool active = g_infobar_active;
+        uint32_t start = g_infobar_start;
+        uint16_t span = g_infobar_span;
+        xeros_spinlock_unlock(&g_popup_spinlock);
+
+        if (!active) return;
+
+        /* 超时检查：span 到期后自动停止 */
+        if (hal_get_ticks() - start >= span) {
+            wifi_infobar_dismiss();
+            return;
+        }
+
+        /* 每帧 push 保持 InfoBar 存活 */
+        xeros_spinlock_lock(&g_popup_spinlock);
+        xerintosh_push_info_bar(g_infobar_content, span);
+        xeros_spinlock_unlock(&g_popup_spinlock);
+    }
 }
 
 /* ═══ 前向声明 ═══ */
@@ -407,6 +464,7 @@ void wifi_mgr_disable(void)
              (uint32_t)st.free_bytes,
              (uint32_t)st.largest_free_block);
 
+    wifi_infobar_dismiss();
     wifi_popup_dismiss();
 
     /* 注销事件处理器 */
@@ -517,7 +575,7 @@ void wifi_menu_on_network_button_pressed(void *ud)
         return;
     }
 
-    wifi_popup_request("请在串口输入密码", 8000);
+    wifi_infobar_request("请在串口输入密码", 2000);
     serial_request_wifi_password(content);
     g_is_auto_connect = false;
     g_state = WIFI_MGR_CONNECTING;
@@ -566,7 +624,7 @@ void wifi_menu_on_saved_connect_pressed(void *ud)
     g_connect_start_time = hal_get_ticks();
     g_is_auto_connect = false;
     g_state = WIFI_MGR_CONNECTING;
-    wifi_popup_request("连接中...", 15000);
+    wifi_infobar_request("连接中...", 2000);
 
     xerintosh_selector_exit_current_item();
 }
@@ -616,7 +674,7 @@ void wifi_menu_on_scan_pressed(void *ud)
     } else {
         g_state = WIFI_MGR_SCANNING;
         g_wifi_scan_start_time = hal_get_ticks();
-        wifi_popup_request("扫描中...", WIFI_SCAN_TIMEOUT_MS);
+        wifi_infobar_request("扫描中...", 2000);
     }
 }
 
@@ -725,7 +783,7 @@ void wifi_mgr_update(void)
                 g_state = WIFI_MGR_SCANNING;
                 g_wifi_scan_start_time = hal_get_ticks();
                 if (!g_initial_scan_shown) {
-                    wifi_popup_request("扫描中...", WIFI_SCAN_TIMEOUT_MS);
+                    wifi_infobar_request("扫描中...", 2000);
                 }
             }
         }
@@ -735,6 +793,7 @@ void wifi_mgr_update(void)
     case WIFI_MGR_SCANNING: {
         if (hal_get_ticks() - g_wifi_scan_start_time >= WIFI_SCAN_TIMEOUT_MS) {
             if (!g_initial_scan_shown) {
+                wifi_infobar_dismiss();
                 wifi_popup_dismiss();
             }
             wifi_menu_rebuild_list(0);
@@ -758,11 +817,12 @@ void wifi_mgr_update(void)
             }
 
             if (!g_initial_scan_shown) {
+                wifi_infobar_dismiss();
                 wifi_popup_dismiss();
             }
             wifi_menu_rebuild_list(g_scan_ap_count);
             if (g_scan_ap_count > 0 && !g_initial_scan_shown) {
-                wifi_popup_request("扫描完毕", 1500);
+                wifi_infobar_request("扫描完毕", 1500);
             }
             g_state = WIFI_MGR_SCAN_DONE;
             g_initial_scan_shown = true;
@@ -796,11 +856,12 @@ void wifi_mgr_update(void)
                 strncpy(g_connecting_pass, input,  STORAGE_PASS_MAX_LEN);
                 g_connecting = true;
                 g_connect_start_time = hal_get_ticks();
-                wifi_popup_request("连接中...", 15000);
+                wifi_infobar_request("连接中...", 2000);
             }
         } else if (ss == SERIAL_STATE_CANCELLED) {
             g_connecting = false;
             g_state = WIFI_MGR_SCAN_DONE;
+            wifi_infobar_dismiss();
             wifi_popup_dismiss();
             break;
         }
@@ -889,7 +950,7 @@ void wifi_mgr_update(void)
                 snprintf(retry_buf, sizeof(retry_buf),
                          "重连中 (%d/%d)...",
                          g_reconnect_attempts, WIFI_MAX_RECONNECT_ATTEMPTS);
-                wifi_popup_request(retry_buf, 10000);
+                wifi_infobar_request(retry_buf, 2000);
 
                 /* 重置事件标志后重新连接 */
                 g_evt_sta_connected = false;
