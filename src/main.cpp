@@ -35,6 +35,7 @@ void wifi_mgr_task_main(void *arg);
 #include "app/serial_input/serial_input.h"
 #include "app/serial_monitor/serial_monitor.h"
 #include "app/wifi/wifi_manager.h"
+#include "app/bluetooth/bt_uart_service.h"
 #include "app/boot/boot_screen.h"
 
 /* Xeros 内核 */
@@ -191,6 +192,7 @@ static void main_loop_task(void *arg)
     for (;;) {
         dev_ttyS0_poll();
         serial_monitor_update();
+        bt_uart_poll();
         wifi_mgr_process_requests();
 
         /* Periodic stack high-water profiling (once per second) */

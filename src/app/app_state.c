@@ -10,3 +10,6 @@
 
 /* WiFi 默认开启 */
 bool g_wifi_on = true;
+
+/* 蓝牙默认关闭（与 WiFi 互斥，需手动开启） */
+bool g_bt_on = false;

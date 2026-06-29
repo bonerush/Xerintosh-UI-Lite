@@ -20,6 +20,7 @@ extern "C" {
 /* ═══ 无线连接开关状态 ═══ */
 
 extern bool g_wifi_on;  /**< WiFi 开关状态，默认开启 */
+extern bool g_bt_on;    /**< 蓝牙开关状态，默认关闭 */
 
 /* ═══ 设置变更回调（由 main.cpp / native_main.cpp 实现）═══ */
 

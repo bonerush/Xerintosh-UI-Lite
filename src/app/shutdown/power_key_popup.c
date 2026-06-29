@@ -79,7 +79,7 @@ void power_key_popup_update(void)
             uint32_t tenth = (remaining_ms % 1000) / 100;
             snprintf(msg, sizeof(msg), "长按AB键关机,还需%lu.%lus",
                      (unsigned long)sec, (unsigned long)tenth);
-            xerintosh_push_pop_up(msg, SHUTDOWN_HOLD_MS);
+            xerintosh_push_pop_up(msg, 60000);
         }
     }
     else

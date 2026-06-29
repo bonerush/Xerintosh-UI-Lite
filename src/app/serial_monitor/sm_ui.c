@@ -17,6 +17,10 @@
 #include <stdio.h>
 #include <string.h>
 
+#ifndef NATIVE_TEST
+#include "app/bluetooth/bt_uart_service.h"
+#endif
+
 /**
  * @brief  绘制信息栏（顶部控制区）
  * @note   包含 START/STOP 按钮、波特率显示、SER 模式指示。
@@ -31,7 +35,22 @@ static void draw_info_bar(void)
     int16_t bar_y = HAL_MARGIN_SM + entry;
 
     const char *start_label = sm_running ? "STOP" : "RUN";
-    const char *mode_label = "SER";
+
+    /* 模式标签：SER 或 BT（含连接状态） */
+    char mode_label[16];
+    if (sm_source == SM_SOURCE_BT) {
+#ifndef NATIVE_TEST
+        if (bt_uart_is_connected()) {
+            snprintf(mode_label, sizeof(mode_label), "BT:OK");
+        } else {
+            snprintf(mode_label, sizeof(mode_label), "BT:--");
+        }
+#else
+        snprintf(mode_label, sizeof(mode_label), "BT");
+#endif
+    } else {
+        snprintf(mode_label, sizeof(mode_label), "SER");
+    }
     int16_t start_w = hal_get_string_width(start_label) + HAL_MARGIN_MD;
     int16_t mode_w  = hal_get_string_width(mode_label) + HAL_MARGIN_MD;
 

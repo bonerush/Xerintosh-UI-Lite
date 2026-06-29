@@ -2,7 +2,8 @@
  * @file   sm_app.cpp
  * @brief  串口监视器 App 生命周期与后台读取
  * @details 实现串口监视器的初始化、主循环、退出及后台数据读取。
- *          仅支持有线串口（SER）数据源。
+ *          支持有线串口（SER）和蓝牙串口（BT）两种数据源。
+ *          BT 模式通过 bt_uart_service 回调接收数据。
  *
  * @copyright Copyright (c) 2026
  */
@@ -17,6 +18,13 @@
 #include "ui/ui_core.h"
 #include "ui/ui_item.h"
 
+#ifndef NATIVE_TEST
+#include "app/bluetooth/bt_uart_service.h"
+#include "app/wifi/wifi_manager.h"
+#include "app/app_state.h"
+#include "esp_log.h"
+#endif
+
 /* 串口监视器调试开关：0=禁用每帧调试日志，1=启用 */
 #define SM_DBG_ENABLED 0
 
@@ -24,9 +32,16 @@
 
 bool        sm_running = false;
 uint8_t     sm_selected = 0;
+sm_source_t sm_source  = SM_SOURCE_SER;
 sm_buffer_t sm_buffer;
 
 static uint32_t    sm_blink_tick = 0;
+
+/* 进入串口监视器时自动开启 BT 的状态跟踪 */
+#ifndef NATIVE_TEST
+static bool s_auto_bt_active = false;
+static bool s_auto_wifi_was_on = false;
+#endif
 
 /* 动画状态 */
 float       sm_entry_offset = 0.0f;
@@ -47,6 +62,42 @@ static uint8_t     sm_rx_len = 0;
 #define SM_BLINK_PERIOD 500  /* 反色闪烁周期（毫秒） */
 
 /**
+ * @brief BT SPP RX 数据回调
+ * @note  由 bt_uart_poll() 在 main_loop_task 上下文中调用。
+ *        将接收到的字节追加到 sm_rx_buf，遇到换行时提交为一行。
+ *        仅在 BT 模式下处理数据（SER 模式由 serial_monitor_update 处理）。
+ */
+#ifndef NATIVE_TEST
+static void sm_on_bt_rx(const uint8_t *data, uint16_t len)
+{
+    /* 诊断：确认回调被调用和 len */
+#ifndef NATIVE_TEST
+    if (sm_source == SM_SOURCE_BT && sm_running) {
+        ESP_LOGI("sm_bt", "RX: len=%d", len);
+    }
+#endif
+    if (sm_source != SM_SOURCE_BT) return;
+    if (!sm_running) return;
+
+    for (uint16_t i = 0; i < len; i++) {
+        char c = (char)data[i];
+
+        if (c == '\n' || c == '\r') {
+            if (sm_rx_len > 0) {
+                sm_rx_buf[sm_rx_len] = '\0';
+                sm_buffer_add_line(&sm_buffer, sm_rx_buf, true);
+                sm_rx_len = 0;
+            }
+        } else if (sm_rx_len < SM_TERM_LINE_LEN - 1) {
+            sm_rx_buf[sm_rx_len++] = c;
+        }
+    }
+
+    /* 与普通串口（SER 模式）一致：等待 \n 才提交 */
+}
+#endif
+
+/**
  * @brief 初始化串口监视器 App
  * @note  重置所有状态、清空缓冲区、初始化动画变量
  */
@@ -55,6 +106,7 @@ void serial_monitor_init(void *ud)
     (void)ud;
     sm_running = false;
     sm_selected = 0;
+    sm_source  = SM_SOURCE_SER;
     sm_blink_tick = hal_get_ticks();
     sm_buffer_init(&sm_buffer);
 
@@ -68,6 +120,24 @@ void serial_monitor_init(void *ud)
 
 #ifndef NATIVE_TEST
     sm_rx_len = 0;
+    /* 自动开启 BT、关闭 WiFi（如果未开启 BT） */
+    if (!g_bt_on) {
+        s_auto_wifi_was_on = wifi_mgr_is_enabled();
+        if (s_auto_wifi_was_on) {
+            wifi_mgr_disable();
+            g_wifi_on = false;
+        }
+        if (bt_uart_service_init()) {
+            g_bt_on = true;
+            s_auto_bt_active = true;
+        } else if (s_auto_wifi_was_on) {
+            /* BT 初始化失败，恢复 WiFi */
+            wifi_mgr_enable();
+            g_wifi_on = true;
+        }
+    }
+    /* 注册 BT RX 回调（必须在 bt_uart_service_init 之后，否则会被 init 中的 g_rx_cb=NULL 覆盖） */
+    bt_uart_set_rx_callback(sm_on_bt_rx);
     ui_service_enter_landscape();
     ui_service_user_item_init();
     hal_input_set_double_click_enabled(true);
@@ -91,12 +161,14 @@ void serial_monitor_loop(void *ud)
         sm_selected = !sm_selected;
     }
 
-    /* 第三步：长按确认按钮切换 RUN/STOP 状态 */
+    /* 第三步：长按确认按钮切换 RUN/STOP 或数据源模式 */
     if (event_a == HAL_EVENT_LONG_PRESS) {
         if (sm_selected == 0) {
             sm_running = !sm_running;
+        } else {
+            /* sm_selected == 1: 切换 SER/BT 数据源 */
+            sm_source = (sm_source == SM_SOURCE_SER) ? SM_SOURCE_BT : SM_SOURCE_SER;
         }
-        /* sm_selected == 1 为 SER 模式指示，无切换功能 */
     }
 
     /* 第四步：长按返回按钮退出 App */
@@ -146,6 +218,17 @@ void serial_monitor_exit(void *ud)
     sm_buffer_clear(&sm_buffer);
 
 #ifndef NATIVE_TEST
+    /* 自动关闭 BT、恢复 WiFi */
+    if (s_auto_bt_active) {
+        bt_uart_service_deinit();
+        g_bt_on = false;
+        s_auto_bt_active = false;
+        if (s_auto_wifi_was_on) {
+            wifi_mgr_enable();
+            g_wifi_on = true;
+            s_auto_wifi_was_on = false;
+        }
+    }
     ui_service_exit_landscape();
     hal_input_set_double_click_enabled(false);
     ui_service_user_item_exit();
@@ -155,12 +238,16 @@ void serial_monitor_exit(void *ud)
 /**
  * @brief 后台串口数据读取
  * @note  供 main.cpp 的 loop() 每帧调用。
- *        仅在运行中时读取硬件 UART 数据并缓存到环形缓冲区。
+ *        SER 模式：仅在运行中时读取硬件 UART 数据并缓存到环形缓冲区。
+ *        BT 模式：数据由 bt_uart_service 回调直接写入，此处不操作。
  *        若 serial_input 处于 WAITING 状态，暂停读取避免竞争。
  */
 void serial_monitor_update(void)
 {
     if (!sm_running) return;
+
+    /* BT 模式：数据由 bt_uart_poll → sm_on_bt_rx 处理 */
+    if (sm_source == SM_SOURCE_BT) return;
 
     /*
      * 当 serial_input 正在等待密码/配对码时，不消费串口字符。
@@ -191,10 +278,11 @@ void serial_monitor_update(void)
 }
 
 /**
- * @brief 查询串口监视器是否正在活跃
- * @note  仅在运行中时阻止 dev_ttyS0 消费 Serial 数据。
+ * @brief 查询串口监视器是否正在活跃（仅 SER 模式）
+ * @note  仅在 SER 模式运行中时阻止 dev_ttyS0 消费 UART 数据。
+ *        BT 模式下 UART 数据仍由 dev_ttyS0/Shell 正常处理。
  */
 extern "C" bool serial_monitor_is_active(void)
 {
-    return sm_running;
+    return sm_running && (sm_source == SM_SOURCE_SER);
 }
