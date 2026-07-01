@@ -33,6 +33,7 @@ void wifi_mgr_task_main(void *arg) { (void)arg; }
 #else
 
 #include <string.h>
+#include <inttypes.h>
 #include <esp_log.h>
 #include <esp_wifi.h>
 #include <esp_event.h>
@@ -102,20 +103,41 @@ static volatile uint8_t g_evt_disconnect_reason = 0;   /* 断开原因码 */
 static uint8_t g_reconnect_attempts = 0;
 #define WIFI_MAX_RECONNECT_ATTEMPTS 3
 
+/* ═══ WiFi 调试日志辅助 ═══
+ * 在关键查询路径上打印详细信息，帮助定位网络连接问题。
+ * 使用 ESP_LOGI 确保默认日志级别下可见。 */
+#define WIFI_LOGD(...) ESP_LOGI(TAG, __VA_ARGS__)
+
+/**
+ * @brief 格式化 IP 地址（避免依赖 ip4addr_ntoa 等 lwip 函数）
+ */
+static void ip_to_str(uint32_t addr, char *buf, size_t buf_size)
+{
+    if (!buf || buf_size < 1) return;
+    uint8_t *b = (uint8_t *)&addr;
+    snprintf(buf, buf_size, "%u.%u.%u.%u", b[0], b[1], b[2], b[3]);
+}
+
 /* ═══ 统一 WiFi + IP 事件处理器 ═══ */
 
 static void wifi_event_handler(void* arg, esp_event_base_t base,
                                int32_t event_id, void *data)
 {
-    (void)arg; (void)base;
+    (void)arg;
     switch (event_id) {
     case WIFI_EVENT_SCAN_DONE:
+        WIFI_LOGD("[EVT] WIFI_EVENT_SCAN_DONE");
         g_scan_done = true;
         break;
-    case WIFI_EVENT_STA_CONNECTED:
+    case WIFI_EVENT_STA_CONNECTED: {
+        wifi_event_sta_connected_t *evt =
+            (wifi_event_sta_connected_t *)data;
+        WIFI_LOGD("[EVT] WIFI_EVENT_STA_CONNECTED: ssid='%.32s' ch=%d auth=%d",
+                   evt->ssid, evt->channel, evt->authmode);
         g_evt_sta_connected = true;
         g_evt_sta_disconnected = false;
         break;
+    }
     case WIFI_EVENT_STA_DISCONNECTED: {
         wifi_event_sta_disconnected_t *evt =
             (wifi_event_sta_disconnected_t *)data;
@@ -123,9 +145,20 @@ static void wifi_event_handler(void* arg, esp_event_base_t base,
         g_evt_sta_disconnected = true;
         g_evt_sta_connected = false;
         g_evt_got_ip = false;
+        /* reason codes: https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/wifi.html#wi-fi-reason-code */
+        WIFI_LOGD("[EVT] WIFI_EVENT_STA_DISCONNECTED: ssid='%.32s' reason=%d",
+                   evt->ssid, evt->reason);
         break;
     }
+    case WIFI_EVENT_STA_START:
+        WIFI_LOGD("[EVT] WIFI_EVENT_STA_START");
+        break;
+    case WIFI_EVENT_STA_STOP:
+        WIFI_LOGD("[EVT] WIFI_EVENT_STA_STOP");
+        break;
     default:
+        WIFI_LOGD("[EVT] unhandled wifi event: %" PRId32 " (base=%s)",
+                   event_id, base ? base : "?");
         break;
     }
 }
@@ -133,9 +166,21 @@ static void wifi_event_handler(void* arg, esp_event_base_t base,
 static void ip_event_handler(void* arg, esp_event_base_t base,
                              int32_t event_id, void *data)
 {
-    (void)arg; (void)base;
+    (void)arg;
     if (event_id == IP_EVENT_STA_GOT_IP) {
+        ip_event_got_ip_t *evt = (ip_event_got_ip_t *)data;
+        if (evt && evt->ip_info.ip.addr != 0) {
+            char ip_buf[16];
+            ip_to_str(evt->ip_info.ip.addr, ip_buf, sizeof(ip_buf));
+            char gw_buf[16];
+            ip_to_str(evt->ip_info.gw.addr, gw_buf, sizeof(gw_buf));
+            WIFI_LOGD("[EVT] ✅ IP_EVENT_STA_GOT_IP: IP=%s GW=%s", ip_buf, gw_buf);
+        } else {
+            WIFI_LOGD("[EVT] IP_EVENT_STA_GOT_IP (no IP data)");
+        }
         g_evt_got_ip = true;
+    } else if (event_id == IP_EVENT_STA_LOST_IP) {
+        WIFI_LOGD("[EVT] ⚠️ IP_EVENT_STA_LOST_IP");
     }
 }
 
@@ -287,33 +332,89 @@ bool wifi_mgr_is_driver_on(void) { return g_wifi_enabled; }
 
 bool wifi_mgr_is_connected(void)
 {
-    /* CONNECTED 状态代表 IP_EVENT_STA_GOT_IP 已触发，
-       因此直接信任 g_state 即可（事件驱动保证） */
-    if (g_state != WIFI_MGR_CONNECTED) return false;
+    /* ── 获取调用方状态 ── */
+    wifi_mgr_state_t cur_state = g_state;
+
+    if (cur_state != WIFI_MGR_CONNECTED) {
+        static wifi_mgr_state_t last_logged = WIFI_MGR_IDLE;
+        if (cur_state != last_logged) {
+            const char *state_names[] = {
+                "IDLE", "WARMUP", "SCANNING", "SCAN_DONE",
+                "CONNECTING", "CONNECTED", "CONNECT_FAILED"
+            };
+            const char *sname = (cur_state <= WIFI_MGR_CONNECT_FAILED)
+                                ? state_names[cur_state] : "UNKNOWN";
+            WIFI_LOGD("[is_connected] 状态=%d(%s) → false", cur_state, sname);
+            last_logged = cur_state;
+        }
+        return false;
+    }
 
     /* 二次确认：netif 确实持有有效 IP */
     esp_netif_t *netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
-    if (!netif) return false;
+    if (!netif) {
+        WIFI_LOGD("[is_connected] state=CONNECTED 但 netif 为 NULL → false");
+        return false;
+    }
 
     esp_netif_ip_info_t ip_info;
-    if (esp_netif_get_ip_info(netif, &ip_info) != ESP_OK) return false;
+    if (esp_netif_get_ip_info(netif, &ip_info) != ESP_OK) {
+        WIFI_LOGD("[is_connected] state=CONNECTED 但 get_ip_info 失败 → false");
+        return false;
+    }
 
-    return ip_info.ip.addr != 0;
+    if (ip_info.ip.addr == 0) {
+        WIFI_LOGD("[is_connected] state=CONNECTED 但 IP=0.0.0.0 → false");
+        return false;
+    }
+
+    /* ── 连接健全，打印 IP/DNS 信息 ── */
+    char ip_str[16], gw_str[16], dns_str[16];
+    ip_to_str(ip_info.ip.addr, ip_str, sizeof(ip_str));
+    ip_to_str(ip_info.gw.addr, gw_str, sizeof(gw_str));
+
+    esp_netif_dns_info_t dns_info;
+    if (esp_netif_get_dns_info(netif, ESP_NETIF_DNS_MAIN, &dns_info) == ESP_OK) {
+        ip_to_str(dns_info.ip.u_addr.ip4.addr, dns_str, sizeof(dns_str));
+    } else {
+        snprintf(dns_str, sizeof(dns_str), "N/A");
+    }
+
+    WIFI_LOGD("[is_connected] ✅ true | IP=%s GW=%s DNS=%s",
+               ip_str, gw_str, dns_str);
+    return true;
 }
 
 void wifi_mgr_ensure_dns(void)
 {
     esp_netif_t *netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
-    if (!netif) return;
+    if (!netif) {
+        WIFI_LOGD("[ensure_dns] netif=NULL → 无法操作 DNS");
+        return;
+    }
 
     esp_netif_dns_info_t dns_info;
-    if (esp_netif_get_dns_info(netif, ESP_NETIF_DNS_MAIN, &dns_info) != ESP_OK) return;
+    if (esp_netif_get_dns_info(netif, ESP_NETIF_DNS_MAIN, &dns_info) != ESP_OK) {
+        WIFI_LOGD("[ensure_dns] 获取 DNS 失败");
+        return;
+    }
 
-    if (dns_info.ip.u_addr.ip4.addr != 0) return;
+    if (dns_info.ip.u_addr.ip4.addr != 0) {
+        char cur_dns[16];
+        ip_to_str(dns_info.ip.u_addr.ip4.addr, cur_dns, sizeof(cur_dns));
+        WIFI_LOGD("[ensure_dns] DNS 已配置: %s (无需修改)", cur_dns);
+        return;
+    }
 
+    WIFI_LOGD("[ensure_dns] ⚠️ DNS 为空! 设置为 8.8.8.8");
     dns_info.ip.type = ESP_IPADDR_TYPE_V4;
     dns_info.ip.u_addr.ip4.addr = ipaddr_addr("8.8.8.8");
-    esp_netif_set_dns_info(netif, ESP_NETIF_DNS_MAIN, &dns_info);
+    esp_err_t rc = esp_netif_set_dns_info(netif, ESP_NETIF_DNS_MAIN, &dns_info);
+    if (rc != ESP_OK) {
+        WIFI_LOGD("[ensure_dns] 设置 DNS 为 8.8.8.8 失败: %d", rc);
+    } else {
+        WIFI_LOGD("[ensure_dns] ✅ DNS 已设置为 8.8.8.8");
+    }
 }
 
 uint32_t wifi_mgr_needed_heap(void) { return WIFI_MIN_FREE_HEAP; }
@@ -714,11 +815,16 @@ static bool try_auto_connect(void)
         }
     }
 
-    if (best_saved_idx < 0) return false;
+    if (best_saved_idx < 0) {
+        WIFI_LOGD("[auto_connect] 扫描结果中没有匹配的已保存网络");
+        return false;
+    }
 
     char ssid[STORAGE_SSID_MAX_LEN];
     char pass[STORAGE_PASS_MAX_LEN];
     if (!storage_wifi_get(best_saved_idx, ssid, pass)) return false;
+
+    WIFI_LOGD("[auto_connect] 自动连接 SSID='%s' (RSSI=%d)", ssid, best_rssi);
 
     esp_wifi_disconnect();
     kern_sleep_ms(50);
@@ -795,6 +901,7 @@ void wifi_mgr_update(void)
             if (!g_initial_scan_shown) {
                 wifi_infobar_dismiss();
                 wifi_popup_dismiss();
+                WIFI_LOGD("[STATE] SCANNING→SCAN_DONE (30s 超时)");
             }
             wifi_menu_rebuild_list(0);
             g_state = WIFI_MGR_SCAN_DONE;
@@ -811,9 +918,11 @@ void wifi_mgr_update(void)
             if (g_scan_ap_records) {
                 esp_wifi_scan_get_ap_records(&ap_count, g_scan_ap_records);
                 g_scan_ap_count = ap_count;
+                WIFI_LOGD("[STATE] SCANNING→SCAN_DONE (发现 %d 个 AP)", ap_count);
             } else {
                 g_scan_ap_count = 0;
                 wifi_popup_request("内存不足，无法扫描", 2000);
+                WIFI_LOGD("[STATE] SCANNING→SCAN_DONE (malloc AP 记录失败)");
             }
 
             if (!g_initial_scan_shown) {
@@ -837,6 +946,7 @@ void wifi_mgr_update(void)
             const char *input  = serial_get_input();
             const char *target = serial_get_target_name();
             if (input && target) {
+                WIFI_LOGD("[STATE] 收到串口密码, 连接 SSID='%s'", target);
                 esp_wifi_disconnect();
                 kern_sleep_ms(50);
 
@@ -859,6 +969,7 @@ void wifi_mgr_update(void)
                 wifi_infobar_request("连接中...", 2000);
             }
         } else if (ss == SERIAL_STATE_CANCELLED) {
+            WIFI_LOGD("[STATE] CONNECTING→SCAN_DONE (密码输入取消)");
             g_connecting = false;
             g_state = WIFI_MGR_SCAN_DONE;
             wifi_infobar_dismiss();
@@ -874,21 +985,28 @@ void wifi_mgr_update(void)
             esp_wifi_disconnect();
             kern_sleep_ms(50);
             g_connecting = false;
+            WIFI_LOGD("[STATE] CONNECTING→CONNECT_FAILED (15s 超时, SSID='%s')",
+                       g_connecting_ssid);
             if (!g_is_auto_connect) {
                 wifi_popup_request("连接超时", 2000);
             }
+            /* 连接失败也释放扫描记录回收内存 */
+            if (g_scan_ap_records) { free(g_scan_ap_records); g_scan_ap_records = NULL; g_scan_ap_count = 0; }
             g_state = WIFI_MGR_CONNECT_FAILED;
             break;
         }
 
         /* 事件：已断开（密码错误或 AP 拒绝） */
         if (g_evt_sta_disconnected) {
+            uint8_t reason = g_evt_disconnect_reason;
             g_evt_sta_disconnected = false;
             g_connecting = false;
+            WIFI_LOGD("[STATE] CONNECTING→CONNECT_FAILED (断开 reason=%d, SSID='%s')",
+                       reason, g_connecting_ssid);
             if (!g_is_auto_connect) {
                 char reason_buf[48];
                 snprintf(reason_buf, sizeof(reason_buf),
-                         "连接失败 (%d)", g_evt_disconnect_reason);
+                         "连接失败 (%d)", reason);
                 wifi_popup_request(reason_buf, 3000);
             }
             g_state = WIFI_MGR_CONNECT_FAILED;
@@ -901,9 +1019,20 @@ void wifi_mgr_update(void)
             g_evt_got_ip = false;
             g_connecting = false;
             storage_wifi_add(g_connecting_ssid, g_connecting_pass);
+            WIFI_LOGD("[STATE] ✅ CONNECTING→CONNECTED (SSID='%s')",
+                       g_connecting_ssid);
             if (!g_is_auto_connect) {
                 wifi_popup_request("已连接", 1500);
             }
+
+            /* 连接成功，释放扫描结果以回收内存 */
+            if (g_scan_ap_records) {
+                free(g_scan_ap_records);
+                g_scan_ap_records = NULL;
+                g_scan_ap_count = 0;
+                WIFI_LOGD("[STATE] 已释放扫描 AP 记录 (回收 ~2.5KB)");
+            }
+
             g_state = WIFI_MGR_CONNECTED;
             wifi_menu_rebuild_list(0);
         }
@@ -913,7 +1042,9 @@ void wifi_mgr_update(void)
     case WIFI_MGR_SCAN_DONE: {
         if (!g_auto_connect_done) {
             g_auto_connect_done = true;
-            try_auto_connect();
+            WIFI_LOGD("[STATE] SCAN_DONE → 尝试自动连接...");
+            bool connected = try_auto_connect();
+            WIFI_LOGD("[STATE]   自动连接 %s", connected ? "已发起" : "无可用已保存网络");
         }
         break;
     }
@@ -945,6 +1076,8 @@ void wifi_mgr_update(void)
 
             if (should_retry && g_reconnect_attempts < WIFI_MAX_RECONNECT_ATTEMPTS) {
                 g_reconnect_attempts++;
+                WIFI_LOGD("[STATE] CONNECTED→CONNECTING (重连 %d/3, reason=%d)",
+                           g_reconnect_attempts, reason);
 
                 char retry_buf[64];
                 snprintf(retry_buf, sizeof(retry_buf),
@@ -968,6 +1101,9 @@ void wifi_mgr_update(void)
                 /* 放弃重连 */
                 if (g_reconnect_attempts > 0) {
                     wifi_popup_request("重连失败", 2000);
+                    WIFI_LOGD("[STATE] CONNECTED→CONNECT_FAILED (放弃重连, reason=%d)", reason);
+                } else {
+                    WIFI_LOGD("[STATE] CONNECTED→CONNECT_FAILED (reason=%d, 不可重连原因)", reason);
                 }
                 g_reconnect_attempts = 0;
                 g_connecting = false;
